@@ -1,0 +1,4 @@
+# 只上傳 README.md，其餘全部忽略
+*
+!README.md
+!.gitignore
