@@ -1,4 +1,87 @@
-# 只上傳 README.md，其餘全部忽略
-*
-!README.md
-!.gitignore
+# macOS 版原始碼（不上傳）
+app.py
+transcriber.py
+recorder.py
+memory.py
+config.py
+dashboard.py
+dashboard_window.py
+overlay.py
+launcher.py
+run.sh
+build.sh
+config.json
+requirements.txt
+test_*.py
+voiceinput.spec
+INSTALL.md
+INSTALL_FOR_COLLEAGUE.md
+CLAUDE.md
+
+# 舊版檔案
+VoiceInput-Release/
+VoiceInput.zip
+VoiceInput_v2.zip
+android/ApiClient.kt
+android/Dockerfile
+android/INSTALL.md
+android/main.py
+android/SettingsActivity.kt
+android/VoiceInputService.kt
+
+# Build artifacts
+build/
+dist/
+__pycache__/
+*.py[cod]
+venv/
+
+# macOS
+.DS_Store
+*.dmg
+
+# IDE
+.vscode/
+.idea/
+
+# AI agent / spec configs
+.agent/
+.gemini/
+.claude/
+.kiro/
+docs/
+
+# Local data
+dictionary.json
+*.log
+*.tmp
+static/
+
+# 空目錄（誤建）
+-g/
+-s/
+-z/
+--out/
+cp/
+sips/
+format/
+png/
+16/
+32/
+64/
+128/
+256/
+512/
+1024/
+
+# 資源目錄（macOS 版 icon）
+resources/
+
+# Android Studio 產物（在 android/SGHVoice/.gitignore 管理）
+android/SGHVoice/.gradle/
+android/SGHVoice/build/
+android/SGHVoice/app/build/
+android/SGHVoice/local.properties
+android/SGHVoice/*.iml
+android/SGHVoice/.idea/
+android/SGHVoice/captures/
