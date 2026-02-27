@@ -1,9 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- 主題設定 — SGH Voice -->
-<resources>
-    <style name="Theme.SGHVoice" parent="Theme.Material3.DayNight.NoActionBar">
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- 基礎主題使用 Material3 -->
+    <style name="Theme.SGHVoice" parent="Theme.Material3.Light.NoActionBar">
+        <!-- 品牌色彩定義 -->
         <item name="colorPrimary">@color/primary</item>
-        <item name="colorPrimaryDark">@color/primary_dark</item>
         <item name="colorSecondary">@color/secondary</item>
+        <item name="android:statusBarColor">@color/primary</item>
     </style>
 </resources>

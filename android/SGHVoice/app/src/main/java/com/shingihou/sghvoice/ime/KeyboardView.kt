@@ -1,13 +1,14 @@
 package com.shingihou.sghvoice.ime
 
 import android.content.Context
+import android.content.res.ColorStateList
 import android.util.AttributeSet
 import android.view.LayoutInflater
 import android.view.MotionEvent
-import android.view.View
 import android.widget.ImageButton
 import android.widget.LinearLayout
 import android.widget.TextView
+import androidx.core.content.ContextCompat
 import com.shingihou.sghvoice.R
 
 /**
@@ -68,28 +69,37 @@ class KeyboardView @JvmOverloads constructor(
         when (state) {
             VoiceInputIME.ImeState.IDLE -> {
                 statusText.text = context.getString(R.string.status_idle)
+                statusText.setTextColor(ContextCompat.getColor(context, R.color.status_text))
                 micButton.isEnabled = true
                 micButton.alpha = 1.0f
+                micButton.backgroundTintList = ColorStateList.valueOf(ContextCompat.getColor(context, R.color.mic_bg))
             }
             VoiceInputIME.ImeState.RECORDING -> {
                 statusText.text = context.getString(R.string.status_recording)
+                statusText.setTextColor(ContextCompat.getColor(context, R.color.status_recording))
                 micButton.isEnabled = true
                 micButton.alpha = 1.0f
+                micButton.backgroundTintList = ColorStateList.valueOf(ContextCompat.getColor(context, R.color.mic_bg_recording))
             }
             VoiceInputIME.ImeState.PROCESSING -> {
                 statusText.text = context.getString(R.string.status_processing)
+                statusText.setTextColor(ContextCompat.getColor(context, R.color.status_text))
                 micButton.isEnabled = false
                 micButton.alpha = 0.5f
+                micButton.backgroundTintList = ColorStateList.valueOf(ContextCompat.getColor(context, R.color.mic_bg))
             }
             VoiceInputIME.ImeState.DONE -> {
                 statusText.text = context.getString(R.string.status_done)
+                statusText.setTextColor(ContextCompat.getColor(context, R.color.status_success))
                 micButton.isEnabled = true
                 micButton.alpha = 1.0f
+                micButton.backgroundTintList = ColorStateList.valueOf(ContextCompat.getColor(context, R.color.mic_bg))
             }
             VoiceInputIME.ImeState.ERROR -> {
+                statusText.setTextColor(ContextCompat.getColor(context, R.color.status_recording))
                 micButton.isEnabled = true
                 micButton.alpha = 1.0f
-                // 錯誤訊息由外部設定 statusText
+                micButton.backgroundTintList = ColorStateList.valueOf(ContextCompat.getColor(context, R.color.mic_bg))
             }
         }
     }
