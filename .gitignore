@@ -1,22 +1,5 @@
-# macOS 版原始碼（不上傳）
-app.py
-transcriber.py
-recorder.py
-memory.py
-config.py
-dashboard.py
-dashboard_window.py
-overlay.py
-launcher.py
-run.sh
-build.sh
-config.json
-requirements.txt
-test_*.py
-voiceinput.spec
-INSTALL.md
-INSTALL_FOR_COLLEAGUE.md
-CLAUDE.md
+# macOS 版原始碼（保留追蹤）
+# app.py, transcriber.py 等核心檔案已加入 git 追蹤
 
 # 舊版檔案
 VoiceInput-Release/
