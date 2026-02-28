@@ -29,29 +29,32 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
     private var currentState = ImeState.IDLE
     private var keyboardView: KeyboardView? = null
 
-    // 延遲初始化的核心元件
-    private lateinit var apiConfig: ApiConfig
-    private lateinit var audioRecorder: AudioRecorder
-    private lateinit var pipeline: TranscriptionPipeline
+    // 核心元件
+    private var apiConfig: ApiConfig? = null
+    private var audioRecorder: AudioRecorder? = null
+    private var pipeline: TranscriptionPipeline? = null
+    private var initError: String? = null
 
     private val serviceScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
     override fun onCreate() {
         super.onCreate()
-        // 核心配置初始化
-        apiConfig = ApiConfig(this)
-        audioRecorder = AudioRecorder()
-        
-        // 將耗時的 Pipeline 初始化移到協程中
-        serviceScope.launch(Dispatchers.Default) {
-            val whisperClient = WhisperClient(apiConfig)
-            val claudeClient = ClaudeClient(apiConfig)
-            val dictionaryManager = DictionaryManager(this@VoiceInputIME)
+        try {
+            // 同步初始化所有元件，避免競態條件
+            val config = ApiConfig(this)
+            apiConfig = config
+            audioRecorder = AudioRecorder()
+
+            val whisperClient = WhisperClient(config)
+            val claudeClient = ClaudeClient(config)
+            val dictionaryManager = DictionaryManager(this)
             val openCCConverter = OpenCCConverter()
 
             pipeline = TranscriptionPipeline(
                 whisperClient, claudeClient, dictionaryManager, openCCConverter
             )
+        } catch (e: Exception) {
+            initError = e.message ?: "初始化失敗"
         }
     }
 
@@ -72,7 +75,7 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
 
     override fun onDestroy() {
         serviceScope.cancel()
-        audioRecorder.release()
+        audioRecorder?.release()
         super.onDestroy()
     }
 
@@ -80,11 +83,20 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
 
     override fun onMicPressed() {
         if (currentState == ImeState.PROCESSING) return
+
+        // 初始化失敗時顯示錯誤
+        if (initError != null) {
+            setState(ImeState.ERROR)
+            keyboardView?.setStatusText("初始化失敗：$initError")
+            return
+        }
+
+        val recorder = audioRecorder ?: return
         vibrateShort()
         setState(ImeState.RECORDING)
         serviceScope.launch {
             try {
-                audioRecorder.startRecording()
+                recorder.startRecording()
             } catch (e: Exception) {
                 setState(ImeState.ERROR)
                 keyboardView?.setStatusText("錄音失敗：${e.message}")
@@ -94,8 +106,9 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
 
     override fun onMicReleased() {
         if (currentState != ImeState.RECORDING) return
+        val recorder = audioRecorder ?: return
         vibrateShort()
-        val wavData = audioRecorder.stopRecording()
+        val wavData = recorder.stopRecording()
         if (wavData == null || wavData.size <= 44) {
             setState(ImeState.IDLE)
             return
@@ -125,9 +138,15 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
     }
 
     private fun processAudio(wavData: ByteArray) {
+        val currentPipeline = pipeline
+        if (currentPipeline == null) {
+            setState(ImeState.ERROR)
+            keyboardView?.setStatusText("系統尚未就緒，請稍候再試")
+            return
+        }
         setState(ImeState.PROCESSING)
         serviceScope.launch {
-            pipeline.process(wavData, object : TranscriptionPipeline.ProgressCallback {
+            currentPipeline.process(wavData, object : TranscriptionPipeline.ProgressCallback {
                 override fun onWhisperStarted() { keyboardView?.setStatusText("語音辨識中...") }
                 override fun onWhisperCompleted(text: String) { keyboardView?.setStatusText("後處理中...") }
                 override fun onClaudeStarted() { keyboardView?.setStatusText("AI 潤稿中...") }

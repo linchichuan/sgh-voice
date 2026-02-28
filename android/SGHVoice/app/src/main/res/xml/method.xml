@@ -1,18 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 輸入法宣告設定 -->
+<!-- 輸入法宣告設定 — 將模式改為 keyboard 以確保出現在主切換清單 -->
 <input-method xmlns:android="http://schemas.android.com/apk/res/android"
     android:settingsActivity="com.shingihou.sghvoice.ui.MainActivity"
-    android:icon="@drawable/ic_mic">
+    android:icon="@mipmap/ic_launcher">
     <subtype
         android:label="@string/subtype_label"
         android:imeSubtypeLocale="zh_TW"
-        android:imeSubtypeMode="voice" />
+        android:imeSubtypeMode="keyboard" />
     <subtype
         android:label="@string/subtype_label_ja"
         android:imeSubtypeLocale="ja_JP"
-        android:imeSubtypeMode="voice" />
+        android:imeSubtypeMode="keyboard" />
     <subtype
         android:label="@string/subtype_label_en"
         android:imeSubtypeLocale="en_US"
-        android:imeSubtypeMode="voice" />
+        android:imeSubtypeMode="keyboard" />
 </input-method>

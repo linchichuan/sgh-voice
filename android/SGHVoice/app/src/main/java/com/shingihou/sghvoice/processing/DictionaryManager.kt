@@ -16,6 +16,34 @@ class DictionaryManager(context: Context) {
         private const val PREF_NAME = "sgh_voice_dictionary"
         private const val KEY_CUSTOM_WORDS = "custom_words"
         private const val KEY_CORRECTIONS = "corrections"
+
+        /**
+         * 內部基礎詞庫 — 提升辨識精度，不在 UI 顯示
+         * 包含公司專有名詞、常見技術術語、人名修正等
+         */
+        private val BASE_CUSTOM_WORDS = listOf(
+            "新義豊", "Shingihou", "KusuriJapan", "Medical Supporter",
+            "SGH Phone", "林紀全", "薬機法", "PMD Act",
+            "Ultravox", "Twilio", "n8n", "LINE Bot",
+            "福岡", "博多", "代表取締役", "繁體中文", "輸入法",
+            "Repo", "Repository", "GitHub", "API", "Android", "Kotlin",
+            "Whisper", "Claude", "Haiku", "Sonnet", "OpenCC",
+            "Docker", "Zeabur", "Google Play", "IME",
+            "Push-to-Talk", "PCM", "WAV", "WebSocket", "OkHttp",
+        )
+
+        private val BASE_CORRECTIONS = mapOf(
+            "新義豐" to "新義豊",
+            "新义丰" to "新義豊",
+            "醫療supporter" to "Medical Supporter",
+            "medicalsupporter" to "Medical Supporter",
+            "薬日本" to "kusurijapan",
+            "林紀泉" to "林紀全",
+            "林記全" to "林紀全",
+            "輸入發" to "輸入法",
+            "繁體重文" to "繁體中文",
+            "語音辨是" to "語音辨識",
+        )
     }
 
     private val prefs: SharedPreferences =
@@ -30,32 +58,34 @@ class DictionaryManager(context: Context) {
     init {
         loadCustomWords()
         loadCorrections()
-        initDefaultCorrections()
     }
 
     /**
      * 建立 Whisper 提示詞
-     * 將自訂詞彙串接為提示文字，幫助 Whisper 辨識專有名詞
+     * 合併基礎詞庫 + 使用者自訂詞彙，幫助 Whisper 辨識專有名詞
      */
     fun buildWhisperPrompt(): String {
-        val allWords = customWords.toSet()
+        val allWords = (BASE_CUSTOM_WORDS + customWords).toSet()
         if (allWords.isEmpty()) return ""
         return allWords.joinToString("、")
     }
 
     /**
      * 套用詞彙修正
+     * 合併基礎修正 + 使用者自訂修正（使用者規則優先）
      * 以最長匹配優先原則，將辨識錯誤的詞彙替換為正確版本
      *
      * @param text 需要修正的文字
      * @return 修正後的文字
      */
     fun applyCorrections(text: String): String {
-        if (corrections.isEmpty()) return text
+        // 合併修正規則：使用者自訂覆蓋基礎規則
+        val merged = BASE_CORRECTIONS + corrections
+        if (merged.isEmpty()) return text
 
         var result = text
         // 依鍵長度排序（最長優先匹配），避免短詞誤匹配
-        val sortedCorrections = corrections.entries.sortedByDescending { it.key.length }
+        val sortedCorrections = merged.entries.sortedByDescending { it.key.length }
 
         for ((wrong, correct) in sortedCorrections) {
             result = result.replace(wrong, correct)
@@ -107,36 +137,7 @@ class DictionaryManager(context: Context) {
 
     // ===== 內部方法 =====
 
-    /** 初始化預設修正規則（通用語音辨識常見錯誤） */
-    private fun initDefaultCorrections() {
-        val defaults = mapOf(
-            "輸入發" to "輸入法",
-            "繁體重文" to "繁體中文",
-            "語音辨是" to "語音辨識",
-        )
-
-        // 只新增尚未存在的預設規則
-        for ((wrong, correct) in defaults) {
-            if (wrong !in corrections) {
-                corrections[wrong] = correct
-            }
-        }
-
-        // 預設自訂詞彙（提升 Whisper 辨識率）
-        val defaultWords = listOf(
-            "繁體中文", "輸入法"
-        )
-        for (word in defaultWords) {
-            if (word !in customWords) {
-                customWords.add(word)
-            }
-        }
-
-        saveCorrections()
-        saveCustomWords()
-    }
-
-    /** 從 SharedPreferences 載入自訂詞彙 */
+/** 從 SharedPreferences 載入自訂詞彙 */
     private fun loadCustomWords() {
         val json = prefs.getString(KEY_CUSTOM_WORDS, null) ?: return
         try {
