@@ -107,16 +107,12 @@ class DictionaryManager(context: Context) {
 
     // ===== 內部方法 =====
 
-    /** 初始化預設修正規則（新義豊相關用語） */
+    /** 初始化預設修正規則（通用語音辨識常見錯誤） */
     private fun initDefaultCorrections() {
         val defaults = mapOf(
-            "新義豐" to "新義豊",
-            "新义丰" to "新義豊",
-            "醫療supporter" to "Medical Supporter",
-            "medicalsupporter" to "Medical Supporter",
-            "薬日本" to "kusurijapan",
-            "林紀泉" to "林紀全",
-            "林記全" to "林紀全"
+            "輸入發" to "輸入法",
+            "繁體重文" to "繁體中文",
+            "語音辨是" to "語音辨識",
         )
 
         // 只新增尚未存在的預設規則
@@ -128,8 +124,7 @@ class DictionaryManager(context: Context) {
 
         // 預設自訂詞彙（提升 Whisper 辨識率）
         val defaultWords = listOf(
-            "新義豊", "林紀全", "Medical Supporter", "kusurijapan",
-            "福岡", "繁體中文", "輸入法"
+            "繁體中文", "輸入法"
         )
         for (word in defaultWords) {
             if (word !in customWords) {
