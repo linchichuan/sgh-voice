@@ -15,6 +15,8 @@ class ApiConfig(context: Context) {
         private const val PREF_NAME = "sgh_voice_secure_prefs"
         private const val KEY_OPENAI_API_KEY = "openai_api_key"
         private const val KEY_ANTHROPIC_API_KEY = "anthropic_api_key"
+        private const val KEY_GROQ_API_KEY = "groq_api_key"
+        private const val KEY_ELEVENLABS_API_KEY = "elevenlabs_api_key"
         private const val KEY_WHISPER_MODEL = "whisper_model"
         private const val KEY_CLAUDE_MODEL = "claude_model"
         private const val KEY_LANGUAGE_PREF = "language_preference"
@@ -48,6 +50,16 @@ class ApiConfig(context: Context) {
         get() = prefs.getString(KEY_ANTHROPIC_API_KEY, "") ?: ""
         set(value) = prefs.edit().putString(KEY_ANTHROPIC_API_KEY, value).apply()
 
+    /** Groq API 金鑰 */
+    var groqApiKey: String
+        get() = prefs.getString(KEY_GROQ_API_KEY, "") ?: ""
+        set(value) = prefs.edit().putString(KEY_GROQ_API_KEY, value).apply()
+
+    /** ElevenLabs API 金鑰 */
+    var elevenlabsApiKey: String
+        get() = prefs.getString(KEY_ELEVENLABS_API_KEY, "") ?: ""
+        set(value) = prefs.edit().putString(KEY_ELEVENLABS_API_KEY, value).apply()
+
     /** Whisper 模型名稱 */
     var whisperModel: String
         get() = prefs.getString(KEY_WHISPER_MODEL, DEFAULT_WHISPER_MODEL) ?: DEFAULT_WHISPER_MODEL
@@ -73,9 +85,11 @@ class ApiConfig(context: Context) {
         get() = prefs.getBoolean(KEY_SETUP_COMPLETE, false)
         set(value) = prefs.edit().putBoolean(KEY_SETUP_COMPLETE, value).apply()
 
-    /** 檢查 API 金鑰是否已設定 */
+    /** 檢查 API 金鑰是否已設定 (至少需有 Whisper 和 Claude 其中一套) */
     fun hasApiKeys(): Boolean {
-        return openAiApiKey.isNotBlank() && anthropicApiKey.isNotBlank()
+        val hasStt = openAiApiKey.isNotBlank() || groqApiKey.isNotBlank()
+        val hasLlm = anthropicApiKey.isNotBlank() || openAiApiKey.isNotBlank()
+        return hasStt && hasLlm
     }
 
     /** 清除所有設定 */

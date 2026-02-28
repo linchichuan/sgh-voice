@@ -47,6 +47,10 @@ class KeyboardView @JvmOverloads constructor(
     private lateinit var enterButton: TextView
 
     init {
+        layoutParams = LayoutParams(
+            LayoutParams.MATCH_PARENT,
+            LayoutParams.WRAP_CONTENT
+        )
         LayoutInflater.from(context).inflate(R.layout.keyboard_view, this, true)
         setupViews()
     }

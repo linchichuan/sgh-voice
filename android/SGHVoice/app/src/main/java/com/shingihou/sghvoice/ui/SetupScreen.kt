@@ -67,8 +67,13 @@ private fun BasicSettingsTab(apiConfig: ApiConfig) {
     
     var openAiKey by remember { mutableStateOf(apiConfig.openAiApiKey) }
     var anthropicKey by remember { mutableStateOf(apiConfig.anthropicApiKey) }
+    var groqKey by remember { mutableStateOf(apiConfig.groqApiKey) }
+    var elevenLabsKey by remember { mutableStateOf(apiConfig.elevenlabsApiKey) }
+    
     var showOpenAiKey by remember { mutableStateOf(false) }
     var showAnthropicKey by remember { mutableStateOf(false) }
+    var showGroqKey by remember { mutableStateOf(false) }
+    var showElevenLabsKey by remember { mutableStateOf(false) }
     var saveMessage by remember { mutableStateOf("") }
     val msgSaved = stringResource(R.string.msg_keys_saved)
     var selectedStyle by remember { mutableStateOf(apiConfig.outputStyle) }
@@ -106,6 +111,32 @@ private fun BasicSettingsTab(apiConfig: ApiConfig) {
                     }
                 }
             )
+            Spacer(modifier = Modifier.height(8.dp))
+            OutlinedTextField(
+                value = groqKey,
+                onValueChange = { groqKey = it },
+                label = { Text(stringResource(R.string.groq_key_label)) },
+                modifier = Modifier.fillMaxWidth(),
+                visualTransformation = if (showGroqKey) VisualTransformation.None else PasswordVisualTransformation(),
+                trailingIcon = {
+                    TextButton(onClick = { showGroqKey = !showGroqKey }) {
+                        Text(if (showGroqKey) stringResource(R.string.btn_hide) else stringResource(R.string.btn_show))
+                    }
+                }
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            OutlinedTextField(
+                value = elevenLabsKey,
+                onValueChange = { elevenLabsKey = it },
+                label = { Text(stringResource(R.string.elevenlabs_key_label)) },
+                modifier = Modifier.fillMaxWidth(),
+                visualTransformation = if (showElevenLabsKey) VisualTransformation.None else PasswordVisualTransformation(),
+                trailingIcon = {
+                    TextButton(onClick = { showElevenLabsKey = !showElevenLabsKey }) {
+                        Text(if (showElevenLabsKey) stringResource(R.string.btn_hide) else stringResource(R.string.btn_show))
+                    }
+                }
+            )
             Spacer(modifier = Modifier.height(16.dp))
             
             Text(stringResource(R.string.output_style_label), fontWeight = FontWeight.SemiBold)
@@ -127,6 +158,8 @@ private fun BasicSettingsTab(apiConfig: ApiConfig) {
                 onClick = {
                     apiConfig.openAiApiKey = openAiKey.trim()
                     apiConfig.anthropicApiKey = anthropicKey.trim()
+                    apiConfig.groqApiKey = groqKey.trim()
+                    apiConfig.elevenlabsApiKey = elevenLabsKey.trim()
                     apiConfig.outputStyle = selectedStyle
                     saveMessage = msgSaved
                 },

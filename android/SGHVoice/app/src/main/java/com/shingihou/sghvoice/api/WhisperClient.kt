@@ -24,6 +24,7 @@ class WhisperClient(private val apiConfig: ApiConfig) {
 
     companion object {
         private const val WHISPER_API_URL = "https://api.openai.com/v1/audio/transcriptions"
+        private const val GROQ_API_URL = "https://api.groq.com/openai/v1/audio/transcriptions"
         private const val TIMEOUT_SECONDS = 30L
     }
 
@@ -42,9 +43,13 @@ class WhisperClient(private val apiConfig: ApiConfig) {
      * @throws WhisperException 當 API 呼叫失敗時拋出
      */
     suspend fun transcribe(wavData: ByteArray, initialPrompt: String = ""): String {
-        val apiKey = apiConfig.openAiApiKey
+        val useGroq = apiConfig.groqApiKey.isNotBlank()
+        val apiKey = if (useGroq) apiConfig.groqApiKey else apiConfig.openAiApiKey
+        val apiUrl = if (useGroq) GROQ_API_URL else WHISPER_API_URL
+        val modelName = if (useGroq) "whisper-large-v3-turbo" else apiConfig.whisperModel
+
         if (apiKey.isBlank()) {
-            throw WhisperException("OpenAI API key not set")
+            throw WhisperException("OpenAI or Groq API key not set")
         }
 
         return withContext(Dispatchers.IO) {
@@ -55,7 +60,7 @@ class WhisperClient(private val apiConfig: ApiConfig) {
                     "recording.wav",
                     wavData.toRequestBody("audio/wav".toMediaType())
                 )
-                .addFormDataPart("model", apiConfig.whisperModel)
+                .addFormDataPart("model", modelName)
                 .addFormDataPart("response_format", "json")
                 .apply {
                     // 提示詞：包含自訂詞彙以提升三語混合辨識
@@ -66,7 +71,7 @@ class WhisperClient(private val apiConfig: ApiConfig) {
                 .build()
 
             val request = Request.Builder()
-                .url(WHISPER_API_URL)
+                .url(apiUrl)
                 .header("Authorization", "Bearer $apiKey")
                 .post(requestBody)
                 .build()

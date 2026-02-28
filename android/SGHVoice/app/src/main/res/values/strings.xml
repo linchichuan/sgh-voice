@@ -42,6 +42,8 @@
     <string name="step_api_keys">設定 API 金鑰</string>
     <string name="openai_key_label">OpenAI API 金鑰</string>
     <string name="anthropic_key_label">Anthropic API 金鑰</string>
+    <string name="groq_key_label">Groq API 金鑰 (Whisper)</string>
+    <string name="elevenlabs_key_label">ElevenLabs API 金鑰 (TTS)</string>
     <string name="btn_hide">隱藏</string>
     <string name="btn_show">顯示</string>
     <string name="btn_save_keys">儲存金鑰</string>

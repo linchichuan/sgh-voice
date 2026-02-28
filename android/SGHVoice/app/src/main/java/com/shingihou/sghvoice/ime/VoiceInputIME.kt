@@ -99,6 +99,12 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
         return false
     }
 
+    override fun onEvaluateInputViewShown(): Boolean {
+        super.onEvaluateInputViewShown()
+        // 強制顯示虛擬鍵盤，即使在連接了實體鍵盤的模擬器或裝置上也能顯示
+        return true
+    }
+
     override fun onWindowShown() {
         Log.d(TAG, "onWindowShown")
         super.onWindowShown()

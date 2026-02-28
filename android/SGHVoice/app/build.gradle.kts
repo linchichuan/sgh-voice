@@ -22,10 +22,20 @@ android {
         }
     }
 
+    signingConfigs {
+        create("release") {
+            storeFile = file("SGHUploadKey.jks")
+            storePassword = "sghvoice123"
+            keyAlias = "upload"
+            keyPassword = "sghvoice123"
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
+            signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
