@@ -68,3 +68,8 @@ android/SGHVoice/local.properties
 android/SGHVoice/*.iml
 android/SGHVoice/.idea/
 android/SGHVoice/captures/
+android/SGHVoice/gradle-8.13-bin.zip
+android/SGHVoice/gradle-8.5-bin.zip
+android/SGHVoice/gradle-8.13/
+android/SGHVoice/gradle-8.5/
+android/SGHVoice_Release/
