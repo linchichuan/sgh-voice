@@ -16,14 +16,15 @@ sf_datas, sf_bins, sf_imports = collect_all('soundfile')
 opencc_datas = collect_data_files('opencc')
 rumps_datas, rumps_bins, rumps_imports = collect_all('rumps')
 tiktoken_datas, tiktoken_bins, tiktoken_imports = collect_all('tiktoken')
+scipy_datas, scipy_bins, scipy_imports = collect_all('scipy')
 
 a = Analysis(
     ['launcher.py'],
     pathex=[],
-    binaries=mlx_bins + mlx_nn_bins + whisper_bins + sd_bins + sf_bins + rumps_bins + tiktoken_bins,
+    binaries=mlx_bins + mlx_nn_bins + whisper_bins + sd_bins + sf_bins + rumps_bins + tiktoken_bins + scipy_bins,
     datas=[
         ('static', 'static'),
-    ] + mlx_datas + mlx_nn_datas + whisper_datas + sd_datas + sf_datas + opencc_datas + rumps_datas + tiktoken_datas,
+    ] + mlx_datas + mlx_nn_datas + whisper_datas + sd_datas + sf_datas + opencc_datas + rumps_datas + tiktoken_datas + scipy_datas,
     hiddenimports=[
         # App 核心
         'app', 'config', 'memory', 'transcriber', 'recorder', 'dashboard', 'overlay',
@@ -50,12 +51,12 @@ a = Analysis(
         'objc', 'PyObjCTools', 'PyObjCTools.Conversion',
         # 標準庫
         'json', 'csv', 'io', 'shutil', 'threading', 'datetime',
-    ] + mlx_imports + mlx_nn_imports + whisper_imports + sd_imports + sf_imports + rumps_imports + tiktoken_imports,
+    ] + mlx_imports + mlx_nn_imports + whisper_imports + sd_imports + sf_imports + rumps_imports + tiktoken_imports + scipy_imports,
     excludes=[
         # 排除 torch（mlx-whisper 推理不需要，省 500MB+）
         'torch', 'torchvision', 'torchaudio', 'torch._C',
         # 排除不需要的大型套件
-        'tkinter', 'matplotlib', 'PIL', 'cv2', 'scipy.spatial.transform',
+        'tkinter', 'matplotlib', 'PIL', 'cv2',
         'pytest', 'ruff', 'black', 'mypy', 'pylint',
         'jupyter', 'notebook', 'IPython',
     ],

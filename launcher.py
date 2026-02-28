@@ -51,6 +51,10 @@ def init_user_data():
 
 
 if __name__ == "__main__":
+    import multiprocessing
+    # 解決打包成 .app 後，mlx_whisper（或 scipy 底層）使用 multiprocessing 引發的 unrecognized arguments 錯誤
+    multiprocessing.freeze_support()
+
     # 設定 bundle 路徑環境變數，讓其他模組可以使用
     os.environ["VOICEINPUT_BUNDLE_DIR"] = get_bundle_dir()
     init_user_data()

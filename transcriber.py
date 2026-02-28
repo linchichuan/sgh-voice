@@ -11,6 +11,7 @@ from datetime import datetime
 import openai
 import anthropic
 from config import load_smart_replace
+from ollama_detector import get_detector, OllamaStatus
 
 
 class Transcriber:
@@ -49,13 +50,24 @@ class Transcriber:
         return self._anthropic
 
     @property
+    def ollama_detector(self):
+        return get_detector()
+
+    @property
     def local_llm(self):
-        """Ollama 提供與 OpenAI 相容的 API 格式"""
-        if not hasattr(self, '_local_llm_client') or self._local_llm_client is None:
+        """Ollama 提供與 OpenAI 相容的 API 格式，URL 由偵測器決定"""
+        detector = self.ollama_detector
+        base_url = detector.base_url or "http://127.0.0.1:11434/v1"
+
+        # 如果 URL 變了（偵測器切換了位址），重建 client
+        cached_url = getattr(self, '_local_llm_url', None)
+        if not hasattr(self, '_local_llm_client') or self._local_llm_client is None or cached_url != base_url:
             self._local_llm_client = openai.OpenAI(
-                base_url="http://localhost:11434/v1",
-                api_key="ollama"  # 必須有值但會被忽略
+                base_url=base_url,
+                api_key="ollama",  # 必須有值但會被忽略
+                timeout=1.5,       # 1.5 秒超時，避免使用者等太久
             )
+            self._local_llm_url = base_url
         return self._local_llm_client
 
     def warmup(self):
@@ -90,19 +102,34 @@ class Transcriber:
                 print(f" ⚠️ mlx-whisper 預熱失敗: {e}")
 
         def _warmup_ollama():
+            # Step 1: 偵測 Ollama 服務
+            detector = self.ollama_detector
+            status = detector.detect(force=True)
+
+            if status != OllamaStatus.CONNECTED:
+                env_info = detector.check_environment()
+                print(f" ⚠️ Ollama 狀態: {status}")
+                if env_info["issues"]:
+                    for issue in env_info["issues"]:
+                        print(f"    → {issue}")
+                print(f"    → 將自動使用雲端 API 作為 LLM 後處理")
+                return
+
+            # Step 2: 偵測成功，預熱模型
             try:
-                # 發送簡單請求讓 Ollama 載入模型到記憶體
                 self.local_llm.chat.completions.create(
                     model=self.config.get("local_llm_model", "qwen2.5:3b"),
                     messages=[{"role": "user", "content": "hi"}],
                     max_tokens=1,
                 )
-                print(" ✅ Ollama Qwen 模型預熱完成")
+                models = detector.available_models
+                model_str = ", ".join(models[:5]) if models else "unknown"
+                print(f" ✅ Ollama 預熱完成 (可用模型: {model_str})")
             except Exception as e:
-                print(f" ⚠️ Ollama 預熱失敗 (可忽略如未安裝): {e}")
+                print(f" ⚠️ Ollama 預熱失敗: {e}")
 
         def _sequential_warmup():
-            """序列執行：先 Ollama（不用 GPU），再 Whisper（Metal GPU）"""
+            """序列執行：先偵測+預熱 Ollama（不用 GPU），再 Whisper（Metal GPU）"""
             _warmup_ollama()
             _warmup_whisper()
 
@@ -203,51 +230,45 @@ class Transcriber:
                 print(" ⚡ [短句跳過 LLM 後處理，極速模式]")
 
         if not skip_llm:
-            # 優先順序：Claude (~1.5s) > Local Qwen (fallback) > 本地正則
-            # Claude 比 Qwen 快 7 倍且品質更好，所以 Claude 優先
-            # 優先順序：Claude > OpenAI > Local Qwen > 本地正則
-            # 如果使用者只設定了 OpenAI Key，則自動切換為 OpenAI 處理
+            # ──── LLM 路由：Local Ollama 優先 → Cloud Fallback ────
+            # 有 Ollama 就先用（省 API 費用），1.5 秒超時後無感切換雲端
             has_anthropic = bool(self.config.get("anthropic_api_key"))
             has_openai = bool(self.config.get("openai_api_key"))
-            
+
             should_polish = (
-                self.config.get("enable_claude_polish") # 沿用此開關作為 "是否啟用 AI 潤稿"
+                self.config.get("enable_claude_polish")
                 and (len(corrected) > 2 or mode in ("edit", "translate"))
             )
 
-            if should_polish and has_anthropic:
-                final = self._claude_process(corrected, mode, edit_context)
-                llm_source = "claude"
-                if final is None:  # Fallback if Claude fails/times out
-                    print(" ⚠️ Claude timeout/error, switching to Local Fallback")
-                    final = None # Reset to trigger local logic below
-                    llm_source = "none"
-
-            elif should_polish and has_openai:
-                final = self._openai_process(corrected, mode, edit_context)
-                llm_source = "openai"
-                if final is None:
-                    print(" ⚠️ OpenAI timeout/error, switching to Local Fallback")
-                    final = None
-                    llm_source = "none"
-
-            # Fallback Logic: If cloud failed (final is None) or wasn't tried, and hybrid/local is enabled
-            if final is None: 
-                # Reset final to corrected text before trying local
-                final = corrected
-                if is_hybrid:
-                    # API 均不可用或失敗時，fallback 到本地 Qwen
+            if should_polish:
+                # ── 優先順序 A: 本地 Ollama（1.5 秒超時）──
+                if is_hybrid and mode == "dictate":
                     local_res = self._local_llm_process(corrected)
                     if local_res:
                         final = local_res
                         llm_source = "local"
-                        print(" ⚡ [Local Qwen fallback 處理成功]")
-                    elif self.config.get("enable_filler_removal"):
-                        final = self._local_filler_removal(corrected)
-                        llm_source = "local"
-                elif self.config.get("enable_filler_removal"):
+
+                # ── 優先順序 B: Cloud Fallback（Local 失敗或不可用時）──
+                if final is None and has_anthropic:
+                    final = self._claude_process(corrected, mode, edit_context)
+                    if final:
+                        llm_source = "claude"
+                    else:
+                        print(" ⚠️ Claude 失敗，嘗試下一個 fallback")
+
+                if final is None and has_openai:
+                    final = self._openai_process(corrected, mode, edit_context)
+                    if final:
+                        llm_source = "openai"
+                    else:
+                        print(" ⚠️ OpenAI 失敗")
+
+            # ── 最終 Fallback: 本地正則去填充詞 ──
+            if final is None:
+                final = corrected
+                if self.config.get("enable_filler_removal"):
                     final = self._local_filler_removal(corrected)
-                    llm_source = "local"
+                    llm_source = "regex"
 
         # 繁中三層防護第三層：OpenCC s2twp 轉換
         if self._opencc and final:
@@ -345,30 +366,50 @@ class Transcriber:
             return None
 
     def _local_llm_process(self, text):
-        """使用本地 Ollama (Qwen) 進行簡易去填充詞與潤稿"""
+        """使用本地 Ollama (Qwen) 進行去填充詞與潤稿（1.5 秒超時，失敗無感切換雲端）"""
         if not text.strip():
             return text
-        
+
+        # 先確認 Ollama 是否可用（有快取，不會每次都偵測）
+        detector = self.ollama_detector
+        if detector.status == OllamaStatus.NOT_RUNNING:
+            # 已知不可用，跳過嘗試直接回傳 None 觸發雲端 fallback
+            return None
+
+        # 如果狀態未知，快速偵測一次
+        if detector.status == OllamaStatus.UNKNOWN:
+            detector.detect()
+            if detector.status != OllamaStatus.CONNECTED:
+                return None
+
         system = (
-            "你是語音辨識文字修正助手。請修正錯字、移除口語填充詞（嗯、啊、那個等），"
-            "並只輸出修正後的最終文字，絕不加入任何解釋或問候語。"
+            "語音辨識後處理。修正錯字、移除填充詞（嗯、啊、那個、えーと、um 等），"
+            "只輸出修正後的文字，不加解釋。所有中文必須是繁體中文。"
         )
-        
-        user_msg = f"請修正這段語音辨識文字：\n{text}"
-        
+
         try:
+            t0 = time.time()
             resp = self.local_llm.chat.completions.create(
                 model=self.config.get("local_llm_model", "qwen2.5:3b"),
                 messages=[
                     {"role": "system", "content": system},
-                    {"role": "user", "content": user_msg}
+                    {"role": "user", "content": text}
                 ],
-                max_tokens=150,
-                temperature=0.1
+                max_tokens=min(300, max(100, len(text) * 2)),
+                temperature=0.1,
             )
-            return resp.choices[0].message.content.strip()
+            elapsed = time.time() - t0
+            result = resp.choices[0].message.content.strip()
+            print(f" ⚡ [Local Ollama] 完成 ({elapsed:.2f}s)")
+            return result
         except Exception as e:
-            print(f" ⚠️ Local LLM 發生錯誤 (確認 Ollama 是否開啟): {e}")
+            err_str = str(e).lower()
+            if "connection" in err_str or "refused" in err_str or "timeout" in err_str:
+                # 連線問題：標記為需要重新偵測
+                detector._last_check = 0  # 清除快取，下次觸發重新偵測
+                print(f" ⚠️ Ollama 連線失敗，切換到雲端 API: {e}")
+            else:
+                print(f" ⚠️ Local LLM 錯誤: {e}")
             return None
 
     # 固定的高效 system prompt（不從 config 讀取，避免使用者破壞品質）
@@ -614,6 +655,19 @@ class Transcriber:
             save_stats(stats)
         except Exception:
             pass
+
+    def get_service_status(self) -> dict:
+        """回傳當前各服務的狀態（供 Dashboard 狀態燈使用）"""
+        detector = self.ollama_detector
+        if detector.status == OllamaStatus.UNKNOWN:
+            detector.detect()
+        return {
+            **detector.get_status_dict(),
+            "has_openai_key": bool(self.config.get("openai_api_key")),
+            "has_anthropic_key": bool(self.config.get("anthropic_api_key")),
+            "hybrid_mode": self.config.get("enable_hybrid_mode", True),
+            "local_model": self.config.get("local_llm_model", "qwen2.5:3b"),
+        }
 
     def _apply_smart_replace(self, text):
         """Layer 3: Smart Replace — 觸發詞展開（@mail→email 等）"""

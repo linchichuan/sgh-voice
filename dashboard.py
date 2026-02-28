@@ -236,6 +236,38 @@ def api_usage():
     return jsonify(usage)
 
 
+@app.route("/api/service-status")
+def api_service_status():
+    """服務狀態：Ollama / Cloud API 連線情況（供狀態燈使用）"""
+    if _engine and hasattr(_engine, 'transcriber'):
+        return jsonify(_engine.transcriber.get_service_status())
+    # 沒有 engine 時，直接用偵測器
+    from ollama_detector import get_detector
+    detector = get_detector()
+    detector.detect()
+    config = load_config()
+    return jsonify({
+        **detector.get_status_dict(),
+        "has_openai_key": bool(config.get("openai_api_key")),
+        "has_anthropic_key": bool(config.get("anthropic_api_key")),
+        "hybrid_mode": config.get("enable_hybrid_mode", True),
+        "local_model": config.get("local_llm_model", "qwen2.5:3b"),
+    })
+
+
+@app.route("/api/ollama/detect", methods=["POST"])
+def api_ollama_detect():
+    """手動觸發 Ollama 重新偵測"""
+    from ollama_detector import get_detector
+    detector = get_detector()
+    status = detector.detect(force=True)
+    env_check = detector.check_environment()
+    return jsonify({
+        **detector.get_status_dict(),
+        "environment": env_check,
+    })
+
+
 # ─── Recording Control from Dashboard ───────────────────
 _engine = None  # Will be set by set_engine()
 

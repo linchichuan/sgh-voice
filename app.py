@@ -49,36 +49,37 @@ def paste_text(text):
         print(f"Clipboard copy error: {e}")
         return
 
-    # ★ 等待修飾鍵完全放開（push-to-talk 放開右 Cmd 後需要一點時間）
-    time.sleep(0.35)
+    # ★ 等待修飾鍵完全放開 + 辨識處理動畫消失
+    time.sleep(0.5)
 
     pasted = False
 
-    # 方法 1: Quartz CGEvent（最可靠，不需要 Accessibility 權限即可發送按鍵）
+    # 方法 1: Quartz CGEvent（.app bundle 中最可靠）
     try:
         from Quartz import (
-            CGEventCreateKeyboardEvent, CGEventPost, kCGHIDEventTap,
+            CGEventCreateKeyboardEvent, CGEventPost, kCGSessionEventTap,
             CGEventSetFlags, kCGEventFlagMaskCommand
         )
-        # 'v' 鍵的 macOS virtual keycode = 9
-        V_KEYCODE = 9
+        V_KEYCODE = 9  # 'v' 鍵的 macOS virtual keycode
 
         # Key Down with Cmd flag
         event_down = CGEventCreateKeyboardEvent(None, V_KEYCODE, True)
         CGEventSetFlags(event_down, kCGEventFlagMaskCommand)
-        # Key Up with Cmd flag
+        # Key Up with Cmd flag  
         event_up = CGEventCreateKeyboardEvent(None, V_KEYCODE, False)
         CGEventSetFlags(event_up, kCGEventFlagMaskCommand)
 
-        CGEventPost(kCGHIDEventTap, event_down)
-        CGEventPost(kCGHIDEventTap, event_up)
+        # 使用 kCGSessionEventTap（不需要 root 權限）
+        CGEventPost(kCGSessionEventTap, event_down)
+        time.sleep(0.02)
+        CGEventPost(kCGSessionEventTap, event_up)
         pasted = True
-        time.sleep(0.05)
+        print(" ✅ CGEvent 貼上成功")
     except Exception as e:
         print(f"CGEvent paste error (non-fatal): {e}")
 
-    # 方法 2: osascript fallback
-    if not pasted:
+    # 方法 2: osascript fallback（僅在非 .app 下使用）
+    if not pasted and not getattr(sys, 'frozen', False):
         try:
             result = subprocess.run([
                 "osascript", "-e",
@@ -92,7 +93,7 @@ def paste_text(text):
     # 還原原有剪貼簿內容（不干涉使用者的複製貼上）
     if old_clipboard is not None:
         def _restore():
-            time.sleep(0.5)  # 等貼上完成後再還原
+            time.sleep(0.8)
             try:
                 pyperclip.copy(old_clipboard)
             except Exception:
@@ -101,7 +102,7 @@ def paste_text(text):
 
     if not pasted:
         print(f"⚠️ 自動貼上失敗，文字已複製到剪貼簿，請手動 Cmd+V")
-        show_copy_dialog(text)
+        notify("SGH Voice", "📋 文字已複製到剪貼簿，請 Cmd+V 貼上")
 
 
 def show_copy_dialog(text):
@@ -160,9 +161,23 @@ class VoiceEngine:
             return
         self.is_recording = True
         self.overlay.show("recording")
-        if self._on_status_change:
-            self._on_status_change("recording")
+        self._safe_status_change("recording")
         self.recorder.start()
+
+    def _safe_status_change(self, status):
+        """Thread-safe 狀態更新（rumps NSStatusItem 必須在 main thread 更新）"""
+        if not self._on_status_change:
+            return
+        try:
+            # 檢查是否在 main thread
+            if threading.current_thread() is threading.main_thread():
+                self._on_status_change(status)
+            else:
+                # 排程到 main thread（透過 rumps 的 timer 機制）
+                import rumps
+                rumps.Timer(lambda t: (self._on_status_change(status), t.stop()), 0.01).start()
+        except Exception as e:
+            print(f"Status change error (non-fatal): {e}")
 
     def stop_and_process(self, mode="dictate", edit_context=""):
         """停止錄音並處理（全面異常防護，避免 .app 閃退）"""
@@ -176,13 +191,11 @@ class VoiceEngine:
             self.is_recording = False
 
             self.overlay.show("processing")
-            if self._on_status_change:
-                self._on_status_change("processing")
+            self._safe_status_change("processing")
 
             if audio_array is None and not filepath:
                 self.overlay.show("idle")
-                if self._on_status_change:
-                    self._on_status_change("idle")
+                self._safe_status_change("idle")
                 return None
 
             # 如果設定了翻譯目標語言，自動切換模式
@@ -239,11 +252,7 @@ class VoiceEngine:
             except Exception:
                 pass
 
-        if self._on_status_change:
-            try:
-                self._on_status_change("idle")
-            except Exception:
-                pass
+        self._safe_status_change("idle")
 
         return result
 
