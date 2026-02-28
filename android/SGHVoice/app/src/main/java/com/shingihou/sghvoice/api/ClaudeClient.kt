@@ -37,15 +37,13 @@ class ClaudeClient(private val apiConfig: ApiConfig) {
             "えーと", "あの", "えー", "まあ", "その",
             "um", "uh", "like", "you know", "well", "so"
         )
-
-        // 系統提示詞：語音辨識後處理規則
-        private const val SYSTEM_PROMPT = """語音辨識後處理。規則：
-1. 刪除填充詞：嗯、啊、那個、就是、えーと、あの、um、uh、like
-2. 口語自我修正→只保留最終版本
-3. 標點符號：加上正確標點，適當分段
-4. 不改寫核心句意，保持原語言（中/日/英混合保持原樣）
-5. 只輸出結果，不加解釋
-6. 所有中文必須是繁體中文"""
+        
+        // 系統提示詞：語音辨識後處理規則 (分場合)
+        private const val BASE_PROMPT = "語音辨識後處理。規則：\n1. 刪除填充詞：嗯、啊、那個、就是、えーと、あの、um、uh、like\n2. 口語自我修正→只保留最終版本\n3. 標點符號：加上正確標點，適當分段\n4. 不改寫核心句意，保持原語言（中/日/英混合保持原樣）\n5. 只輸出結果，不加解釋\n6. 所有中文必須是繁體中文\n"
+        
+        private const val LINE_PROMPT = BASE_PROMPT + "7. 語氣設定為【LINE 訊息】：文字精簡、口語自然，不要過於死板。"
+        private const val EMAIL_PROMPT = BASE_PROMPT + "7. 語氣設定為【正式 Email】：文字得體、結構嚴謹且專業。"
+        private const val NORMAL_PROMPT = BASE_PROMPT + "7. 語氣設定為【一般文字】：語氣中立，字句稍微順過即可。"
     }
 
     private val httpClient = OkHttpClient.Builder()
@@ -72,16 +70,23 @@ class ClaudeClient(private val apiConfig: ApiConfig) {
         }
 
         val apiKey = apiConfig.anthropicApiKey
+        // 完全離線模式（沒有 API Key 時直接回傳修正過自訂詞彙的原文）
         if (apiKey.isBlank()) {
-            // API 金鑰未設定時直接回傳原文（降級處理）
             return text
+        }
+
+        // 決定提示詞（根據設定的轉換風格）
+        val systemPrompt = when (apiConfig.outputStyle) {
+            "line" -> LINE_PROMPT
+            "email" -> EMAIL_PROMPT
+            else -> NORMAL_PROMPT
         }
 
         return withContext(Dispatchers.IO) {
             val requestJson = JSONObject().apply {
                 put("model", apiConfig.claudeModel)
                 put("max_tokens", MAX_TOKENS)
-                put("system", SYSTEM_PROMPT)
+                put("system", systemPrompt)
                 put("messages", JSONArray().apply {
                     put(JSONObject().apply {
                         put("role", "user")
@@ -98,19 +103,19 @@ class ClaudeClient(private val apiConfig: ApiConfig) {
                 .post(requestJson.toString().toRequestBody("application/json".toMediaType()))
                 .build()
 
-            val response = httpClient.awaitCall(request)
+            val response = try {
+                httpClient.awaitCall(request)
+            } catch (e: Exception) {
+                // 完全離線保護或網路錯誤：直接返回原文
+                return@withContext text
+            }
+            
             val body = response.body?.string()
-                ?: throw ClaudeException("Claude API 回傳空白回應")
+                ?: throw ClaudeException("Claude API returned empty response")
 
             if (!response.isSuccessful) {
-                val errorMsg = try {
-                    val errorJson = JSONObject(body)
-                    errorJson.optJSONObject("error")?.optString("message")
-                        ?: "HTTP ${response.code}"
-                } catch (_: Exception) {
-                    "HTTP ${response.code}: $body"
-                }
-                throw ClaudeException("Claude API 錯誤：$errorMsg")
+                // 回應有錯誤，為了讓輸入法不要崩潰可以直接返回原文
+                return@withContext text
             }
 
             try {
@@ -119,10 +124,11 @@ class ClaudeClient(private val apiConfig: ApiConfig) {
                 if (content.length() > 0) {
                     content.getJSONObject(0).getString("text").trim()
                 } else {
-                    text // 無回應時回傳原文
+                    text // Return original text if no content is found
                 }
             } catch (e: Exception) {
-                throw ClaudeException("無法解析 Claude 回應：${e.message}")
+                // 解析錯誤時直接返回原文
+                return@withContext text
             }
         }
     }
@@ -160,7 +166,7 @@ private suspend fun OkHttpClient.awaitCall(request: Request): Response {
             override fun onFailure(call: Call, e: IOException) {
                 if (!continuation.isCancelled) {
                     continuation.resumeWithException(
-                        ClaudeException("網路連線失敗：${e.message}")
+                        ClaudeException("Network error: ${e.message}")
                     )
                 }
             }

@@ -12,6 +12,7 @@ import com.shingihou.sghvoice.api.WhisperClient
 import com.shingihou.sghvoice.audio.AudioRecorder
 import com.shingihou.sghvoice.processing.DictionaryManager
 import com.shingihou.sghvoice.processing.OpenCCConverter
+import com.shingihou.sghvoice.R
 import com.shingihou.sghvoice.processing.TranscriptionPipeline
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -87,7 +88,7 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
                 audioRecorder.startRecording()
             } catch (e: Exception) {
                 setState(ImeState.ERROR)
-                keyboardView?.setStatusText("錄音失敗：${e.message}")
+                keyboardView?.setStatusText(getString(R.string.msg_record_failed) + "${e.message}")
             }
         }
     }
@@ -103,7 +104,7 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
         if (wavData == null || wavData.size <= 44) {
             // 錄音太短（只有標頭），回到待機
             setState(ImeState.IDLE)
-            keyboardView?.setStatusText("錄音時間太短，請再試一次")
+            keyboardView?.setStatusText(getString(R.string.msg_record_too_short))
             return
         }
 
@@ -162,15 +163,15 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
         processingJob = serviceScope.launch {
             val callback = object : TranscriptionPipeline.ProgressCallback {
                 override fun onWhisperStarted() {
-                    keyboardView?.setStatusText("語音辨識中...")
+                    keyboardView?.setStatusText(getString(R.string.msg_recognizing))
                 }
 
                 override fun onWhisperCompleted(text: String) {
-                    keyboardView?.setStatusText("辨識完成，後處理中...")
+                    keyboardView?.setStatusText(getString(R.string.msg_post_processing))
                 }
 
                 override fun onClaudeStarted() {
-                    keyboardView?.setStatusText("AI 潤稿中...")
+                    keyboardView?.setStatusText(getString(R.string.msg_ai_processing))
                 }
 
                 override fun onCompleted(result: TranscriptionPipeline.Result) {
@@ -180,16 +181,16 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
                         setState(ImeState.DONE)
                     } else if (result.text.isBlank()) {
                         setState(ImeState.IDLE)
-                        keyboardView?.setStatusText("未偵測到語音，請再試一次")
+                        keyboardView?.setStatusText(getString(R.string.msg_no_speech))
                     } else {
                         setState(ImeState.ERROR)
-                        keyboardView?.setStatusText("處理失敗：${result.error}")
+                        keyboardView?.setStatusText(getString(R.string.msg_process_failed) + "${result.error}")
                     }
                 }
 
                 override fun onError(error: String) {
                     setState(ImeState.ERROR)
-                    keyboardView?.setStatusText("錯誤：$error")
+                    keyboardView?.setStatusText(getString(R.string.msg_error) + "$error")
                 }
             }
 

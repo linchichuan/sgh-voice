@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 字串資源 — 所有使用者可見文字皆為繁體中文 -->
 <resources>
+    <!-- App 資訊 -->
     <string name="app_name">SGH Voice</string>
     <string name="ime_label">SGH Voice 語音輸入</string>
 
@@ -16,6 +16,17 @@
     <string name="status_done">輸入完成</string>
     <string name="status_error">發生錯誤</string>
 
+    <string name="msg_record_failed">錄音失敗：</string>
+    <string name="msg_record_too_short">錄音時間太短，請再試一次</string>
+    <string name="msg_recognizing">語音辨識中...</string>
+    <string name="msg_post_processing">辨識完成，後處理中...</string>
+    <string name="msg_ai_processing">AI 潤稿中...</string>
+    <string name="msg_no_speech">未偵測到語音，請再試一次</string>
+    <string name="msg_process_failed">處理失敗：</string>
+    <string name="msg_error">錯誤：</string>
+    <string name="msg_unknown_error">未知錯誤</string>
+    <string name="msg_recognize_failed">辨識失敗</string>
+
     <!-- 鍵盤按鍵 -->
     <string name="mic_button_desc">語音輸入麥克風按鈕</string>
     <string name="key_backspace">⌫</string>
@@ -23,32 +34,41 @@
     <string name="key_enter">↵</string>
 
     <!-- 設定頁面 -->
-    <string name="setup_title">SGH Voice 設定</string>
-    <string name="setup_subtitle">AI 語音輸入法 — 新義豊株式会社</string>
-    <string name="step_api_keys">設定 API 金鑰</string>
-    <string name="step_permissions">授予麥克風權限</string>
-    <string name="step_enable_ime">啟用輸入法</string>
+    <string name="tab_basic_settings">基本設定</string>
+    <string name="tab_dictionary">個人詞庫</string>
+    <string name="tab_usage_guide">使用說明</string>
 
+    <string name="title_basic_settings">SGH Voice 基本設定</string>
+    <string name="step_api_keys">設定 API 金鑰</string>
     <string name="openai_key_label">OpenAI API 金鑰</string>
     <string name="anthropic_key_label">Anthropic API 金鑰</string>
-    <string name="save_keys">儲存金鑰</string>
-    <string name="keys_saved">金鑰已安全儲存</string>
-    <string name="keys_missing">請輸入兩組 API 金鑰</string>
+    <string name="btn_hide">隱藏</string>
+    <string name="btn_show">顯示</string>
+    <string name="btn_save_keys">儲存金鑰</string>
+    <string name="msg_keys_saved">金鑰已儲存</string>
 
-    <string name="enable_ime_button">啟用輸入法</string>
-    <string name="switch_ime_button">切換輸入法</string>
+    <string name="step_enable_ime">啟用輸入法</string>
+    <string name="desc_enable_ime">請在系統設定中啟用 SGH Voice，並手動切換至該輸入法。</string>
+    <string name="btn_enable_settings">啟用設定</string>
+    <string name="btn_switch_ime">切換輸入法</string>
 
-    <string name="permission_mic_rationale">語音輸入需要麥克風權限。首次使用時系統會自動詢問。</string>
-    <string name="enable_ime_guide">請在系統設定中啟用 SGH Voice 輸入法，並將其設為目前使用的輸入法。</string>
+    <!-- 個人詞庫 -->
+    <string name="title_dictionary_manage">個人詞庫管理</string>
+    <string name="title_custom_words">自訂詞彙 (提升辨識率)</string>
+    <string name="label_add_proper_noun">新增專有名詞</string>
+    <string name="title_corrections">錯誤修正規則</string>
+    <string name="label_wrong_word">原字</string>
+    <string name="label_correct_word">修正</string>
 
     <!-- 使用說明 -->
     <string name="usage_title">使用說明</string>
-    <string name="usage_content">在任何文字輸入框切換至 SGH Voice 輸入法後：\n\n1. 按住麥克風按鈕開始說話\n2. 放開按鈕停止錄音\n3. 系統自動辨識並輸入文字\n\n支援中文、日語、英語混合語音輸入，中文部分自動轉換為繁體中文。</string>
+    <string name="usage_step1">1. 按住藍色麥克風說話，放開即停止並開始辨識。</string>
+    <string name="usage_step2">2. 系統會自動處理中、日、英三語混合，並修正口語填充詞。</string>
+    <string name="usage_step3">3. 所有的簡體字都會在最後一步自動轉為繁體中文（台灣慣用詞）。</string>
+    <string name="usage_step4">4. 若有專有名詞辨識不準，請在「個人詞庫」中新增該詞彙。</string>
 
-    <!-- 錯誤訊息 -->
-    <string name="error_no_api_key">請先設定 API 金鑰</string>
-    <string name="error_recording_failed">錄音失敗</string>
-    <string name="error_network">網路連線失敗，請檢查網路設定</string>
-    <string name="error_too_short">錄音時間太短，請再試一次</string>
-    <string name="error_no_speech">未偵測到語音，請再試一次</string>
+    <string name="output_style_label">預設防護語氣風格</string>
+    <string name="style_normal">一般文字（預設）</string>
+    <string name="style_line">LINE 訊息（簡短口語）</string>
+    <string name="style_email">正式 Email（嚴謹專業）</string>
 </resources>

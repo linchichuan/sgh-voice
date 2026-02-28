@@ -99,7 +99,7 @@ class TranscriptionPipeline(
             return result
 
         } catch (e: Exception) {
-            val errorMsg = e.message ?: "未知錯誤"
+            val errorMsg = e.message ?: "Unknown error"
             callback?.onError(errorMsg)
             return Result(
                 text = "",
@@ -120,7 +120,7 @@ class TranscriptionPipeline(
             val rawText = whisperClient.transcribe(wavData, whisperPrompt)
             Result(text = rawText, rawText = rawText, success = true)
         } catch (e: Exception) {
-            Result(success = false, error = e.message ?: "辨識失敗")
+            Result(success = false, error = e.message ?: "Transcription failed")
         }
     }
 }

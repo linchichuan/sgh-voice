@@ -20,6 +20,8 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.shingihou.sghvoice.api.ApiConfig
 import com.shingihou.sghvoice.processing.DictionaryManager
+import androidx.compose.ui.res.stringResource
+import com.shingihou.sghvoice.R
 
 /**
  * 設定畫面
@@ -31,7 +33,11 @@ fun SetupScreen(apiConfig: ApiConfig) {
     val dictionaryManager = remember { DictionaryManager(context) }
     
     var selectedTab by remember { mutableIntStateOf(0) }
-    val tabs = listOf("基本設定", "個人詞庫", "使用說明")
+    val tabs = listOf(
+        stringResource(R.string.tab_basic_settings),
+        stringResource(R.string.tab_dictionary),
+        stringResource(R.string.tab_usage_guide)
+    )
 
     Column(modifier = Modifier.fillMaxSize()) {
         TabRow(selectedTabIndex = selectedTab) {
@@ -64,24 +70,26 @@ private fun BasicSettingsTab(apiConfig: ApiConfig) {
     var showOpenAiKey by remember { mutableStateOf(false) }
     var showAnthropicKey by remember { mutableStateOf(false) }
     var saveMessage by remember { mutableStateOf("") }
+    val msgSaved = stringResource(R.string.msg_keys_saved)
+    var selectedStyle by remember { mutableStateOf(apiConfig.outputStyle) }
 
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(scrollState),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Text("SGH Voice 基本設定", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        Text(stringResource(R.string.title_basic_settings), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
 
         // === 步驟一：API 金鑰 ===
-        StepCard(stepNumber = 1, title = "設定 API 金鑰") {
+        StepCard(stepNumber = 1, title = stringResource(R.string.step_api_keys)) {
             OutlinedTextField(
                 value = openAiKey,
                 onValueChange = { openAiKey = it },
-                label = { Text("OpenAI API 金鑰") },
+                label = { Text(stringResource(R.string.openai_key_label)) },
                 modifier = Modifier.fillMaxWidth(),
                 visualTransformation = if (showOpenAiKey) VisualTransformation.None else PasswordVisualTransformation(),
                 trailingIcon = {
                     TextButton(onClick = { showOpenAiKey = !showOpenAiKey }) {
-                        Text(if (showOpenAiKey) "隱藏" else "顯示")
+                        Text(if (showOpenAiKey) stringResource(R.string.btn_hide) else stringResource(R.string.btn_show))
                     }
                 }
             )
@@ -89,40 +97,57 @@ private fun BasicSettingsTab(apiConfig: ApiConfig) {
             OutlinedTextField(
                 value = anthropicKey,
                 onValueChange = { anthropicKey = it },
-                label = { Text("Anthropic API 金鑰") },
+                label = { Text(stringResource(R.string.anthropic_key_label)) },
                 modifier = Modifier.fillMaxWidth(),
                 visualTransformation = if (showAnthropicKey) VisualTransformation.None else PasswordVisualTransformation(),
                 trailingIcon = {
                     TextButton(onClick = { showAnthropicKey = !showAnthropicKey }) {
-                        Text(if (showAnthropicKey) "隱藏" else "顯示")
+                        Text(if (showAnthropicKey) stringResource(R.string.btn_hide) else stringResource(R.string.btn_show))
                     }
                 }
             )
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            Text(stringResource(R.string.output_style_label), fontWeight = FontWeight.SemiBold)
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            val styles = listOf("normal" to stringResource(R.string.style_normal), "line" to stringResource(R.string.style_line), "email" to stringResource(R.string.style_email))
+            styles.forEach { (styleId, styleName) ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    RadioButton(
+                        selected = selectedStyle == styleId,
+                        onClick = { selectedStyle = styleId }
+                    )
+                    Text(text = styleName)
+                }
+            }
+
             Spacer(modifier = Modifier.height(12.dp))
             Button(
                 onClick = {
                     apiConfig.openAiApiKey = openAiKey.trim()
                     apiConfig.anthropicApiKey = anthropicKey.trim()
-                    saveMessage = "金鑰已儲存"
+                    apiConfig.outputStyle = selectedStyle
+                    saveMessage = msgSaved
                 },
                 modifier = Modifier.fillMaxWidth()
-            ) { Text("儲存金鑰") }
+            ) { Text(stringResource(R.string.btn_save_keys)) }
             if (saveMessage.isNotBlank()) {
                 Text(saveMessage, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall)
             }
         }
 
         // === 步驟二：啟用輸入法 ===
-        StepCard(stepNumber = 2, title = "啟用輸入法") {
-            Text("請在系統設定中啟用 SGH Voice，並手動切換至該輸入法。", style = MaterialTheme.typography.bodyMedium)
+        StepCard(stepNumber = 2, title = stringResource(R.string.step_enable_ime)) {
+            Text(stringResource(R.string.desc_enable_ime), style = MaterialTheme.typography.bodyMedium)
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = {
                     context.startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS))
-                }, modifier = Modifier.weight(1f)) { Text("啟用設定") }
+                }, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.btn_enable_settings)) }
                 OutlinedButton(onClick = {
                     val imm = context.getSystemService(InputMethodManager::class.java)
                     imm?.showInputMethodPicker()
-                }, modifier = Modifier.weight(1f)) { Text("切換輸入法") }
+                }, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.btn_switch_ime)) }
             }
         }
     }
@@ -143,18 +168,18 @@ private fun DictionaryTab(dictionaryManager: DictionaryManager) {
         modifier = Modifier.fillMaxSize().verticalScroll(scrollState),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Text("個人詞庫管理", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        Text(stringResource(R.string.title_dictionary_manage), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
 
         // 自訂詞彙卡片
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(16.dp)) {
-                Text("自訂詞彙 (提升辨識率)", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.title_custom_words), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     OutlinedTextField(
                         value = newWord,
                         onValueChange = { newWord = it },
-                        label = { Text("新增專有名詞") },
+                        label = { Text(stringResource(R.string.label_add_proper_noun)) },
                         modifier = Modifier.weight(1f),
                         singleLine = true
                     )
@@ -191,13 +216,13 @@ private fun DictionaryTab(dictionaryManager: DictionaryManager) {
         // 錯誤修正卡片
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(16.dp)) {
-                Text("錯誤修正規則", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.title_corrections), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     OutlinedTextField(
                         value = wrongText,
                         onValueChange = { wrongText = it },
-                        label = { Text("原字") },
+                        label = { Text(stringResource(R.string.label_wrong_word)) },
                         modifier = Modifier.weight(1f),
                         singleLine = true
                     )
@@ -205,7 +230,7 @@ private fun DictionaryTab(dictionaryManager: DictionaryManager) {
                     OutlinedTextField(
                         value = correctText,
                         onValueChange = { correctText = it },
-                        label = { Text("修正") },
+                        label = { Text(stringResource(R.string.label_correct_word)) },
                         modifier = Modifier.weight(1f),
                         singleLine = true
                     )
@@ -244,16 +269,16 @@ private fun UsageTab() {
         modifier = Modifier.fillMaxSize().verticalScroll(scrollState),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Text("使用說明", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        Text(stringResource(R.string.usage_title), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(16.dp)) {
-                Text("1. 按住藍色麥克風說話，放開即停止並開始辨識。", style = MaterialTheme.typography.bodyMedium)
+                Text(stringResource(R.string.usage_step1), style = MaterialTheme.typography.bodyMedium)
                 Spacer(modifier = Modifier.height(8.dp))
-                Text("2. 系統會自動處理中、日、英三語混合，並修正口語填充詞。", style = MaterialTheme.typography.bodyMedium)
+                Text(stringResource(R.string.usage_step2), style = MaterialTheme.typography.bodyMedium)
                 Spacer(modifier = Modifier.height(8.dp))
-                Text("3. 所有的簡體字都會在最後一步自動轉為繁體中文（台灣慣用詞）。", style = MaterialTheme.typography.bodyMedium)
+                Text(stringResource(R.string.usage_step3), style = MaterialTheme.typography.bodyMedium)
                 Spacer(modifier = Modifier.height(8.dp))
-                Text("4. 若有專有名詞辨識不準，請在「個人詞庫」中新增該詞彙。", style = MaterialTheme.typography.bodyMedium)
+                Text(stringResource(R.string.usage_step4), style = MaterialTheme.typography.bodyMedium)
             }
         }
     }
@@ -266,7 +291,7 @@ private fun StepCard(stepNumber: Int, title: String, content: @Composable () -> 
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text(text = "步驟 $stepNumber: $title", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text(text = "$stepNumber. $title", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             Spacer(modifier = Modifier.height(8.dp))
             content()
         }

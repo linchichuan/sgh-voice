@@ -44,7 +44,7 @@ class WhisperClient(private val apiConfig: ApiConfig) {
     suspend fun transcribe(wavData: ByteArray, initialPrompt: String = ""): String {
         val apiKey = apiConfig.openAiApiKey
         if (apiKey.isBlank()) {
-            throw WhisperException("OpenAI API 金鑰尚未設定")
+            throw WhisperException("OpenAI API key not set")
         }
 
         return withContext(Dispatchers.IO) {
@@ -74,7 +74,7 @@ class WhisperClient(private val apiConfig: ApiConfig) {
             val response = httpClient.awaitCall(request)
 
             val body = response.body?.string()
-                ?: throw WhisperException("Whisper API 回傳空白回應")
+                ?: throw WhisperException("Whisper API returned empty response")
 
             if (!response.isSuccessful) {
                 val errorMsg = try {
@@ -84,14 +84,14 @@ class WhisperClient(private val apiConfig: ApiConfig) {
                 } catch (_: Exception) {
                     "HTTP ${response.code}: $body"
                 }
-                throw WhisperException("Whisper API 錯誤：$errorMsg")
+                throw WhisperException("Whisper API error: $errorMsg")
             }
 
             try {
                 val json = JSONObject(body)
                 json.getString("text").trim()
             } catch (e: Exception) {
-                throw WhisperException("無法解析 Whisper 回應：${e.message}")
+                throw WhisperException("Failed to parse Whisper response: ${e.message}")
             }
         }
     }
@@ -120,7 +120,7 @@ private suspend fun OkHttpClient.awaitCall(request: Request): Response {
             override fun onFailure(call: Call, e: IOException) {
                 if (!continuation.isCancelled) {
                     continuation.resumeWithException(
-                        WhisperException("網路連線失敗：${e.message}")
+                        WhisperException("Network error: ${e.message}")
                     )
                 }
             }

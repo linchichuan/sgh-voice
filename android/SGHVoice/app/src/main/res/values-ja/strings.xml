@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- App 資訊 -->
+    <string name="app_name">SGH Voice</string>
+    <string name="ime_label">SGH Voice 音声入力</string>
+
+    <!-- 輸入法子類型標籤 -->
+    <string name="subtype_label">音声入力（繁体字）</string>
+    <string name="subtype_label_ja">音声入力（日本語）</string>
+    <string name="subtype_label_en">Voice Input (English)</string>
+
+    <!-- 鍵盤狀態文字 -->
+    <string name="status_idle">マイクを長押しして話す</string>
+    <string name="status_recording">録音中… 離して終了</string>
+    <string name="status_processing">処理中…</string>
+    <string name="status_done">入力完了</string>
+    <string name="status_error">エラー発生</string>
+
+    <string name="msg_record_failed">録音失敗：</string>
+    <string name="msg_record_too_short">録音時間が短すぎます。もう一度お試しください</string>
+    <string name="msg_recognizing">音声認識中...</string>
+    <string name="msg_post_processing">認識完了、後処理中...</string>
+    <string name="msg_ai_processing">AI 校正中...</string>
+    <string name="msg_no_speech">音声が検出されませんでした。もう一度お試しください</string>
+    <string name="msg_process_failed">処理失敗：</string>
+    <string name="msg_error">エラー：</string>
+    <string name="msg_unknown_error">不明なエラー</string>
+    <string name="msg_recognize_failed">認識失敗</string>
+
+    <!-- 鍵盤按鍵 -->
+    <string name="mic_button_desc">音声入力マイクボタン</string>
+    <string name="key_backspace">⌫</string>
+    <string name="key_space">空白</string>
+    <string name="key_enter">↵</string>
+
+    <!-- 設定頁面 -->
+    <string name="tab_basic_settings">基本設定</string>
+    <string name="tab_dictionary">個人辞書</string>
+    <string name="tab_usage_guide">使用説明</string>
+
+    <string name="title_basic_settings">SGH Voice 基本設定</string>
+    <string name="step_api_keys">API キーの設定</string>
+    <string name="openai_key_label">OpenAI API キー</string>
+    <string name="anthropic_key_label">Anthropic API キー</string>
+    <string name="btn_hide">隠す</string>
+    <string name="btn_show">表示</string>
+    <string name="btn_save_keys">キーを保存</string>
+    <string name="msg_keys_saved">キーが保存されました</string>
+
+    <string name="step_enable_ime">キーボードを有効化</string>
+    <string name="desc_enable_ime">システム設定で SGH Voice を有効にし、手動でキーボードを切り替えてください。</string>
+    <string name="btn_enable_settings">設定を開く</string>
+    <string name="btn_switch_ime">キーボードを切り替え</string>
+
+    <!-- 個人詞庫 -->
+    <string name="title_dictionary_manage">個人辞書管理</string>
+    <string name="title_custom_words">カスタム単語 (認識率向上)</string>
+    <string name="label_add_proper_noun">固有名詞を追加</string>
+    <string name="title_corrections">エラー修正ルール</string>
+    <string name="label_wrong_word">元の文字</string>
+    <string name="label_correct_word">修正後</string>
+
+    <!-- 使用說明 -->
+    <string name="usage_title">使用説明</string>
+    <string name="usage_step1">1. 青いマイクボタンを長押しして話し、離すと録音が停止して認識が始まります。</string>
+    <string name="usage_step2">2. システムが日中英の3ヶ国語混在を自動処理し、不要なつなぎ言葉（フィラー）を修正します。</string>
+    <string name="usage_step3">3. 簡体字は最後のステップで自動的に台湾の繁体字に変換されます（日本のユーザーには無関係の場合があります）。</string>
+    <string name="usage_step4">4. 固有名詞の認識精度が低い場合は、「個人辞書」に登録してください。</string>
+
+    <string name="output_style_label">出力スタイルの設定</string>
+    <string name="style_normal">一般テキスト（デフォルト）</string>
+    <string name="style_line">LINE メッセージ（短くカジュアル）</string>
+    <string name="style_email">正式なメール（厳密でプロフェッショナル）</string>
+</resources>

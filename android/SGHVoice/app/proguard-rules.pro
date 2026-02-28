@@ -7,8 +7,8 @@
 
 # 保留 OpenCC4J
 -keep class com.github.houbb.opencc4j.** { *; }
-
-# 保留 EncryptedSharedPreferences
+-dontwarn com.github.houbb.opencc4j.**
+-dontwarn com.huaban.analysis.jieba.**
 -keep class androidx.security.crypto.** { *; }
 
 # 保留 Kotlin 協程

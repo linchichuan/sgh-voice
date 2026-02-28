@@ -19,6 +19,7 @@ class ApiConfig(context: Context) {
         private const val KEY_CLAUDE_MODEL = "claude_model"
         private const val KEY_LANGUAGE_PREF = "language_preference"
         private const val KEY_SETUP_COMPLETE = "setup_complete"
+        private const val KEY_OUTPUT_STYLE = "output_style"
 
         // 預設模型
         const val DEFAULT_WHISPER_MODEL = "whisper-1"
@@ -56,6 +57,11 @@ class ApiConfig(context: Context) {
     var claudeModel: String
         get() = prefs.getString(KEY_CLAUDE_MODEL, DEFAULT_CLAUDE_MODEL) ?: DEFAULT_CLAUDE_MODEL
         set(value) = prefs.edit().putString(KEY_CLAUDE_MODEL, value).apply()
+
+    /** 輸出風格 (normal / line / email) */
+    var outputStyle: String
+        get() = prefs.getString(KEY_OUTPUT_STYLE, "normal") ?: "normal"
+        set(value) = prefs.edit().putString(KEY_OUTPUT_STYLE, value).apply()
 
     /** 偏好語言：auto / zh / ja / en */
     var languagePreference: String
