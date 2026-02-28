@@ -24,10 +24,10 @@ android {
 
     signingConfigs {
         create("release") {
-            storeFile = file("SGHUploadKey.jks")
-            storePassword = "sghvoice123"
-            keyAlias = "upload"
-            keyPassword = "sghvoice123"
+            storeFile = file("${System.getProperty("user.home")}/.android/sgh-voice.jks")
+            storePassword = "shingihou2025"
+            keyAlias = "sghvoice"
+            keyPassword = "shingihou2025"
         }
     }
 
