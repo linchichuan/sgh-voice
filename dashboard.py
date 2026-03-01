@@ -41,7 +41,7 @@ def api_stats():
     return jsonify({
         "stats": stats,
         "personalization": personalization,
-        "typing_speed_wpm": config.get("typing_speed_wpm", 40),
+        "typing_speed_cpm": config.get("typing_speed_cpm", 50),
     })
 
 

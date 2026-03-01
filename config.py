@@ -106,7 +106,7 @@ DEFAULT_CONFIG = {
     "max_recording_duration": 360,          # 6 分鐘 (同 Typeless)
     "auto_paste": True,
     "show_notification": True,
-    "typing_speed_wpm": 40,                 # 用戶打字速度（計算節省時間用）
+    "typing_speed_cpm": 50,                 # 用戶打字速度（每分鐘字元數，中文約 30-60）
     "custom_words": [
         "繁體中文", "輸入法",
         "Repo", "Repository", "GitHub", "branch", "Release", "DMG",
@@ -251,8 +251,8 @@ def update_stats(text, audio_duration, config):
     words = len(text.split())
     chars = len(text)
 
-    # Time saved estimate: (chars / typing_speed_cpm) - audio_duration
-    typing_speed_cpm = config.get("typing_speed_wpm", 40) * 5  # chars per minute
+    # 節省時間：打字所需時間 - 語音錄製時間
+    typing_speed_cpm = config.get("typing_speed_cpm", 50)  # 每分鐘字元數（中文約 30-60）
     typing_time = (chars / typing_speed_cpm) * 60 if typing_speed_cpm > 0 else 0
     time_saved = max(0, typing_time - audio_duration)
 
