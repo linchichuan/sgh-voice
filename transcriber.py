@@ -115,9 +115,14 @@ class Transcriber:
                 print(f"    → 將自動使用雲端 API 作為 LLM 後處理")
                 return
 
-            # Step 2: 偵測成功，預熱模型
+            # Step 2: 偵測成功，預熱模型（首次載入模型需要較長時間）
             try:
-                self.local_llm.chat.completions.create(
+                warmup_client = openai.OpenAI(
+                    base_url=detector.base_url or "http://127.0.0.1:11434/v1",
+                    api_key="ollama",
+                    timeout=30.0,  # 模型首次載入可能需 5-15 秒
+                )
+                warmup_client.chat.completions.create(
                     model=self.config.get("local_llm_model", "qwen2.5:3b"),
                     messages=[{"role": "user", "content": "hi"}],
                     max_tokens=1,
