@@ -3,9 +3,11 @@
 > 替代 Typeless（$12/月）的自建方案。Whisper 語音辨識 + Claude/Qwen 智慧後處理，支援中日英三語混合，資料 100% 掌控在自己手中。
 
 [![macOS](https://img.shields.io/badge/macOS-Apple_Silicon-black?logo=apple)](https://github.com/linchichuan/sgh-voice/releases)
+[![Android](https://img.shields.io/badge/Android-8.0+-green?logo=android)](https://github.com/linchichuan/sgh-voice/releases)
 [![Python](https://img.shields.io/badge/Python-3.12+-blue?logo=python)](https://www.python.org/)
 [![License](https://img.shields.io/badge/License-Private-gray)]()
-[![Version](https://img.shields.io/badge/Version-1.1.0-green)]()
+[![Version](https://img.shields.io/badge/Version-1.2.0-green)]()
+[![Website](https://img.shields.io/badge/Website-voice.shingihou.com-blue)](https://voice.shingihou.com)
 
 ---
 
@@ -20,9 +22,11 @@
 | **個人詞庫學習** | 自動累積修正規則，越用越準 |
 | **Smart Replace** | `@mail`、`@phone` 等觸發詞自動展開 |
 | **9 種改寫模式** | 精簡 / 正式 / 會議 / Email / 技術 / 口語 / 翻英 / 翻日 / 翻中 |
+| **🏥 醫療場景模式** | 日文醫療術語・藥品名・生技名詞專用詞庫（v1.2） |
 | **Push-to-Talk / Toggle** | 按住 Right Cmd 說話，或按一下開始、再按一下停止 |
 | **跨應用程式** | 系統級語音輸入，辨識完自動貼到游標位置 |
 | **Web Dashboard** | 使用統計、歷史紀錄、詞庫管理、設定 |
+| **Android IME** | Android 鍵盤輸入法，任何 App 都能用語音輸入 |
 
 ---
 
@@ -126,23 +130,27 @@ Dashboard:       Flask + 原生 HTML/JS
 ### API 整合方式
 
 **OpenAI Whisper API**
+
 - 用途：語音轉文字（Cloud 路由）
 - 音檔格式：WAV 16kHz mono
 - 特色：`initial_prompt` 帶入自訂詞庫提升辨識精度
 - 費用：約 $0.006/分鐘
 
 **Anthropic Claude API**
+
 - 用途：後處理潤稿（去填充詞、自我修正偵測、標點分段）
 - 模型：Claude Haiku 4.5（速度優先）
 - 特色：自訂 system prompt，保持三語混合不翻譯
 - 費用：約 $0.001/次
 
 **本地 Whisper (mlx-whisper)**
+
 - 用途：短音訊快速辨識，無需網路
 - 模型：`mlx-community/whisper-turbo`
 - 特色：Apple Silicon Neural Engine 加速，beam_size=1 貪婪解碼
 
 **本地 LLM (Ollama)**
+
 - 用途：短文字快速後處理
 - 模型：`qwen2.5:3b`
 - 特色：完全離線，適合簡單去填充詞
@@ -226,7 +234,7 @@ sgh-voice/
 ├── transcriber.py      # Whisper + LLM 五層處理管線
 ├── recorder.py         # 音訊錄製（sounddevice）
 ├── memory.py           # 詞庫記憶 + 自動學習
-├── config.py           # 設定與資料持久化
+├── config.py           # 設定、場景預設、資料持久化
 ├── dashboard.py        # Flask Web Dashboard
 ├── dashboard_window.py # WebView 視窗啟動器
 ├── overlay.py          # 狀態覆蓋 UI
@@ -236,11 +244,20 @@ sgh-voice/
 ├── resources/
 │   ├── icon.icns       # App 圖示
 │   └── entitlements.plist
-└── static/
-    └── index.html      # Dashboard UI
+├── static/
+│   └── index.html      # Dashboard UI
+├── android/SGHVoice/   # Android IME 專案 (Kotlin + Jetpack Compose)
+└── sgh-voice-web/      # 產品網站 (voice.shingihou.com)
+    ├── index.html      # Landing Page
+    ├── style.css
+    ├── i18n.js         # 5 語翻譯
+    ├── main.js         # Firebase Firestore 互動
+    ├── privacy.html    # 隱私權政策
+    └── firebase.json   # Firebase 部署設定
 ```
 
 本地資料位置：`~/.voice-input/`
+
 ```
 ~/.voice-input/
 ├── config.json         # 設定（含 API Key）
@@ -271,5 +288,7 @@ Private — 新義豊株式会社 (Shingihou Co., Ltd.) 內部使用
 ## 開發者
 
 **林紀全 (Lin Chichuan)** — CEO, 新義豊株式会社
+
 - 🌐 [shingihou.com](https://shingihou.com)
-- 📧 service@shingihou.com
+- 🎙️ [voice.shingihou.com](https://voice.shingihou.com)
+- 📧 <service@shingihou.com>
