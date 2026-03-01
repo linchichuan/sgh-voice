@@ -43,6 +43,13 @@ class DictionaryManager(context: Context) {
             "輸入發" to "輸入法",
             "繁體重文" to "繁體中文",
             "語音辨是" to "語音辨識",
+            // Claude 常被 Whisper 辨識為 cloud/Cloud
+            "cloud code" to "Claude Code",
+            "Cloud Code" to "Claude Code",
+            "cloud AI" to "Claude AI",
+            "Cloud AI" to "Claude AI",
+            "cloud haiku" to "Claude Haiku",
+            "Cloud Haiku" to "Claude Haiku",
         )
 
         // ─── 使用場景預設（同步自 macOS config.py SCENE_PRESETS）───

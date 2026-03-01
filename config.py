@@ -26,6 +26,15 @@ BASE_CORRECTIONS = {
     "薬日本": "kusurijapan",
     "林紀泉": "林紀全",
     "林記全": "林紀全",
+    # Claude 常被 Whisper 辨識為 cloud/Cloud
+    "cloud code": "Claude Code",
+    "Cloud Code": "Claude Code",
+    "cloud AI": "Claude AI",
+    "Cloud AI": "Claude AI",
+    "cloud haiku": "Claude Haiku",
+    "Cloud Haiku": "Claude Haiku",
+    "cloud sonnet": "Claude Sonnet",
+    "Cloud Sonnet": "Claude Sonnet",
 }
 
 # ─── 使用場景預設（醫療、一般等）────────────────────────
