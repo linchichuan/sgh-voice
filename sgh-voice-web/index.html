@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SGH Voice — AI 音声入力アシスタント</title>
+    <meta name="description" content="話すだけで、プロ品質のテキストに。中国語・日本語・英語 3言語対応 AI 音声入力ツール。macOS &amp; Android 対応。">
+    <meta property="og:title" content="SGH Voice — AI 音声入力アシスタント">
+    <meta property="og:description" content="話すだけで、プロ品質のテキストに。AI が自動校正・フォーマットまで完了。">
+    <meta property="og:type" content="website">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Noto+Sans+JP:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&family=Noto+Sans:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <!-- ===== Navigation ===== -->
+    <nav class="navbar" id="navbar">
+        <div class="nav-container">
+            <a href="#" class="nav-logo">
+                <svg class="logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+                    <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                    <line x1="12" y1="19" x2="12" y2="23" />
+                    <line x1="8" y1="23" x2="16" y2="23" />
+                </svg>
+                <span>SGH Voice</span>
+            </a>
+            <div class="nav-links">
+                <a href="#features" data-i18n="nav.features">機能</a>
+                <a href="#how-it-works" data-i18n="nav.howItWorks">使い方</a>
+                <a href="#pricing" data-i18n="nav.pricing">料金</a>
+                <a href="#download" data-i18n="nav.download">ダウンロード</a>
+                <a href="privacy.html" data-i18n="nav.privacy">プライバシー</a>
+            </div>
+            <div class="nav-right">
+                <div class="lang-selector">
+                    <button class="lang-btn" id="langBtn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18"
+                            height="18">
+                            <circle cx="12" cy="12" r="10" />
+                            <path d="M2 12h20" />
+                            <path
+                                d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+                        </svg>
+                        <span id="currentLang">日本語</span>
+                    </button>
+                    <div class="lang-dropdown" id="langDropdown">
+                        <button onclick="setLanguage('ja')" class="lang-option active" data-lang="ja">🇯🇵 日本語</button>
+                        <button onclick="setLanguage('zh')" class="lang-option" data-lang="zh">🇹🇼 繁體中文</button>
+                        <button onclick="setLanguage('en')" class="lang-option" data-lang="en">🇺🇸 English</button>
+                        <button onclick="setLanguage('vi')" class="lang-option" data-lang="vi">🇻🇳 Tiếng Việt</button>
+                        <button onclick="setLanguage('th')" class="lang-option" data-lang="th">🇹🇭 ภาษาไทย</button>
+                    </div>
+                </div>
+                <a href="#download" class="nav-cta" data-i18n="nav.cta">無料で始める</a>
+            </div>
+            <button class="mobile-toggle" id="mobileToggle" aria-label="Toggle menu">
+                <span></span><span></span><span></span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- ===== Hero ===== -->
+    <section class="hero" id="hero">
+        <div class="hero-bg">
+            <div class="hero-orb hero-orb-1"></div>
+            <div class="hero-orb hero-orb-2"></div>
+            <div class="hero-orb hero-orb-3"></div>
+        </div>
+        <div class="container hero-content">
+            <div class="hero-badge" data-i18n="hero.badge">macOS & Android 対応</div>
+            <h1 class="hero-title">
+                <span data-i18n="hero.title1">話すだけで、</span><br>
+                <span class="gradient-text" data-i18n="hero.title2">プロ品質のテキストに。</span>
+            </h1>
+            <p class="hero-subtitle" data-i18n="hero.subtitle">AI
+                が音声をリアルタイムで文字起こし・校正・フォーマット。中国語・日本語・英語の3言語を自動検出し、話したままの自然な文章を即座に出力します。</p>
+            <div class="hero-actions">
+                <a href="#download" class="btn btn-primary">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                        <polyline points="7 10 12 15 17 10" />
+                        <line x1="12" y1="15" x2="12" y2="3" />
+                    </svg>
+                    <span data-i18n="hero.cta">無料ダウンロード</span>
+                </a>
+                <a href="#how-it-works" class="btn btn-ghost">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                        <polygon points="5 3 19 12 5 21 5 3" />
+                    </svg>
+                    <span data-i18n="hero.ctaSecondary">使い方を見る</span>
+                </a>
+            </div>
+            <div class="hero-stats">
+                <div class="stat">
+                    <span class="stat-value">3</span>
+                    <span class="stat-label" data-i18n="hero.stat1">対応言語</span>
+                </div>
+                <div class="stat-divider"></div>
+                <div class="stat">
+                    <span class="stat-value">0.5<small>s</small></span>
+                    <span class="stat-label" data-i18n="hero.stat2">応答速度</span>
+                </div>
+                <div class="stat-divider"></div>
+                <div class="stat">
+                    <span class="stat-value">99<small>%</small></span>
+                    <span class="stat-label" data-i18n="hero.stat3">認識精度</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== Features ===== -->
+    <section class="features" id="features">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-label" data-i18n="features.label">主要機能</span>
+                <h2 class="section-title" data-i18n="features.title">すべてをAIに任せる、<br>新しい音声入力体験</h2>
+            </div>
+            <div class="features-grid">
+                <div class="feature-card feature-card-large">
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="28"
+                            height="28">
+                            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+                            <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                            <line x1="12" y1="19" x2="12" y2="23" />
+                            <line x1="8" y1="23" x2="16" y2="23" />
+                        </svg>
+                    </div>
+                    <h3 data-i18n="features.f1.title">3言語混合認識</h3>
+                    <p data-i18n="features.f1.desc">中国語（繁体字）・日本語・英語をシームレスに混合して話しても、AIが自動で正確に文字起こしします。言語切替は不要です。</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="28"
+                            height="28">
+                            <path d="M12 20h9" />
+                            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+                        </svg>
+                    </div>
+                    <h3 data-i18n="features.f2.title">AI 自動校正</h3>
+                    <p data-i18n="features.f2.desc">Claude AI が口語の「えーと」「あの」等を除去し、自然な書き言葉に変換します。</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="28"
+                            height="28">
+                            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+                        </svg>
+                    </div>
+                    <h3 data-i18n="features.f3.title">Groq 超高速処理</h3>
+                    <p data-i18n="features.f3.desc">Groq のハードウェアで Whisper を実行。0.5秒以下で文字起こし完了。</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="28"
+                            height="28">
+                            <rect x="2" y="3" width="20" height="14" rx="2" />
+                            <line x1="8" y1="21" x2="16" y2="21" />
+                            <line x1="12" y1="17" x2="12" y2="21" />
+                        </svg>
+                    </div>
+                    <h3 data-i18n="features.f4.title">ハイブリッドモード</h3>
+                    <p data-i18n="features.f4.desc">短い文はローカルAI、長文はクラウドAIへ自動振り分け。コスト最適化。</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="28"
+                            height="28">
+                            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+                        </svg>
+                    </div>
+                    <h3 data-i18n="features.f5.title">カスタム辞書</h3>
+                    <p data-i18n="features.f5.desc">専門用語・固有名詞を登録して認識精度を大幅に向上。</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="28"
+                            height="28">
+                            <rect x="5" y="2" width="14" height="20" rx="2" />
+                            <line x1="12" y1="18" x2="12" y2="18" />
+                        </svg>
+                    </div>
+                    <h3 data-i18n="features.f6.title">Android IME 対応</h3>
+                    <p data-i18n="features.f6.desc">Androidキーボードとして動作。どのアプリでも音声入力が可能。</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== How It Works ===== -->
+    <section class="how-it-works" id="how-it-works">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-label" data-i18n="howItWorks.label">使い方</span>
+                <h2 class="section-title" data-i18n="howItWorks.title">3ステップで音声入力</h2>
+            </div>
+            <div class="steps-grid">
+                <div class="step-card">
+                    <div class="step-number">01</div>
+                    <div class="step-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="32"
+                            height="32">
+                            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+                            <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                        </svg>
+                    </div>
+                    <h3 data-i18n="howItWorks.s1.title">話す</h3>
+                    <p data-i18n="howItWorks.s1.desc">ホットキーを押しながら、マイクに向かって自由に話しかけます。中国語・日本語・英語を混ぜてもOK。</p>
+                </div>
+                <div class="step-connector">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24">
+                        <polyline points="9 18 15 12 9 6" />
+                    </svg>
+                </div>
+                <div class="step-card">
+                    <div class="step-number">02</div>
+                    <div class="step-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="32"
+                            height="32">
+                            <circle cx="12" cy="12" r="10" />
+                            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+                            <line x1="12" y1="17" x2="12.01" y2="17" />
+                        </svg>
+                    </div>
+                    <h3 data-i18n="howItWorks.s2.title">AI が処理</h3>
+                    <p data-i18n="howItWorks.s2.desc">Whisper が音声を認識し、Claude AI が自動で校正・フォーマット。口語表現を書き言葉に変換します。</p>
+                </div>
+                <div class="step-connector">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24">
+                        <polyline points="9 18 15 12 9 6" />
+                    </svg>
+                </div>
+                <div class="step-card">
+                    <div class="step-number">03</div>
+                    <div class="step-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="32"
+                            height="32">
+                            <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                    </div>
+                    <h3 data-i18n="howItWorks.s3.title">自動入力</h3>
+                    <p data-i18n="howItWorks.s3.desc">処理結果がカーソル位置に自動ペースト。メール、チャット、ドキュメント ― どこでもすぐに使えます。</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== Pricing ===== -->
+    <section class="pricing" id="pricing">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-label" data-i18n="pricing.label">料金プラン</span>
+                <h2 class="section-title" data-i18n="pricing.title">シンプルな料金体系</h2>
+                <p class="section-subtitle" data-i18n="pricing.subtitle">アプリ本体は無料。AI処理は各サービスのAPI利用料のみ。</p>
+            </div>
+            <div class="pricing-grid">
+                <div class="pricing-card">
+                    <div class="pricing-name" data-i18n="pricing.free.name">Free プラン</div>
+                    <div class="pricing-price">¥0</div>
+                    <div class="pricing-period" data-i18n="pricing.free.period">永久無料</div>
+                    <ul class="pricing-features">
+                        <li data-i18n="pricing.free.f1">アプリ本体の全機能</li>
+                        <li data-i18n="pricing.free.f2">Web ダッシュボード</li>
+                        <li data-i18n="pricing.free.f3">カスタム辞書</li>
+                        <li data-i18n="pricing.free.f4">自動繁体字変換</li>
+                        <li data-i18n="pricing.free.f5">API キー自己管理</li>
+                    </ul>
+                    <a href="#download" class="btn btn-outline" data-i18n="pricing.free.cta">ダウンロード</a>
+                </div>
+                <div class="pricing-card pricing-card-featured">
+                    <div class="pricing-badge" data-i18n="pricing.pro.badge">おすすめ</div>
+                    <div class="pricing-name" data-i18n="pricing.pro.name">Pro プラン</div>
+                    <div class="pricing-price">¥980<small>/月</small></div>
+                    <div class="pricing-period" data-i18n="pricing.pro.period">API 料金込み・使い放題</div>
+                    <ul class="pricing-features">
+                        <li data-i18n="pricing.pro.f1">Free プランの全機能</li>
+                        <li data-i18n="pricing.pro.f2">API キー不要（サーバー提供）</li>
+                        <li data-i18n="pricing.pro.f3">優先サポート</li>
+                        <li data-i18n="pricing.pro.f4">新機能の先行体験</li>
+                        <li data-i18n="pricing.pro.f5">商用利用可</li>
+                    </ul>
+                    <a href="#subscribe" class="btn btn-primary" data-i18n="pricing.pro.cta">サブスクライブ</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== Subscribe ===== -->
+    <section class="subscribe" id="subscribe">
+        <div class="container">
+            <div class="subscribe-card">
+                <div class="subscribe-content">
+                    <h2 data-i18n="subscribe.title">最新情報をお届けします</h2>
+                    <p data-i18n="subscribe.desc">新機能のリリース情報やアップデートをいち早くお届けします。メールアドレスをご登録ください。</p>
+                </div>
+                <form class="subscribe-form" id="subscribeForm" onsubmit="handleSubscribe(event)">
+                    <div class="input-group">
+                        <input type="email" id="emailInput" placeholder="mail@example.com" required>
+                        <button type="submit" class="btn btn-primary" data-i18n="subscribe.cta">登録する</button>
+                    </div>
+                    <p class="subscribe-note" data-i18n="subscribe.note">スパムは送りません。いつでも解除可能です。</p>
+                    <div class="subscribe-success" id="subscribeSuccess" style="display:none;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20"
+                            height="20">
+                            <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                        <span data-i18n="subscribe.success">登録ありがとうございます！</span>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== Download ===== -->
+    <section class="download" id="download">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-label" data-i18n="download.label">ダウンロード</span>
+                <h2 class="section-title" data-i18n="download.title">今すぐ始めましょう</h2>
+            </div>
+            <div class="download-grid">
+                <div class="download-card">
+                    <div class="download-icon">
+                        <svg viewBox="0 0 24 24" fill="currentColor" width="40" height="40">
+                            <path
+                                d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z" />
+                        </svg>
+                    </div>
+                    <h3>macOS</h3>
+                    <p class="download-desc" data-i18n="download.macDesc">Apple Silicon (M1/M2/M3/M4)</p>
+                    <a href="https://github.com/linchichuan/sgh-voice/releases/download/v1.1.1/SGH.Voice-1.1.0-apple-silicon.dmg"
+                        class="btn btn-primary download-btn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18"
+                            height="18">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                            <polyline points="7 10 12 15 17 10" />
+                            <line x1="12" y1="15" x2="12" y2="3" />
+                        </svg>
+                        DMG (136 MB)
+                    </a>
+                </div>
+                <div class="download-card">
+                    <div class="download-icon">
+                        <svg viewBox="0 0 24 24" fill="currentColor" width="40" height="40">
+                            <path
+                                d="M17.523 0H6.477L.48 5.97V18l5.998 6h11.046L23.52 18V5.97L17.523 0zM2.5 6.81L7.34 2.01h9.3l4.84 4.8v10.36l-4.84 4.82H7.34L2.5 17.19V6.81z" />
+                            <path d="M16.5 8.5l-5 3v6l5-3v-6zM7.5 8.5v6l5 3v-6l-5-3z" />
+                        </svg>
+                    </div>
+                    <h3>Android</h3>
+                    <p class="download-desc" data-i18n="download.androidDesc">Android 8.0+ (Google Play 審査中)</p>
+                    <a href="https://github.com/linchichuan/sgh-voice/releases/tag/v1.1.1"
+                        class="btn btn-outline download-btn" data-i18n="download.androidCta">リリースページ</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== Footer ===== -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-grid">
+                <div class="footer-brand">
+                    <div class="footer-logo">
+                        <svg class="logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+                            <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                            <line x1="12" y1="19" x2="12" y2="23" />
+                            <line x1="8" y1="23" x2="16" y2="23" />
+                        </svg>
+                        <span>SGH Voice</span>
+                    </div>
+                    <p class="footer-desc" data-i18n="footer.desc">新義豊株式会社が開発する AI 音声入力アシスタント</p>
+                </div>
+                <div class="footer-links">
+                    <h4 data-i18n="footer.product">製品</h4>
+                    <a href="#features" data-i18n="nav.features">機能</a>
+                    <a href="#pricing" data-i18n="nav.pricing">料金</a>
+                    <a href="#download" data-i18n="nav.download">ダウンロード</a>
+                </div>
+                <div class="footer-links">
+                    <h4 data-i18n="footer.legal">法的事項</h4>
+                    <a href="privacy.html" data-i18n="nav.privacy">プライバシーポリシー</a>
+                    <a href="terms.html" data-i18n="footer.terms">利用規約</a>
+                </div>
+                <div class="footer-links">
+                    <h4 data-i18n="footer.company">会社情報</h4>
+                    <a href="https://shingihou.com" target="_blank">Shingihou Co., Ltd.</a>
+                    <a href="mailto:info@shingihou.com">info@shingihou.com</a>
+                    <a href="https://github.com/linchichuan/sgh-voice" target="_blank">GitHub</a>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>© 2026 Shingihou Co., Ltd. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="i18n.js"></script>
+    <script src="main.js"></script>
+</body>
+
+</html>
