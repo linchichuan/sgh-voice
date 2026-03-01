@@ -1,0 +1,27 @@
+{
+    "firestore": {
+        "rules": "firestore.rules"
+    },
+    "hosting": {
+        "site": "sgh-voice",
+        "public": ".",
+        "ignore": [
+            "firebase.json",
+            "firestore.rules",
+            "vercel.json",
+            "**/.*",
+            "**/node_modules/**"
+        ],
+        "headers": [
+            {
+                "source": "**/*.@(js|css|html)",
+                "headers": [
+                    {
+                        "key": "Cache-Control",
+                        "value": "max-age=3600"
+                    }
+                ]
+            }
+        ]
+    }
+}
