@@ -535,6 +535,22 @@ body {
     line-height: 1.7;
 }
 
+/* Medical feature card highlight */
+.feature-card-medical {
+    background: linear-gradient(135deg, #ecfdf5 0%, #f0fdf4 40%, #eff6ff 100%);
+    border-color: rgba(16, 185, 129, 0.25);
+}
+
+.feature-card-medical:hover {
+    border-color: rgba(16, 185, 129, 0.5);
+    box-shadow: 0 0 40px rgba(16, 185, 129, 0.15);
+}
+
+.feature-icon-medical {
+    background: rgba(16, 185, 129, 0.12);
+    color: #059669;
+}
+
 /* --- How It Works --- */
 .how-it-works {
     padding: 100px 0;
