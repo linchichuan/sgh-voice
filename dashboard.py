@@ -78,6 +78,23 @@ def api_history():
     return jsonify(items)
 
 
+@app.route("/api/history/<path:timestamp>", methods=["PATCH"])
+def api_update_history(timestamp):
+    """更新歷史紀錄的 final_text，並自動學習修正規則"""
+    data = request.json
+    new_text = data.get("final_text", "")
+    old_text = memory.update_history_item(timestamp, new_text)
+    if old_text is None:
+        return jsonify({"error": "not found"}), 404
+
+    # 自動學習：比對修改前後的差異
+    learned = []
+    if old_text != new_text:
+        learned = memory.learn_correction(old_text, new_text)
+
+    return jsonify({"ok": True, "learned": learned})
+
+
 @app.route("/api/history/<timestamp>", methods=["DELETE"])
 def api_delete_history(timestamp):
     memory.delete_history_item(timestamp)

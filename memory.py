@@ -25,30 +25,33 @@ class Memory:
 
     # ─── Whisper Prompt ──────────────────────────────────
 
-    def build_whisper_prompt(self, custom_words):
-        """合併 BASE_CUSTOM_WORDS + custom_words + auto_added 去重後注入 Whisper prompt。
-        基礎詞庫不顯示在 UI，但提升辨識精度。限制 20 個以內。"""
+    def build_whisper_prompt(self, custom_words, scene_words=None):
+        """合併 BASE_CUSTOM_WORDS + scene_words + custom_words + auto_added 去重後注入 Whisper prompt。
+        基礎詞庫不顯示在 UI，但提升辨識精度。限制 50 個以內（醫療術語較多）。"""
         auto_added = self.dictionary.get("auto_added", [])
-        # 合併去重：基礎詞庫 + 使用者 config 詞彙 + 自動學習詞彙
+        # 合併去重：基礎詞庫 + 場景詞彙 + 使用者 config 詞彙 + 自動學習詞彙
         seen = set()
         terms = []
-        for w in BASE_CUSTOM_WORDS + list(custom_words) + auto_added:
+        all_words = BASE_CUSTOM_WORDS + (scene_words or []) + list(custom_words) + auto_added
+        for w in all_words:
             if w not in seen:
                 seen.add(w)
                 terms.append(w)
-            if len(terms) >= 30:
+            if len(terms) >= 50:
                 break
         if not terms:
             return ""
         prompt = ", ".join(terms)
-        return prompt[:500]
+        return prompt[:800]
 
     # ─── Apply Corrections ───────────────────────────────
 
-    def apply_corrections(self, text):
-        """套用修正：基礎修正 + 使用者自訂修正（使用者規則覆蓋基礎規則）"""
-        # 合併：基礎修正被使用者自訂覆蓋
-        merged = {**BASE_CORRECTIONS, **self.dictionary.get("corrections", {})}
+    def apply_corrections(self, text, scene_corrections=None):
+        """套用修正：基礎修正 + 場景修正 + 使用者自訂修正（使用者規則 > 場景規則 > 基底規則）"""
+        merged = {**BASE_CORRECTIONS}
+        if scene_corrections:
+            merged.update(scene_corrections)
+        merged.update(self.dictionary.get("corrections", {}))
         result = text
         for wrong, right in sorted(merged.items(), key=lambda x: -len(x[0])):
             result = result.replace(wrong, right)
@@ -182,6 +185,18 @@ class Memory:
                      if search in h.get("final_text", "").lower()
                      or search in h.get("whisper_raw", "").lower()]
         return list(reversed(items[-n:]))
+
+    def update_history_item(self, timestamp, new_final_text):
+        """更新歷史紀錄的 final_text，並回傳原始文字（供 learn_correction 使用）"""
+        with self._history_lock:
+            for h in self.history:
+                if h.get("timestamp") == timestamp:
+                    old_text = h.get("final_text", "")
+                    h["final_text"] = new_final_text
+                    h["edited"] = True
+                    save_history(self.history)
+                    return old_text
+        return None
 
     def delete_history_item(self, timestamp):
         """刪除單一歷史紀錄"""

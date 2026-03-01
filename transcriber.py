@@ -10,7 +10,7 @@ import numpy as np
 from datetime import datetime
 import openai
 import anthropic
-from config import load_smart_replace
+from config import load_smart_replace, SCENE_PRESETS
 from ollama_detector import get_detector, OllamaStatus
 
 
@@ -217,8 +217,10 @@ class Transcriber:
                     print(f" 🔇 偵測到 Whisper 幻覺（重複 {len(words)} 次），跳過")
                     return None
 
-        # Step 2: 本地詞庫修正
-        corrected = self.memory.apply_corrections(raw)
+        # Step 2: 本地詞庫修正（含場景修正）
+        scene = self.config.get("active_scene", "general")
+        scene_data = SCENE_PRESETS.get(scene, {})
+        corrected = self.memory.apply_corrections(raw, scene_data.get("corrections"))
 
         # Step 3: Smart Replace（觸發詞展開）
         corrected = self._apply_smart_replace(corrected)
@@ -317,9 +319,11 @@ class Transcriber:
             lang = self.config.get("language", "auto")
             if lang != "auto":
                 kwargs["language"] = lang
-            # 注入 custom_words prompt 提升專有名詞辨識準確度
+            # 注入 custom_words + 場景詞彙 prompt 提升專有名詞辨識準確度
+            scene = self.config.get("active_scene", "general")
+            scene_words = SCENE_PRESETS.get(scene, {}).get("custom_words")
             prompt = self.memory.build_whisper_prompt(
-                self.config.get("custom_words", [])
+                self.config.get("custom_words", []), scene_words=scene_words
             )
             if prompt:
                 kwargs["prompt"] = prompt
@@ -352,9 +356,11 @@ class Transcriber:
             lang = self.config.get("language", "auto")
             if lang != "auto":
                 kwargs["language"] = lang
-            # 三語引導前綴 + memory 的 custom_words/auto_added
+            # 三語引導前綴 + memory 的 custom_words/auto_added + 場景詞彙
+            scene = self.config.get("active_scene", "general")
+            scene_words = SCENE_PRESETS.get(scene, {}).get("custom_words")
             whisper_prompt = self.memory.build_whisper_prompt(
-                self.config.get("custom_words", [])
+                self.config.get("custom_words", []), scene_words=scene_words
             )
             prefix = "繁體中文、日本語、English mixed conversation。"
             kwargs["initial_prompt"] = f"{prefix}{whisper_prompt}" if whisper_prompt else prefix
@@ -391,6 +397,11 @@ class Transcriber:
             "語音辨識後處理。修正錯字、移除填充詞（嗯、啊、那個、えーと、um 等），"
             "只輸出修正後的文字，不加解釋。所有中文必須是繁體中文。"
         )
+        # 注入場景額外 prompt
+        scene = self.config.get("active_scene", "general")
+        scene_extra = SCENE_PRESETS.get(scene, {}).get("system_prompt_extra", "")
+        if scene_extra:
+            system = system + "\n" + scene_extra
 
         try:
             t0 = time.time()
@@ -442,8 +453,12 @@ class Transcriber:
             system = "翻譯助手。只輸出翻譯結果。"
             user_msg = self._build_translate_prompt(text)
         else:
-            # 優先使用 config 中的 claude_system_prompt (其實是通用的 system prompt)
             system = self.config.get("claude_system_prompt", self._DICTATE_SYSTEM)
+            # 注入場景額外 prompt
+            scene = self.config.get("active_scene", "general")
+            scene_extra = SCENE_PRESETS.get(scene, {}).get("system_prompt_extra", "")
+            if scene_extra:
+                system = system + "\n" + scene_extra
             user_msg = text
 
         try:
@@ -497,9 +512,13 @@ class Transcriber:
             system = "翻譯助手。只輸出翻譯結果。"
             user_msg = self._build_translate_prompt(text)
         else:
-            # 讀取 config 中的 prompt
             system = self.config.get("claude_system_prompt", self._DICTATE_SYSTEM)
-            user_msg = text  # 直接送原文
+            # 注入場景額外 prompt
+            scene = self.config.get("active_scene", "general")
+            scene_extra = SCENE_PRESETS.get(scene, {}).get("system_prompt_extra", "")
+            if scene_extra:
+                system = system + "\n" + scene_extra
+            user_msg = text
 
         try:
             # max_tokens 按輸入長度給（加標點分段後可能比原文長，需足夠空間）
