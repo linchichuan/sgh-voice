@@ -60,7 +60,7 @@ class ClaudeClient(private val apiConfig: ApiConfig) {
      * @return 後處理後的文字
      * @throws ClaudeException 當 API 呼叫失敗時拋出
      */
-    suspend fun postProcess(text: String): String {
+    suspend fun postProcess(text: String, sceneExtra: String = ""): String {
         // 空白文字直接回傳
         if (text.isBlank()) return text
 
@@ -75,11 +75,14 @@ class ClaudeClient(private val apiConfig: ApiConfig) {
             return text
         }
 
-        // 決定提示詞（根據設定的轉換風格）
-        val systemPrompt = when (apiConfig.outputStyle) {
+        // 決定提示詞（根據設定的轉換風格）+ 場景額外指示
+        var systemPrompt = when (apiConfig.outputStyle) {
             "line" -> LINE_PROMPT
             "email" -> EMAIL_PROMPT
             else -> NORMAL_PROMPT
+        }
+        if (sceneExtra.isNotBlank()) {
+            systemPrompt = "$systemPrompt\n$sceneExtra"
         }
 
         return withContext(Dispatchers.IO) {

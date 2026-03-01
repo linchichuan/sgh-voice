@@ -78,10 +78,11 @@ class TranscriptionPipeline(
             // === 第二層：詞庫修正 ===
             val correctedText = dictionaryManager.applyCorrections(rawText)
 
-            // === 第三層：Claude 後處理 ===
+            // === 第三層：Claude 後處理（含場景指令）===
             callback?.onClaudeStarted()
+            val sceneExtra = dictionaryManager.getSceneSystemPromptExtra()
             val processedText = try {
-                claudeClient.postProcess(correctedText)
+                claudeClient.postProcess(correctedText, sceneExtra)
             } catch (e: Exception) {
                 // Claude 失敗時降級為使用詞庫修正後的結果
                 correctedText
