@@ -167,7 +167,7 @@ class Transcriber:
         raw = None
         # 如果是 numpy 陣列或檔案路徑，優先嘗試 Local Whisper
         if is_hybrid and (isinstance(audio_source, np.ndarray) or audio_duration <= self.config.get("hybrid_audio_threshold", 15)):
-            raw = self._local_whisper(audio_source)
+            raw = self._local_stt(audio_source)
             if raw:
                 stt_source = "local"
                 print(f" ⚡ [Local Whisper 處理成功] 耗時: {time.time()-t0:.2f}s")
@@ -350,6 +350,51 @@ class Transcriber:
             except Exception as e:
                 print(f"Whisper API error (timeout/network): {e}")
                 return None
+
+    def _local_stt(self, audio_source):
+        """統一本地 STT 入口，根據 stt_engine 路由"""
+        engine = self.config.get("stt_engine", "mlx-whisper")
+        if engine == "cloud-only":
+            return None  # 跳過本地 STT，直接用雲端 API
+        if engine == "qwen3-asr":
+            return self._qwen3_asr(audio_source)
+        return self._local_whisper(audio_source)  # 預設 mlx-whisper
+
+    def _qwen3_asr(self, audio_source):
+        """Qwen3-ASR MLX 推論"""
+        try:
+            from mlx_qwen3_asr import transcribe as qwen3_transcribe
+        except ImportError:
+            print(" ⚠️ mlx-qwen3-asr 未安裝，fallback 到 mlx-whisper")
+            print("    安裝方式：pip install mlx-qwen3-asr")
+            return self._local_whisper(audio_source)
+        try:
+            # 如果 audio_source 是 numpy 陣列，先存成臨時 WAV
+            audio_path = audio_source
+            is_temp = False
+            if isinstance(audio_source, np.ndarray):
+                import tempfile
+                import soundfile as sf
+                sr = self.config.get("sample_rate", 16000)
+                tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
+                sf.write(tmp.name, audio_source, sr)
+                tmp.close()
+                audio_path = tmp.name
+                is_temp = True
+
+            with Transcriber._metal_lock:
+                result = qwen3_transcribe(audio_path)
+
+            # 清理臨時檔
+            if is_temp:
+                import os
+                os.unlink(audio_path)
+
+            text = result.get("text", "") if isinstance(result, dict) else str(result)
+            return text
+        except Exception as e:
+            print(f" ⚠️ Qwen3-ASR 錯誤: {e}，fallback 到 mlx-whisper")
+            return self._local_whisper(audio_source)
 
     def _local_whisper(self, audio_source):
         """使用 Mac 本地 mlx-whisper，支援傳入 numpy 陣列或路徑"""
@@ -728,6 +773,7 @@ class Transcriber:
             "has_anthropic_key": bool(self.config.get("anthropic_api_key")),
             "hybrid_mode": self.config.get("enable_hybrid_mode", True),
             "local_model": self.config.get("local_llm_model", "qwen2.5:3b"),
+            "stt_engine": self.config.get("stt_engine", "mlx-whisper"),
         }
 
     def _apply_smart_replace(self, text):

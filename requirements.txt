@@ -9,3 +9,5 @@ rumps>=0.4.0
 flask>=3.0.0
 opencc-python-reimplemented>=0.1.7
 elevenlabs>=1.0.0
+# 可選：Qwen3-ASR MLX（多語 ASR，Apple Silicon 專用）
+# pip install mlx-qwen3-asr

@@ -215,6 +215,7 @@ DEFAULT_CONFIG = {
     "enable_hybrid_mode": True,             # 混合模式開關 (Local + Cloud)，Apple Silicon 預設開啟
     "hybrid_audio_threshold": 15,           # 錄音小於 15 秒用 Local Whisper
     "hybrid_text_threshold": 30,            # 句子小於 30 字用 Local LLM (Qwen)
+    "stt_engine": "mlx-whisper",                           # mlx-whisper | qwen3-asr | cloud-only
     "local_whisper_model": "mlx-community/whisper-turbo",  # 本地 Whisper 模型
     "local_llm_model": "qwen2.5:3b",        # Ollama 上的本地模型名稱
     "backup_audio_dir": "",                  # 音訊備份目錄（空字串=不備份）
