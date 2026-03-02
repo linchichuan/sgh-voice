@@ -81,57 +81,33 @@ SCENE_PRESETS = {
 }
 
 # ─── App 感知場景風格（偵測前景 App 自動切換 prompt）─────────
+# App 感知風格：根據前景 App 自動調整輸出格式
+# 核心原則：語言由口述內容的主要語言決定，不由 App 強制指定
+_LANG_RULE = "語言規則：根據口述內容的主要語言輸出，不強制指定語言。中文必須是繁體中文。"
 DEFAULT_APP_STYLES = {
-    "line": {
-        "label": "LINE 💬",
-        "apps": ["jp.naver.line.mac"],
-        "prompt": (
-            "FORMAT: 正在 LINE 上聊天。\n"
-            "- 必須使用「繁體中文」輸出，口語化、自然流暢\n"
-            "- 句子簡短，不隨便加問候語\n"
-            "- 堅い構造や敬語体にしない"
-        )
-    },
-    "whatsapp": {
-        "label": "WhatsApp 💬",
-        "apps": ["net.whatsapp.WhatsApp", "net.whatsapp.WhatsApp.mac"],
-        "prompt": (
-            "FORMAT: User is typing in WhatsApp.\n"
-            "- MUST output in English\n"
-            "- Keep it casual, concise, and conversational\n"
-            "- Use short sentences"
-        )
-    },
     "chat": {
-        "label": "其他通訊 💬",
+        "label": "通訊 💬",
         "apps": [
+            "jp.naver.line.mac",
+            "net.whatsapp.WhatsApp", "net.whatsapp.WhatsApp.mac",
             "com.tinyspeck.slackmacgap",     # Slack
             "com.hnc.Discord",               # Discord
             "org.telegram.Telegram",         # Telegram
             "com.facebook.archon",           # Messenger
         ],
-        "prompt": (
-            "FORMAT: 正在通訊軟體上聊天。\n"
-            "- 根據使用者的原語言輸出（預設繁體中文）\n"
-            "- 口語化、簡潔、短句，不要官腔過度正式"
-        ),
+        "prompt": f"聊天訊息風格：口語、簡潔、短句。{_LANG_RULE}",
     },
     "email": {
-        "label": "メール 📧",
+        "label": "信件 📧",
         "apps": [
             "com.apple.mail",
             "com.google.Gmail",
             "com.microsoft.Outlook",
         ],
-        "prompt": (
-            "FORMAT: ユーザーはメールを書いている。\n"
-            "- 丁寧で構造的な文章に\n"
-            "- 段落を分けて読みやすく\n"
-            "- ビジネスメールの場合は適切な敬語・定型文を使用"
-        ),
+        "prompt": f"商務信件風格：段落分明、語氣得體。{_LANG_RULE}",
     },
     "notes": {
-        "label": "ノート 📝",
+        "label": "筆記 📝",
         "apps": [
             "notion.id",
             "md.obsidian",
@@ -139,15 +115,10 @@ DEFAULT_APP_STYLES = {
             "com.apple.Notes",
             "com.evernote.Evernote",
         ],
-        "prompt": (
-            "FORMAT: ユーザーはノートアプリに記入中。\n"
-            "- 箇条書きや番号付きリストを活用\n"
-            "- 見出しや構造を意識した整理\n"
-            "- 簡潔で検索しやすい表現に"
-        ),
+        "prompt": f"筆記風格：善用條列式、簡潔扼要。{_LANG_RULE}",
     },
     "code": {
-        "label": "IDE/程式碼 💻",
+        "label": "開發 💻",
         "apps": [
             "com.microsoft.VSCode",
             "com.apple.dt.Xcode",
@@ -157,58 +128,41 @@ DEFAULT_APP_STYLES = {
             "com.apple.Terminal",
         ],
         "prompt": (
-            "FORMAT: 正在 IDE 或終端機中開發。\n"
-            "- 絕對要保留所有技術用語、程式碼、指令的原始寫法\n"
-            "- 不要畫蛇添足加上不必要的標點符號\n"
-            "- 若使用者在講述邏輯，確保變數名稱和邏輯的精確性"
+            "開發環境：保留所有技術用語原始寫法（Repo, API, GitHub, Claude, REPL, Docker 等），"
+            f"不加多餘標點。{_LANG_RULE}"
         ),
     },
     "ai_chat": {
-        "label": "AI 対話 ✨",
+        "label": "AI 對話 ✨",
         "apps": [
             "com.openai.chat",                # ChatGPT
             "com.anthropic.claudefordesktop",  # Claude Desktop
         ],
-        "prompt": (
-            "FORMAT: ユーザーは AI チャットに質問/指示を入力中。\n"
-            "- 完全な質問文や指示文にする\n"
-            "- 文脈と意図を明確に記述\n"
-            "- 「〜してください」等の依頼形を活用"
-        ),
+        "prompt": f"AI 對話：整理成完整的問題或指示。{_LANG_RULE}",
     },
     "search": {
-        "label": "検索 🔍",
+        "label": "搜尋 🔍",
         "apps": [
             "com.apple.Safari",
             "com.google.Chrome",
             "org.mozilla.firefox",
             "company.thebrowser.Browser",     # Arc
         ],
-        "prompt": (
-            "FORMAT: ユーザーは検索バーに入力中。\n"
-            "- 検索キーワード化する（短いフレーズ）\n"
-            "- 句読点は最小限\n"
-            "- 検索意図を明確に表現"
-        ),
+        "prompt": "搜尋模式：轉為簡短搜尋關鍵字，最少標點。",
     },
     "social": {
-        "label": "SNS 👥",
+        "label": "社群 👥",
         "apps": [
             "com.atebits.Tweetie2",    # X (Twitter)
             "com.facebook.Facebook",
             "com.burbn.instagram",
         ],
-        "prompt": (
-            "FORMAT: ユーザーは SNS に投稿中。\n"
-            "- カジュアルで親しみやすい文体\n"
-            "- 適度な改行で読みやすく\n"
-            "- 長すぎない段落に"
-        ),
+        "prompt": f"社群貼文風格：親切自然、適度換行。{_LANG_RULE}",
     },
     "default": {
         "label": "一般",
         "apps": [],
-        "prompt": "",   # 追加 prompt なし → 標準の後処理のみ
+        "prompt": "",
     },
 }
 
