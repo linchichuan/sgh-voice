@@ -332,8 +332,13 @@ def api_model_download(model_key):
             from huggingface_hub import snapshot_download
             from tqdm import tqdm
 
-            # 自訂 tqdm 類，攔截進度資訊
+            # 自訂 tqdm 類，攔截進度資訊（接受 huggingface_hub 傳入的額外 kwargs）
             class ProgressTracker(tqdm):
+                def __init__(self, *args, **kwargs):
+                    # huggingface_hub 會傳 name= 等額外參數，tqdm 不認識，先過濾掉
+                    kwargs.pop("name", None)
+                    super().__init__(*args, **kwargs)
+
                 def update(self, n=1):
                     super().update(n)
                     _download_status["progress"] = self.n
