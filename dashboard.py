@@ -5,7 +5,7 @@ dashboard.py — Web Dashboard (Flask)
 import os
 import sys
 import json
-from flask import Flask, jsonify, request
+from flask import Flask, request, jsonify, send_from_directory
 from config import load_config, save_config, load_stats, update_stats, load_smart_replace, save_smart_replace, DEFAULT_APP_STYLES
 from memory import Memory
 import anthropic
