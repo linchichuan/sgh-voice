@@ -226,13 +226,14 @@ class Transcriber:
         corrected = self._apply_smart_replace(corrected)
 
         # Step 4: 後處理（潤稿/去填充詞/自我修正偵測/翻譯）
-        final = corrected
+        final = None
 
         # 短句跳過 LLM：≤20 字且無填充詞，直接用詞庫修正結果，極速貼上
         skip_llm = False
         if mode == "dictate" and len(corrected) <= 20:
             skip_llm = not self._has_filler_words(corrected)
             if skip_llm:
+                final = corrected
                 llm_source = "skip"
                 print(" ⚡ [短句跳過 LLM 後處理，極速模式]")
 
@@ -395,8 +396,8 @@ class Transcriber:
 
         system = (
             "語音辨識後處理。修正錯字、移除填充詞（嗯、啊、那個、えーと、um 等），"
-            "務必加上正確的標點符號（逗號、句號、問號等），長段落適當分段。"
-            "只輸出修正後的文字，不加解釋。所有中文必須是繁體中文。"
+            "務必加上標點符號：中文用全形（，。？！、：），日文用全形，英文用半形且後面空一格。"
+            "長段落適當分段。只輸出修正後的文字，不加解釋。所有中文必須是繁體中文。"
         )
         # 注入場景額外 prompt
         scene = self.config.get("active_scene", "general")
@@ -421,7 +422,7 @@ class Transcriber:
             return result
         except Exception as e:
             err_str = str(e).lower()
-            if "connection" in err_str or "refused" in err_str or "timeout" in err_str:
+            if "connection" in err_str or "refused" in err_str or "timeout" in err_str or "timed out" in err_str:
                 # 連線問題：標記為需要重新偵測
                 detector._last_check = 0  # 清除快取，下次觸發重新偵測
                 print(f" ⚠️ Ollama 連線失敗，切換到雲端 API: {e}")
@@ -435,7 +436,7 @@ class Transcriber:
         "1. 刪除所有填充詞：嗯、啊、那個、就是、然後、對、欸、所以說、基本上、えーと、あの、えー、まあ、um、uh、like、you know、basically、actually、so yeah、I mean\n"
         "2. 刪除冗餘詞：這個、那個（非必要指代時）、就是說、我想說一下\n"
         "3. 口語自我修正→只保留最終版本（例：不是A啦，我的意思是B→只留B）\n"
-        "4. 標點與段落：請務必加上正確的標點符號（逗號、句號、問號等），並將長篇大論適當分段，提升閱讀性。\n"
+        "4. 標點符號必加：中文用全形標點（，。？！、：；），日文用全形標點，英文用半形標點且後面空一格。長篇大論適當分段，提升閱讀性。\n"
         "5. 不要改寫核心句子結構，保持講者的原意與語氣\n"
         "6. 多語混合保持原樣\n"
         "7. 只輸出結果，不加任何解釋"
