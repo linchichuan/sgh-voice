@@ -5,8 +5,7 @@ dashboard.py — Web Dashboard (Flask)
 import os
 import sys
 import json
-from flask import Flask, request, jsonify, send_from_directory
-from config import load_config, save_config, load_stats, update_stats, load_smart_replace, save_smart_replace
+from config import load_config, save_config, load_stats, update_stats, load_smart_replace, save_smart_replace, DEFAULT_APP_STYLES
 from memory import Memory
 import anthropic
 
@@ -50,6 +49,7 @@ def api_get_config():
     config = load_config()
     # 隱藏 API key 的中間部分
     safe = config.copy()
+    safe["app_styles"] = config.get("app_styles", DEFAULT_APP_STYLES)
     for key in ["openai_api_key", "anthropic_api_key", "elevenlabs_api_key", "groq_api_key"]:
         v = safe.get(key, "")
         if len(v) > 12:

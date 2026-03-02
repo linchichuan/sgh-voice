@@ -10,7 +10,7 @@ import numpy as np
 from datetime import datetime
 import openai
 import anthropic
-from config import load_smart_replace, SCENE_PRESETS
+from config import load_smart_replace, SCENE_PRESETS, DEFAULT_APP_STYLES, detect_app_style
 from ollama_detector import get_detector, OllamaStatus
 
 
@@ -225,7 +225,13 @@ class Transcriber:
         # Step 3: Smart Replace（觸發詞展開）
         corrected = self._apply_smart_replace(corrected)
 
-        # Step 4: 後處理（潤稿/去填充詞/自我修正偵測/翻譯）
+        # Step 4: 偵測前景 App 場景風格
+        app_style = detect_app_style(self.config)
+        app_style_prompt = app_style.get("prompt", "")
+        if app_style["style"] != "default":
+            print(f" 🎯 [App Style] {app_style['app_name']} → {app_style['style']}")
+
+        # Step 5: 後處理（潤稿/去填充詞/自我修正偵測/翻譯）
         final = None
 
         # 短句跳過 LLM：≤20 字且無填充詞，直接用詞庫修正結果，極速貼上
@@ -404,6 +410,10 @@ class Transcriber:
         scene_extra = SCENE_PRESETS.get(scene, {}).get("system_prompt_extra", "")
         if scene_extra:
             system = system + "\n" + scene_extra
+        # 注入 App 感知風格 prompt
+        app_prompt = detect_app_style(self.config).get("prompt", "")
+        if app_prompt:
+            system = system + "\n" + app_prompt
 
         try:
             t0 = time.time()
@@ -461,7 +471,11 @@ class Transcriber:
             scene_extra = SCENE_PRESETS.get(scene, {}).get("system_prompt_extra", "")
             if scene_extra:
                 system = system + "\n" + scene_extra
-            user_msg = text
+            # 注入 App 感知風格 prompt
+            app_prompt = detect_app_style(self.config).get("prompt", "")
+            if app_prompt:
+                system = system + "\n" + app_prompt
+            user_msg = f"[語音轉錄原文，請修正後直接輸出]\n{text}"
 
         try:
             resp = self.oai.chat.completions.create(
@@ -520,7 +534,11 @@ class Transcriber:
             scene_extra = SCENE_PRESETS.get(scene, {}).get("system_prompt_extra", "")
             if scene_extra:
                 system = system + "\n" + scene_extra
-            user_msg = text
+            # 注入 App 感知風格 prompt
+            app_prompt = detect_app_style(self.config).get("prompt", "")
+            if app_prompt:
+                system = system + "\n" + app_prompt
+            user_msg = f"[語音轉錄原文，請修正後直接輸出]\n{text}"
 
         try:
             # max_tokens 按輸入長度給（加標點分段後可能比原文長，需足夠空間）
@@ -563,24 +581,41 @@ class Transcriber:
         "我將按照", "我将按照", "確保：", "确保：",
         "為您修改如下", "为您修改如下",
         "I'm ready", "I'll help", "Here is", "Sure,",
+        "I'm Claude", "I am Claude", "I'm an AI", "I am an AI",
+        "as an AI", "AI assistant", "language model",
+        "I appreciate your", "I should clarify",
         "お手伝い", "承知しました",
+        "我是 Claude", "我是Claude", "作為 AI", "作為AI",
+        "身為 AI", "身為AI", "語言模型",
     ]
 
     def _is_llm_hallucination(self, result, original_text):
         """偵測 LLM 是否進入「回答」模式而非「編輯/濃縮」模式"""
-        # 檢查特徵詞：只檢查字串「開頭」是否有明顯的問候語或解釋語。
-        # 不使用全句 in 搜尋，避免誤殺正常的濃縮總結。
+        # 1. 檢查開頭特徵詞（問候語/解釋語）
         startswith_markers = [
             "好的", "沒問題", "沒問題，", "了解", "了解，",
-            "為您", "為您修改", "以下是", "已為您", "當然，", "沒錯", "沒錯，"
+            "為您", "為您修改", "以下是", "已為您", "當然，", "沒錯", "沒錯，",
+            "I appreciate", "I should clarify", "Thank you for",
+            "As an AI", "As a language model",
         ]
         if any(result.startswith(m) for m in startswith_markers):
             return True
-            
-        # 回覆比原文長 3 倍以上，可能是加了過多解釋
+
+        # 2. 全文搜尋 AI 自我介紹特徵（這些不可能出現在正常口述中）
+        ai_identity_markers = [
+            "I'm Claude", "I am Claude", "I'm an AI", "I am an AI",
+            "AI assistant made by", "language model",
+            "我是 Claude", "我是Claude", "作為 AI", "身為 AI",
+            "Anthropic", "OpenAI 開發",
+        ]
+        result_lower = result.lower()
+        if any(m.lower() in result_lower for m in ai_identity_markers):
+            return True
+
+        # 3. 回覆比原文長 3 倍以上，可能是加了過多解釋
         if len(result) > len(original_text) * 3 and len(original_text) > 10:
             return True
-            
+
         return False
 
     def _build_dictate_prompt(self, text):

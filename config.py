@@ -80,6 +80,161 @@ SCENE_PRESETS = {
     },
 }
 
+# ─── App 感知場景風格（偵測前景 App 自動切換 prompt）─────────
+DEFAULT_APP_STYLES = {
+    "line": {
+        "label": "LINE 💬",
+        "apps": ["jp.naver.line.mac"],
+        "prompt": (
+            "FORMAT: 正在 LINE 上聊天。\n"
+            "- 必須使用「繁體中文」輸出，口語化、自然流暢\n"
+            "- 句子簡短，不隨便加問候語\n"
+            "- 堅い構造や敬語体にしない"
+        )
+    },
+    "whatsapp": {
+        "label": "WhatsApp 💬",
+        "apps": ["net.whatsapp.WhatsApp", "net.whatsapp.WhatsApp.mac"],
+        "prompt": (
+            "FORMAT: User is typing in WhatsApp.\n"
+            "- MUST output in English\n"
+            "- Keep it casual, concise, and conversational\n"
+            "- Use short sentences"
+        )
+    },
+    "chat": {
+        "label": "其他通訊 💬",
+        "apps": [
+            "com.tinyspeck.slackmacgap",     # Slack
+            "com.hnc.Discord",               # Discord
+            "org.telegram.Telegram",         # Telegram
+            "com.facebook.archon",           # Messenger
+        ],
+        "prompt": (
+            "FORMAT: 正在通訊軟體上聊天。\n"
+            "- 根據使用者的原語言輸出（預設繁體中文）\n"
+            "- 口語化、簡潔、短句，不要官腔過度正式"
+        ),
+    },
+    "email": {
+        "label": "メール 📧",
+        "apps": [
+            "com.apple.mail",
+            "com.google.Gmail",
+            "com.microsoft.Outlook",
+        ],
+        "prompt": (
+            "FORMAT: ユーザーはメールを書いている。\n"
+            "- 丁寧で構造的な文章に\n"
+            "- 段落を分けて読みやすく\n"
+            "- ビジネスメールの場合は適切な敬語・定型文を使用"
+        ),
+    },
+    "notes": {
+        "label": "ノート 📝",
+        "apps": [
+            "notion.id",
+            "md.obsidian",
+            "net.shinyfrog.bear",
+            "com.apple.Notes",
+            "com.evernote.Evernote",
+        ],
+        "prompt": (
+            "FORMAT: ユーザーはノートアプリに記入中。\n"
+            "- 箇条書きや番号付きリストを活用\n"
+            "- 見出しや構造を意識した整理\n"
+            "- 簡潔で検索しやすい表現に"
+        ),
+    },
+    "code": {
+        "label": "IDE/程式碼 💻",
+        "apps": [
+            "com.microsoft.VSCode",
+            "com.apple.dt.Xcode",
+            "com.todesktop.230313mzl4w4u92",  # Cursor
+            "dev.warp.Warp-Stable",
+            "com.googlecode.iterm2",
+            "com.apple.Terminal",
+        ],
+        "prompt": (
+            "FORMAT: 正在 IDE 或終端機中開發。\n"
+            "- 絕對要保留所有技術用語、程式碼、指令的原始寫法\n"
+            "- 不要畫蛇添足加上不必要的標點符號\n"
+            "- 若使用者在講述邏輯，確保變數名稱和邏輯的精確性"
+        ),
+    },
+    "ai_chat": {
+        "label": "AI 対話 ✨",
+        "apps": [
+            "com.openai.chat",                # ChatGPT
+            "com.anthropic.claudefordesktop",  # Claude Desktop
+        ],
+        "prompt": (
+            "FORMAT: ユーザーは AI チャットに質問/指示を入力中。\n"
+            "- 完全な質問文や指示文にする\n"
+            "- 文脈と意図を明確に記述\n"
+            "- 「〜してください」等の依頼形を活用"
+        ),
+    },
+    "search": {
+        "label": "検索 🔍",
+        "apps": [
+            "com.apple.Safari",
+            "com.google.Chrome",
+            "org.mozilla.firefox",
+            "company.thebrowser.Browser",     # Arc
+        ],
+        "prompt": (
+            "FORMAT: ユーザーは検索バーに入力中。\n"
+            "- 検索キーワード化する（短いフレーズ）\n"
+            "- 句読点は最小限\n"
+            "- 検索意図を明確に表現"
+        ),
+    },
+    "social": {
+        "label": "SNS 👥",
+        "apps": [
+            "com.atebits.Tweetie2",    # X (Twitter)
+            "com.facebook.Facebook",
+            "com.burbn.instagram",
+        ],
+        "prompt": (
+            "FORMAT: ユーザーは SNS に投稿中。\n"
+            "- カジュアルで親しみやすい文体\n"
+            "- 適度な改行で読みやすく\n"
+            "- 長すぎない段落に"
+        ),
+    },
+    "default": {
+        "label": "一般",
+        "apps": [],
+        "prompt": "",   # 追加 prompt なし → 標準の後処理のみ
+    },
+}
+
+def detect_app_style(config):
+    """前景 App の Bundle ID から場景スタイルを判定（macOS 専用，套用使用者自訂）"""
+    app_styles = config.get("app_styles", DEFAULT_APP_STYLES)
+    app_style_lookup = {}
+    for style_key, style_data in app_styles.items():
+        for bundle_id in style_data.get("apps", []):
+            app_style_lookup[bundle_id] = style_key
+
+    try:
+        from AppKit import NSWorkspace
+        app = NSWorkspace.sharedWorkspace().frontmostApplication()
+        bundle_id = app.bundleIdentifier() or ""
+        app_name = app.localizedName() or ""
+        style_key = app_style_lookup.get(bundle_id, "default")
+        return {
+            "bundle_id": bundle_id,
+            "app_name": app_name,
+            "style": style_key,
+            "prompt": app_styles.get(style_key, {}).get("prompt", ""),
+        }
+    except Exception:
+        return {"bundle_id": "", "app_name": "", "style": "default", "prompt": ""}
+
 DATA_DIR = os.path.expanduser("~/.voice-input")
 CONFIG_FILE = os.path.join(DATA_DIR, "config.json")
 DICTIONARY_FILE = os.path.join(DATA_DIR, "dictionary.json")
