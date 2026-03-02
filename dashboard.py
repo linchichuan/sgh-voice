@@ -5,7 +5,7 @@ dashboard.py — Web Dashboard (Flask)
 import os
 import sys
 import json
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory, Response
 from config import load_config, save_config, load_stats, update_stats, load_smart_replace, save_smart_replace, DEFAULT_APP_STYLES
 from memory import Memory
 import anthropic
@@ -284,6 +284,101 @@ def api_ollama_detect():
         **detector.get_status_dict(),
         "environment": env_check,
     })
+
+
+# ─── 模型下載管理 ──────────────────────────────────────
+
+# 模型下載狀態（全域，供 SSE 輪詢）
+_download_status = {"active": False, "progress": 0, "total": 0, "message": "", "done": False, "error": ""}
+
+# 模型 repo 對照表
+_MODEL_REPOS = {
+    "qwen3-asr": "Qwen/Qwen3-ASR-0.6B",
+    "whisper-large-v3": "mlx-community/whisper-large-v3-mlx",
+}
+
+
+@app.route("/api/model/status/<model_key>")
+def api_model_status(model_key):
+    """檢查模型是否已下載"""
+    repo_id = _MODEL_REPOS.get(model_key)
+    if not repo_id:
+        return jsonify({"error": "unknown model"}), 400
+    # 檢查 HF 快取
+    cache_name = f"models--{repo_id.replace('/', '--')}"
+    hf_home = os.environ.get("HF_HOME", os.path.expanduser("~/.cache/huggingface"))
+    model_dir = os.path.join(hf_home, "hub", cache_name)
+    snapshots = os.path.join(model_dir, "snapshots")
+    downloaded = os.path.isdir(snapshots) and len(os.listdir(snapshots)) > 0
+    return jsonify({"model": model_key, "repo": repo_id, "downloaded": downloaded})
+
+
+@app.route("/api/model/download/<model_key>", methods=["POST"])
+def api_model_download(model_key):
+    """觸發模型下載（背景執行）"""
+    global _download_status
+    repo_id = _MODEL_REPOS.get(model_key)
+    if not repo_id:
+        return jsonify({"error": "unknown model"}), 400
+    if _download_status["active"]:
+        return jsonify({"error": "already downloading"}), 409
+
+    import threading
+
+    def _do_download():
+        global _download_status
+        _download_status = {"active": True, "progress": 0, "total": 0, "message": f"正在下載 {repo_id}...", "done": False, "error": ""}
+        try:
+            from huggingface_hub import snapshot_download
+            from tqdm import tqdm
+
+            # 自訂 tqdm 類，攔截進度資訊
+            class ProgressTracker(tqdm):
+                def update(self, n=1):
+                    super().update(n)
+                    _download_status["progress"] = self.n
+                    _download_status["total"] = self.total or 0
+
+            snapshot_download(
+                repo_id,
+                tqdm_class=ProgressTracker,
+            )
+            _download_status["done"] = True
+            _download_status["message"] = f"{repo_id} 下載完成"
+        except Exception as e:
+            _download_status["error"] = str(e)
+            _download_status["message"] = f"下載失敗: {e}"
+        finally:
+            _download_status["active"] = False
+
+    t = threading.Thread(target=_do_download, daemon=True)
+    t.start()
+    return jsonify({"status": "started", "repo": repo_id})
+
+
+@app.route("/api/model/download-progress")
+def api_model_download_progress():
+    """SSE 串流下載進度"""
+    def generate():
+        import time
+        while True:
+            pct = 0
+            if _download_status["total"] > 0:
+                pct = round(_download_status["progress"] / _download_status["total"] * 100, 1)
+            data = json.dumps({
+                "active": _download_status["active"],
+                "progress": _download_status["progress"],
+                "total": _download_status["total"],
+                "percent": pct,
+                "message": _download_status["message"],
+                "done": _download_status["done"],
+                "error": _download_status["error"],
+            })
+            yield f"data: {data}\n\n"
+            if _download_status["done"] or _download_status["error"]:
+                break
+            time.sleep(0.5)
+    return Response(generate(), mimetype="text/event-stream", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
 # ─── Recording Control from Dashboard ───────────────────

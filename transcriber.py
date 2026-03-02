@@ -767,6 +767,13 @@ class Transcriber:
         detector = self.ollama_detector
         if detector.status == OllamaStatus.UNKNOWN:
             detector.detect()
+        # 偵測 Qwen3-ASR 安裝狀態
+        try:
+            import mlx_qwen3_asr
+            qwen3_installed = True
+        except ImportError:
+            qwen3_installed = False
+
         return {
             **detector.get_status_dict(),
             "has_openai_key": bool(self.config.get("openai_api_key")),
@@ -774,6 +781,7 @@ class Transcriber:
             "hybrid_mode": self.config.get("enable_hybrid_mode", True),
             "local_model": self.config.get("local_llm_model", "qwen2.5:3b"),
             "stt_engine": self.config.get("stt_engine", "mlx-whisper"),
+            "qwen3_asr_installed": qwen3_installed,
         }
 
     def _apply_smart_replace(self, text):

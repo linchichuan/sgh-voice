@@ -36,16 +36,51 @@
 
 - macOS 14.0+ (Sonoma 或更新)
 - Apple Silicon (M1/M2/M3/M4)
-- OpenAI API Key（語音辨識用）
-- Anthropic API Key（選用，AI 後處理潤稿）
+- 網路連線（若使用雲端 API）
+- **儲存空間**：約 100MB（若僅用雲端）/ 約 3~6GB（若使用本地模型）
+
+### API 金鑰與模型準備（支援全本地或雲端）
+
+本工具提供極高的彈性，您可以選擇**完全免費的本地端運行**，或是**使用強大的雲端 API**。請依據您的需求準備：
+
+#### 方案 A：全雲端模式（推薦，最省電、最精確）
+
+若不想佔用電腦效能及空間，請準備以下 API Keys：
+
+1. **OpenAI API Key** (`sk-...`)
+   - **用途**：語音轉文字 (STT)
+   - **取得方式**：前往 [OpenAI Platform](https://platform.openai.com/api-keys) 註冊綁定信用卡並取得金鑰。
+2. **Anthropic API Key** (`sk-ant-...`) (選用但極度推薦)
+   - **用途**：AI 智慧後處理（去填充詞、術語修正、自動排版）
+   - **取得方式**：前往 [Anthropic Console](https://console.anthropic.com/settings/keys) 取得金鑰。
+
+#### 方案 B：Hybrid 智能分流（本地 STT + 雲端 LLM）
+
+最平衡的設定，短句零延遲，長句與後處理交給雲端：
+
+1. **本地 Whisper 模型**
+   - 不需特別下載，首次在 Dashboard 啟用 Hybrid 模式時，會在背景自動下載 `mlx-community/whisper-turbo` (約 1.5GB)。
+2. **Anthropic API Key** (同方案 A)
+
+#### 方案 C：全本地模式（完全免費、隱私最高）
+
+完全不需要任何 API Key 即可使用！斷網也能運作：
+
+1. **本地 Whisper 模型**（同方案 B，自動下載）
+2. **本地 Ollama 模型**（用於取代 Claude 進行後處理）
+   - 請先安裝 [Ollama for Mac](https://ollama.com/download/mac)
+   - 開啟終端機執行：`ollama run qwen2.5:3b`（下載約 2GB）
+   - 模型下載完成後，保持 Ollama 運行並在 Dashboard 中選擇該模型。
+
+> 💡 **提示**：除了 OpenAI 跟 Anthropic 以外，進階使用者也可在 Dashboard 填入 **ElevenLabs** 或是 **Groq** 的 API Key 以啟用特定極速功能。
 
 ### 安裝步驟
 
-1. 從 [Releases](https://github.com/linchichuan/sgh-voice/releases) 下載 `SGH-Voice-1.1.0-apple-silicon.dmg`
-2. 雙擊 DMG，將 **SGH Voice** 拖入 Applications 資料夾
-3. 首次開啟：右鍵 → 打開（macOS Gatekeeper 需要允許一次）
+1. 從 [Releases](https://github.com/linchichuan/sgh-voice/releases) 下載 `Voice Input-1.1.0-apple-silicon.dmg`
+2. 雙擊 DMG，將 **Voice Input** 拖入 Applications 資料夾
+3. 首次開啟：在應用程式點擊右鍵 → **打開**（macOS Gatekeeper 需要允許一次）
 4. 選單列出現 🎙 圖示後，點擊 **Open Dashboard**
-5. 在 Dashboard 設定頁填入 API Key
+5. 在 Dashboard 設定頁填入您準備好的 API Key，或是啟用 **Hybrid 模式** 並設定為本地 Ollama。
 
 ### macOS 權限授權
 
@@ -53,9 +88,9 @@
 
 | 權限 | 用途 | 授權對象 |
 |------|------|---------|
-| 麥克風 | 錄音 | SGH Voice |
-| 輔助使用 | 自動貼上（Cmd+V） | SGH Voice |
-| 輸入監控 | 全域快捷鍵監聽 | SGH Voice |
+| 麥克風 | 錄音 | Voice Input |
+| 輔助使用 | 自動貼上（Cmd+V） | Voice Input |
+| 輸入監控 | 全域快捷鍵監聽 | Voice Input |
 
 ---
 

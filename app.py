@@ -10,6 +10,11 @@ macOS 選單列常駐 + Web Dashboard + 全域快捷鍵
 """
 import sys
 import os
+
+# 模型快取指向外接 SSD（Ollama 由 .zshrc 的 OLLAMA_MODELS 管理）
+if not os.environ.get("HF_HOME") and os.path.isdir("/Volumes/Satechi_SSD/huggingface"):
+    os.environ["HF_HOME"] = "/Volumes/Satechi_SSD/huggingface"
+
 import subprocess
 import threading
 import time
