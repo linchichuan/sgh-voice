@@ -159,7 +159,7 @@ class Transcriber:
         # Step 0: 音訊能量檢查（防止靜音送入 Whisper 產生幻覺）
         if isinstance(audio_source, np.ndarray):
             rms = np.sqrt(np.mean(audio_source ** 2))
-            if rms < 0.005:  # 靜音閾值
+            if rms < 0.0005:  # 靜音閾值 (Lowered from 0.005 to 0.0005)
                 print(f" 🔇 音訊能量過低 (RMS={rms:.5f})，跳過辨識")
                 return None
 
@@ -383,15 +383,15 @@ class Transcriber:
                 is_temp = True
 
             with Transcriber._metal_lock:
-                result = qwen3_transcribe(audio_path)
+                result = qwen3_transcribe(audio_path, model="Qwen/Qwen3-ASR-0.6B")
 
             # 清理臨時檔
             if is_temp:
                 import os
                 os.unlink(audio_path)
 
-            text = result.get("text", "") if isinstance(result, dict) else str(result)
-            return text
+            # TranscriptionResult dataclass，.text 是轉錄文字
+            return result.text
         except Exception as e:
             print(f" ⚠️ Qwen3-ASR 錯誤: {e}，fallback 到 mlx-whisper")
             return self._local_whisper(audio_source)
