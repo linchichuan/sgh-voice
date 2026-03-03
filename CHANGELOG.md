@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.2.1 (2026-03-03)
+
+- 新增 Dashboard「詞庫學習懸浮提示」：新增詞彙、新增/更新修正規則時，右上角即時浮窗提示使用者。
+- 懸浮提示支援多語系（zh-TW / ja / en / ko / th / vi）並加入短時間去重，避免重複洗版。
+- 更新 macOS App / DMG 版本號至 `1.2.1`（`build.sh` / `voiceinput.spec` / README / Firebase 下載頁）。
+- iOS / Android 不新增此懸浮提示（維持現有行為）。
+
 ## v1.2.0 (2026-03-03)
 
 - 修復 Dashboard `static/index.html` 內的 JavaScript 語法錯誤，避免頁面因 i18n 區塊錯置而無法載入。
