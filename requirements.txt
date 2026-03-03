@@ -1,0 +1,13 @@
+openai>=1.0.0
+anthropic>=0.30.0
+sounddevice>=0.4.6
+soundfile>=0.12.1
+numpy>=1.24.0
+pynput>=1.7.6
+pyperclip>=1.8.2
+rumps>=0.4.0
+flask>=3.0.0
+opencc-python-reimplemented>=0.1.7
+elevenlabs>=1.0.0
+# 可選：Qwen3-ASR MLX（多語 ASR，Apple Silicon 專用）
+# pip install mlx-qwen3-asr

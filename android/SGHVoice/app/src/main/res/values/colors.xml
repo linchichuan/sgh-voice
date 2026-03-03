@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 色彩資源 — SGH Voice -->
+<resources>
+    <!-- 品牌色彩 -->
+    <color name="primary">#1A73E8</color>
+    <color name="primary_dark">#1558B0</color>
+    <color name="secondary">#34A853</color>
+
+    <!-- 鍵盤色彩 -->
+    <color name="keyboard_bg">#F0F0F2</color>
+    <color name="key_bg">#FFFFFF</color>
+    <color name="key_bg_pressed">#D4D4D8</color>
+    <color name="key_text">#333333</color>
+    <color name="key_text_enter">#FFFFFF</color>
+    <color name="key_enter_bg">#1A73E8</color>
+
+    <!-- 麥克風按鈕色彩 -->
+    <color name="mic_bg">#1A73E8</color>
+    <color name="mic_bg_recording">#E53935</color>
+    <color name="mic_icon">#FFFFFF</color>
+
+    <!-- 狀態文字色彩 -->
+    <color name="status_text">#666666</color>
+    <color name="status_recording">#E53935</color>
+    <color name="status_success">#34A853</color>
+</resources>

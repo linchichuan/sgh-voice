@@ -1,0 +1,25 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Subscribe emails — anyone can create, no one can read/update/delete
+    match /sgh-voice-subscribers/{docId} {
+      allow create: if request.resource.data.keys().hasAll(['email', 'createdAt'])
+                    && request.resource.data.email is string
+                    && request.resource.data.email.size() > 0
+                    && request.resource.data.email.size() < 256;
+      allow read, update, delete: if false;
+    }
+    // Contact form — anyone can create, no one can read/update/delete
+    match /sgh-voice-contacts/{docId} {
+      allow create: if request.resource.data.keys().hasAll(['name', 'email', 'message', 'createdAt'])
+                    && request.resource.data.name is string
+                    && request.resource.data.email is string
+                    && request.resource.data.message is string;
+      allow read, update, delete: if false;
+    }
+    // Default: deny all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

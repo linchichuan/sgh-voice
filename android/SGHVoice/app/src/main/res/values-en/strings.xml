@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- App Info -->
+    <string name="app_name">SGH Voice</string>
+    <string name="ime_label">SGH Voice Input</string>
+
+    <!-- Subtype labels -->
+    <string name="subtype_label">Voice Input (Trad. Chinese)</string>
+    <string name="subtype_label_ja">Voice Input (Japanese)</string>
+    <string name="subtype_label_en">Voice Input (English)</string>
+
+    <!-- Keyboard Status -->
+    <string name="status_idle">Hold Mic to speak</string>
+    <string name="status_recording">Recording... Release to stop</string>
+    <string name="status_processing">Processing...</string>
+    <string name="status_done">Done</string>
+    <string name="status_error">Error</string>
+
+    <string name="msg_record_failed">Recording failed: </string>
+    <string name="msg_record_too_short">Recording too short, try again.</string>
+    <string name="msg_recognizing">Recognizing speech...</string>
+    <string name="msg_post_processing">Recognizing done, processing...</string>
+    <string name="msg_ai_processing">AI refining text...</string>
+    <string name="msg_no_speech">No speech detected, try again.</string>
+    <string name="msg_process_failed">Processing failed: </string>
+    <string name="msg_error">Error: </string>
+    <string name="msg_unknown_error">Unknown error</string>
+    <string name="msg_recognize_failed">Recognition failed</string>
+
+    <!-- Keyboard buttons -->
+    <string name="mic_button_desc">Voice Input Mic</string>
+    <string name="key_backspace">⌫</string>
+    <string name="key_space">Space</string>
+    <string name="key_enter">↵</string>
+
+    <!-- Setup Screen Tabs -->
+    <string name="tab_basic_settings">Basic Settings</string>
+    <string name="tab_dictionary">Dictionary</string>
+    <string name="tab_usage_guide">Guide</string>
+
+    <string name="title_basic_settings">SGH Voice Settings</string>
+    <string name="step_api_keys">Setup API Keys</string>
+    <string name="openai_key_label">OpenAI API Key</string>
+    <string name="anthropic_key_label">Anthropic API Key</string>
+    <string name="btn_hide">Hide</string>
+    <string name="btn_show">Show</string>
+    <string name="btn_save_keys">Save Keys</string>
+    <string name="msg_keys_saved">Keys saved securely</string>
+
+    <string name="step_enable_ime">Enable Keyboard</string>
+    <string name="desc_enable_ime">Please enable SGH Voice in System Settings, then switch to it.</string>
+    <string name="btn_enable_settings">Open Settings</string>
+    <string name="btn_switch_ime">Switch Keyboard</string>
+
+    <!-- Dictionary -->
+    <string name="title_dictionary_manage">Personal Dictionary</string>
+    <string name="title_custom_words">Custom Words (Enhance Recognition)</string>
+    <string name="label_add_proper_noun">Add proper noun</string>
+    <string name="title_corrections">Error Corrections</string>
+    <string name="label_wrong_word">Original</string>
+    <string name="label_correct_word">Corrected</string>
+
+    <!-- Usage Guide -->
+    <string name="usage_title">Usage Guide</string>
+    <string name="usage_step1">1. Hold the blue microphone button to speak, then release to stop recording.</string>
+    <string name="usage_step2">2. The system automatically processes mixed language (EN/JA/ZH) and removes filler words.</string>
+    <string name="usage_step3">3. Simplified Chinese will be converted to Traditional Chinese (Taiwan standard) automatically.</string>
+    <string name="usage_step4">4. Add proper nouns to the "Personal Dictionary" if they are often misrecognized.</string>
+
+    <string name="output_style_label">Output Style</string>
+    <string name="style_normal">Normal Text (Default)</string>
+    <string name="style_line">LINE Message (Short &amp; Casual)</string>
+    <string name="style_email">Formal Email (Professional)</string>
+</resources>
