@@ -883,6 +883,58 @@
       transform: translateY(0);
       opacity: 1;
     }
+
+    /* ── Learning Popups ── */
+    .learn-popups {
+      position: fixed;
+      top: 18px;
+      right: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      z-index: 10000;
+      pointer-events: none;
+    }
+
+    .learn-popup {
+      min-width: 260px;
+      max-width: 420px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: linear-gradient(145deg, var(--surface2), #1b1d24);
+      box-shadow: 0 10px 28px #00000050;
+      padding: 10px 12px;
+      transform: translateX(120%);
+      opacity: 0;
+      transition: transform 0.25s ease, opacity 0.25s ease;
+    }
+
+    .learn-popup.show {
+      transform: translateX(0);
+      opacity: 1;
+    }
+
+    .learn-popup.word {
+      border-left: 4px solid var(--accent2);
+    }
+
+    .learn-popup.rule {
+      border-left: 4px solid var(--green);
+    }
+
+    .learn-popup .title {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+
+    .learn-popup .content {
+      font-size: 13px;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--text2);
+      word-break: break-word;
+    }
   </style>
 </head>
 
@@ -1373,6 +1425,7 @@
   </div>
 
   <div class="toast" id="toast"></div>
+  <div class="learn-popups" id="learn-popups"></div>
 
   <script>
     // ── i18n 介面多語言 ──
@@ -1884,6 +1937,141 @@
       setTimeout(() => t.classList.remove('show'), 2500);
     }
 
+    // ── Learning Popup ──
+    const _learningState = {
+      initialized: false,
+      words: new Set(),
+      rules: new Map(),
+      timer: null,
+      recent: new Map(),
+    };
+
+    function learnText(key) {
+      const labels = {
+        'zh-TW': {
+          word_added: '🧠 新增詞彙',
+          rule_added: '📚 新增修正',
+          rule_updated: '📚 更新修正',
+          auto_learned: '📚 自動學習',
+        },
+        'ja': {
+          word_added: '🧠 新しい単語を学習',
+          rule_added: '📚 修正ルールを追加',
+          rule_updated: '📚 修正ルールを更新',
+          auto_learned: '📚 自動学習',
+        },
+        'en': {
+          word_added: '🧠 New Word Learned',
+          rule_added: '📚 Correction Added',
+          rule_updated: '📚 Correction Updated',
+          auto_learned: '📚 Auto-Learned',
+        },
+        'ko': {
+          word_added: '🧠 새 단어 학습',
+          rule_added: '📚 수정 규칙 추가',
+          rule_updated: '📚 수정 규칙 업데이트',
+          auto_learned: '📚 자동 학습',
+        },
+        'th': {
+          word_added: '🧠 เรียนรู้คำใหม่',
+          rule_added: '📚 เพิ่มกฎการแก้ไข',
+          rule_updated: '📚 อัปเดตกฎการแก้ไข',
+          auto_learned: '📚 เรียนรู้อัตโนมัติ',
+        },
+        'vi': {
+          word_added: '🧠 Học từ mới',
+          rule_added: '📚 Thêm quy tắc sửa',
+          rule_updated: '📚 Cập nhật quy tắc sửa',
+          auto_learned: '📚 Tự học',
+        },
+      };
+      const langPack = labels[currentUILang] || labels['en'];
+      return langPack[key] || labels['en'][key] || key;
+    }
+
+    function _escapeHtml(s) {
+      return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function _learningRecentlyShown(key) {
+      if (!key) return false;
+      const now = Date.now();
+      const ttl = 15000;
+      for (const [k, ts] of _learningState.recent.entries()) {
+        if (now - ts > ttl) _learningState.recent.delete(k);
+      }
+      const seen = _learningState.recent.get(key);
+      if (seen && now - seen < ttl) return true;
+      _learningState.recent.set(key, now);
+      return false;
+    }
+
+    function showLearningPopup(title, content, kind = 'word', dedupKey = '') {
+      if (dedupKey && _learningRecentlyShown(dedupKey)) return;
+
+      const wrap = document.getElementById('learn-popups');
+      if (!wrap) return;
+
+      const el = document.createElement('div');
+      el.className = `learn-popup ${kind}`;
+      el.innerHTML = `
+        <div class="title">${_escapeHtml(title)}</div>
+        <div class="content">${_escapeHtml(content)}</div>
+      `;
+      wrap.appendChild(el);
+      requestAnimationFrame(() => el.classList.add('show'));
+
+      setTimeout(() => {
+        el.classList.remove('show');
+        setTimeout(() => el.remove(), 280);
+      }, 2800);
+    }
+
+    async function pollLearningUpdates() {
+      try {
+        const data = await api('/dictionary');
+        const nextWords = new Set(data.custom_words || []);
+        const nextRules = new Map(Object.entries(data.corrections || {}));
+
+        if (_learningState.initialized) {
+          // 新增詞彙
+          const wordAdds = [];
+          nextWords.forEach(w => { if (!_learningState.words.has(w)) wordAdds.push(w); });
+          wordAdds.sort().forEach(w => {
+            showLearningPopup(learnText('word_added'), w, 'word', 'word:' + w);
+          });
+
+          // 新增/更新修正規則
+          const ruleAdds = [];
+          nextRules.forEach((right, wrong) => {
+            const old = _learningState.rules.get(wrong);
+            if (old === undefined) ruleAdds.push([wrong, right, 'rule_added']);
+            else if (old !== right) ruleAdds.push([wrong, right, 'rule_updated']);
+          });
+          ruleAdds.sort((a, b) => a[0].localeCompare(b[0])).forEach(([wrong, right, labelKey]) => {
+            showLearningPopup(learnText(labelKey), `${wrong} → ${right}`, 'rule', `rule:${wrong}->${right}`);
+          });
+        }
+
+        _learningState.words = nextWords;
+        _learningState.rules = nextRules;
+        _learningState.initialized = true;
+      } catch (e) {
+        // ignore polling errors
+      }
+    }
+
+    function startLearningMonitor() {
+      pollLearningUpdates();
+      if (_learningState.timer) clearInterval(_learningState.timer);
+      _learningState.timer = setInterval(pollLearningUpdates, 2500);
+    }
+
     // ── Toggle Switch ──
     function toggleSwitch(el) { el.classList.toggle('on'); }
 
@@ -2157,6 +2345,9 @@
         item.edited = true;
         // 顯示學習結果
         if (res.learned && res.learned.length > 0) {
+          res.learned.forEach(r => {
+            showLearningPopup(learnText('auto_learned'), `${r.wrong} → ${r.right}`, 'rule', `rule:${r.wrong}->${r.right}`);
+          });
           const rules = res.learned.map(r => r.wrong + ' → ' + r.right).join('、');
           toast('✅ 已儲存，學習到：' + rules);
         } else {
@@ -2193,6 +2384,7 @@
       await api('/dictionary/word', { method: 'POST', body: { word } });
       input.value = '';
       loadDictionary();
+      showLearningPopup(learnText('word_added'), word, 'word', 'word:' + word);
       toast('已新增：' + word);
     }
     async function removeWord(word) {
@@ -2207,6 +2399,7 @@
       document.getElementById('corr-wrong').value = '';
       document.getElementById('corr-right').value = '';
       loadDictionary();
+      showLearningPopup(learnText('rule_added'), `${wrong} → ${right}`, 'rule', `rule:${wrong}->${right}`);
       toast('已新增修正規則');
     }
     async function removeCorrection(wrong) {
@@ -2519,6 +2712,7 @@
     // ── Init ──
     applyUILang();
     loadDashboard();
+    startLearningMonitor();
 
     // 初始化側邊欄 Ollama 狀態燈
     (async function initSidebarStatus() {
