@@ -73,3 +73,12 @@ android/SGHVoice/gradle-8.5-bin.zip
 android/SGHVoice/gradle-8.13/
 android/SGHVoice/gradle-8.5/
 android/SGHVoice_Release/
+
+# iOS / Xcode
+ios/SGHVoice/SGHVoice.xcodeproj/project.xcworkspace/
+ios/SGHVoice/SGHVoice.xcodeproj/xcuserdata/
+ios/SGHVoice/build/
+ios/SGHVoice/DerivedData/
+ios/SGHVoice/*.xcuserstate
+ios/SGHVoice/SGHVoice/Models/
+ios/SGHVoice/SGHVoice/Utils/

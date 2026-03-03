@@ -1,12 +1,15 @@
 # 🎙 SGH Voice — AI 語音輸入工具
 
+**[English](README.en.md)** | **[日本語](README.ja.md)** | **繁體中文**
+
 > 替代 Typeless（$12/月）的自建方案。Whisper 語音辨識 + Claude/Qwen 智慧後處理，支援中日英三語混合，資料 100% 掌控在自己手中。
 
 [![macOS](https://img.shields.io/badge/macOS-Apple_Silicon-black?logo=apple)](https://github.com/linchichuan/sgh-voice/releases)
+[![iOS](https://img.shields.io/badge/iOS-17.0+-blue?logo=apple)](https://github.com/linchichuan/sgh-voice/releases)
 [![Android](https://img.shields.io/badge/Android-8.0+-green?logo=android)](https://github.com/linchichuan/sgh-voice/releases)
 [![Python](https://img.shields.io/badge/Python-3.12+-blue?logo=python)](https://www.python.org/)
 [![License](https://img.shields.io/badge/License-Private-gray)]()
-[![Version](https://img.shields.io/badge/Version-1.2.0-green)]()
+[![Version](https://img.shields.io/badge/Version-1.3.0-green)]()
 [![Website](https://img.shields.io/badge/Website-voice.shingihou.com-blue)](https://voice.shingihou.com)
 
 ---
@@ -27,6 +30,7 @@
 | **跨應用程式** | 系統級語音輸入，辨識完自動貼到游標位置 |
 | **Web Dashboard** | 使用統計、歷史紀錄、詞庫管理、設定 |
 | **Android IME** | Android 鍵盤輸入法，任何 App 都能用語音輸入 |
+| **iOS App** | iPhone / iPad 原生 App，按下錄音即時辨識（v1.3） |
 
 ---
 
@@ -282,6 +286,12 @@ sgh-voice/
 ├── static/
 │   └── index.html      # Dashboard UI
 ├── android/SGHVoice/   # Android IME 專案 (Kotlin + Jetpack Compose)
+├── ios/SGHVoice/       # iOS App 專案 (Swift + SwiftUI)
+│   └── SGHVoice/
+│       ├── API/        # ApiConfig, WhisperClient, ClaudeClient
+│       ├── Audio/      # AudioRecorder (AVFoundation)
+│       ├── Processing/ # DictionaryManager, TranscriptionPipeline
+│       └── UI/         # MainView, MainViewModel, SettingsView
 └── sgh-voice-web/      # 產品網站 (voice.shingihou.com)
     ├── index.html      # Landing Page
     ├── style.css
