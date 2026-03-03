@@ -1,0 +1,2547 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Voice Input — Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+    rel="stylesheet">
+  <style>
+    :root {
+      /* Default Dark Mode */
+      --bg: #0a0a0f;
+      --surface: #12121a;
+      --surface2: #1a1a26;
+      --surface3: #222233;
+      --border: #2a2a3d;
+      --text: #e4e4ed;
+      --text2: #8888a0;
+      --text3: #555566;
+      --accent: #6c5ce7;
+      --accent2: #a29bfe;
+      --green: #00d2a0;
+      --green2: #00b894;
+      --orange: #fdcb6e;
+      --red: #fd7979;
+      --blue: #74b9ff;
+      --pink: #fd79a8;
+      --radius: 14px;
+      --radius-sm: 8px;
+    }
+
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg: #f8f9fa;
+        --surface: #ffffff;
+        --surface2: #f0f2f5;
+        --surface3: #e4e6eb;
+        --border: #dcdfe3;
+        --text: #1c1e21;
+        --text2: #606770;
+        --text3: #8b929a;
+        --accent: #5e50d8;
+        --accent2: #8a81eb;
+        --green: #00a884;
+        --green2: #009677;
+        --orange: #f39c12;
+        --red: #e74c3c;
+        --blue: #3498db;
+        --pink: #e84393;
+      }
+    }
+
+    /* 手動強制覆寫 */
+    html[data-theme="dark"] {
+      --bg: #0a0a0f;
+      --surface: #12121a;
+      --surface2: #1a1a26;
+      --surface3: #222233;
+      --border: #2a2a3d;
+      --text: #e4e4ed;
+      --text2: #8888a0;
+      --text3: #555566;
+      --accent: #6c5ce7;
+      --accent2: #a29bfe;
+      --green: #00d2a0;
+      --green2: #00b894;
+      --orange: #fdcb6e;
+      --red: #fd7979;
+      --blue: #74b9ff;
+      --pink: #fd79a8;
+    }
+
+    html[data-theme="light"] {
+      --bg: #f8f9fa;
+      --surface: #ffffff;
+      --surface2: #f0f2f5;
+      --surface3: #e4e6eb;
+      --border: #dcdfe3;
+      --text: #1c1e21;
+      --text2: #606770;
+      --text3: #8b929a;
+      --accent: #5e50d8;
+      --accent2: #8a81eb;
+      --green: #00a884;
+      --green2: #009677;
+      --orange: #f39c12;
+      --red: #e74c3c;
+      --blue: #3498db;
+      --pink: #e84393;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── Sidebar ── */
+    .layout {
+      display: flex;
+      min-height: 100vh;
+    }
+
+    .sidebar {
+      width: 220px;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      padding: 24px 0;
+      position: fixed;
+      top: 0;
+      left: 0;
+      bottom: 0;
+      z-index: 100;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .sidebar-logo {
+      padding: 0 20px 24px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 8px;
+    }
+
+    .sidebar-logo h1 {
+      font-size: 18px;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--accent2), var(--green));
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      letter-spacing: -0.5px;
+    }
+
+    .sidebar-logo p {
+      font-size: 11px;
+      color: var(--text2);
+      margin-top: 4px;
+    }
+
+    .nav {
+      flex: 1;
+      padding: 8px 10px;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      color: var(--text2);
+      font-size: 13px;
+      font-weight: 500;
+      transition: all 0.15s;
+      margin-bottom: 2px;
+    }
+
+    .nav-item:hover {
+      background: var(--surface2);
+      color: var(--text);
+    }
+
+    .nav-item.active {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    .nav-item .icon {
+      font-size: 16px;
+      width: 20px;
+      text-align: center;
+    }
+
+    .sidebar-footer {
+      padding: 16px 20px;
+      border-top: 1px solid var(--border);
+      font-size: 11px;
+      color: var(--text3);
+    }
+
+    /* ── Main ── */
+    .main {
+      margin-left: 220px;
+      flex: 1;
+      padding: 32px 40px;
+      max-width: 1100px;
+    }
+
+    .main h2 {
+      font-size: 22px;
+      font-weight: 700;
+      margin-bottom: 24px;
+      letter-spacing: -0.5px;
+    }
+
+    .page {
+      display: none;
+    }
+
+    .page.active {
+      display: block;
+    }
+
+    /* ── Cards ── */
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-bottom: 28px;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+    }
+
+    .card-label {
+      font-size: 12px;
+      color: var(--text2);
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+
+    .card-value {
+      font-size: 32px;
+      font-weight: 700;
+      letter-spacing: -1px;
+      line-height: 1;
+    }
+
+    .card-value.green {
+      color: var(--green);
+    }
+
+    .card-value.accent {
+      color: var(--accent2);
+    }
+
+    .card-value.orange {
+      color: var(--orange);
+    }
+
+    .card-value.blue {
+      color: var(--blue);
+    }
+
+    .card-value.pink {
+      color: var(--pink);
+    }
+
+    .card-sub {
+      font-size: 12px;
+      color: var(--text2);
+      margin-top: 6px;
+    }
+
+    /* ── Progress Ring (Personalization) ── */
+    .progress-section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 28px;
+      margin-bottom: 28px;
+      display: flex;
+      align-items: center;
+      gap: 32px;
+    }
+
+    .progress-ring-wrap {
+      position: relative;
+      width: 120px;
+      height: 120px;
+      flex-shrink: 0;
+    }
+
+    .progress-ring {
+      transform: rotate(-90deg);
+    }
+
+    .progress-ring circle {
+      fill: none;
+      stroke-width: 8;
+      stroke-linecap: round;
+    }
+
+    .progress-ring .bg {
+      stroke: var(--surface3);
+    }
+
+    .progress-ring .fg {
+      stroke: url(#grad);
+      transition: stroke-dashoffset 1s ease;
+    }
+
+    .progress-percent {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--accent2);
+    }
+
+    .progress-info h3 {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .progress-info p {
+      font-size: 13px;
+      color: var(--text2);
+      line-height: 1.6;
+    }
+
+    .progress-bars {
+      margin-top: 14px;
+    }
+
+    .progress-bar-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+      font-size: 12px;
+      color: var(--text2);
+    }
+
+    .progress-bar-item .label {
+      width: 80px;
+    }
+
+    .progress-bar-track {
+      flex: 1;
+      height: 6px;
+      background: var(--surface3);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      border-radius: 3px;
+      transition: width 0.8s ease;
+    }
+
+    /* ── Table ── */
+    .table-wrap {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    .table-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .table-header h3 {
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th {
+      text-align: left;
+      padding: 10px 16px;
+      font-size: 11px;
+      color: var(--text2);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    td {
+      padding: 12px 16px;
+      font-size: 13px;
+      border-bottom: 1px solid var(--border);
+      max-width: 300px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    td.td-final {
+      max-width: 420px;
+      white-space: normal;
+      word-break: break-all;
+      overflow: visible;
+      line-height: 1.5;
+      cursor: pointer;
+      position: relative;
+    }
+
+    td.td-final:hover {
+      background: var(--surface2);
+    }
+
+    td.td-final:hover::after {
+      content: '📋 點擊複製';
+      position: absolute;
+      top: 4px;
+      right: 8px;
+      font-size: 10px;
+      color: var(--accent2);
+      background: var(--surface);
+      padding: 2px 6px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+    }
+
+    tr:hover td {
+      background: var(--surface2);
+    }
+
+    .tag {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    .tag-zh {
+      background: #6c5ce720;
+      color: var(--accent2);
+    }
+
+    .tag-ja {
+      background: #fd79a820;
+      color: var(--pink);
+    }
+
+    .tag-en {
+      background: #74b9ff20;
+      color: var(--blue);
+    }
+
+    .tag-edit {
+      background: #fdcb6e20;
+      color: var(--orange);
+    }
+
+    /* ── Forms ── */
+    input[type="text"],
+    input[type="password"],
+    input[type="number"],
+    select,
+    textarea {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      padding: 10px 14px;
+      font-size: 13px;
+      font-family: inherit;
+      width: 100%;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    input:focus,
+    select:focus,
+    textarea:focus {
+      border-color: var(--accent);
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 80px;
+    }
+
+    label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text2);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    .form-section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+
+    .form-section h3 {
+      font-size: 15px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    /* ── Toggles ── */
+    .toggle-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .toggle-row:last-child {
+      border-bottom: none;
+    }
+
+    .toggle-label {
+      font-size: 13px;
+    }
+
+    .toggle-desc {
+      font-size: 11px;
+      color: var(--text2);
+      margin-top: 2px;
+    }
+
+    .toggle {
+      width: 44px;
+      height: 24px;
+      background: var(--surface3);
+      border-radius: 12px;
+      position: relative;
+      cursor: pointer;
+      transition: background 0.2s;
+      flex-shrink: 0;
+    }
+
+    .toggle.on {
+      background: var(--accent);
+    }
+
+    .toggle::after {
+      content: '';
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 18px;
+      height: 18px;
+      background: #fff;
+      border-radius: 50%;
+      transition: transform 0.2s;
+    }
+
+    .toggle.on::after {
+      transform: translateX(20px);
+    }
+
+    /* ── Buttons ── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 16px;
+      border: none;
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+      font-family: inherit;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    .btn-primary:hover {
+      background: var(--accent2);
+    }
+
+    .btn-ghost {
+      background: transparent;
+      color: var(--text2);
+      border: 1px solid var(--border);
+    }
+
+    .btn-ghost:hover {
+      background: var(--surface2);
+      color: var(--text);
+    }
+
+    .btn-danger {
+      background: var(--red);
+      color: #fff;
+    }
+
+    .btn-danger:hover {
+      opacity: 0.85;
+    }
+
+    .btn-sm {
+      padding: 5px 10px;
+      font-size: 11px;
+    }
+
+    /* ── Search ── */
+    .search-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 6px 12px;
+    }
+
+    .search-bar input {
+      border: none;
+      background: transparent;
+      padding: 4px;
+      font-size: 13px;
+    }
+
+    .search-bar input:focus {
+      outline: none;
+      border: none;
+    }
+
+    .search-icon {
+      color: var(--text2);
+      font-size: 14px;
+    }
+
+    /* ── Words/Tags ── */
+    .word-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .word-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      font-size: 12px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .word-tag .remove {
+      cursor: pointer;
+      color: var(--text2);
+      font-size: 14px;
+      line-height: 1;
+    }
+
+    .word-tag .remove:hover {
+      color: var(--red);
+    }
+
+    /* ── Chart area ── */
+    .chart-area {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      margin-bottom: 28px;
+    }
+
+    .chart-area h3 {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 16px;
+    }
+
+    .bar-chart {
+      display: flex;
+      align-items: flex-end;
+      gap: 6px;
+      height: 120px;
+      padding-top: 10px;
+    }
+
+    .bar-col {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .bar {
+      width: 100%;
+      max-width: 40px;
+      background: linear-gradient(to top, var(--accent), var(--accent2));
+      border-radius: 4px 4px 0 0;
+      min-height: 2px;
+      transition: height 0.5s ease;
+    }
+
+    .bar-label {
+      font-size: 10px;
+      color: var(--text2);
+    }
+
+    .bar-value {
+      font-size: 10px;
+      color: var(--text2);
+      font-weight: 600;
+    }
+
+    /* ── Empty state ── */
+    .empty {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--text2);
+    }
+
+    .empty .icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+    }
+
+    .empty p {
+      font-size: 14px;
+    }
+
+    /* ── Quick Record ── */
+    .quick-record {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      margin-bottom: 28px;
+    }
+
+    .rec-btn {
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      border: none;
+      cursor: pointer;
+      font-size: 28px;
+      transition: all 0.2s;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .rec-btn.idle {
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #fff;
+      box-shadow: 0 4px 20px rgba(108, 92, 231, 0.4);
+    }
+
+    .rec-btn.idle:hover {
+      transform: scale(1.08);
+      box-shadow: 0 6px 28px rgba(108, 92, 231, 0.6);
+    }
+
+    .rec-btn.recording {
+      background: var(--red);
+      color: #fff;
+      animation: pulse-rec 1.2s infinite;
+    }
+
+    .rec-btn.processing {
+      background: var(--orange);
+      color: #000;
+      pointer-events: none;
+    }
+
+    @keyframes pulse-rec {
+
+      0%,
+      100% {
+        box-shadow: 0 0 0 0 rgba(253, 121, 121, 0.5);
+      }
+
+      50% {
+        box-shadow: 0 0 0 14px rgba(253, 121, 121, 0);
+      }
+    }
+
+    .rec-info h3 {
+      font-size: 15px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .rec-info p {
+      font-size: 12px;
+      color: var(--text2);
+    }
+
+    .rec-status {
+      font-size: 13px;
+      color: var(--green);
+      font-weight: 600;
+      margin-top: 4px;
+    }
+
+    /* ── Source Tags ── */
+    .tag-local {
+      background: #00d2a020;
+      color: var(--green);
+    }
+
+    .tag-cloud {
+      background: #74b9ff20;
+      color: var(--blue);
+    }
+
+    .tag-ai {
+      background: #a29bfe20;
+      color: var(--accent2);
+    }
+
+    .tag-skip {
+      background: #2a2a3d;
+      color: var(--text2);
+    }
+
+    /* ── Toast ── */
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: var(--green);
+      color: #000;
+      padding: 12px 20px;
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      font-weight: 600;
+      transform: translateY(100px);
+      opacity: 0;
+      transition: all 0.3s;
+      z-index: 9999;
+    }
+
+    .toast.show {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="layout">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-logo">
+        <h1>🎙 Voice Input</h1>
+        <p>AI 語音輸入工具</p>
+      </div>
+      <nav class="nav">
+        <div class="nav-item active" data-page="dashboard">
+          <span class="icon">📊</span> 總覽
+        </div>
+        <div class="nav-item" data-page="history">
+          <span class="icon">📜</span> 歷史紀錄
+        </div>
+        <div class="nav-item" data-page="dictionary">
+          <span class="icon">📖</span> 詞庫記憶
+        </div>
+        <div class="nav-item" data-page="settings">
+          <span class="icon">⚙️</span> 設定
+        </div>
+      </nav>
+      <div class="sidebar-footer">
+        <div id="sidebar-status" style="display:flex; align-items:center; gap:6px; margin-bottom:6px;">
+          <div id="sidebar-led" style="width:7px; height:7px; border-radius:50%; background:var(--text3);"></div>
+          <span id="sidebar-led-text" style="font-size:10px;">偵測中</span>
+        </div>
+        v1.2.0 · 本地運行 · 零資料保留
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main">
+
+      <!-- ═══ Dashboard ═══ -->
+      <div class="page active" id="page-dashboard">
+        <h2>總覽</h2>
+
+        <!-- Quick Record -->
+        <div class="quick-record">
+          <button class="rec-btn idle" id="rec-btn" onclick="toggleRecording()" title="按下開始錄音">🎤</button>
+          <div class="rec-info">
+            <h3 data-i18n="quick_voice">快速語音輸入</h3>
+            <p data-i18n="quick_voice_desc">點擊麥克風開始錄音，再次點擊停止並處理</p>
+            <div class="rec-status" id="rec-status"></div>
+          </div>
+        </div>
+
+        <div class="card-grid">
+          <div class="card">
+            <div class="card-label">總口述時間</div>
+            <div class="card-value green" id="stat-audio-time">0m</div>
+            <div class="card-sub">累計錄音</div>
+          </div>
+          <div class="card">
+            <div class="card-label">口述字數</div>
+            <div class="card-value accent" id="stat-words">0</div>
+            <div class="card-sub">語音輸入</div>
+          </div>
+          <div class="card">
+            <div class="card-label">節省時間</div>
+            <div class="card-value blue" id="stat-time-saved">0m</div>
+            <div class="card-sub">比打字更快</div>
+          </div>
+          <div class="card">
+            <div class="card-label">平均口述速度</div>
+            <div class="card-value orange" id="stat-wpm">0</div>
+            <div class="card-sub" id="stat-wpm-unit">每分鐘字數</div>
+          </div>
+          <div class="card">
+            <div class="card-label">總聽寫次數</div>
+            <div class="card-value pink" id="stat-dictations">0</div>
+            <div class="card-sub">累計使用</div>
+          </div>
+          <div class="card">
+            <div class="card-label">本月估算費用</div>
+            <div class="card-value" style="color:var(--text2)" id="stat-cost">$0</div>
+            <div class="card-sub" id="stat-cost-detail">Whisper + Claude</div>
+          </div>
+        </div>
+
+        <!-- Personalization Progress -->
+        <div class="progress-section">
+          <div class="progress-ring-wrap">
+            <svg class="progress-ring" width="120" height="120">
+              <defs>
+                <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" style="stop-color:var(--accent2);stop-opacity:1" />
+                  <stop offset="100%" style="stop-color:var(--green);stop-opacity:1" />
+                </linearGradient>
+              </defs>
+              <circle class="bg" cx="60" cy="60" r="50" />
+              <circle class="fg" id="progress-circle" cx="60" cy="60" r="50" stroke-dasharray="314"
+                stroke-dashoffset="314" />
+            </svg>
+            <div class="progress-percent" id="progress-pct">0%</div>
+          </div>
+          <div class="progress-info">
+            <h3 data-i18n="personalization">個人化進度</h3>
+            <p data-i18n="personalization_desc">Voice Input 正在學習你的用詞習慣。越多使用，辨識越準確。</p>
+            <div class="progress-bars">
+              <div class="progress-bar-item">
+                <span class="label" data-i18n="progress_corrections">修正詞庫</span>
+                <div class="progress-bar-track">
+                  <div class="progress-bar-fill" id="bar-dict" style="width:0; background:var(--accent2)"></div>
+                </div>
+              </div>
+              <div class="progress-bar-item">
+                <span class="label" data-i18n="progress_words">自訂詞彙</span>
+                <div class="progress-bar-track">
+                  <div class="progress-bar-fill" id="bar-vocab" style="width:0; background:var(--green)"></div>
+                </div>
+              </div>
+              <div class="progress-bar-item">
+                <span class="label" data-i18n="progress_frequency">使用頻率</span>
+                <div class="progress-bar-track">
+                  <div class="progress-bar-fill" id="bar-usage" style="width:0; background:var(--blue)"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Weekly Chart -->
+        <div class="chart-area">
+          <h3 data-i18n="weekly_chart">近 7 天使用量</h3>
+          <div class="bar-chart" id="weekly-chart"></div>
+        </div>
+      </div>
+
+      <!-- ═══ Styles ═══ -->
+      <!-- ═══ History ═══ -->
+      <div class="page" id="page-history">
+        <h2 data-i18n="history_title">歷史紀錄</h2>
+        <div class="table-wrap">
+          <div class="table-header">
+            <div class="search-bar">
+              <span class="search-icon">🔍</span>
+              <input type="text" id="history-search" placeholder="搜尋紀錄...">
+            </div>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-ghost btn-sm" onclick="exportHistory('txt')">匯出 TXT</button>
+              <button class="btn btn-ghost btn-sm" onclick="exportHistory('csv')">匯出 CSV</button>
+              <button class="btn btn-ghost btn-sm" onclick="clearHistory()">清除全部</button>
+            </div>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>時間</th>
+                <th>模式</th>
+                <th>原始辨識</th>
+                <th>最終文字</th>
+                <th>耗時</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="history-body"></tbody>
+          </table>
+          <div class="empty" id="history-empty" style="display:none">
+            <div class="icon">📜</div>
+            <p>尚無歷史紀錄。開始使用語音輸入後，紀錄會顯示在這裡。</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ Dictionary ═══ -->
+      <div class="page" id="page-dictionary">
+        <h2>詞庫記憶</h2>
+
+        <div class="form-section">
+          <h3>📝 自訂詞彙</h3>
+          <p style="font-size:12px;color:var(--text2);margin-bottom:12px">
+            新增專業術語、人名、公司名，提高語音辨識準確度。
+          </p>
+          <div style="display:flex;gap:8px;margin-bottom:12px">
+            <input type="text" id="new-word" placeholder="輸入新詞彙..." style="max-width:300px">
+            <button class="btn btn-primary" onclick="addWord()">新增</button>
+          </div>
+          <div class="word-tags" id="word-tags"></div>
+        </div>
+
+        <div class="form-section">
+          <h3>🔄 修正規則（自動學習 + 手動）</h3>
+          <p style="font-size:12px;color:var(--text2);margin-bottom:12px">
+            語音辨識常見錯誤 → 正確詞的對應表。手動修正時會自動新增。
+          </p>
+          <div style="display:flex;gap:8px;margin-bottom:16px">
+            <input type="text" id="corr-wrong" placeholder="錯誤詞..." style="max-width:200px">
+            <span style="color:var(--text2);line-height:40px">→</span>
+            <input type="text" id="corr-right" placeholder="正確詞..." style="max-width:200px">
+            <button class="btn btn-primary" onclick="addCorrection()">新增</button>
+          </div>
+          <table id="corrections-table">
+            <thead>
+              <tr>
+                <th>錯誤</th>
+                <th>→ 正確</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="corrections-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ═══ Settings ═══ -->
+      <div class="page" id="page-settings">
+        <h2 data-i18n="settings">設定</h2>
+
+        <div class="form-section">
+          <h3 data-i18n="settings_ui_lang">🌐 介面語言</h3>
+          <div class="form-group" style="max-width:250px">
+            <select id="cfg-ui-lang" onchange="switchUILang(this.value)">
+              <option value="zh-TW">繁體中文</option>
+              <option value="ja">日本語</option>
+              <option value="en">English</option>
+              <option value="ko">한국어</option>
+              <option value="th">ภาษาไทย</option>
+              <option value="vi">Tiếng Việt</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <h3 data-i18n="settings_api_keys">🔑 API 金鑰（擇一輸入即可使用對應功能）</h3>
+          <p data-i18n="settings_api_desc" style="color:var(--text2);font-size:13px;margin-bottom:15px;">根據你偏好的模型填寫對應的
+            API
+            金鑰即可啟動該服務，不需全部填寫。留空表示自動使用本地模型（或跳過該步驟）。</p>
+          <div class="form-row">
+            <div class="form-group">
+              <label data-i18n="label_openai_key">OpenAI API Key（Whisper 雲端辨識）</label>
+              <input type="password" id="cfg-openai-key" placeholder="sk-...">
+            </div>
+            <div class="form-group">
+              <label data-i18n="label_anthropic_key">Anthropic API Key（Claude 智慧潤稿）</label>
+              <input type="password" id="cfg-anthropic-key" placeholder="sk-ant-...">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label data-i18n="label_elevenlabs_key">ElevenLabs API Key（超極速 Streaming）</label>
+              <input type="password" id="cfg-elevenlabs-key" placeholder="sk_...">
+            </div>
+            <div class="form-group">
+              <label data-i18n="label_groq_key">Groq API Key（極速 LLM 處理）</label>
+              <input type="password" id="cfg-groq-key" placeholder="gsk_...">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label data-i18n="label_whisper_model">Whisper 模型</label>
+              <select id="cfg-whisper-model">
+                <option value="whisper-1">whisper-1</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label data-i18n="label_claude_model">Claude 模型</label>
+              <select id="cfg-claude-model">
+                <option value="claude-haiku-4-5-20251001">Claude Haiku 4.5（推薦：極速）</option>
+                <option value="claude-sonnet-4-5-20250514">Claude Sonnet 4.5（較精確但較慢）</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <h3 data-i18n="settings_voice_rec">🎙 語音辨識</h3>
+          <div class="form-row">
+            <div class="form-group">
+              <label data-i18n="label_scene">使用場景</label>
+              <select id="cfg-scene">
+                <option value="general">一般</option>
+                <option value="medical">醫療・藥品・生技</option>
+              </select>
+              <small data-i18n="label_scene_desc"
+                style="color:var(--text3);display:block;margin-top:4px">切換場景會自動載入對應的專業詞庫和 LLM 提示詞</small>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label data-i18n="label_language">辨識語言</label>
+              <select id="cfg-language">
+                <option value="auto">自動偵測（推薦）</option>
+                <option value="zh">中文</option>
+                <option value="ja">日本語</option>
+                <option value="en">English</option>
+                <option value="ko">韓國語</option>
+                <option value="th">泰文</option>
+                <option value="vi">越南語</option>
+                <option value="id">印尼語</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label data-i18n="label_target_lang">翻譯目標語言（空 = 不翻譯）</label>
+              <select id="cfg-target-language">
+                <option value="">不翻譯</option>
+                <option value="zh">繁體中文</option>
+                <option value="ja">日本語</option>
+                <option value="en">English</option>
+                <option value="ko">韓國語</option>
+                <option value="th">泰文</option>
+                <option value="vi">越南語</option>
+                <option value="id">印尼語</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label data-i18n="label_hotkey_mode">快捷鍵模式</label>
+              <select id="cfg-hotkey-mode">
+                <option value="push_to_talk">Push-to-Talk（按住錄音）</option>
+                <option value="toggle">Toggle（按一下開始/停止）</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label data-i18n="label_hotkey">快捷鍵</label>
+              <input type="text" id="cfg-hotkey" placeholder="right_cmd">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label data-i18n="label_silence_dur">靜音自動停止（秒）</label>
+              <input type="number" id="cfg-silence-dur" step="0.5" min="0.5" max="10">
+            </div>
+            <div class="form-group">
+              <label data-i18n="label_max_dur">最長錄音（秒）</label>
+              <input type="number" id="cfg-max-dur" step="10" min="10" max="600">
+            </div>
+          </div>
+          <div class="form-group">
+            <label data-i18n="label_cpm">打字速度（每分鐘字數，用於計算節省時間，中文約 30-60）</label>
+            <input type="number" id="cfg-cpm" step="5" min="10" max="200" style="max-width:200px">
+          </div>
+        </div>
+
+        <div class="form-section">
+          <h3 data-i18n="settings_hybrid">🚀 Hybrid 模式（本地 + 雲端）</h3>
+
+          <!-- Ollama 狀態指示燈 -->
+          <div id="ollama-status-bar"
+            style="display:flex; align-items:center; gap:12px; padding:10px 14px; background:var(--surface2); border-radius:var(--radius-sm); margin-bottom:16px;">
+            <div id="ollama-led"
+              style="width:10px; height:10px; border-radius:50%; background:var(--text3); flex-shrink:0;"></div>
+            <div style="flex:1; min-width:0;">
+              <div id="ollama-status-text" style="font-size:13px; font-weight:500;">偵測中...</div>
+              <div id="ollama-status-detail" style="font-size:11px; color:var(--text2); margin-top:2px;"></div>
+            </div>
+            <button class="btn" onclick="detectOllama()" style="font-size:11px; padding:4px 10px; white-space:nowrap;"
+              data-i18n="btn_detect">重新偵測</button>
+          </div>
+
+          <div class="toggle-row">
+            <div>
+              <div class="toggle-label" data-i18n="toggle_hybrid">啟用 Hybrid 模式</div>
+              <div class="toggle-desc" data-i18n="toggle_hybrid_desc">Apple Silicon 本地 Whisper + Ollama，長句自動 fallback 雲端
+              </div>
+            </div>
+            <div class="toggle" id="tog-hybrid" onclick="toggleSwitch(this)"></div>
+          </div>
+          <div class="form-row" style="margin-top:16px">
+            <div class="form-group">
+              <label data-i18n="label_stt_engine">本地辨識引擎</label>
+              <select id="cfg-stt-engine" onchange="onSttEngineChange()">
+                <option value="mlx-whisper">Whisper（預設，已安裝）</option>
+                <option value="qwen3-asr">Qwen3-ASR（多語最強，需下載 1.2 GB）</option>
+                <option value="cloud-only">僅雲端 API</option>
+              </select>
+            </div>
+            <div class="form-group" id="whisper-model-group">
+              <label data-i18n="label_whisper_local">Whisper 模型</label>
+              <select id="cfg-local-whisper-model">
+                <option value="mlx-community/whisper-turbo">Turbo（推薦，快速）</option>
+                <option value="mlx-community/whisper-large-v3-mlx">Large V3（最精確，2.9 GB）</option>
+                <option value="mlx-community/whisper-large-v3-turbo">Large V3 Turbo</option>
+                <option value="mlx-community/whisper-small">Small（輕量）</option>
+              </select>
+            </div>
+          </div>
+          <!-- 模型下載進度條 -->
+          <div id="model-download-bar"
+            style="display:none; padding:12px 14px; background:var(--surface2); border-radius:var(--radius-sm); margin-bottom:12px;">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
+              <span id="model-download-msg" style="font-size:13px; font-weight:500;">準備下載...</span>
+              <span id="model-download-pct" style="font-size:13px; font-weight:600; color:var(--accent2);">0%</span>
+            </div>
+            <div style="width:100%; height:6px; background:var(--surface3); border-radius:3px; overflow:hidden;">
+              <div id="model-download-fill"
+                style="width:0%; height:100%; background:linear-gradient(90deg, var(--accent), var(--accent2)); border-radius:3px; transition:width 0.3s ease;">
+              </div>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label data-i18n="label_llm_model">本地 LLM 模型（Ollama）</label>
+              <select id="cfg-local-llm-model">
+                <option value="qwen2.5:3b">qwen2.5:3b（預設）</option>
+              </select>
+              <div id="ollama-model-hint" style="font-size:11px; color:var(--text3); margin-top:4px;"></div>
+            </div>
+          </div>
+          <div id="hybrid-notice"
+            style="font-size: 11px; color: var(--orange); margin-bottom: 16px; margin-top: -8px; line-height: 1.4; padding: 8px 12px; background: #fdcb6e15; border-radius: 6px; border-left: 3px solid var(--orange);">
+            ⚠️ <b>初次啟用注意：</b><br>
+            系統首次使用 Hybrid 模式時，會在背景自動下載 Whisper 模型（約 1.5GB），可能會花費一點時間。<br>
+            若選擇 <b>Qwen3-ASR</b>，需先安裝：<code>pip install mlx-qwen3-asr</code>（未安裝時自動 fallback 到 Whisper）。<br>
+            若您要使用本地 LLM，請確認您的電腦已安裝並啟動 <a href="https://ollama.com" target="_blank"
+              style="color:var(--accent2); text-decoration:none;">Ollama</a>，且已下載該模型（例如：在終端機執行
+            <code>ollama run qwen2.5:3b</code>）。
+          </div>
+          <div class="form-group">
+            <label data-i18n="label_backup_dir">音訊備份路徑（空白 = 不備份）</label>
+            <input type="text" id="cfg-backup-dir" placeholder="/Volumes/SSD/voice-data">
+          </div>
+        </div>
+
+        <div class="form-section">
+          <h3 data-i18n="settings_ai">🤖 AI 處理功能</h3>
+          <div class="toggle-row">
+            <div>
+              <div class="toggle-label" data-i18n="toggle_claude">Claude 後處理潤稿</div>
+              <div class="toggle-desc" data-i18n="toggle_claude_desc">使用 Claude 修正術語、潤飾語句</div>
+            </div>
+            <div class="toggle" id="tog-claude" onclick="toggleSwitch(this)"></div>
+          </div>
+          <div class="toggle-row">
+            <div>
+              <div class="toggle-label" data-i18n="toggle_filler">移除填充詞</div>
+              <div class="toggle-desc" data-i18n="toggle_filler_desc">自動移除「嗯」「啊」「um」「えーと」等</div>
+            </div>
+            <div class="toggle" id="tog-filler" onclick="toggleSwitch(this)"></div>
+          </div>
+          <div class="toggle-row">
+            <div>
+              <div class="toggle-label" data-i18n="toggle_selfcorr">自我修正偵測</div>
+              <div class="toggle-desc" data-i18n="toggle_selfcorr_desc">偵測說話中的改口，只保留最終意圖</div>
+            </div>
+            <div class="toggle" id="tog-selfcorr" onclick="toggleSwitch(this)"></div>
+          </div>
+          <div class="toggle-row">
+            <div>
+              <div class="toggle-label" data-i18n="toggle_format">自動格式化</div>
+              <div class="toggle-desc" data-i18n="toggle_format_desc">口述列表或步驟時自動排版</div>
+            </div>
+            <div class="toggle" id="tog-format" onclick="toggleSwitch(this)"></div>
+          </div>
+          <div class="toggle-row">
+            <div>
+              <div class="toggle-label" data-i18n="toggle_learn">自動學習</div>
+              <div class="toggle-desc" data-i18n="toggle_learn_desc">從手動修正中學習新的修正規則</div>
+            </div>
+            <div class="toggle" id="tog-learn" onclick="toggleSwitch(this)"></div>
+          </div>
+          <div class="toggle-row">
+            <div>
+              <div class="toggle-label" data-i18n="toggle_paste">辨識後自動貼上</div>
+              <div class="toggle-desc" data-i18n="toggle_paste_desc">辨識完成後自動貼到游標位置</div>
+            </div>
+            <div class="toggle" id="tog-paste" onclick="toggleSwitch(this)"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <h3 data-i18n="settings_app_styles">🎯 App 感知風格（自動切換）</h3>
+        <p data-i18n="settings_app_styles_desc"
+          style="color:var(--text2);font-size:13px;margin-top:2px;margin-bottom:12px">
+          根據前景 App 自動調整輸出格式。語言由口述內容決定，不由 App 強制。點擊展開可自訂。
+        </p>
+        <div id="app-styles-container" style="display:flex;flex-direction:column;gap:8px;"></div>
+      </div>
+
+      <div class="form-section">
+        <h3 data-i18n="label_system_prompt">📝 Claude 系統提示詞</h3>
+        <textarea id="cfg-system-prompt" rows="6"></textarea>
+      </div>
+
+      <button class="btn btn-primary" onclick="saveConfig()" style="margin-top:8px" data-i18n="btn_save">
+        💾 儲存設定
+      </button>
+  </div>
+
+  </main>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    // ── i18n 介面多語言 ──
+    const UI_LANG = {
+      'zh-TW': {
+        // Nav
+        nav_overview: '總覽', nav_history: '歷史紀錄', nav_dictionary: '詞庫記憶', nav_settings: '設定',
+        // Overview cards
+        card_audio: '總口述時間', card_audio_sub: '累計錄音',
+        card_words: '口述字數', card_words_sub: '語音輸入',
+        card_saved: '節省時間', card_saved_sub: '比打字更快',
+        card_speed: '平均口述速度', card_speed_unit: '每分鐘字數',
+        card_count: '總聽寫次數', card_count_sub: '累計使用',
+        card_cost: '本月估算費用',
+        // History
+        history_title: '歷史紀錄', history_search: '搜尋紀錄...',
+        col_time: '時間', col_mode: '模式', col_raw: '原始辨識', col_final: '最終文字', col_duration: '耗時',
+        export_txt: '匯出 TXT', export_csv: '匯出 CSV', clear_all: '清除全部',
+        history_empty: '尚無歷史紀錄。開始使用語音輸入後，紀錄會顯示在這裡。',
+        // Dictionary
+        dict_title: '詞庫記憶', dict_words: '自訂詞彙', dict_words_desc: '新增專業術語、人名、公司名，提高語音辨識準確度。',
+        dict_add: '新增', dict_word_placeholder: '輸入新詞彙...',
+        dict_corrections: '修正規則（自動學習 + 手動）', dict_corrections_desc: '語音辨識常見錯誤 → 正確詞的對應表。手動修正時會自動新增。',
+        dict_wrong: '錯誤詞...', dict_right: '正確詞...',
+        col_wrong: '錯誤', col_right: '→ 正確',
+        // Settings
+        settings_title: '設定', save_settings: '💾 儲存設定',
+        personalization: '個人化進度', quick_voice: '快速語音輸入',
+        // Overview extra
+        quick_voice_desc: '點擊麥克風開始錄音，再次點擊停止並處理',
+        personalization_desc: 'Voice Input 正在學習你的用詞習慣。越多使用，辨識越準確。',
+        progress_corrections: '修正詞庫', progress_words: '自訂詞彙', progress_frequency: '使用頻率',
+        weekly_chart: '近 7 天使用量',
+        // Settings sections
+        settings_ui_lang: '🌐 介面語言',
+        settings_api_keys: '🔑 API 金鑰（擇一輸入即可使用對應功能）',
+        settings_api_desc: '根據你偏好的模型填寫對應的 API 金鑰即可啟動該服務，不需全部填寫。留空表示自動使用本地模型（或跳過該步驟）。',
+        settings_voice_rec: '🎙 語音辨識',
+        settings_hybrid: '🚀 Hybrid 模式（本地 + 雲端）',
+        settings_ai: '🤖 AI 處理功能',
+        settings_advanced: '⚙️ 進階設定',
+        settings_app_styles: '🎯 App 感知風格（自動切換）',
+        settings_app_styles_desc: '根據前景 App 自動調整輸出格式。語言由口述內容決定，不由 App 強制。點擊展開可自訂。',
+        // Labels
+        label_openai_key: 'OpenAI API Key（Whisper 雲端辨識）',
+        label_anthropic_key: 'Anthropic API Key（Claude 智慧潤稿）',
+        label_elevenlabs_key: 'ElevenLabs API Key（超極速 Streaming）',
+        label_groq_key: 'Groq API Key（極速 LLM 處理）',
+        label_whisper_model: 'Whisper 模型', label_claude_model: 'Claude 模型',
+        label_scene: '使用場景', label_scene_desc: '切換場景會自動載入對應的專業詞庫和 LLM 提示詞',
+        label_language: '辨識語言', label_target_lang: '翻譯目標語言（空 = 不翻譯）',
+        label_hotkey_mode: '快捷鍵模式', label_hotkey: '快捷鍵',
+        label_stt_engine: '本地辨識引擎', label_whisper_local: 'Whisper 模型',
+        label_llm_model: '本地 LLM 模型（Ollama）',
+        label_backup_dir: '音訊備份路徑（空白 = 不備份）',
+        label_silence_dur: '靜音自動停止（秒）', label_max_dur: '最長錄音（秒）',
+        label_cpm: '打字速度（每分鐘字數，用於計算節省時間，中文約 30-60）',
+        label_system_prompt: '📝 Claude 系統提示詞',
+        // Toggles
+        toggle_hybrid: '啟用 Hybrid 模式',
+        toggle_hybrid_desc: 'Apple Silicon 本地 Whisper + Ollama，長句自動 fallback 雲端',
+        toggle_claude: 'Claude 後處理潤稿', toggle_claude_desc: '使用 Claude 修正術語、潤飾語句',
+        toggle_filler: '移除填充詞', toggle_filler_desc: '自動移除「嗯」「啊」「um」「えーと」等',
+        toggle_selfcorr: '自我修正偵測', toggle_selfcorr_desc: '偵測說話中的改口，只保留最終意圖',
+        toggle_format: '自動格式化', toggle_format_desc: '口述列表或步驟時自動排版',
+        toggle_learn: '自動學習', toggle_learn_desc: '從手動修正中學習新的修正規則',
+        toggle_paste: '辨識後自動貼上', toggle_paste_desc: '辨識完成後自動貼到游標位置',
+        // Hybrid notice
+        hybrid_notice: '⚠️ <b>初次啟用注意：</b><br>系統首次使用 Hybrid 模式時，會在背景自動下載 Whisper 模型（約 1.5GB），可能會花費一點時間。<br>若選擇 <b>Qwen3-ASR</b>，需先安裝：<code>pip install mlx-qwen3-asr</code>（未安裝時自動 fallback 到 Whisper）。<br>若您要使用本地 LLM，請確認您的電腦已安裝並啟動 <a href="https://ollama.com" target="_blank" style="color:var(--accent2); text-decoration:none;">Ollama</a>，且已下載該模型（例如：在終端機執行 <code>ollama run qwen2.5:3b</code>）。',
+        // Buttons
+        btn_save: '💾 儲存設定', btn_detect: '重新偵測',
+      },
+      'ja': {
+        nav_overview: '概要', nav_history: '履歴', nav_dictionary: '辞書', nav_settings: '設定',
+        card_audio: '総音声時間', card_audio_sub: '累計録音',
+        card_words: '文字数', card_words_sub: '音声入力',
+        card_saved: '節約時間', card_saved_sub: 'タイピングより速い',
+        card_speed: '平均速度', card_speed_unit: '文字/分',
+        card_count: '総回数', card_count_sub: '累計使用',
+        card_cost: '今月の推定費用',
+        history_title: '履歴', history_search: '検索...',
+        col_time: '時刻', col_mode: 'モード', col_raw: '元テキスト', col_final: '最終テキスト', col_duration: '所要',
+        export_txt: 'TXT出力', export_csv: 'CSV出力', clear_all: '全消去',
+        history_empty: 'まだ履歴がありません。音声入力を始めるとここに表示されます。',
+        dict_title: '辞書', dict_words: 'カスタム語彙', dict_words_desc: '専門用語・人名・社名を追加して音声認識の精度を向上。',
+        dict_add: '追加', dict_word_placeholder: '新しい語彙...',
+        dict_corrections: '修正ルール（自動学習＋手動）', dict_corrections_desc: '音声認識の誤り → 正しい語の対応表。',
+        dict_wrong: '誤り...', dict_right: '正しい語...',
+        col_wrong: '誤り', col_right: '→ 正しい語',
+        settings_title: '設定', save_settings: '💾 設定を保存',
+        personalization: 'パーソナライズ', quick_voice: '音声入力',
+        quick_voice_desc: 'マイクをクリックして録音開始。もう一度クリックで停止',
+        personalization_desc: 'Voice Inputはあなたの用語の習慣を学習しています。使えば使うほど精度が高まります。',
+        progress_corrections: '修正辞書',
+        progress_words: 'カスタム語彙',
+        progress_frequency: '使用頻度',
+        weekly_chart: '過去7日間の使用量',
+        settings_ui_lang: '🌐 インターフェース言語',
+        settings_api_keys: '🔑 APIキー（どれか1つ入力すれば対応機能が使えます）',
+        settings_api_desc: '好みのモデルに対応するAPIキーを入力してください。すべて入力する必要はありません。空白の場合はローカルモデルを使用します。',
+        settings_voice_rec: '🎙 音声認識',
+        settings_hybrid: '🚀 ハイブリッドモード（ローカル＋クラウド）',
+        settings_ai: '🤖 AI 處理功能',
+        settings_advanced: '⚙️ 詳細設定',
+        settings_app_styles: '🎯 アプリ連携スタイル（自動切替）',
+        settings_app_styles_desc: 'アクティブなアプリに応じて出力形式を自動調整します。言語は音声内容で決まり、アプリには強制されません。クリックしてカスタマイズできます。',
+        label_openai_key: 'OpenAI API Key (Whisper クラウド認識)',
+        label_anthropic_key: 'Anthropic API Key (Claude スマート校正)',
+        label_elevenlabs_key: 'ElevenLabs API Key (ストリーミング)',
+        label_groq_key: 'Groq API Key (超高速 LLM)',
+        label_whisper_model: 'Whisperモデル',
+        label_claude_model: 'Claudeモデル',
+        label_scene: '使用シーン',
+        label_scene_desc: 'シーンを切り替えると、対応する専門辞書とLLMプロンプトがロードされます。',
+        label_language: '認識言語',
+        label_target_lang: '翻訳先言語（空＝翻訳しない）',
+        label_hotkey_mode: 'ショートカットモード',
+        label_hotkey: 'ショートカット',
+        label_stt_engine: 'ローカル認識エンジン',
+        label_whisper_local: 'Whisperモデル',
+        label_llm_model: 'ローカルLLMモデル（Ollama）',
+        label_backup_dir: '音声バックアップパス（空＝バックアップしない）',
+        label_silence_dur: '無音自動停止 (秒)',
+        label_max_dur: '最大録音時間 (秒)',
+        label_cpm: 'タイピング速度（文字/分、時間節約の計算用、通常30-60）',
+        label_system_prompt: '📝 Claude システムプロンプト',
+        toggle_hybrid: 'ハイブリッドモードを有効にする',
+        toggle_hybrid_desc: 'Apple Silicon ローカル Whisper + Ollama。長い文は自動的にクラウドにフォールバック。',
+        toggle_claude: 'Claude 校正',
+        toggle_claude_desc: 'Claudeを使って専門用語や文章を修正',
+        toggle_filler: 'フィラー除去',
+        toggle_filler_desc: '「えー」「あの」などを自動除去',
+        toggle_selfcorr: '自己修正と認識',
+        toggle_selfcorr_desc: '言い直しを検知し、最終的な意圖だけを残す',
+        toggle_format: '自動フォーマット',
+        toggle_format_desc: '箇条書きやステップを話した時に自動で整形する',
+        toggle_learn: '自動学習',
+        toggle_learn_desc: '手動の修正から新しいルールを学習',
+        toggle_paste: '認識後自動貼り付け',
+        toggle_paste_desc: '認識完了後にカーソル位置へ自動的に貼り付けます',
+        hybrid_notice: '⚠️ <b>初回起動時の注意:</b><br>システムが初めてハイブリッドモードを使用する際、バックグラウンドでWhisperモデル（約1.5GB）を自動ダウンロードするため、少し時間がかかる場合があります。<br>ローカルLLMを使用する場合は、お使いのMacに<a href=\'https://ollama.com\' target=\'_blank\' style=\'color:var(--accent2); text-decoration:none;\'>Ollama</a>がインストールおよび起動されており、モデルがダウンロードされていること（例：ターミナルで<code>ollama run qwen2.5:3b</code>を実行）を確認してください。',
+        btn_save: '💾 設定を保存',
+        btn_detect: '再検出'
+      },
+      'en': {
+        nav_overview: 'Overview', nav_history: 'History', nav_dictionary: 'Dictionary', nav_settings: 'Settings',
+        card_audio: 'Total Audio', card_audio_sub: 'Recorded',
+        card_words: 'Characters', card_words_sub: 'Voice input',
+        card_saved: 'Time Saved', card_saved_sub: 'Faster than typing',
+        card_speed: 'Avg Speed', card_speed_unit: 'chars/min',
+        card_count: 'Dictations', card_count_sub: 'Total usage',
+        card_cost: 'Est. Cost (month)',
+        history_title: 'History', history_search: 'Search...',
+        col_time: 'Time', col_mode: 'Mode', col_raw: 'Raw', col_final: 'Final Text', col_duration: 'Time',
+        export_txt: 'Export TXT', export_csv: 'Export CSV', clear_all: 'Clear All',
+        history_empty: 'No history yet. Start using voice input and records will appear here.',
+        dict_title: 'Dictionary', dict_words: 'Custom Words', dict_words_desc: 'Add terms, names, and brands to improve recognition accuracy.',
+        dict_add: 'Add', dict_word_placeholder: 'New word...',
+        dict_corrections: 'Correction Rules (Auto-learn + Manual)', dict_corrections_desc: 'Common recognition errors → correct word mapping.',
+        dict_wrong: 'Wrong...', dict_right: 'Correct...',
+        col_wrong: 'Wrong', col_right: '→ Correct',
+        settings_title: 'Settings', save_settings: '💾 Save Settings',
+        personalization: 'Personalization', quick_voice: 'Quick Voice Input',
+        quick_voice_desc: 'Click microphone to start recording, click again to stop and process',
+        personalization_desc: 'Voice Input is learning your vocabulary. The more you use it, the more accurate it gets.',
+        progress_corrections: 'Corrections',
+        progress_words: 'Custom Words',
+        progress_frequency: 'Frequency',
+        weekly_chart: 'Last 7 Days Usage',
+        settings_ui_lang: '🌐 Interface Language',
+        settings_api_keys: '🔑 API Keys (Enter one to use its features)',
+        settings_api_desc: 'Enter the API key for your preferred model. You don\'t need to fill all of them. Leave blank to automatically use local models (or skip).',
+        settings_voice_rec: '🎙 Voice Recognition',
+        settings_hybrid: '🚀 Hybrid Mode (Local + Cloud)',
+        settings_ai: '🤖 AI Processing',
+        settings_advanced: '⚙️ Advanced Settings',
+        settings_app_styles: '🎯 App-Aware Styles (Auto-switch)',
+        settings_app_styles_desc: 'Automatically adjusts formatting based on the active App. Spoken language determines output language. Click to customize.',
+        label_openai_key: 'OpenAI API Key (Whisper Cloud)',
+        label_anthropic_key: 'Anthropic API Key (Claude Polishing)',
+        label_elevenlabs_key: 'ElevenLabs API Key (Streaming)',
+        label_groq_key: 'Groq API Key (Fast LLM)',
+        label_whisper_model: 'Whisper Model',
+        label_claude_model: 'Claude Model',
+        label_scene: 'Use Case',
+        label_scene_desc: 'Switching scenes will automatically load custom dictionaries and LLM prompts.',
+        label_language: 'Recognition Language',
+        label_target_lang: 'Target Translation (Blank = None)',
+        label_hotkey_mode: 'Hotkey Mode',
+        label_hotkey: 'Hotkey',
+        label_stt_engine: 'Local STT Engine',
+        label_whisper_local: 'Whisper Model',
+        label_llm_model: 'Local LLM Model (Ollama)',
+        label_backup_dir: 'Audio Backup Path (Blank = None)',
+        label_silence_dur: 'Auto-stop Silence (sec)',
+        label_max_dur: 'Max Recording (sec)',
+        label_cpm: 'Typing Speed (chars/min, used for saved time)',
+        label_system_prompt: '📝 Claude System Prompt',
+        toggle_hybrid: 'Enable Hybrid Mode',
+        toggle_hybrid_desc: 'Apple Silicon local Whisper + Ollama, fallback to cloud for long phrases',
+        toggle_claude: 'Claude Polishing',
+        toggle_claude_desc: 'Use Claude to correct terminology and grammar',
+        toggle_filler: 'Remove Fillers',
+        toggle_filler_desc: 'Automatically remove \'um\', \'uh\', etc.',
+        toggle_selfcorr: 'Self-Correction Detection',
+        toggle_selfcorr_desc: 'Detect mid-sentence corrections and keep only the final intent',
+        toggle_format: 'Auto-Formatting',
+        toggle_format_desc: 'Automatically format lists or steps',
+        toggle_learn: 'Auto-learning',
+        toggle_learn_desc: 'Learn new correction rules from manual edits',
+        toggle_paste: 'Auto-paste after Recognition',
+        toggle_paste_desc: 'Automatically paste transcribed text at the cursor',
+        hybrid_notice: '⚠️ <b>First-time Setup:</b><br>When using Hybrid mode for the first time, it will automatically download the Whisper model (~1.5GB) in the background. It might take some time.<br>If you want to use local LLM, ensure <a href=\'https://ollama.com\' target=\'_blank\' style=\'color:var(--accent2); text-decoration:none;\'>Ollama</a> is installed and running, and the model is downloaded (e.g., run <code>ollama run qwen2.5:3b</code> in terminal).',
+        btn_save: '💾 Save Settings',
+        btn_detect: 'Re-detect'
+      },
+      'ko': {
+        nav_overview: '개요', nav_history: '기록', nav_dictionary: '사전', nav_settings: '설정',
+        card_audio: '총 음성 시간', card_audio_sub: '누적 녹음',
+        card_words: '입력 글자 수', card_words_sub: '음성 입력',
+        card_saved: '절약된 시간', card_saved_sub: '타이핑보다 빠름',
+        card_speed: '평균 말하기 속도', card_speed_unit: '문자/분',
+        card_count: '총 받아쓰기', card_count_sub: '누적 사용량',
+        card_cost: '이번 달 예상 비용',
+        history_title: '기록', history_search: '기록 검색...',
+        col_time: '시간', col_mode: '모드', col_raw: '원본 텍스트', col_final: '최종 텍스트', col_duration: '소요 시간',
+        export_txt: 'TXT 내보내기', export_csv: 'CSV 내보내기', clear_all: '모두 지우기',
+        history_empty: '아직 기록이 없습니다. 음성 입력을 시작하면 여기에 표시됩니다.',
+        dict_title: '사전', dict_words: '사용자 지정 단어', dict_words_desc: '전문 용어, 이름, 회사명을 추가하여 인식 정확도를 높이세요.',
+        dict_add: '추가', dict_word_placeholder: '새 단어...',
+        dict_corrections: '수정 규칙 (자동 학습 + 수동)', dict_corrections_desc: '음성 인식 오류 → 올바른 단어 매핑.',
+        dict_wrong: '오류...', dict_right: '올바른 단어...',
+        col_wrong: '오류', col_right: '→ 올바른 단어',
+        settings_title: '설정', save_settings: '💾 설정 저장',
+        personalization: '개인화', quick_voice: '빠른 음성 입력',
+        quick_voice_desc: '마이크를 클릭하여 녹음을 시작하고, 다시 클릭하여 중지',
+        personalization_desc: 'Voice Input이 어휘를 학습 중입니다. 자주 사용할수록 정확해집니다.',
+        progress_corrections: '수정 사전',
+        progress_words: '사용자 단어',
+        progress_frequency: '사용 빈도',
+        weekly_chart: '최근 7일 사용량',
+        settings_ui_lang: '🌐 인터페이스 언어',
+        settings_api_keys: '🔑 API 키 (해당 기능을 사용하려면 1개 입력)',
+        settings_api_desc: '선호하는 모델의 API 키를 입력하세요. 모두 입력할 필요는 없습니다. 비워두면 로컬 모델을 사용합니다.',
+        settings_voice_rec: '🎙 음성 인식',
+        settings_hybrid: '🚀 하이브리드 모드 (로컬 + 클라우드)',
+        settings_ai: '🤖 AI 처리 기능',
+        settings_advanced: '⚙️ 고급 설정',
+        settings_app_styles: '🎯 앱 감지 스타일 (자동 전환)',
+        settings_app_styles_desc: '활성 앱에 따라 형식을 조정합니다. 클릭하여 맞춤 설정.',
+        label_openai_key: 'OpenAI API Key (클라우드)',
+        label_anthropic_key: 'Anthropic API Key (Claude 교정)',
+        label_elevenlabs_key: 'ElevenLabs API Key (초고속)',
+        label_groq_key: 'Groq API Key',
+        label_whisper_model: 'Whisper 모델',
+        label_claude_model: 'Claude 모델',
+        label_scene: '사용 환경',
+        label_scene_desc: '환경을 전환하면 해당 사전과 프롬프트가 로드됩니다.',
+        label_language: '인식 언어',
+        label_target_lang: '번역 대상 (공백 = 안함)',
+        label_hotkey_mode: '단축키 모드',
+        label_hotkey: '단축키',
+        label_stt_engine: '로컬 엔진',
+        label_whisper_local: 'Whisper 모델',
+        label_llm_model: '로컬 LLM (Ollama)',
+        label_backup_dir: '백업 경로',
+        label_silence_dur: '자동 중지 무음 (초)',
+        label_max_dur: '최대 녹음 (초)',
+        label_cpm: '타이핑 속도 (분당 글자 수)',
+        label_system_prompt: '📝 Claude 프롬프트',
+        toggle_hybrid: '하이브리드 모드 활성화',
+        toggle_hybrid_desc: '로컬 Whisper + 클라우드 우회',
+        toggle_claude: 'Claude 교정',
+        toggle_claude_desc: 'Claude로 용어 수정',
+        toggle_filler: '추임새 제거',
+        toggle_filler_desc: '\'어\', \'음\' 제거',
+        toggle_selfcorr: '자가 수정 감지',
+        toggle_selfcorr_desc: '말하는 도중 수정된 부분 감지',
+        toggle_format: '자동 포맷',
+        toggle_format_desc: '목록 자동 정리',
+        toggle_learn: '자동 학습',
+        toggle_learn_desc: '수동 수정에서 학습',
+        toggle_paste: '인식 후 붙여넣기',
+        toggle_paste_desc: '완료 후 커서 위치에 붙여넣기',
+        hybrid_notice: '⚠️ <b>초기 설정:</b><br>하이브리드 모드 최초 사용 시 1.5GB 모델이 다운로드됩니다.<br>로컬 모델을 쓰려면 <a href=\'https://ollama.com\' target=\'_blank\'>Ollama</a>를 설치하세요.',
+        btn_save: '💾 설정 저장',
+        btn_detect: '다시 감지'
+      },
+      'th': {
+         nav_overview: 'ภาพรวม', nav_history: 'ประวัติ', nav_dictionary: 'พจนานุกรม', nav_settings: 'การตั้งค่า',
+        card_audio: 'เวลาที่บันทึกเสียงทั้งหมด', card_audio_sub: 'บันทึกสะสม',
+        card_words: 'จำนวนตัวอักษร', card_words_sub: 'ป้อนด้วยเสียง',
+        card_saved: 'ประหยัดเวลา', card_saved_sub: 'เร็วกว่าการพิมพ์',
+        card_speed: 'ความเร็วเฉลี่ย', card_speed_unit: 'ตัวอักษร/นาที',
+        card_count: 'ใช้ทั้งหมด', card_count_sub: 'ใช้งานสะสม',
+        card_cost: 'ค่าใช้จ่ายโดยประมาณ',
+        history_title: 'ประวัติ', history_search: 'ค้นหาประวัติ...',
+        col_time: 'เวลา', col_mode: 'โหมด', col_raw: 'ข้อความต้นฉบับ', col_final: 'ข้อความสุดท้าย', col_duration: 'เวลา',
+        export_txt: 'ส่งออก TXT', export_csv: 'ส่งออก CSV', clear_all: 'ลบทั้งหมด',
+        history_empty: 'ยังไม่มีประวัติ เริ่มใช้การป้อนด้วยเสียงแล้วประวัติจะแสดงที่นี่',
+        dict_title: 'พจนานุกรม', dict_words: 'คำศัพท์กำหนดเอง', dict_words_desc: 'เพิ่มคำศัพท์เฉพาะ ชื่อ และชื่อบริษัทเพื่อเพิ่มความแม่นยำ',
+        dict_add: 'เพิ่ม', dict_word_placeholder: 'คำศัพท์ใหม่...',
+        dict_corrections: 'กฎการแก้ไข (เรียนรู้อัตโนมัติ + กำหนดเอง)', dict_corrections_desc: 'ข้อผิดพลาดที่พบบ่อย → คำที่ถูกต้อง',
+        dict_wrong: 'คำที่ผิด...', dict_right: 'คำที่ถูก...',
+        col_wrong: 'ผิด', col_right: '→ ถูก',
+        settings_title: 'การตั้งค่า', save_settings: '💾 บันทึกการตั้งค่า',
+        personalization: 'เรียนรู้', quick_voice: 'ป้อนด้วยเสียง',
+        quick_voice_desc: 'คลิกไมโครโฟนเพื่อเริ่มบันทึก คลิกอีกครั้งเพื่อหยุด',
+        personalization_desc: 'ระบบกำลังเรียนรู้คำศัพท์ของคุณ ยิ่งใช้ยิ่งแม่นยำ',
+        progress_corrections: 'พจนานุกรมการแก้ไข',
+        progress_words: 'คำศัพท์กำหนดเอง',
+        progress_frequency: 'ความถี่',
+        weekly_chart: 'การใช้งาน 7 วันล่าสุด',
+        settings_ui_lang: '🌐 ภาษาอินเทอร์เฟซ',
+        settings_api_keys: '🔑 API คีย์',
+        settings_api_desc: 'ระบุคีย์สำหรับบริการที่คุณต้องการ ไม่จำเป็นต้องกรอกทั้งหมด',
+        settings_voice_rec: '🎙 การจดจำเสียง',
+        settings_hybrid: '🚀 โหมดไฮบริด',
+        settings_ai: '🤖 การประมวลผล AI',
+        settings_advanced: '⚙️ การตั้งค่าขั้นสูง',
+        settings_app_styles: '🎯 สไตล์ตามแอป',
+        settings_app_styles_desc: 'ปรับรูปแบบตามแอปที่ใช้งานโดยอัตโนมัติ',
+        label_openai_key: 'OpenAI API Key',
+        label_anthropic_key: 'Anthropic API Key',
+        label_elevenlabs_key: 'ElevenLabs API Key',
+        label_groq_key: 'Groq API Key',
+        label_whisper_model: 'โมเดล Whisper',
+        label_claude_model: 'โมเดล Claude',
+        label_scene: 'สถานการณ์ใช้งาน',
+        label_scene_desc: 'เปลี่ยนสถานการณ์เพื่อโหลดพจนานุกรมเฉพาะ',
+        label_language: 'ภาษาชที่จำ',
+        label_target_lang: 'เป้าหมายการแปล',
+        label_hotkey_mode: 'โหมดปุ่มลัด',
+        label_hotkey: 'ปุ่มลัด',
+        label_stt_engine: 'เอนจินภายใน',
+        label_whisper_local: 'โมเดล Whisper',
+        label_llm_model: 'โมเดล LLM ภายใน',
+        label_backup_dir: 'โฟลเดอร์สำรองเสียง',
+        label_silence_dur: 'หยุดเมื่อเงียบ (วินาที)',
+        label_max_dur: 'บันทึกสูงสุด (วินาที)',
+        label_cpm: 'ความเร็วการพิมพ์',
+        label_system_prompt: '📝 Claude พรอมต์',
+        toggle_hybrid: 'เปิดใช้งานไฮบริด',
+        toggle_hybrid_desc: 'ใช้ Whisper สลับกับคลาวด์',
+        toggle_claude: 'ปรับปรุงด้วย Claude',
+        toggle_claude_desc: 'ใช้ Claude เพื่อแก้ไขคำ',
+        toggle_filler: 'ลบคำเติม',
+        toggle_filler_desc: 'ลบ เอิ่ม อา อัตโนมัติ',
+        toggle_selfcorr: 'ตรวจจับการแก้ไขตัวเอง',
+        toggle_selfcorr_desc: 'ตรวจจับการพูดแก้คำผิด',
+        toggle_format: 'จัดรูปแบบอัตโนมัติ',
+        toggle_format_desc: 'จัดรูปแบบรายการอัตโนมัติ',
+        toggle_learn: 'เรียนรู้อัตโนมัติ',
+        toggle_learn_desc: 'เรียนรู้จากการแก้ไขกำหนดเอง',
+        toggle_paste: 'วางอัตโนมัติ',
+        toggle_paste_desc: 'วางข้อความหลังจากการจำเสียง',
+        hybrid_notice: '⚠️ <b>ตั้งค่าครั้งแรก:</b><br>มีการดาวน์โหลด 1.5GB ติดตั้ง <a href=\'https://ollama.com\' target=\'_blank\'>Ollama</a> หากต้องการใช้ LLM',
+        btn_save: '💾 บันทึกการตั้งค่า',
+        btn_detect: 'ตรวจจับใหม่'
+      },
+      'vi': {
+        nav_overview: 'Tổng quan', nav_history: 'Lịch sử', nav_dictionary: 'Từ điển', nav_settings: 'Cài đặt',
+        card_audio: 'Tiếng nói', card_audio_sub: 'Đã ghi âm',
+        card_words: 'Số ký tự', card_words_sub: 'Nhập bằng giọng nói',
+        card_saved: 'Tiết kiệm thời gian', card_saved_sub: 'Nhanh hơn gõ phím',
+        card_speed: 'Tốc độ', card_speed_unit: 'ký tự/phút',
+        card_count: 'Lượt sử dụng', card_count_sub: 'Tích lũy',
+        card_cost: 'Chi phí ước tính',
+        history_title: 'Lịch sử', history_search: 'Tìm kiếm...',
+        col_time: 'Thời gian', col_mode: 'Chế độ', col_raw: 'Văn bản gốc', col_final: 'Văn bản cuối', col_duration: 'Thời gian',
+        export_txt: 'Xuất TXT', export_csv: 'Xuất CSV', clear_all: 'Xóa tất cả',
+        history_empty: 'Chưa có lịch sử. Bắt đầu sử dụng để ghi lại lịch sử.',
+        dict_title: 'Từ điển', dict_words: 'Từ vựng', dict_words_desc: 'Thêm thuật ngữ, tên, tên công ty để cải thiện độ chính xác.',
+        dict_add: 'Thêm', dict_word_placeholder: 'Từ mới...',
+        dict_corrections: 'Quy tắc sửa lỗi', dict_corrections_desc: 'Lỗi nhận dạng phổ biến → Từ đúng.',
+        dict_wrong: 'Lỗi...', dict_right: 'Từ đúng...',
+        col_wrong: 'Lỗi', col_right: '→ Đúng',
+        settings_title: 'Cài đặt', save_settings: '💾 Lưu cài đặt',
+        personalization: 'Cá nhân hóa', quick_voice: 'Giọng nói',
+        quick_voice_desc: 'Nhấn vào micro để ghi âm, nhấn lại để hoàn tất',
+        personalization_desc: 'Voice Input đang học từ vựng của bạn. Càng dùng càng chính xác.',
+        progress_corrections: 'Sửa lỗi',
+        progress_words: 'Từ tùy chỉnh',
+        progress_frequency: 'Tần suất',
+        weekly_chart: 'Sử dụng 7 ngày qua',
+        settings_ui_lang: '🌐 Ngôn ngữ giao diện',
+        settings_api_keys: '🔑 API Key',
+        settings_api_desc: 'Nhập API Key cho dịch vụ mong muốn, để trống để dùng cục bộ.',
+        settings_voice_rec: '🎙 Nhận dạng giọng nói',
+        settings_hybrid: '🚀 Chế độ Hybrid',
+        settings_ai: '🤖 Xử lý AI',
+        settings_advanced: '⚙️ Cài đặt nâng cao',
+        settings_app_styles: '🎯 Kiểu dựa trên ứng dụng',
+        settings_app_styles_desc: 'Tự động điều chỉnh định dạng theo ứng dụng.',
+        label_openai_key: 'OpenAI API Key',
+        label_anthropic_key: 'Anthropic API Key',
+        label_elevenlabs_key: 'ElevenLabs API Key',
+        label_groq_key: 'Groq API Key',
+        label_whisper_model: 'Mô hình Whisper',
+        label_claude_model: 'Mô hình Claude',
+        label_scene: 'Ngữ cảnh',
+        label_scene_desc: 'Chuyển ngữ cảnh để tải từ điển riêng.',
+        label_language: 'Ngôn ngữ nhận dạng',
+        label_target_lang: 'Dịch sang',
+        label_hotkey_mode: 'Phím tắt',
+        label_hotkey: 'Phím',
+        label_stt_engine: 'Engine cục bộ',
+        label_whisper_local: 'Mô hình Whisper',
+        label_llm_model: 'LLM cục bộ (Ollama)',
+        label_backup_dir: 'Đường dẫn sao lưu',
+        label_silence_dur: 'Tự động dừng khi im lặng (giây)',
+        label_max_dur: 'Thời lượng tối đa (giây)',
+        label_cpm: 'Tốc độ gõ phím',
+        label_system_prompt: '📝 Claude System Prompt',
+        toggle_hybrid: 'Bật chế độ Hybrid',
+        toggle_hybrid_desc: 'Kết hợp Whisper và Cloud',
+        toggle_claude: 'Sửa lỗi với Claude',
+        toggle_claude_desc: 'Sửa thuật ngữ và ngữ pháp',
+        toggle_filler: 'Xóa từ thừa',
+        toggle_filler_desc: 'Xóa à, ờ tự động',
+        toggle_selfcorr: 'Phát hiện tự sửa lỗi',
+        toggle_selfcorr_desc: 'Bỏ qua các phần tự sửa giữa câu',
+        toggle_format: 'Tự động định dạng',
+        toggle_format_desc: 'Định dạng danh sách tự động',
+        toggle_learn: 'Học tự động',
+        toggle_learn_desc: 'Học từ chỉnh sửa thủ công',
+        toggle_paste: 'Tự động dán',
+        toggle_paste_desc: 'Dán văn bản sau khi nhận dạng',
+        hybrid_notice: '⚠️ <b>Thiết lập lần đầu:</b><br>Tải 1.5GB. Cài <a href=\'https://ollama.com\' target=\'_blank\'>Ollama</a> để dùng LLM.',
+        btn_save: '💾 Lưu cài đặt',
+        btn_detect: 'Kiểm tra lại'
+      }
+    };
+
+    let currentUILang = localStorage.getItem('ui_lang') || 'zh-TW';
+
+    function t(key) {
+      return (UI_LANG[currentUILang] || UI_LANG['zh-TW'])[key] || (UI_LANG['zh-TW'])[key] || key;
+    }
+
+    function switchUILang(lang) {
+      currentUILang = lang;
+      localStorage.setItem('ui_lang', lang);
+      applyUILang();
+    }
+
+    function applyUILang() {
+      // Nav items
+      const navMap = { dashboard: 'nav_overview', history: 'nav_history', dictionary: 'nav_dictionary', settings: 'nav_settings' };
+      document.querySelectorAll('.nav-item').forEach(el => {
+        const page = el.dataset.page;
+        if (navMap[page]) el.innerHTML = `<span class="icon">${el.querySelector('.icon')?.textContent || ''}</span> ${t(navMap[page])}`;
+      });
+
+      // Overview cards
+      const cardLabels = document.querySelectorAll('.card-label');
+      const cardKeys = ['card_audio', 'card_words', 'card_saved', 'card_speed', 'card_count', 'card_cost'];
+      const subKeys = ['card_audio_sub', 'card_words_sub', 'card_saved_sub', 'card_speed_unit', 'card_count_sub', null];
+      cardLabels.forEach((el, i) => { if (cardKeys[i]) el.textContent = t(cardKeys[i]); });
+      document.querySelectorAll('.card-sub').forEach((el, i) => { if (subKeys[i]) el.textContent = t(subKeys[i]); });
+
+      // History
+      const histSearch = document.getElementById('history-search');
+      if (histSearch) histSearch.placeholder = t('history_search');
+
+      // Dictionary
+      const newWord = document.getElementById('new-word');
+      if (newWord) newWord.placeholder = t('dict_word_placeholder');
+
+      // Settings lang selector
+      const langSel = document.getElementById('cfg-ui-lang');
+      if (langSel) langSel.value = currentUILang;
+
+      document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.dataset.i18n;
+        const val = t(key);
+        if (val && val !== key) {
+          if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
+            el.placeholder = val;
+          } else {
+            el.innerHTML = val;
+          }
+        }
+        // Apply i18n value directly — no '_title' suffix appending
+        // (previous code appended '_title' causing lookups like 'history_title_title')
+      });
+    }
+
+    // ── Navigation ──
+    document.querySelectorAll('.nav-item').forEach(item => {
+      item.addEventListener('click', () => {
+        document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+        item.classList.add('active');
+        document.getElementById('page-' + item.dataset.page).classList.add('active');
+        // Lazy load
+        if (item.dataset.page === 'history') loadHistory();
+        if (item.dataset.page === 'dictionary') loadDictionary();
+        if (item.dataset.page === 'settings') loadConfig();
+        if (item.dataset.page === 'dashboard') loadDashboard();
+      });
+    });
+
+    // ── Toast ──
+    function toast(msg) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), 2500);
+    }
+
+    // ── Toggle Switch ──
+    function toggleSwitch(el) { el.classList.toggle('on'); }
+
+    // ── API helpers ──
+    async function api(path, opts = {}) {
+      const res = await fetch('/api' + path, {
+        headers: { 'Content-Type': 'application/json' },
+        ...opts,
+        body: opts.body ? JSON.stringify(opts.body) : undefined,
+      });
+      return res.json();
+    }
+
+    // ── Dashboard ──
+    async function loadDashboard() {
+      const data = await api('/stats');
+      const s = data.stats;
+      const p = data.personalization;
+
+      // Total audio time
+      const audioMins = Math.round((s.total_audio_seconds || 0) / 60);
+      const audioHrs = ((s.total_audio_seconds || 0) / 3600).toFixed(1);
+      document.getElementById('stat-audio-time').textContent =
+        audioMins >= 60 ? audioHrs + 'h' : audioMins + 'm';
+
+      // Words
+      document.getElementById('stat-words').textContent = (s.total_characters || 0).toLocaleString() + ' 字';
+
+      // Time saved
+      const mins = Math.round(s.total_seconds_saved / 60);
+      const hrs = (s.total_seconds_saved / 3600).toFixed(1);
+      document.getElementById('stat-time-saved').textContent =
+        mins >= 60 ? hrs + 'h' : mins + 'm';
+
+      // WPM (chars per minute based on audio time)
+      const totalAudioMin = (s.total_audio_seconds || 1) / 60;
+      const wpm = Math.round((s.total_characters || 0) / Math.max(totalAudioMin, 0.1));
+      document.getElementById('stat-wpm').textContent = wpm;
+
+      // Dictations
+      document.getElementById('stat-dictations').textContent = s.total_dictations.toLocaleString();
+
+      // 費用追蹤
+      try {
+        const usage = await api('/usage');
+        const now = new Date();
+        const monthKey = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+        const m = usage[monthKey] || {};
+        const claudeCost = ((m.claude_input_tokens || 0) * 0.0000008) + ((m.claude_output_tokens || 0) * 0.000004);
+        const whisperCost = ((m.whisper_seconds || 0) / 60) * 0.006;
+        const totalCost = claudeCost + whisperCost;
+        document.getElementById('stat-cost').textContent = '$' + totalCost.toFixed(2);
+        document.getElementById('stat-cost-detail').textContent =
+          `Whisper $${whisperCost.toFixed(3)} + Claude $${claudeCost.toFixed(3)}`;
+      } catch (e) { }
+
+      // Progress ring
+      const pct = p.total;
+      const circ = document.getElementById('progress-circle');
+      const offset = 314 - (314 * pct / 100);
+      circ.style.strokeDashoffset = offset;
+      document.getElementById('progress-pct').textContent = pct + '%';
+
+      // Progress bars
+      document.getElementById('bar-dict').style.width = (p.dict_score / 30 * 100) + '%';
+      document.getElementById('bar-vocab').style.width = (p.vocab_score / 30 * 100) + '%';
+      document.getElementById('bar-usage').style.width = (p.usage_score / 40 * 100) + '%';
+
+      // Weekly chart
+      const chart = document.getElementById('weekly-chart');
+      chart.innerHTML = '';
+      const daily = s.daily || {};
+      const days = [];
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        const key = d.toISOString().slice(0, 10);
+        const label = (d.getMonth() + 1) + '/' + d.getDate();
+        const val = daily[key]?.dictations || 0;
+        days.push({ label, val });
+      }
+      const maxVal = Math.max(...days.map(d => d.val), 1);
+      days.forEach(d => {
+        const col = document.createElement('div');
+        col.className = 'bar-col';
+        const h = Math.max(2, (d.val / maxVal) * 100);
+        col.innerHTML = `
+      <div class="bar-value">${d.val}</div>
+      <div class="bar" style="height:${h}px"></div>
+      <div class="bar-label">${d.label}</div>`;
+        chart.appendChild(col);
+      });
+    }
+
+    // ── Recording Control ──
+    let _recPolling = null;
+    async function toggleRecording() {
+      const btn = document.getElementById('rec-btn');
+      const status = document.getElementById('rec-status');
+      try {
+        const st = await api('/recording/status');
+        if (!st.available) { toast('❌ 引擎未啟動，請用 python app.py 啟動'); return; }
+        if (st.recording) {
+          btn.className = 'rec-btn processing'; btn.textContent = '⏳';
+          status.textContent = '處理中...';
+          await api('/recording/stop', { method: 'POST' });
+          setTimeout(() => {
+            btn.className = 'rec-btn idle'; btn.textContent = '🎤';
+            status.textContent = '✅ 完成';
+            loadDashboard();
+            setTimeout(() => { status.textContent = ''; }, 3000);
+          }, 2000);
+        } else {
+          await api('/recording/start', { method: 'POST' });
+          btn.className = 'rec-btn recording'; btn.textContent = '⏹';
+          status.textContent = '🔴 錄音中...';
+        }
+      } catch (e) {
+        toast('❌ 錄音控制失敗');
+        btn.className = 'rec-btn idle'; btn.textContent = '🎤'; status.textContent = '';
+      }
+    }
+
+    // ── History ──
+    let historyDebounce;
+    document.getElementById('history-search').addEventListener('input', () => {
+      clearTimeout(historyDebounce);
+      historyDebounce = setTimeout(loadHistory, 300);
+    });
+
+    async function loadHistory() {
+      const search = document.getElementById('history-search').value;
+      const items = await api('/history?search=' + encodeURIComponent(search));
+      const body = document.getElementById('history-body');
+      const empty = document.getElementById('history-empty');
+
+      if (!items.length) {
+        body.innerHTML = '';
+        empty.style.display = 'block';
+        return;
+      }
+      empty.style.display = 'none';
+      // 儲存歷史項目供改寫使用
+      window._historyItems = items;
+      body.innerHTML = items.map((h, idx) => {
+        const time = h.timestamp?.slice(5, 16).replace('T', ' ') || '';
+        const modeTag = h.mode === 'edit' ? '<span class="tag tag-edit">編輯</span>' :
+          h.mode === 'translate' ? '<span class="tag tag-ja">翻譯</span>' :
+            '<span class="tag tag-zh">聽寫</span>';
+        // Source tags
+        const sttTag = h.stt_source === 'local' ? '<span class="tag tag-local">本地</span>' :
+          h.stt_source === 'cloud' ? '<span class="tag tag-cloud">雲端</span>' : '';
+        const llmTag = h.llm_source === 'cloud' ? '<span class="tag tag-ai">AI</span>' :
+          h.llm_source === 'local' ? '<span class="tag tag-local">Qwen</span>' :
+            h.llm_source === 'skip' ? '<span class="tag tag-skip">極速</span>' : '';
+        const finalText = h.final_text || '';
+        const rawText = h.whisper_raw || '';
+        return `<tr>
+      <td style="white-space:nowrap;color:var(--text2)">${time}</td>
+      <td>${modeTag} ${sttTag} ${llmTag}</td>
+      <td title="${esc(rawText)}">${esc(trunc(rawText, 40))}</td>
+      <td class="td-final" onclick="copyHistoryText(${idx}, 'final')" title="點擊複製全文"><strong>${esc(finalText)}</strong></td>
+      <td style="color:var(--text2)">${h.process_time || 0}s</td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-primary btn-sm" onclick="copyHistoryText(${idx}, 'final')">複製</button>
+        <button class="btn btn-ghost btn-sm" onclick="copyHistoryText(${idx}, 'raw')">原文</button>
+        <button class="btn btn-ghost btn-sm" onclick="editHistoryItem(${idx})">編輯</button>
+        <button class="btn btn-ghost btn-sm" onclick="showRewriteMenu(${idx})">改寫</button>
+        <button class="btn btn-ghost btn-sm" onclick="deleteHistory('${esc(h.timestamp)}')">✕</button>
+      </td>
+    </tr>`;
+      }).join('');
+    }
+
+    function esc(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
+    function trunc(s, n) { return s.length > n ? s.slice(0, n) + '…' : s; }
+    function copyText(text) {
+      navigator.clipboard.writeText(text).then(() => toast('✅ 已複製到剪貼簿'));
+    }
+    function copyHistoryText(idx, field) {
+      const item = window._historyItems?.[idx];
+      if (!item) return;
+      const text = field === 'raw' ? (item.whisper_raw || '') : (item.final_text || '');
+      copyText(text);
+    }
+    async function showRewriteMenu(idx) {
+      const item = window._historyItems?.[idx];
+      if (!item) return;
+      const text = item.final_text || '';
+      const styles = [
+        ['concise', '精簡'],
+        ['formal', '正式'],
+        ['meeting', '會議記錄'],
+        ['email', 'Email 草稿'],
+        ['technical', '技術文件'],
+        ['casual', '輕鬆口語'],
+        ['translate_en', '翻譯英文'],
+        ['translate_ja', '翻譯日文'],
+        ['translate_zh', '翻譯繁中'],
+      ];
+      const options = styles.map(([k, v], i) => `${i + 1}. ${v}`).join('\n');
+      const choice = prompt('選擇改寫情境：\n' + options + '\n\n輸入編號：', '1');
+      if (!choice) return;
+      const idx2 = parseInt(choice) - 1;
+      if (idx2 < 0 || idx2 >= styles.length) { toast('❌ 無效選擇'); return; }
+      const styleName = styles[idx2][0];
+      toast('⏳ 改寫中...');
+      try {
+        const res = await api('/rewrite', { method: 'POST', body: { text, style: styleName } });
+        if (res.error) { toast('❌ ' + res.error); return; }
+        await navigator.clipboard.writeText(res.result);
+        toast('✅ ' + styles[idx2][1] + ' 改寫完成，已複製');
+      } catch (e) { toast('❌ 改寫失敗'); }
+    }
+    function exportHistory(fmt) {
+      const search = document.getElementById('history-search').value;
+      window.open('/api/history/export?format=' + fmt + '&search=' + encodeURIComponent(search));
+    }
+
+    async function deleteHistory(ts) {
+      await api('/history/' + encodeURIComponent(ts), { method: 'DELETE' });
+      loadHistory();
+    }
+    async function clearHistory() {
+      if (!confirm('確定清除所有歷史紀錄？')) return;
+      await api('/history/clear', { method: 'POST' });
+      loadHistory();
+      toast('已清除歷史紀錄');
+    }
+
+    // ── History Edit（Typeless 式修正即學習）──
+    function editHistoryItem(idx) {
+      const item = window._historyItems?.[idx];
+      if (!item) return;
+      const row = document.getElementById('history-body').rows[idx];
+      if (!row) return;
+      const cell = row.cells[3]; // final_text 欄位
+      const originalText = item.final_text || '';
+      // 行內編輯：替換為 textarea
+      cell.innerHTML = `
+        <textarea id="edit-textarea-${idx}" style="width:100%;min-height:60px;font-size:13px;padding:6px;border-radius:6px;border:1px solid var(--accent);background:var(--surface2);color:var(--text);resize:vertical;font-family:inherit;">${esc(originalText)}</textarea>
+        <div style="margin-top:4px;display:flex;gap:4px">
+          <button class="btn btn-primary btn-sm" onclick="saveHistoryEdit(${idx})">儲存</button>
+          <button class="btn btn-ghost btn-sm" onclick="cancelHistoryEdit(${idx})">取消</button>
+        </div>`;
+      document.getElementById('edit-textarea-' + idx).focus();
+    }
+    function cancelHistoryEdit(idx) {
+      const item = window._historyItems?.[idx];
+      if (!item) return;
+      const row = document.getElementById('history-body').rows[idx];
+      if (!row) return;
+      const cell = row.cells[3];
+      const finalText = item.final_text || '';
+      cell.innerHTML = `<strong title="${esc(finalText)}">${esc(trunc(finalText, 50))}</strong>`;
+    }
+    async function saveHistoryEdit(idx) {
+      const item = window._historyItems?.[idx];
+      if (!item) return;
+      const textarea = document.getElementById('edit-textarea-' + idx);
+      if (!textarea) return;
+      const newText = textarea.value;
+      if (newText === item.final_text) { cancelHistoryEdit(idx); return; }
+      try {
+        const res = await api('/history/' + encodeURIComponent(item.timestamp), {
+          method: 'PATCH', body: { final_text: newText }
+        });
+        if (res.error) { toast('❌ ' + res.error); return; }
+        // 更新本地資料
+        item.final_text = newText;
+        item.edited = true;
+        // 顯示學習結果
+        if (res.learned && res.learned.length > 0) {
+          const rules = res.learned.map(r => r.wrong + ' → ' + r.right).join('、');
+          toast('✅ 已儲存，學習到：' + rules);
+        } else {
+          toast('✅ 已儲存');
+        }
+        cancelHistoryEdit(idx);
+      } catch (e) { toast('❌ 儲存失敗'); }
+    }
+
+    // ── Dictionary ──
+    async function loadDictionary() {
+      const data = await api('/dictionary');
+      // Words
+      const tags = document.getElementById('word-tags');
+      tags.innerHTML = (data.custom_words || []).map(w =>
+        `<span class="word-tag">${esc(w)} <span class="remove" onclick="removeWord('${esc(w)}')">✕</span></span>`
+      ).join('');
+      // Corrections
+      const body = document.getElementById('corrections-body');
+      const corr = data.corrections || {};
+      body.innerHTML = Object.entries(corr).sort().map(([w, r]) =>
+        `<tr>
+      <td style="font-family:'JetBrains Mono',monospace;color:var(--red)">${esc(w)}</td>
+      <td style="font-family:'JetBrains Mono',monospace;color:var(--green)">${esc(r)}</td>
+      <td><button class="btn btn-ghost btn-sm" onclick="removeCorrection('${esc(w)}')">✕</button></td>
+    </tr>`
+      ).join('');
+    }
+
+    async function addWord() {
+      const input = document.getElementById('new-word');
+      const word = input.value.trim();
+      if (!word) return;
+      await api('/dictionary/word', { method: 'POST', body: { word } });
+      input.value = '';
+      loadDictionary();
+      toast('已新增：' + word);
+    }
+    async function removeWord(word) {
+      await api('/dictionary/word', { method: 'DELETE', body: { word } });
+      loadDictionary();
+    }
+    async function addCorrection() {
+      const wrong = document.getElementById('corr-wrong').value.trim();
+      const right = document.getElementById('corr-right').value.trim();
+      if (!wrong || !right) return;
+      await api('/dictionary/correction', { method: 'POST', body: { wrong, right } });
+      document.getElementById('corr-wrong').value = '';
+      document.getElementById('corr-right').value = '';
+      loadDictionary();
+      toast('已新增修正規則');
+    }
+    async function removeCorrection(wrong) {
+      await api('/dictionary/correction', { method: 'DELETE', body: { wrong } });
+      loadDictionary();
+    }
+
+    // ── Settings ──
+    async function loadConfig() {
+      const cfg = await api('/config');
+      document.getElementById('cfg-openai-key').value = cfg.openai_api_key || '';
+      document.getElementById('cfg-anthropic-key').value = cfg.anthropic_api_key || '';
+      document.getElementById('cfg-elevenlabs-key').value = cfg.elevenlabs_api_key || '';
+      document.getElementById('cfg-groq-key').value = cfg.groq_api_key || '';
+      document.getElementById('cfg-whisper-model').value = cfg.whisper_model || 'whisper-1';
+      document.getElementById('cfg-claude-model').value = cfg.claude_model || 'claude-haiku-4-5-20251001';
+      document.getElementById('cfg-scene').value = cfg.active_scene || 'general';
+      document.getElementById('cfg-language').value = cfg.language || 'auto';
+      document.getElementById('cfg-target-language').value = cfg.target_language || '';
+      document.getElementById('cfg-hotkey-mode').value = cfg.hotkey_mode || 'push_to_talk';
+      document.getElementById('cfg-hotkey').value = cfg.hotkey || 'right_cmd';
+      document.getElementById('cfg-silence-dur').value = cfg.silence_duration || 2;
+      document.getElementById('cfg-max-dur').value = cfg.max_recording_duration || 360;
+      document.getElementById('cfg-cpm').value = cfg.typing_speed_cpm || 50;
+      document.getElementById('cfg-system-prompt').value = cfg.claude_system_prompt || '';
+
+      // App Styles
+      window._appStyles = cfg.app_styles || {};
+      renderAppStyles();
+
+      // Hybrid 設定
+      setToggle('tog-hybrid', cfg.enable_hybrid_mode);
+      document.getElementById('cfg-stt-engine').value = cfg.stt_engine || 'mlx-whisper';
+      document.getElementById('cfg-local-whisper-model').value = cfg.local_whisper_model || 'mlx-community/whisper-turbo';
+      document.getElementById('cfg-backup-dir').value = cfg.backup_audio_dir || '';
+      onSttEngineChange(); // 根據引擎選擇顯示/隱藏 Whisper 子選項
+
+      setToggle('tog-claude', cfg.enable_claude_polish);
+      setToggle('tog-filler', cfg.enable_filler_removal);
+      setToggle('tog-selfcorr', cfg.enable_self_correction);
+      setToggle('tog-format', cfg.enable_auto_format);
+      setToggle('tog-learn', cfg.enable_auto_learn);
+      setToggle('tog-paste', cfg.auto_paste);
+
+      // 載入 Ollama 狀態 + 模型列表
+      loadOllamaStatus(cfg.local_llm_model || 'qwen2.5:3b');
+    }
+
+    // ── Ollama 狀態偵測與模型列表 ──
+    async function loadOllamaStatus(selectedModel) {
+      try {
+        const status = await api('/service-status');
+        updateOllamaUI(status, selectedModel);
+        updateQwen3Status(status.qwen3_asr_installed || false);
+      } catch (e) {
+        updateOllamaUI({ ollama_status: 'unknown', ollama_models: [] }, selectedModel);
+      }
+    }
+
+    function updateOllamaUI(status, selectedModel) {
+      const led = document.getElementById('ollama-led');
+      const text = document.getElementById('ollama-status-text');
+      const detail = document.getElementById('ollama-status-detail');
+      const select = document.getElementById('cfg-local-llm-model');
+      const hint = document.getElementById('ollama-model-hint');
+
+      // 狀態燈
+      if (status.ollama_status === 'connected') {
+        led.style.background = 'var(--green)';
+        led.style.boxShadow = '0 0 6px var(--green)';
+        text.textContent = 'Ollama 已連線';
+        text.style.color = 'var(--green)';
+        const count = (status.ollama_models || []).length;
+        detail.textContent = `${status.ollama_url || ''} · ${count} 個模型可用`;
+      } else if (status.ollama_status === 'cors_blocked') {
+        led.style.background = 'var(--orange)';
+        led.style.boxShadow = '0 0 6px var(--orange)';
+        text.textContent = 'Ollama 被 CORS 擋住';
+        text.style.color = 'var(--orange)';
+        detail.textContent = '請設定 OLLAMA_ORIGINS="*" 後重啟 Ollama';
+      } else if (status.ollama_status === 'not_running') {
+        led.style.background = 'var(--text3)';
+        led.style.boxShadow = 'none';
+        text.textContent = 'Ollama 未啟動';
+        text.style.color = 'var(--text2)';
+        detail.textContent = '將自動使用雲端 API（Claude / OpenAI）';
+      } else {
+        led.style.background = 'var(--red)';
+        led.style.boxShadow = '0 0 6px var(--red)';
+        text.textContent = 'Ollama 連線異常';
+        text.style.color = 'var(--red)';
+        detail.textContent = status.ollama_diagnosis || '請確認 Ollama 是否正常運行';
+      }
+
+      // 填充模型下拉選單
+      const models = status.ollama_models || [];
+      select.innerHTML = '';
+
+      if (models.length > 0) {
+        // 依推薦度排序：qwen 系列優先，再依名稱
+        const sorted = [...models].sort((a, b) => {
+          const aQ = a.startsWith('qwen') ? 0 : 1;
+          const bQ = b.startsWith('qwen') ? 0 : 1;
+          if (aQ !== bQ) return aQ - bQ;
+          return a.localeCompare(b);
+        });
+        sorted.forEach(m => {
+          const opt = document.createElement('option');
+          opt.value = m;
+          // 標註推薦模型
+          let label = m;
+          if (m === 'qwen2.5:3b') label += '（推薦：快速+中文強）';
+          else if (m === 'qwen2.5:7b') label += '（高品質，需較多 RAM）';
+          else if (m.includes('llama')) label += '（英文為主）';
+          opt.textContent = label;
+          select.appendChild(opt);
+        });
+        hint.textContent = `已偵測到 ${models.length} 個本地模型`;
+        hint.style.color = 'var(--green)';
+      } else {
+        // Ollama 未連線時提供手動輸入
+        const fallback = ['qwen2.5:3b', 'qwen2.5:7b', 'llama3.2:3b', 'mistral-small:latest'];
+        fallback.forEach(m => {
+          const opt = document.createElement('option');
+          opt.value = m;
+          opt.textContent = m;
+          select.appendChild(opt);
+        });
+        hint.textContent = 'Ollama 未連線，顯示預設模型';
+        hint.style.color = 'var(--text3)';
+      }
+
+      // 選中目前使用的模型
+      select.value = selectedModel;
+      // 如果選不到（模型不在列表中），加一個選項
+      if (select.value !== selectedModel) {
+        const opt = document.createElement('option');
+        opt.value = selectedModel;
+        opt.textContent = selectedModel + '（目前設定）';
+        select.insertBefore(opt, select.firstChild);
+        select.value = selectedModel;
+      }
+    }
+
+    async function onSttEngineChange() {
+      const engine = document.getElementById('cfg-stt-engine').value;
+      const whisperGroup = document.getElementById('whisper-model-group');
+      whisperGroup.style.display = engine === 'mlx-whisper' ? '' : 'none';
+
+      // 選了 qwen3-asr → 檢查模型是否已下載
+      if (engine === 'qwen3-asr') {
+        try {
+          const st = await api('/model/status/qwen3-asr');
+          if (!st.downloaded) {
+            if (confirm('Qwen3-ASR 模型尚未下載（約 1.2 GB）。\n要現在下載嗎？')) {
+              startModelDownload('qwen3-asr');
+            }
+          }
+        } catch (e) { /* ignore */ }
+      }
+    }
+
+    function startModelDownload(modelKey) {
+      const bar = document.getElementById('model-download-bar');
+      const msg = document.getElementById('model-download-msg');
+      const pct = document.getElementById('model-download-pct');
+      const fill = document.getElementById('model-download-fill');
+      bar.style.display = 'block';
+      msg.textContent = '準備下載...';
+      pct.textContent = '0%';
+      fill.style.width = '0%';
+
+      // 觸發下載
+      api('/model/download/' + modelKey, { method: 'POST' }).then(() => {
+        // SSE 監聽進度
+        const es = new EventSource('/api/model/download-progress');
+        es.onmessage = (ev) => {
+          const d = JSON.parse(ev.data);
+          const p = d.percent || 0;
+          msg.textContent = d.message || '下載中...';
+          pct.textContent = p + '%';
+          fill.style.width = p + '%';
+          if (d.done) {
+            msg.textContent = '✅ ' + d.message;
+            pct.textContent = '100%';
+            fill.style.width = '100%';
+            fill.style.background = 'var(--green)';
+            es.close();
+            // 更新下拉選單狀態
+            updateQwen3Status(true);
+            setTimeout(() => { bar.style.display = 'none'; }, 3000);
+          }
+          if (d.error) {
+            msg.textContent = '❌ ' + d.message;
+            msg.style.color = 'var(--red)';
+            es.close();
+            setTimeout(() => { bar.style.display = 'none'; }, 5000);
+          }
+        };
+        es.onerror = () => { es.close(); };
+      }).catch(() => {
+        msg.textContent = '❌ 無法啟動下載';
+        setTimeout(() => { bar.style.display = 'none'; }, 3000);
+      });
+    }
+
+    function updateQwen3Status(installed) {
+      const select = document.getElementById('cfg-stt-engine');
+      const opt = select.querySelector('option[value="qwen3-asr"]');
+      if (opt) {
+        opt.textContent = installed
+          ? 'Qwen3-ASR（多語最強，已安裝 ✅）'
+          : 'Qwen3-ASR（多語最強，需下載 1.2 GB）';
+      }
+    }
+
+    async function detectOllama() {
+      const text = document.getElementById('ollama-status-text');
+      const detail = document.getElementById('ollama-status-detail');
+      text.textContent = '偵測中...';
+      text.style.color = 'var(--text2)';
+      detail.textContent = '';
+      try {
+        const result = await api('/ollama/detect', { method: 'POST' });
+        const currentModel = document.getElementById('cfg-local-llm-model').value || 'qwen2.5:3b';
+        updateOllamaUI(result, currentModel);
+        if (result.ollama_status === 'connected') {
+          toast('Ollama 偵測成功');
+        } else {
+          toast('⚠️ Ollama 未連線 — ' + (result.ollama_diagnosis || '').split('\n')[0]);
+        }
+      } catch (e) {
+        text.textContent = '偵測失敗';
+        text.style.color = 'var(--red)';
+        detail.textContent = e.message;
+      }
+    }
+
+    function setToggle(id, val) {
+      const el = document.getElementById(id);
+      if (val) el.classList.add('on'); else el.classList.remove('on');
+    }
+    function getToggle(id) { return document.getElementById(id).classList.contains('on'); }
+
+    async function saveConfig() {
+      const cfg = {
+        openai_api_key: document.getElementById('cfg-openai-key').value,
+        anthropic_api_key: document.getElementById('cfg-anthropic-key').value,
+        elevenlabs_api_key: document.getElementById('cfg-elevenlabs-key').value,
+        groq_api_key: document.getElementById('cfg-groq-key').value,
+        whisper_model: document.getElementById('cfg-whisper-model').value,
+        claude_model: document.getElementById('cfg-claude-model').value,
+        active_scene: document.getElementById('cfg-scene').value,
+        language: document.getElementById('cfg-language').value,
+        target_language: document.getElementById('cfg-target-language').value,
+        hotkey_mode: document.getElementById('cfg-hotkey-mode').value,
+        hotkey: document.getElementById('cfg-hotkey').value,
+        silence_duration: parseFloat(document.getElementById('cfg-silence-dur').value) || 2,
+        max_recording_duration: parseInt(document.getElementById('cfg-max-dur').value) || 360,
+        typing_speed_cpm: parseInt(document.getElementById('cfg-cpm').value) || 50,
+        claude_system_prompt: document.getElementById('cfg-system-prompt').value,
+        enable_hybrid_mode: getToggle('tog-hybrid'),
+        stt_engine: document.getElementById('cfg-stt-engine').value,
+        local_whisper_model: document.getElementById('cfg-local-whisper-model').value,
+        local_llm_model: document.getElementById('cfg-local-llm-model').value,
+        backup_audio_dir: document.getElementById('cfg-backup-dir').value,
+        enable_claude_polish: getToggle('tog-claude'),
+        enable_filler_removal: getToggle('tog-filler'),
+        enable_self_correction: getToggle('tog-selfcorr'),
+        enable_auto_format: getToggle('tog-format'),
+        enable_auto_learn: getToggle('tog-learn'),
+        auto_paste: getToggle('tog-paste'),
+      };
+
+      if (window._appStyles) {
+        Object.keys(window._appStyles).forEach(key => {
+          const ta = document.getElementById('cfg-appstyle-' + key);
+          if (ta) window._appStyles[key].prompt = ta.value;
+        });
+        cfg.app_styles = window._appStyles;
+      }
+
+      await api('/config', { method: 'POST', body: cfg });
+      toast('✅ 設定已儲存');
+    }
+
+    function renderAppStyles() {
+      const c = document.getElementById('app-styles-container');
+      if (!c || !window._appStyles) return;
+      c.innerHTML = Object.entries(window._appStyles).map(([key, data]) => {
+        if (key === 'default' || !data.prompt) return '';
+        const id = 'cfg-appstyle-' + key;
+        return `
+          <details style="background:var(--surface2);border-radius:8px;padding:10px 14px;border:1px solid var(--border)">
+            <summary style="cursor:pointer;font-size:14px;font-weight:500;list-style:none;display:flex;align-items:center;gap:8px">
+              <span>${data.label}</span>
+              <span style="font-size:11px;color:var(--text3);font-weight:normal">${data.apps.length} 款 App</span>
+              <span style="margin-left:auto;font-size:11px;color:var(--text3)">▸</span>
+            </summary>
+            <textarea id="${id}" rows="2" style="width:100%;font-size:12px;padding:8px;border-radius:6px;border:1px solid var(--border);background:var(--surface1);color:var(--text);resize:vertical;margin-top:8px">${esc(data.prompt)}</textarea>
+          </details>
+        `;
+      }).join('');
+    }
+
+    // Enter key for word/correction input
+    document.getElementById('new-word').addEventListener('keypress', e => { if (e.key === 'Enter') addWord(); });
+    document.getElementById('corr-right').addEventListener('keypress', e => { if (e.key === 'Enter') addCorrection(); });
+
+    // ── Init ──
+    applyUILang();
+    loadDashboard();
+
+    // 初始化側邊欄 Ollama 狀態燈
+    (async function initSidebarStatus() {
+      try {
+        const status = await api('/service-status');
+        const led = document.getElementById('sidebar-led');
+        const txt = document.getElementById('sidebar-led-text');
+        if (status.ollama_status === 'connected') {
+          led.style.background = 'var(--green)';
+          txt.textContent = 'Local LLM';
+          txt.style.color = 'var(--green)';
+        } else if (status.has_anthropic_key || status.has_openai_key) {
+          led.style.background = 'var(--blue)';
+          txt.textContent = 'Cloud API';
+          txt.style.color = 'var(--blue)';
+        } else {
+          led.style.background = 'var(--red)';
+          txt.textContent = 'No LLM';
+          txt.style.color = 'var(--red)';
+        }
+      } catch (e) { }
+    })();
+  </script>
+</body>
+
+</html>
