@@ -3,14 +3,21 @@
 VoiceInput.app — PyInstaller 打包配置
 Apple Silicon (arm64) only
 """
-from PyInstaller.utils.hooks import collect_all, collect_data_files
+from PyInstaller.utils.hooks import collect_all, collect_data_files, collect_dynamic_libs
 
 block_cipher = None
 
 # 收集 native extension 的所有檔案
-mlx_datas, mlx_bins, mlx_imports = collect_all('mlx')
-mlx_nn_datas, mlx_nn_bins, mlx_nn_imports = collect_all('mlx.nn')
-whisper_datas, whisper_bins, whisper_imports = collect_all('mlx_whisper')
+# NOTE: 在 Python 3.14 + PyInstaller 下，collect_all('mlx') 會觸發
+# collect_submodules 匯入 mlx.optimizers，進而在無可用 Metal device 時崩潰。
+# 這裡改成靜態收集資料/動態庫，避免打包階段主動匯入 mlx 子模組。
+mlx_datas = collect_data_files('mlx')
+mlx_bins = collect_dynamic_libs('mlx')
+mlx_imports = ['mlx', 'mlx.core', 'mlx.nn']
+mlx_nn_datas, mlx_nn_bins, mlx_nn_imports = [], [], []
+whisper_datas = collect_data_files('mlx_whisper')
+whisper_bins = collect_dynamic_libs('mlx_whisper')
+whisper_imports = ['mlx_whisper']
 sd_datas, sd_bins, sd_imports = collect_all('sounddevice')
 sf_datas, sf_bins, sf_imports = collect_all('soundfile')
 opencc_datas = collect_data_files('opencc')
@@ -97,8 +104,8 @@ app = BUNDLE(
     info_plist={
         'CFBundleName': 'SGH Voice',
         'CFBundleDisplayName': 'SGH Voice',
-        'CFBundleVersion': '1.1.0',
-        'CFBundleShortVersionString': '1.1.0',
+        'CFBundleVersion': '1.2.0',
+        'CFBundleShortVersionString': '1.2.0',
         'LSMinimumSystemVersion': '13.0',
         'LSUIElement': True,  # 選單列 App，不顯示 Dock 圖示
         'NSMicrophoneUsageDescription': 'SGH Voice 需要麥克風權限來錄製語音並轉為文字。',

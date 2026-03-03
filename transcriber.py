@@ -32,6 +32,10 @@ class Transcriber:
             self._opencc = None
         # 預編譯填充詞正則，加速匹配
         self._filler_pattern = self._compile_filler_pattern()
+        # Ollama timeout 退避：避免連續超時時每次都卡住並重複洗版 warning
+        self._ollama_backoff_until = 0.0
+        self._ollama_fail_count = 0
+        self._ollama_last_warn = 0.0
 
     def reset_clients(self):
         self._openai = None
@@ -58,6 +62,11 @@ class Transcriber:
         """Ollama 提供與 OpenAI 相容的 API 格式，URL 由偵測器決定"""
         detector = self.ollama_detector
         base_url = detector.base_url or "http://127.0.0.1:11434/v1"
+        try:
+            llm_timeout = float(self.config.get("local_llm_timeout_sec", 6.0))
+        except (TypeError, ValueError):
+            llm_timeout = 6.0
+        llm_timeout = max(1.0, llm_timeout)
 
         # 如果 URL 變了（偵測器切換了位址），重建 client
         cached_url = getattr(self, '_local_llm_url', None)
@@ -65,7 +74,7 @@ class Transcriber:
             self._local_llm_client = openai.OpenAI(
                 base_url=base_url,
                 api_key="ollama",  # 必須有值但會被忽略
-                timeout=1.5,       # 1.5 秒超時，避免使用者等太久
+                timeout=llm_timeout,
             )
             self._local_llm_url = base_url
         return self._local_llm_client
@@ -429,9 +438,12 @@ class Transcriber:
             return None
 
     def _local_llm_process(self, text):
-        """使用本地 Ollama (Qwen) 進行去填充詞與潤稿（1.5 秒超時，失敗無感切換雲端）"""
+        """使用本地 Ollama (Qwen) 進行去填充詞與潤稿（失敗時無感切換雲端）"""
         if not text.strip():
             return text
+        # 近期已連續 timeout 時，暫停本地重試，直接走 fallback
+        if time.time() < self._ollama_backoff_until:
+            return None
 
         # 先確認 Ollama 是否可用（有快取，不會每次都偵測）
         detector = self.ollama_detector
@@ -473,14 +485,22 @@ class Transcriber:
             )
             elapsed = time.time() - t0
             result = resp.choices[0].message.content.strip()
+            self._ollama_fail_count = 0
+            self._ollama_backoff_until = 0.0
             print(f" ⚡ [Local Ollama] 完成 ({elapsed:.2f}s)")
             return result
         except Exception as e:
             err_str = str(e).lower()
             if "connection" in err_str or "refused" in err_str or "timeout" in err_str or "timed out" in err_str:
-                # 連線問題：標記為需要重新偵測
+                # 連線問題：退避一段時間，避免每次都卡 timeout
+                self._ollama_fail_count = min(self._ollama_fail_count + 1, 6)
+                cooldown = min(120, 5 * (2 ** (self._ollama_fail_count - 1)))
+                self._ollama_backoff_until = time.time() + cooldown
                 detector._last_check = 0  # 清除快取，下次觸發重新偵測
-                print(f" ⚠️ Ollama 連線失敗，切換到雲端 API: {e}")
+                now = time.time()
+                if now - self._ollama_last_warn > 15:
+                    print(f" ⚠️ Ollama 連線失敗，{cooldown}s 內改走雲端 API: {e}")
+                    self._ollama_last_warn = now
             else:
                 print(f" ⚠️ Local LLM 錯誤: {e}")
             return None

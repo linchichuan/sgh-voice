@@ -76,7 +76,7 @@
 
 ### 安裝步驟
 
-1. 從 [Releases](https://github.com/linchichuan/sgh-voice/releases) 下載 `Voice Input-1.1.0-apple-silicon.dmg`
+1. 從 [Releases](https://github.com/linchichuan/sgh-voice/releases) 下載 `SGH Voice-1.2.0-apple-silicon.dmg`
 2. 雙擊 DMG，將 **Voice Input** 拖入 Applications 資料夾
 3. 首次開啟：在應用程式點擊右鍵 → **打開**（macOS Gatekeeper 需要允許一次）
 4. 選單列出現 🎙 圖示後，點擊 **Open Dashboard**
@@ -256,7 +256,7 @@ python app.py --dashboard  # 只開 Dashboard
 ```bash
 chmod +x build.sh
 ./build.sh
-# 產出：dist/SGH-Voice-1.1.0-apple-silicon.dmg
+# 產出：dist/SGH Voice-1.2.0-apple-silicon.dmg
 ```
 
 ---

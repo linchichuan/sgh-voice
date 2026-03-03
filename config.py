@@ -218,6 +218,7 @@ DEFAULT_CONFIG = {
     "stt_engine": "mlx-whisper",                           # mlx-whisper | qwen3-asr | cloud-only
     "local_whisper_model": "mlx-community/whisper-turbo",  # 本地 Whisper 模型
     "local_llm_model": "qwen2.5:3b",        # Ollama 上的本地模型名稱
+    "local_llm_timeout_sec": 6.0,           # 本地 Ollama 超時秒數（避免 1.5 秒過短造成頻繁 fallback）
     "backup_audio_dir": "",                  # 音訊備份目錄（空字串=不備份）
     "sample_rate": 16000,
     "silence_threshold": 0.001,
