@@ -7,13 +7,13 @@ plugins {
 
 android {
     namespace = "com.shingihou.sghvoice"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.shingihou.sghvoice"
         minSdk = 26
-        targetSdk = 34
-        versionCode = 3
+        targetSdk = 35
+        versionCode = 4
         versionName = "1.2.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
