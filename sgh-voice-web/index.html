@@ -35,7 +35,7 @@
                 <a href="#how-it-works" data-i18n="nav.howItWorks">使い方</a>
                 <a href="#pricing" data-i18n="nav.pricing">料金</a>
                 <a href="#download" data-i18n="nav.download">ダウンロード</a>
-                <a href="#contact" data-i18n="nav.contact">お問い合わせ</a>
+                <a href="#beta" data-i18n="nav.beta">Beta申請</a>
                 <a href="privacy.html" data-i18n="nav.privacy">プライバシー</a>
             </div>
             <div class="nav-right">
@@ -381,33 +381,30 @@
         </div>
     </section>
 
-    <!-- ===== Contact Form ===== -->
-    <section class="contact" id="contact">
+    <!-- ===== Beta Request Form ===== -->
+    <section class="beta" id="beta">
         <div class="container">
             <div class="section-header">
-                <span class="section-label" data-i18n="contact.label">お問い合わせ</span>
-                <h2 class="section-title" data-i18n="contact.title">ご質問・ご要望はこちら</h2>
-                <p class="section-subtitle" data-i18n="contact.subtitle">お気軽にお問い合わせください。通常1営業日以内にご返信いたします。</p>
+                <span class="section-label" data-i18n="beta.label">Beta申請</span>
+                <h2 class="section-title" data-i18n="beta.title">Beta版を利用する</h2>
+                <p class="section-subtitle" data-i18n="beta.subtitle">現在、機能制限なしのPro版をBetaテスト中です。以下のフォームから理由を添えて申請してください。
+                </p>
             </div>
             <div class="contact-card">
-                <form class="contact-form" id="contactForm">
+                <form class="contact-form" id="betaForm">
                     <div class="form-row">
                         <div class="form-group">
-                            <label for="contactName" data-i18n="contact.name">お名前</label>
-                            <input type="text" id="contactName" required>
+                            <label for="betaName" data-i18n="beta.name">お名前 / 企業名</label>
+                            <input type="text" id="betaName" required>
                         </div>
                         <div class="form-group">
-                            <label for="contactEmail" data-i18n="contact.email">メールアドレス</label>
-                            <input type="email" id="contactEmail" required>
+                            <label for="betaEmail" data-i18n="beta.email">メールアドレス</label>
+                            <input type="email" id="betaEmail" required>
                         </div>
                     </div>
                     <div class="form-group">
-                        <label for="contactSubject" data-i18n="contact.subject">件名</label>
-                        <input type="text" id="contactSubject">
-                    </div>
-                    <div class="form-group">
-                        <label for="contactMessage" data-i18n="contact.message">メッセージ</label>
-                        <textarea id="contactMessage" rows="5" required></textarea>
+                        <label for="betaMessage" data-i18n="beta.message">利用目的・理由</label>
+                        <textarea id="betaMessage" rows="5" required></textarea>
                     </div>
                     <button type="submit" class="btn btn-primary contact-submit-btn">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18"
@@ -415,17 +412,17 @@
                             <line x1="22" y1="2" x2="11" y2="13" />
                             <polygon points="22 2 15 22 11 13 2 9 22 2" />
                         </svg>
-                        <span data-i18n="contact.send">送信する</span>
+                        <span data-i18n="beta.send">申請を送る</span>
                     </button>
-                    <div class="contact-success" id="contactSuccess" style="display:none;">
+                    <div class="contact-success" id="betaSuccess" style="display:none;">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20"
                             height="20">
                             <polyline points="20 6 9 17 4 12" />
                         </svg>
-                        <span data-i18n="contact.success">お問い合わせを受け付けました。ありがとうございます！</span>
+                        <span data-i18n="beta.success">申請を受け付けました。追ってご連絡します。</span>
                     </div>
-                    <div class="contact-error" id="contactError" style="display:none;">
-                        <span data-i18n="contact.error">送信に失敗しました。もう一度お試しください。</span>
+                    <div class="contact-error" id="betaError" style="display:none;">
+                        <span data-i18n="beta.error">送信に失敗しました。もう一度お試しください。</span>
                     </div>
                 </form>
             </div>
