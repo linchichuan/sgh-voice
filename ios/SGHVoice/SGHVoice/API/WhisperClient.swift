@@ -8,6 +8,23 @@ enum WhisperError: Error {
     case parseError(String)
 }
 
+extension WhisperError: LocalizedError {
+    var errorDescription: String? {
+        switch self {
+        case .apiKeyNotSet:
+            return "OpenAI API Key 未設定，請先到設定頁填入。"
+        case let .networkError(message):
+            return "Whisper 網路錯誤：\(message)"
+        case let .invalidResponse(message):
+            return "Whisper 回應錯誤：\(message)"
+        case .emptyResponse:
+            return "Whisper 回傳空結果。"
+        case let .parseError(message):
+            return "Whisper 解析失敗：\(message)"
+        }
+    }
+}
+
 /// OpenAI Whisper API 客戶端
 /// 將錄音的 WAV 檔傳送至 Whisper API 取得語音辨識結果
 class WhisperClient {
@@ -23,7 +40,7 @@ class WhisperClient {
     /// - Returns: 辨識後的文字結果
     func transcribe(wavData: Data, initialPrompt: String = "") async throws -> String {
         let apiKey = ApiConfig.shared.openAiApiKey
-        let modelName = ApiConfig.shared.whisperModel
+        let modelName = ApiConfig.shared.whisperModel.isEmpty ? ApiConfig.defaultWhisperModel : ApiConfig.shared.whisperModel
         
         if apiKey.isEmpty {
             throw WhisperError.apiKeyNotSet
@@ -31,6 +48,7 @@ class WhisperClient {
         
         var request = URLRequest(url: whisperApiUrl)
         request.httpMethod = "POST"
+        request.timeoutInterval = 90
         request.addValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         
         let boundary = "Boundary-\(UUID().uuidString)"
@@ -75,8 +93,7 @@ class WhisperClient {
             }
             
             if !(200...299).contains(httpResponse.statusCode) {
-                let errorMsg = String(data: data, encoding: .utf8) ?? "HTTP \(httpResponse.statusCode)"
-                throw WhisperError.invalidResponse(errorMsg)
+                throw WhisperError.invalidResponse(parseApiErrorMessage(data: data, statusCode: httpResponse.statusCode))
             }
             
             let json = try JSONSerialization.jsonObject(with: data, options: []) as? [String: Any]
@@ -88,8 +105,40 @@ class WhisperClient {
             
         } catch let error as WhisperError {
             throw error
+        } catch let error as URLError {
+            switch error.code {
+            case .timedOut:
+                throw WhisperError.networkError("連線逾時（timeout），請檢查網路或稍後重試。")
+            case .notConnectedToInternet:
+                throw WhisperError.networkError("裝置目前沒有網路連線。")
+            default:
+                throw WhisperError.networkError(error.localizedDescription)
+            }
         } catch {
             throw WhisperError.networkError(error.localizedDescription)
         }
+    }
+
+    private func parseApiErrorMessage(data: Data, statusCode: Int) -> String {
+        struct OpenAIErrorResponse: Decodable {
+            struct APIError: Decodable {
+                let message: String?
+                let type: String?
+                let code: String?
+            }
+            let error: APIError?
+        }
+
+        if let decoded = try? JSONDecoder().decode(OpenAIErrorResponse.self, from: data),
+           let message = decoded.error?.message,
+           !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return "HTTP \(statusCode) - \(message)"
+        }
+
+        let raw = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let raw, !raw.isEmpty {
+            return "HTTP \(statusCode) - \(raw)"
+        }
+        return "HTTP \(statusCode)"
     }
 }

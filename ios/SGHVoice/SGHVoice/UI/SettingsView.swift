@@ -17,12 +17,20 @@ struct SettingsView: View {
         Form {
             Section(header: Text("API 金鑰 (Keychain 加密儲存)").font(.headline)) {
                 SecureField("OpenAI API Key (sk-...)", text: $openAiKey)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
                 SecureField("Anthropic API Key (sk-ant-...)", text: $anthropicKey)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
             }
             
             Section(header: Text("模型選用設定").font(.headline)) {
                 TextField("Whisper 模型名稱", text: $whisperModel)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
                 TextField("Claude 模型名稱", text: $claudeModel)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
                 
                 Button("恢復預設模型") {
                     whisperModel = ApiConfig.defaultWhisperModel

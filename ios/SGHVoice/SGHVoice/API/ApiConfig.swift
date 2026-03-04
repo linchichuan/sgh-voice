@@ -65,24 +65,54 @@ class ApiConfig {
     
     // MARK: - API Keys
     var openAiApiKey: String {
-        get { return loadFromKeychain(key: keyOpenAIApiKey) ?? "" }
-        set { saveToKeychain(key: keyOpenAIApiKey, value: newValue) }
+        get {
+            return (loadFromKeychain(key: keyOpenAIApiKey) ?? "")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        set {
+            saveToKeychain(
+                key: keyOpenAIApiKey,
+                value: newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+            )
+        }
     }
     
     var anthropicApiKey: String {
-        get { return loadFromKeychain(key: keyAnthropicApiKey) ?? "" }
-        set { saveToKeychain(key: keyAnthropicApiKey, value: newValue) }
+        get {
+            return (loadFromKeychain(key: keyAnthropicApiKey) ?? "")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        set {
+            saveToKeychain(
+                key: keyAnthropicApiKey,
+                value: newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+            )
+        }
     }
     
     // MARK: - Settings (UserDefaults)
     var whisperModel: String {
-        get { return defaults.string(forKey: keyWhisperModel) ?? ApiConfig.defaultWhisperModel }
-        set { defaults.set(newValue, forKey: keyWhisperModel) }
+        get {
+            let saved = defaults.string(forKey: keyWhisperModel)?
+                .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            return saved.isEmpty ? ApiConfig.defaultWhisperModel : saved
+        }
+        set {
+            let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+            defaults.set(trimmed.isEmpty ? ApiConfig.defaultWhisperModel : trimmed, forKey: keyWhisperModel)
+        }
     }
     
     var claudeModel: String {
-        get { return defaults.string(forKey: keyClaudeModel) ?? ApiConfig.defaultClaudeModel }
-        set { defaults.set(newValue, forKey: keyClaudeModel) }
+        get {
+            let saved = defaults.string(forKey: keyClaudeModel)?
+                .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            return saved.isEmpty ? ApiConfig.defaultClaudeModel : saved
+        }
+        set {
+            let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+            defaults.set(trimmed.isEmpty ? ApiConfig.defaultClaudeModel : trimmed, forKey: keyClaudeModel)
+        }
     }
     
     var outputStyle: String {
