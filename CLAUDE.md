@@ -190,6 +190,30 @@ Swift, SwiftUI, Combine, AVFoundation, URLSession, Keychain, OpenAI Whisper API,
 - 剪貼簿保護（貼上後自動還原原有剪貼簿）
 - LLM 幻覺偵測（自我介紹特徵詞 + 長度比對）
 
+## 本機 Loop 自動化（scripts/）
+
+### 場景 1：模型精度批次測試
+- `scripts/benchmark_models.py`：比較 Breeze-ASR-25 4bit/fp16 vs Whisper Turbo
+- 測試音檔：`test/audio/`，正確答案：`test/ground_truth/`，結果：`test/results/MODEL_BENCHMARK.md`
+- 計算 CER（Character Error Rate）+ 耗時，生成 Markdown 報告
+- Claude Code 用法：`/loop "python3 scripts/benchmark_models.py && cat test/results/MODEL_BENCHMARK.md"`
+
+### 場景 2：HuggingFace 新模型監控
+- `scripts/hf-model-watch.sh`：搜尋 HF 上最近 7 天的新 ASR 模型
+- launchd 每天 08:00 執行，發現新模型推 macOS 通知
+- 可選：有 ANTHROPIC_API_KEY 時自動用 Claude 評估相關性（7 分以上才通知）
+- 追蹤檔案：`~/.voice-input/hf_seen_models.txt`
+
+### 場景 3：業界辭書自動擴充
+- `scripts/dict-update.py`：從 PMDA（新藥）+ MHLW（醫療制度）自動擷取術語
+- launchd 每週日 03:00 執行，新術語寫入 `~/.voice-input/dictionary.json`
+- 支援 `--dry-run` 乾跑模式
+
+### launchd 排程管理
+- 安裝：`bash scripts/install-launchd.sh`
+- 卸載：`bash scripts/install-launchd.sh --uninstall`
+- plist 定義：`scripts/launchd/`
+
 ## Skills
 
 - `/macos-voice-input` — macOS 版完整開發技能（管線、最佳化、API 呼叫）
