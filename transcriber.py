@@ -10,7 +10,7 @@ import numpy as np
 from datetime import datetime
 import openai
 import anthropic
-from config import load_smart_replace, SCENE_PRESETS, DEFAULT_APP_STYLES, detect_app_style
+from config import load_smart_replace, SCENE_PRESETS, DEFAULT_APP_STYLES, detect_app_style, LOCAL_MODEL_PATHS, BREEZE_MODELS
 from ollama_detector import get_detector, OllamaStatus
 from voiceprint import VoiceprintManager
 
@@ -101,12 +101,16 @@ class Transcriber:
                 sf.write(tmp.name, silence, 16000)
                 tmp.close()
 
+                warmup_model_name = self.config.get("local_whisper_model", "mlx-community/whisper-turbo")
+                warmup_model_path = LOCAL_MODEL_PATHS.get(warmup_model_name, warmup_model_name)
+                warmup_kwargs = {
+                    "path_or_hf_repo": warmup_model_path,
+                    "language": "en",
+                }
+                if warmup_model_name in BREEZE_MODELS:
+                    warmup_kwargs["fp16"] = True
                 with Transcriber._metal_lock:
-                    mlx_whisper.transcribe(
-                        tmp.name,
-                        path_or_hf_repo="mlx-community/whisper-turbo",
-                        language="en",
-                    )
+                    mlx_whisper.transcribe(tmp.name, **warmup_kwargs)
                 import os
                 os.unlink(tmp.name)
                 print(" ✅ mlx-whisper 模型預熱完成")
@@ -461,11 +465,21 @@ class Transcriber:
         """使用 Mac 本地 mlx-whisper，支援傳入 numpy 陣列或路徑"""
         try:
             import mlx_whisper
+            model_name = self.config.get("local_whisper_model", "mlx-community/whisper-turbo")
+            # 解析模型路徑：短名稱 → 實際路徑
+            model_path = LOCAL_MODEL_PATHS.get(model_name, model_name)
+            is_breeze = model_name in BREEZE_MODELS
+
             kwargs = {
-                "path_or_hf_repo": self.config.get("local_whisper_model", "mlx-community/whisper-turbo"),
+                "path_or_hf_repo": model_path,
                 "temperature": 0.0,                     # 確定性輸出，greedy decoding
                 "condition_on_previous_text": False,    # 不需要上下文，減少計算量
             }
+
+            # Breeze-ASR-25 基於 whisper-large-v2（80 mel bins, fp16 推理）
+            if is_breeze:
+                kwargs["fp16"] = True
+
             lang = self.config.get("language", "auto")
             if lang != "auto":
                 kwargs["language"] = lang

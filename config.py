@@ -196,6 +196,15 @@ HISTORY_FILE = os.path.join(DATA_DIR, "history.json")
 STATS_FILE = os.path.join(DATA_DIR, "stats.json")
 SMART_REPLACE_FILE = os.path.join(DATA_DIR, "smart_replace.json")
 
+# ─── 本地模型路徑映射（短名稱 → 實際路徑）────────────────
+LOCAL_MODEL_PATHS = {
+    "breeze-asr-25-4bit": "/Volumes/Satechi_SSD/huggingface/hub/breeze-asr-25-mlx-4bit",
+    "breeze-asr-25": "/Volumes/Satechi_SSD/huggingface/hub/breeze-asr-25-mlx",
+}
+
+# Breeze-ASR-25 基於 whisper-large-v2（80 mel bins），需要特殊處理
+BREEZE_MODELS = {"breeze-asr-25-4bit", "breeze-asr-25"}
+
 DEFAULT_CONFIG = {
     "openai_api_key": "",
     "anthropic_api_key": "",
