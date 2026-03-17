@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SGH Voice — AI 音声入力アシスタント</title>
     <meta name="description" content="話すだけで、プロ品質のテキストに。中国語・日本語・英語 3言語対応 AI 音声入力ツール。医療場面モード搭載。macOS &amp; Android 対応。">
-    <meta property="og:title" content="SGH Voice — AI 音声入力アシスタント v1.3.0">
+    <meta property="og:title" content="SGH Voice — AI 音声入力アシスタント v1.4.0">
     <meta property="og:description" content="話すだけで、プロ品質のテキストに。AI が自動校正・フォーマットまで完了。医療場面モード対応。">
     <meta property="og:url" content="https://voice.shingihou.com">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -74,7 +74,7 @@
             <div class="hero-orb hero-orb-3"></div>
         </div>
         <div class="container hero-content">
-            <div class="hero-badge" data-i18n="hero.badge">macOS & Android 対応</div>
+            <div class="hero-badge" data-i18n="hero.badge">macOS & iOS & Android 対応</div>
             <h1 class="hero-title">
                 <span data-i18n="hero.title1">話すだけで、</span><br>
                 <span class="gradient-text" data-i18n="hero.title2">プロ品質のテキストに。</span>
@@ -166,13 +166,17 @@
                 </div>
                 <div class="feature-card">
                     <div class="feature-icon">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="28"
-                            height="28">
-                            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="28" height="28">
+                            <rect x="4" y="4" width="16" height="16" rx="2" />
+                            <rect x="9" y="9" width="6" height="6" />
+                            <line x1="9" y1="1" x2="9" y2="4" /><line x1="15" y1="1" x2="15" y2="4" />
+                            <line x1="9" y1="20" x2="9" y2="23" /><line x1="15" y1="20" x2="15" y2="23" />
+                            <line x1="20" y1="9" x2="23" y2="9" /><line x1="20" y1="15" x2="23" y2="15" />
+                            <line x1="1" y1="9" x2="4" y2="9" /><line x1="1" y1="15" x2="4" y2="15" />
                         </svg>
                     </div>
-                    <h3 data-i18n="features.f3.title">Groq 超高速処理</h3>
-                    <p data-i18n="features.f3.desc">Groq のハードウェアで Whisper を実行。0.5秒以下で文字起こし完了。</p>
+                    <h3 data-i18n="features.f3.title">Breeze-ASR-25 搭載</h3>
+                    <p data-i18n="features.f3.desc">MediaTek製の繁体字中国語特化ASRモデルをApple Silicon上でオフライン実行。Whisper-turbo比3.5倍高速。0.8GBの4bit量子化モデルで、インターネット接続不要です。</p>
                 </div>
                 <div class="feature-card">
                     <div class="feature-icon">
