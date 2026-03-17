@@ -339,6 +339,10 @@ class Transcriber:
         }
         self.memory.add_to_history(entry)
 
+        # 異步執行自動新詞萃取 (模仿 Typeless)
+        if mode == "dictate":
+            self._async_extract_keywords(final)
+
         return {
             "raw": raw,
             "corrected": corrected,
@@ -346,6 +350,30 @@ class Transcriber:
             "process_time": process_time,
             "entry": entry,
         }
+
+    def _async_extract_keywords(self, text):
+        """非同步背景提取專有名詞與外文，加入自動詞庫。"""
+        def task():
+            try:
+                if len(text) < 5: return
+                import re
+                # 提取長度 3 以上且包含字母的單字 (e.g. Firebase, Sendgrid, Genostar, stripe)
+                words = re.findall(r'[A-Za-z][A-Za-z0-9\-]{2,}', text)
+                
+                # 常見的非關鍵字排除名單
+                common = {
+                    "the", "and", "that", "this", "with", "from", "your", "have", "you",
+                    "for", "not", "are", "but", "all", "can", "out", "our", "has", "who", "get"
+                }
+                
+                keywords = [w for w in set(words) if w.lower() not in common]
+                
+                for kw in keywords:
+                    self.memory.add_auto_word(kw)
+            except Exception as e:
+                print(f" Keyword extraction failed: {e}")
+                
+        threading.Thread(target=task, daemon=True).start()
 
     def _whisper(self, audio_path):
         """Whisper API 語音轉文字 — 使用 custom_words prompt 提升三語辨識"""
@@ -531,14 +559,14 @@ class Transcriber:
 
     # 固定的高效 system prompt（不從 config 讀取，避免使用者破壞品質）
     _DICTATE_SYSTEM = (
-        "語音辨識後處理。規則：\n"
-        "1. 刪除所有填充詞：嗯、啊、那個、就是、然後、對、欸、所以說、基本上、えーと、あの、えー、まあ、um、uh、like、you know、basically、actually、so yeah、I mean\n"
-        "2. 刪除冗餘詞：這個、那個（非必要指代時）、就是說、我想說一下\n"
-        "3. 口語自我修正→只保留最終版本（例：不是A啦，我的意思是B→只留B）\n"
-        "4. 標點符號必加：中文用全形標點（，。？！、：；），日文用全形標點，英文用半形標點且後面空一格。長篇大論適當分段，提升閱讀性。\n"
-        "5. 不要改寫核心句子結構，保持講者的原意與語氣\n"
-        "6. 多語混合保持原樣\n"
-        "7. 只輸出結果，不加任何解釋"
+        "你是一個語音辨識後處理與文法檢查助手。規則：\n"
+        "1. 語言判斷：自動判斷原文是中文、日文還是英文。絕對不要翻譯（例如英文不要翻成中文，日文不要翻成中文）。保持講者的原語言！\n"
+        "2. 文法與語氣（Grammar & Tone）：修正明顯的文法錯誤、錯別字、不通順的語句，並優化語氣使其聽起來像母語人士的書面語或流暢口語。\n"
+        "3. 刪除所有填充詞：嗯、啊、那個、就是、然後、對、欸、所以說、基本上、えーと、あの、えー、まあ、um、uh、like、you know、basically、actually 等\n"
+        "4. 口語自我修正→只保留最終版本（例：不是A啦，我的意思是B→只留B）\n"
+        "5. 標點符號必加：中文用全形標點（，。？！、：；），日文用全形標點，英文用半形標點且後面空一格。長篇大論適當分段，提升閱讀性。\n"
+        "6. 多語混合時保持混合狀態，不要翻譯。\n"
+        "7. 只輸出結果，不加任何解釋。"
     )
 
     def _openai_process(self, text, mode, edit_context=""):

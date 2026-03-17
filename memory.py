@@ -97,6 +97,15 @@ class Memory:
 
     def add_custom_word(self, word):
         """手動新增詞彙到詞庫"""
+        manual = self.dictionary.setdefault("manual_added", [])
+        if word not in manual:
+            manual.append(word)
+            save_dictionary(self.dictionary)
+            return True
+        return False
+
+    def add_auto_word(self, word):
+        """系統自動提取的詞彙"""
         auto = self.dictionary.setdefault("auto_added", [])
         if word not in auto:
             auto.append(word)
@@ -105,13 +114,18 @@ class Memory:
         return False
 
     def remove_custom_word(self, word):
-        """刪除自訂詞彙"""
-        auto = self.dictionary.get("auto_added", [])
-        if word in auto:
-            auto.remove(word)
+        """刪除自訂詞彙（會檢查自動或手動）"""
+        removed = False
+        if word in self.dictionary.get("auto_added", []):
+            self.dictionary["auto_added"].remove(word)
+            removed = True
+        if word in self.dictionary.setdefault("manual_added", []):
+            self.dictionary["manual_added"].remove(word)
+            removed = True
+        
+        if removed:
             save_dictionary(self.dictionary)
-            return True
-        return False
+        return removed
 
     def add_correction(self, wrong, right):
         """手動新增修正規則"""
@@ -131,20 +145,31 @@ class Memory:
         return self.dictionary.get("corrections", {})
 
     def get_all_custom_words(self):
-        return self.dictionary.get("auto_added", [])
+        # 兼容原本寫法，返回全部
+        return self.dictionary.get("auto_added", []) + self.dictionary.get("manual_added", [])
+
+    def get_dictionary_words(self):
+        """為 UI 返回區分來源的單字"""
+        return {
+            "auto_added": self.dictionary.get("auto_added", []),
+            "manual_added": self.dictionary.get("manual_added", [])
+        }
 
     # ─── Personalization Progress ────────────────────────
 
     def get_personalization_score(self):
         """計算個人化進度（模仿 Typeless）"""
         corrections_count = len(self.dictionary.get("corrections", {}))
-        words_count = len(self.dictionary.get("auto_added", []))
+        words_count = len(self.dictionary.get("auto_added", [])) + len(self.dictionary.get("manual_added", []))
         history_count = len(self.history)
 
-        # 各項權重評分（滿分 100）
-        dict_score = min(30, corrections_count * 2)
-        vocab_score = min(30, words_count * 1.5)
-        usage_score = min(40, history_count * 0.2)
+        # 各項權重評分（滿分 100，調高門檻讓 100% 變難）
+        # 需要 100 個 correction 才能滿 30 分
+        dict_score = min(30.0, corrections_count * 0.3)
+        # 需要 150 個 vocabulary 才能滿 30 分
+        vocab_score = min(30.0, words_count * 0.2)
+        # 需要 1000 次錄音才能滿 40 分
+        usage_score = min(40.0, history_count * 0.04)
 
         return {
             "total": min(100, int(dict_score + vocab_score + usage_score)),

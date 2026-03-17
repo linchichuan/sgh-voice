@@ -112,7 +112,7 @@ def api_clear_history():
 def api_dictionary():
     return jsonify({
         "corrections": memory.get_all_corrections(),
-        "custom_words": memory.get_all_custom_words(),
+        "custom_words": memory.get_dictionary_words(),
     })
 
 

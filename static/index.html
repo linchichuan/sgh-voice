@@ -965,7 +965,7 @@
           <div id="sidebar-led" style="width:7px; height:7px; border-radius:50%; background:var(--text3);"></div>
           <span id="sidebar-led-text" style="font-size:10px;">偵測中</span>
         </div>
-        v1.2.1 · 本地運行 · 零資料保留
+        v1.3.0 · 本地運行 · 零資料保留
       </div>
     </aside>
 
@@ -1113,9 +1113,17 @@
           <p style="font-size:12px;color:var(--text2);margin-bottom:12px">
             新增專業術語、人名、公司名，提高語音辨識準確度。
           </p>
-          <div style="display:flex;gap:8px;margin-bottom:12px">
+          <div style="display:flex;gap:8px;margin-bottom:12px; align-items:center;">
             <input type="text" id="new-word" placeholder="輸入新詞彙..." style="max-width:300px">
             <button class="btn btn-primary" onclick="addWord()">新增</button>
+            <div style="margin-left:auto; display:flex; gap:12px; font-size:13px; color:var(--text2)">
+              <span style="display:flex; align-items:center; gap:4px">
+                <span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:var(--blue); opacity:0.15; border:1px solid var(--blue)"></span> ✨ 自動新增
+              </span>
+              <span style="display:flex; align-items:center; gap:4px">
+                <span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:var(--bg3); border:1px solid var(--border)"></span> ✍️ 手動新增
+              </span>
+            </div>
           </div>
           <div class="word-tags" id="word-tags"></div>
         </div>
@@ -2387,11 +2395,20 @@
     // ── Dictionary ──
     async function loadDictionary() {
       const data = await api('/dictionary');
-      // Words
+      // Words (auto vs manual)
       const tags = document.getElementById('word-tags');
-      tags.innerHTML = (data.custom_words || []).map(w =>
-        `<span class="word-tag">${esc(w)} <span class="remove" onclick="removeWord('${esc(w)}')">✕</span></span>`
+      let customWords = data.custom_words;
+      // Handle legacy case if custom_words is just an array
+      if (Array.isArray(customWords)) {
+        customWords = { auto_added: customWords, manual_added: [] };
+      }
+      const autoTags = (customWords.auto_added || []).map(w =>
+        `<span class="word-tag" style="background:rgba(10,132,255,0.08); border-color:rgba(10,132,255,0.3); color:var(--blue)">✨ ${esc(w)} <span class="remove" onclick="removeWord('${esc(w)}')">✕</span></span>`
       ).join('');
+      const manualTags = (customWords.manual_added || []).map(w =>
+        `<span class="word-tag">✍️ ${esc(w)} <span class="remove" onclick="removeWord('${esc(w)}')">✕</span></span>`
+      ).join('');
+      tags.innerHTML = autoTags + manualTags;
       // Corrections
       const body = document.getElementById('corrections-body');
       const corr = data.corrections || {};
