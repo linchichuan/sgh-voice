@@ -411,8 +411,11 @@
     td.td-final {
       max-width: 420px;
       white-space: normal;
-      word-break: break-all;
-      overflow: visible;
+      word-break: break-word;
+      overflow: hidden;
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
       line-height: 1.5;
       cursor: pointer;
       position: relative;
@@ -1084,7 +1087,15 @@
               <button class="btn btn-ghost btn-sm" onclick="clearHistory()">清除全部</button>
             </div>
           </div>
-          <table>
+          <table style="table-layout:fixed">
+            <colgroup>
+              <col style="width:100px">
+              <col style="width:140px">
+              <col style="width:30%">
+              <col style="width:auto">
+              <col style="width:60px">
+              <col style="width:200px">
+            </colgroup>
             <thead>
               <tr>
                 <th>時間</th>
@@ -1342,6 +1353,14 @@
           </div>
 
           <div class="form-row">
+            <div class="form-group">
+              <label>首選主要 LLM 引擎</label>
+              <select id="cfg-llm-engine">
+                <option value="ollama">Ollama 本地模型 (免費、無限量)</option>
+                <option value="claude">Claude API (Anthropic)</option>
+                <option value="openai">OpenAI API (GPT-4o)</option>
+              </select>
+            </div>
             <div class="form-group">
               <label data-i18n="label_llm_model">本地 LLM 模型（Ollama）</label>
               <select id="cfg-local-llm-model">
@@ -2270,7 +2289,7 @@
       <td style="white-space:nowrap;color:var(--text2)">${time}</td>
       <td>${modeTag} ${sttTag} ${llmTag}</td>
       <td title="${esc(rawText)}">${esc(trunc(rawText, 40))}</td>
-      <td class="td-final" onclick="copyHistoryText(${idx}, 'final')" title="點擊複製全文"><strong>${esc(finalText)}</strong></td>
+      <td class="td-final" onclick="copyHistoryText(${idx}, 'final')" title="${esc(finalText)}"><strong>${esc(trunc(finalText, 80))}</strong></td>
       <td style="color:var(--text2)">${h.process_time || 0}s</td>
       <td style="white-space:nowrap">
         <button class="btn btn-primary btn-sm" onclick="copyHistoryText(${idx}, 'final')">複製</button>
@@ -2476,7 +2495,8 @@
       window._appStyles = cfg.app_styles || {};
       renderAppStyles();
 
-      // Hybrid 設定
+      // Hybrid & LLM 設定
+      document.getElementById('cfg-llm-engine').value = cfg.llm_engine || 'ollama';
       setToggle('tog-hybrid', cfg.enable_hybrid_mode);
       document.getElementById('cfg-stt-engine').value = cfg.stt_engine || 'mlx-whisper';
       document.getElementById('cfg-local-whisper-model').value = cfg.local_whisper_model || 'mlx-community/whisper-turbo';
@@ -2714,6 +2734,7 @@
         max_recording_duration: parseInt(document.getElementById('cfg-max-dur').value) || 360,
         typing_speed_cpm: parseInt(document.getElementById('cfg-cpm').value) || 50,
         claude_system_prompt: document.getElementById('cfg-system-prompt').value,
+        llm_engine: document.getElementById('cfg-llm-engine').value,
         enable_hybrid_mode: getToggle('tog-hybrid'),
         stt_engine: document.getElementById('cfg-stt-engine').value,
         local_whisper_model: document.getElementById('cfg-local-whisper-model').value,

@@ -292,27 +292,41 @@ class Transcriber:
             )
 
             if should_polish:
-                # ── 優先順序 A: 本地 Ollama（1.5 秒超時）──
-                if is_hybrid and mode == "dictate":
-                    local_res = self._local_llm_process(corrected)
-                    if local_res:
-                        final = local_res
-                        llm_source = "local"
+                pref_engine = self.config.get("llm_engine", "ollama")
+                
+                def try_ollama():
+                    if is_hybrid and mode == "dictate":
+                        return self._local_llm_process(corrected), "local"
+                    return None, None
 
-                # ── 優先順序 B: Cloud Fallback（Local 失敗或不可用時）──
-                if final is None and has_anthropic:
-                    final = self._claude_process(corrected, mode, edit_context)
-                    if final:
-                        llm_source = "claude"
-                    else:
-                        print(" ⚠️ Claude 失敗，嘗試下一個 fallback")
+                def try_claude():
+                    if has_anthropic:
+                        res = self._claude_process(corrected, mode, edit_context)
+                        if res: return res, "claude"
+                        print(" ⚠️ Claude 失敗")
+                    return None, None
 
-                if final is None and has_openai:
-                    final = self._openai_process(corrected, mode, edit_context)
-                    if final:
-                        llm_source = "openai"
-                    else:
+                def try_openai():
+                    if has_openai:
+                        res = self._openai_process(corrected, mode, edit_context)
+                        if res: return res, "openai"
                         print(" ⚠️ OpenAI 失敗")
+                    return None, None
+                
+                # 依據使用者選擇的首選引擎決定嘗試順序
+                if pref_engine == "claude":
+                    routes = [try_claude, try_openai, try_ollama]
+                elif pref_engine == "openai":
+                    routes = [try_openai, try_claude, try_ollama]
+                else:
+                    routes = [try_ollama, try_claude, try_openai]
+
+                for route in routes:
+                    res, source = route()
+                    if res:
+                        final = res
+                        llm_source = source
+                        break
 
             # ── 最終 Fallback: 本地正則去填充詞 ──
             if final is None:
