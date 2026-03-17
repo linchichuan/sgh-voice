@@ -9,7 +9,7 @@
 [![Android](https://img.shields.io/badge/Android-8.0+-green?logo=android)](https://github.com/linchichuan/sgh-voice/releases)
 [![Python](https://img.shields.io/badge/Python-3.12+-blue?logo=python)](https://www.python.org/)
 [![License](https://img.shields.io/badge/License-Private-gray)]()
-[![Version](https://img.shields.io/badge/Version-1.3.0-green)]()
+[![Version](https://img.shields.io/badge/Version-1.4.0-green)]()
 [![Website](https://img.shields.io/badge/Website-voice.shingihou.com-blue)](https://voice.shingihou.com)
 
 ---
@@ -68,7 +68,7 @@ This tool offers maximum flexibility — run entirely locally for free, or use p
 
 ### Installation
 
-1. Download `SGH Voice-1.3.0-apple-silicon.dmg` from [Releases](https://github.com/linchichuan/sgh-voice/releases)
+1. Download `SGH Voice-1.4.0-apple-silicon.dmg` from [Releases](https://github.com/linchichuan/sgh-voice/releases)
 2. Drag **Voice Input** to Applications
 3. First launch: Right-click → **Open** (allow macOS Gatekeeper once)
 4. Menu bar shows 🎙 icon → click **Open Dashboard**

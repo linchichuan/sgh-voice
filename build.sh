@@ -12,7 +12,7 @@ R='\033[0;31m'
 C='\033[0;36m'
 N='\033[0m'
 
-VERSION="1.3.0"
+VERSION="1.4.0"
 APP_NAME="SGH Voice"
 DMG_NAME="${APP_NAME}-${VERSION}-apple-silicon"
 
