@@ -12,6 +12,7 @@ import openai
 import anthropic
 from config import load_smart_replace, SCENE_PRESETS, DEFAULT_APP_STYLES, detect_app_style
 from ollama_detector import get_detector, OllamaStatus
+from voiceprint import VoiceprintManager
 
 
 class Transcriber:
@@ -35,6 +36,8 @@ class Transcriber:
         # Ollama timeout 退避：避免連續超時時每次都卡住並重複洗版 warning
         self._ollama_backoff_until = 0.0
         self._ollama_fail_count = 0
+        # 聲紋驗證器
+        self._voiceprint_mgr = VoiceprintManager()
         self._ollama_last_warn = 0.0
 
     def reset_clients(self):
@@ -168,9 +171,19 @@ class Transcriber:
         # Step 0: 音訊能量檢查（防止靜音送入 Whisper 產生幻覺）
         if isinstance(audio_source, np.ndarray):
             rms = np.sqrt(np.mean(audio_source ** 2))
-            if rms < 0.0005:  # 靜音閾值 (Lowered from 0.005 to 0.0005)
+            if rms < 0.003:  # 靜音閾值（Webcam 麥克風背景噪音約 0.001，正常說話 > 0.01）
                 print(f" 🔇 音訊能量過低 (RMS={rms:.5f})，跳過辨識")
                 return None
+
+        # Step 0.5: 聲紋驗證（只接受已註冊聲紋的語音）
+        if isinstance(audio_source, np.ndarray) and self.config.get("enable_voiceprint", False):
+            if self._voiceprint_mgr.is_enrolled:
+                vp_threshold = self.config.get("voiceprint_threshold", 0.97)
+                vp_score = self._voiceprint_mgr.verify(audio_source)
+                if vp_score < vp_threshold:
+                    print(f" 🔇 聲紋不符 (score={vp_score:.4f} < {vp_threshold})，跳過辨識")
+                    return None
+                print(f" 🔐 聲紋驗證通過 (score={vp_score:.4f})")
 
         # Step 1: Whisper STT (Hybrid Routing)
         raw = None
@@ -216,15 +229,26 @@ class Transcriber:
 
         # 幻覺偵測：Whisper 靜音時容易產生重複文字
         raw_stripped = raw.strip()
-        if len(raw_stripped) > 30:
-            # 檢查是否有連續重複片段（典型幻覺模式）
-            words = raw_stripped.replace('，', ',').replace('、', ',').split(',')
-            words = [w.strip() for w in words if w.strip()]
-            if len(words) >= 5:
-                unique = set(words)
-                if len(unique) <= 3:  # 5+ 個詞但只有 ≤3 種，明顯是幻覺
-                    print(f" 🔇 偵測到 Whisper 幻覺（重複 {len(words)} 次），跳過")
+        if len(raw_stripped) > 10:
+            # 1) 單字元重複偵測：同一個字佔全文 70% 以上（如「整整整整整整整整...」）
+            from collections import Counter
+            char_counts = Counter(raw_stripped.replace(' ', ''))
+            if char_counts:
+                most_common_char, most_common_count = char_counts.most_common(1)[0]
+                total_chars = sum(char_counts.values())
+                if total_chars > 5 and most_common_count / total_chars > 0.7:
+                    print(f" 🔇 偵測到 Whisper 幻覺（「{most_common_char}」重複 {most_common_count}/{total_chars} 次），跳過")
                     return None
+
+            # 2) 逗號分隔重複偵測（如「嗯, 嗯, 嗯, 嗯, 嗯」）
+            if len(raw_stripped) > 30:
+                words = raw_stripped.replace('，', ',').replace('、', ',').split(',')
+                words = [w.strip() for w in words if w.strip()]
+                if len(words) >= 5:
+                    unique = set(words)
+                    if len(unique) <= 3:  # 5+ 個詞但只有 ≤3 種，明顯是幻覺
+                        print(f" 🔇 偵測到 Whisper 幻覺（重複 {len(words)} 次），跳過")
+                        return None
 
         # Step 2: 本地詞庫修正（含場景修正）
         scene = self.config.get("active_scene", "general")

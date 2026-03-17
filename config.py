@@ -220,6 +220,8 @@ DEFAULT_CONFIG = {
     "local_llm_model": "qwen2.5:3b",        # Ollama 上的本地模型名稱
     "local_llm_timeout_sec": 6.0,           # 本地 Ollama 超時秒數（避免 1.5 秒過短造成頻繁 fallback）
     "backup_audio_dir": "",                  # 音訊備份目錄（空字串=不備份）
+    "enable_voiceprint": False,              # 聲紋驗證開關
+    "voiceprint_threshold": 0.97,            # 聲紋相似度閾值（0.95~0.99）
     "sample_rate": 16000,
     "silence_threshold": 0.001,
     "silence_duration": 2.0,

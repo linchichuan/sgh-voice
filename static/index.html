@@ -1356,6 +1356,33 @@
         </div>
 
         <div class="form-section">
+          <h3>🔐 聲紋辨識</h3>
+          <div id="voiceprint-status" style="padding:10px 14px; background:var(--surface2); border-radius:var(--radius-sm); margin-bottom:16px; font-size:13px;">
+            載入中...
+          </div>
+          <div class="toggle-row">
+            <div>
+              <div class="toggle-label">啟用聲紋驗證</div>
+              <div class="toggle-desc">只辨識已註冊的聲紋，自動過濾其他人和環境噪音</div>
+            </div>
+            <div class="toggle" id="tog-voiceprint" onclick="toggleSwitch(this)"></div>
+          </div>
+          <div class="form-group" style="margin-top:16px">
+            <label>相似度閾值（越高越嚴格）</label>
+            <div style="display:flex; align-items:center; gap:12px;">
+              <input type="range" id="cfg-vp-threshold" min="0.90" max="0.99" step="0.01" value="0.97"
+                style="flex:1; accent-color:var(--accent);"
+                oninput="document.getElementById('vp-threshold-val').textContent=this.value">
+              <span id="vp-threshold-val" style="font-family:'JetBrains Mono',monospace; font-size:14px; font-weight:600; color:var(--accent2); min-width:40px;">0.97</span>
+            </div>
+          </div>
+          <div style="display:flex; gap:8px; margin-top:8px;">
+            <button class="btn btn-primary" onclick="enrollVoiceprint()">📥 建立聲紋</button>
+            <button class="btn btn-ghost" onclick="deleteVoiceprint()">🗑️ 刪除聲紋</button>
+          </div>
+        </div>
+
+        <div class="form-section">
           <h3 data-i18n="settings_ai">🤖 AI 處理功能</h3>
           <div class="toggle-row">
             <div>
@@ -2437,6 +2464,13 @@
       document.getElementById('cfg-backup-dir').value = cfg.backup_audio_dir || '';
       onSttEngineChange(); // 根據引擎選擇顯示/隱藏 Whisper 子選項
 
+      // 聲紋
+      setToggle('tog-voiceprint', cfg.enable_voiceprint);
+      const vpThreshold = cfg.voiceprint_threshold || 0.97;
+      document.getElementById('cfg-vp-threshold').value = vpThreshold;
+      document.getElementById('vp-threshold-val').textContent = vpThreshold;
+      loadVoiceprintStatus();
+
       setToggle('tog-claude', cfg.enable_claude_polish);
       setToggle('tog-filler', cfg.enable_filler_removal);
       setToggle('tog-selfcorr', cfg.enable_self_correction);
@@ -2666,6 +2700,8 @@
         local_whisper_model: document.getElementById('cfg-local-whisper-model').value,
         local_llm_model: document.getElementById('cfg-local-llm-model').value,
         backup_audio_dir: document.getElementById('cfg-backup-dir').value,
+        enable_voiceprint: getToggle('tog-voiceprint'),
+        voiceprint_threshold: parseFloat(document.getElementById('cfg-vp-threshold').value) || 0.97,
         enable_claude_polish: getToggle('tog-claude'),
         enable_filler_removal: getToggle('tog-filler'),
         enable_self_correction: getToggle('tog-selfcorr'),
@@ -2735,6 +2771,49 @@
         }
       } catch (e) { }
     })();
+
+    // ─── Voiceprint Management ─────────────────────────
+    async function loadVoiceprintStatus() {
+      try {
+        const info = await api('/voiceprint/status');
+        const el = document.getElementById('voiceprint-status');
+        if (info.enrolled) {
+          el.innerHTML = `<span style="color:var(--green)">✅ 聲紋已建立</span> — 維度: ${info.embedding_dim}，檔案: ${info.file_size} bytes`;
+        } else {
+          el.innerHTML = `<span style="color:var(--orange)">⚠️ 尚未建立聲紋</span> — 請先點擊「建立聲紋」`;
+        }
+      } catch (e) {
+        document.getElementById('voiceprint-status').textContent = '❌ 無法取得聲紋狀態';
+      }
+    }
+
+    async function enrollVoiceprint() {
+      const dir = prompt('請輸入語音檔目錄路徑:', '/Volumes/Satechi_SSD/voice-input/voice-data-lin');
+      if (!dir) return;
+      document.getElementById('voiceprint-status').innerHTML = '⏳ 正在建立聲紋...';
+      try {
+        const res = await fetch('/api/voiceprint/enroll', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({wav_dir: dir})
+        });
+        const data = await res.json();
+        if (data.ok) {
+          document.getElementById('voiceprint-status').innerHTML =
+            `<span style="color:var(--green)">✅ 聲紋建立成功！</span> 使用 ${data.valid_files}/${data.total_files} 個檔案，自我相似度: ${data.self_similarity_mean.toFixed(4)}`;
+        } else {
+          document.getElementById('voiceprint-status').innerHTML = `❌ ${data.error}`;
+        }
+      } catch (e) {
+        document.getElementById('voiceprint-status').innerHTML = `❌ 建立失敗: ${e.message}`;
+      }
+    }
+
+    async function deleteVoiceprint() {
+      if (!confirm('確定要刪除聲紋？')) return;
+      await fetch('/api/voiceprint/delete', {method: 'POST'});
+      loadVoiceprintStatus();
+    }
   </script>
 </body>
 

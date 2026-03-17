@@ -34,7 +34,7 @@ a = Analysis(
     ] + mlx_datas + mlx_nn_datas + whisper_datas + sd_datas + sf_datas + opencc_datas + rumps_datas + tiktoken_datas,
     hiddenimports=[
         # App 核心
-        'app', 'config', 'memory', 'transcriber', 'recorder', 'dashboard', 'overlay',
+        'app', 'config', 'memory', 'transcriber', 'recorder', 'dashboard', 'overlay', 'voiceprint',
         # GUI / 系統
         'rumps',
         'pynput', 'pynput.keyboard', 'pynput.keyboard._darwin',

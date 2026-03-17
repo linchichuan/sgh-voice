@@ -386,6 +386,43 @@ def api_model_download_progress():
     return Response(generate(), mimetype="text/event-stream", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
+# ─── Voiceprint Management ───────────────────────────────
+
+@app.route("/api/voiceprint/status")
+def api_voiceprint_status():
+    """聲紋狀態"""
+    from voiceprint import VoiceprintManager
+    mgr = VoiceprintManager()
+    config = load_config()
+    info = mgr.get_info()
+    info["enabled"] = config.get("enable_voiceprint", False)
+    info["threshold"] = config.get("voiceprint_threshold", 0.97)
+    return jsonify(info)
+
+
+@app.route("/api/voiceprint/enroll", methods=["POST"])
+def api_voiceprint_enroll():
+    """建立聲紋（從指定目錄的 WAV 檔）"""
+    from voiceprint import VoiceprintManager
+    data = request.json or {}
+    wav_dir = data.get("wav_dir", "/Volumes/Satechi_SSD/voice-input/voice-data-lin")
+    mgr = VoiceprintManager()
+    try:
+        result = mgr.enroll_from_directory(wav_dir)
+        return jsonify({"ok": True, **result})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
+@app.route("/api/voiceprint/delete", methods=["POST"])
+def api_voiceprint_delete():
+    """刪除聲紋"""
+    from voiceprint import VoiceprintManager
+    mgr = VoiceprintManager()
+    mgr.delete_voiceprint()
+    return jsonify({"ok": True})
+
+
 # ─── Recording Control from Dashboard ───────────────────
 _engine = None  # Will be set by set_engine()
 

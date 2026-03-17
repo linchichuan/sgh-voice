@@ -26,23 +26,27 @@ class Memory:
     # ─── Whisper Prompt ──────────────────────────────────
 
     def build_whisper_prompt(self, custom_words, scene_words=None):
-        """合併 BASE_CUSTOM_WORDS + scene_words + custom_words + auto_added 去重後注入 Whisper prompt。
-        基礎詞庫不顯示在 UI，但提升辨識精度。限制 50 個以內（醫療術語較多）。"""
-        auto_added = self.dictionary.get("auto_added", [])
-        # 合併去重：基礎詞庫 + 場景詞彙 + 使用者 config 詞彙 + 自動學習詞彙
+        """合併 custom_words + scene_words + BASE_CUSTOM_WORDS 去重後注入 Whisper prompt。
+        ⚠️ 嚴格限制數量（≤20 詞）和長度（≤200 字元），
+        否則 Whisper 會在短音訊/低音量時幻覺出字典詞彙。
+        優先順序：使用者 config 詞彙 > 場景詞彙 > 基礎詞庫。
+        auto_added（73+ 個人名地名）不再注入 prompt，改由 corrections 機制處理。"""
+        MAX_TERMS = 20   # 超過 20 個就容易讓 Whisper 過度「腦補」
+        MAX_CHARS = 200  # prompt 太長 Whisper 會把 prompt 內容當成辨識結果
+        # 優先順序：使用者自訂 > 場景 > 基礎（不含 auto_added）
         seen = set()
         terms = []
-        all_words = BASE_CUSTOM_WORDS + (scene_words or []) + list(custom_words) + auto_added
+        all_words = list(custom_words) + (scene_words or []) + BASE_CUSTOM_WORDS
         for w in all_words:
             if w not in seen:
                 seen.add(w)
                 terms.append(w)
-            if len(terms) >= 50:
+            if len(terms) >= MAX_TERMS:
                 break
         if not terms:
             return ""
         prompt = ", ".join(terms)
-        return prompt[:800]
+        return prompt[:MAX_CHARS]
 
     # ─── Apply Corrections ───────────────────────────────
 
