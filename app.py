@@ -106,19 +106,19 @@ def paste_text(text):
             except Exception as e:
                 print(f"osascript paste error (non-fatal): {e}")
 
-    # 還原原有剪貼簿內容（不干涉使用者的複製貼上）
-    if old_clipboard is not None:
+    if not pasted:
+        # 貼上失敗：保留文字在剪貼簿，不還原，讓使用者手動 Cmd+V
+        print(f"⚠️ 自動貼上失敗，文字已複製到剪貼簿，請手動 Cmd+V")
+        notify("SGH Voice", "📋 文字已複製到剪貼簿，請 Cmd+V 貼上")
+    elif old_clipboard is not None:
+        # 貼上成功：延遲還原原有剪貼簿內容（不干涉使用者的複製貼上）
         def _restore():
-            time.sleep(0.8)
+            time.sleep(1.5)  # 延長至 1.5 秒，確保貼上動作完成
             try:
                 pyperclip.copy(old_clipboard)
             except Exception:
                 pass
         threading.Thread(target=_restore, daemon=True).start()
-
-    if not pasted:
-        print(f"⚠️ 自動貼上失敗，文字已複製到剪貼簿，請手動 Cmd+V")
-        notify("SGH Voice", "📋 文字已複製到剪貼簿，請 Cmd+V 貼上")
 
 
 def show_copy_dialog(text):
