@@ -571,13 +571,20 @@ def run_menubar():
 
     # 啟動時檢查輔助使用權限（自動貼上必需）
     try:
-        import ApplicationServices
-        if not ApplicationServices.AXIsProcessTrusted():
-            # 觸發 macOS 的權限提示對話框
-            import CoreFoundation
-            options = {CoreFoundation.kAXTrustedCheckOptionPrompt: True}
-            ApplicationServices.AXIsProcessTrustedWithOptions(options)
-            _paste_log("啟動時偵測到無輔助使用權限，已觸發系統授權對話框")
+        from ApplicationServices import AXIsProcessTrusted
+        if not AXIsProcessTrusted():
+            # 用 osascript 彈出提示引導使用者到系統設定
+            subprocess.Popen([
+                "osascript", "-e",
+                'display dialog "SGH Voice 需要「輔助使用」權限才能自動貼上文字。\n\n'
+                '請在「系統設定 → 隱私與安全性 → 輔助使用」中開啟 SGH Voice。" '
+                'buttons {"打開系統設定"} default button 1 with title "SGH Voice" with icon caution',
+                "-e",
+                'tell application "System Settings" to activate',
+                "-e",
+                'open location "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"',
+            ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            _paste_log("啟動時偵測到無輔助使用權限，已彈出引導對話框")
     except Exception as e:
         _paste_log(f"輔助使用權限檢查失敗: {e}")
 
