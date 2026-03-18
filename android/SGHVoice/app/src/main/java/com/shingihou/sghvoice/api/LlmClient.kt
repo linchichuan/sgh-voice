@@ -42,14 +42,7 @@ class LlmClient(private val apiConfig: ApiConfig) {
         )
         
         // 系統提示詞
-        private const val BASE_PROMPT = "語音辨識後處理。規則：
-1. 刪除填充詞：嗯、啊、那個、就是、えー特、あの、um、uh、like
-2. 口語自我修正→只保留最終版本
-3. 標點符號：加上正確標點，適當分段
-4. 不改寫核心句意，保持原語言（中/日/英混合保持原樣）
-5. 只輸出結果，不加解釋
-6. 所有中文必須是繁體中文
-"
+        private const val BASE_PROMPT = "語音辨識後處理。規則：\n1. 刪除填充詞：嗯、啊、那個、就是、えー特、あの、um、uh、like\n2. 口語自我修正→只保留最終版本\n3. 標點符號：加上正確標點，適當分段\n4. 不改寫核心句意，保持原語言（中/日/英混合保持原樣）\n5. 只輸出結果，不加解釋\n6. 所有中文必須是繁體中文\n"
         
         private const val LINE_PROMPT = BASE_PROMPT + "7. 語氣設定為【LINE 訊息】：文字精簡、口語自然，不要過於死板。"
         private const val EMAIL_PROMPT = BASE_PROMPT + "7. 語氣設定為【正式 Email】：文字得體、結構嚴謹且專業。"
@@ -81,8 +74,7 @@ class LlmClient(private val apiConfig: ApiConfig) {
             else -> NORMAL_PROMPT
         }
         if (sceneExtra.isNotBlank()) {
-            systemPrompt = "$systemPrompt
-$sceneExtra"
+            systemPrompt = "$systemPrompt\n$sceneExtra"
         }
 
         val engine = apiConfig.llmEngine
