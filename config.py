@@ -26,16 +26,20 @@ BASE_CORRECTIONS = {
     "薬日本": "kusurijapan",
     "林紀泉": "林紀全",
     "林記全": "林紀全",
-    # Claude 常被 Whisper 辨識為 cloud/Cloud
+    # Claude 常被 Whisper 辨識為 cloud/Cloud/CLOUD（發音相似）
     "cloud code": "Claude Code",
-    "Cloud Code": "Claude Code",
     "cloud AI": "Claude AI",
-    "Cloud AI": "Claude AI",
     "cloud haiku": "Claude Haiku",
-    "Cloud Haiku": "Claude Haiku",
     "cloud sonnet": "Claude Sonnet",
-    "Cloud Sonnet": "Claude Sonnet",
+    "cloud opus": "Claude Opus",
+    "cloud API": "Claude API",
+    "cloud desktop": "Claude Desktop",
+    "cloud": "Claude",  # 獨立的 cloud → Claude（最後匹配，長詞優先）
 }
+
+# 不分大小寫的修正規則（key 全部小寫，匹配時做 case-insensitive 替換）
+# 適用於 Whisper 輸出大小寫不穩定的情況（如 CLOUD、Cloud、cloud 都應修正為 Claude）
+CASE_INSENSITIVE_CORRECTIONS = True
 
 # ─── 使用場景預設（醫療、一般等）────────────────────────
 SCENE_PRESETS = {

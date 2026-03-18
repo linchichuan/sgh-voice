@@ -8,7 +8,7 @@ import threading
 from datetime import datetime
 from config import (
     load_dictionary, save_dictionary, load_history, save_history,
-    BASE_CUSTOM_WORDS, BASE_CORRECTIONS,
+    BASE_CUSTOM_WORDS, BASE_CORRECTIONS, CASE_INSENSITIVE_CORRECTIONS,
 )
 
 
@@ -51,14 +51,22 @@ class Memory:
     # ─── Apply Corrections ───────────────────────────────
 
     def apply_corrections(self, text, scene_corrections=None):
-        """套用修正：基礎修正 + 場景修正 + 使用者自訂修正（使用者規則 > 場景規則 > 基底規則）"""
+        """套用修正：基礎修正 + 場景修正 + 使用者自訂修正（使用者規則 > 場景規則 > 基底規則）
+        支援不分大小寫匹配（CASE_INSENSITIVE_CORRECTIONS），解決 Whisper 大小寫不穩定問題。
+        """
         merged = {**BASE_CORRECTIONS}
         if scene_corrections:
             merged.update(scene_corrections)
         merged.update(self.dictionary.get("corrections", {}))
         result = text
+        # 長詞優先，避免短詞先匹配破壞長詞
         for wrong, right in sorted(merged.items(), key=lambda x: -len(x[0])):
-            result = result.replace(wrong, right)
+            if CASE_INSENSITIVE_CORRECTIONS:
+                # 不分大小寫替換：用正則 re.IGNORECASE
+                pattern = re.escape(wrong)
+                result = re.sub(pattern, right, result, flags=re.IGNORECASE)
+            else:
+                result = result.replace(wrong, right)
         return result
 
     # ─── Auto Learn ──────────────────────────────────────
