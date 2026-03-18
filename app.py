@@ -58,62 +58,49 @@ def paste_text(text):
     time.sleep(0.5)
 
     pasted = False
-    
-    # 檢查是否具有輔助使用權限
-    is_trusted = False
-    try:
-        import ApplicationServices
-        is_trusted = ApplicationServices.AXIsProcessTrusted()
-    except Exception:
-        is_trusted = True # 假設有權限
 
-    if not is_trusted:
-        print("⚠️ 缺乏 macOS 輔助使用權限，無法執行鍵盤模擬。")
-    else:
-        # 方法 1: Quartz CGEvent（.app bundle 中最可靠）
+    # 方法 1: osascript System Events keystroke（最可靠，.app / CLI 都能用）
+    try:
+        result = subprocess.run([
+            "osascript", "-e",
+            'tell application "System Events" to keystroke "v" using command down'
+        ], capture_output=True, text=True, timeout=5)
+        if result.returncode == 0:
+            pasted = True
+            print(" ✅ osascript 貼上成功")
+        else:
+            print(f" ⚠️ osascript 貼上失敗: {result.stderr.strip()}")
+    except Exception as e:
+        print(f"osascript paste error (non-fatal): {e}")
+
+    # 方法 2: Quartz CGEvent fallback
+    if not pasted:
         try:
             from Quartz import (
                 CGEventCreateKeyboardEvent, CGEventPost, kCGSessionEventTap,
                 CGEventSetFlags, kCGEventFlagMaskCommand
             )
             V_KEYCODE = 9  # 'v' 鍵的 macOS virtual keycode
-
-            # Key Down with Cmd flag
             event_down = CGEventCreateKeyboardEvent(None, V_KEYCODE, True)
             CGEventSetFlags(event_down, kCGEventFlagMaskCommand)
-            # Key Up with Cmd flag  
             event_up = CGEventCreateKeyboardEvent(None, V_KEYCODE, False)
             CGEventSetFlags(event_up, kCGEventFlagMaskCommand)
-
-            # 使用 kCGSessionEventTap（不需要 root 權限）
             CGEventPost(kCGSessionEventTap, event_down)
             time.sleep(0.02)
             CGEventPost(kCGSessionEventTap, event_up)
             pasted = True
-            print(" ✅ CGEvent 貼上成功")
+            print(" ✅ CGEvent 貼上成功 (fallback)")
         except Exception as e:
             print(f"CGEvent paste error (non-fatal): {e}")
 
-        # 方法 2: osascript fallback（僅在非 .app 下使用）
-        if not pasted and not getattr(sys, 'frozen', False):
-            try:
-                result = subprocess.run([
-                    "osascript", "-e",
-                    'tell application "System Events" to keystroke "v" using command down'
-                ], capture_output=True, text=True, timeout=5)
-                if result.returncode == 0:
-                    pasted = True
-            except Exception as e:
-                print(f"osascript paste error (non-fatal): {e}")
-
     if not pasted:
-        # 貼上失敗：保留文字在剪貼簿，不還原，讓使用者手動 Cmd+V
+        # 兩種方法都失敗：保留文字在剪貼簿，不還原
         print(f"⚠️ 自動貼上失敗，文字已複製到剪貼簿，請手動 Cmd+V")
         notify("SGH Voice", "📋 文字已複製到剪貼簿，請 Cmd+V 貼上")
     elif old_clipboard is not None:
-        # 貼上成功：延遲還原原有剪貼簿內容（不干涉使用者的複製貼上）
+        # 貼上成功：延遲還原原有剪貼簿內容
         def _restore():
-            time.sleep(1.5)  # 延長至 1.5 秒，確保貼上動作完成
+            time.sleep(2.0)
             try:
                 pyperclip.copy(old_clipboard)
             except Exception:
