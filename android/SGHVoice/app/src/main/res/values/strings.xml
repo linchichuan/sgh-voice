@@ -73,4 +73,11 @@
     <string name="style_normal">一般文字（預設）</string>
     <string name="style_line">LINE 訊息（簡短口語）</string>
     <string name="style_email">正式 Email（嚴謹專業）</string>
+
+    <string name="label_stt_engine">語音辨識 (STT) 引擎</string>
+    <string name="label_llm_engine">後處理 (LLM) 引擎</string>
+    <string name="engine_openai">OpenAI (最精確)</string>
+    <string name="engine_groq">Groq (極速)</string>
+    <string name="engine_claude">Claude (Anthropic)</string>
+    <string name="engine_none">不使用 (僅詞庫修正)</string>
 </resources>

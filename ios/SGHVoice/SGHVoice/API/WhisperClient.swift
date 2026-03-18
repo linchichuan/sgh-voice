@@ -12,7 +12,7 @@ extension WhisperError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .apiKeyNotSet:
-            return "OpenAI API Key 未設定，請先到設定頁填入。"
+            return "API Key 未設定（OpenAI 或 Groq），請先到設定頁填入。"
         case let .networkError(message):
             return "Whisper 網路錯誤：\(message)"
         case let .invalidResponse(message):
@@ -30,7 +30,8 @@ extension WhisperError: LocalizedError {
 class WhisperClient {
     static let shared = WhisperClient()
     
-    private let whisperApiUrl = URL(string: "https://api.openai.com/v1/audio/transcriptions")!
+    private let openAiApiUrl = URL(string: "https://api.openai.com/v1/audio/transcriptions")!
+    private let groqApiUrl = URL(string: "https://api.groq.com/openai/v1/audio/transcriptions")!
     
     /// 傳送 WAV 音訊至 Whisper API 進行語音辨識
     ///
@@ -39,14 +40,18 @@ class WhisperClient {
     ///   - initialPrompt: 提示詞，用於提升辨識精確度（包含自訂詞彙）
     /// - Returns: 辨識後的文字結果
     func transcribe(wavData: Data, initialPrompt: String = "") async throws -> String {
-        let apiKey = ApiConfig.shared.openAiApiKey
-        let modelName = ApiConfig.shared.whisperModel.isEmpty ? ApiConfig.defaultWhisperModel : ApiConfig.shared.whisperModel
+        let sttEngine = ApiConfig.shared.sttEngine
+        let useGroq = sttEngine == "groq" || (sttEngine == "openai" && ApiConfig.shared.openAiApiKey.isEmpty && !ApiConfig.shared.groqApiKey.isEmpty)
+        
+        let apiKey = useGroq ? ApiConfig.shared.groqApiKey : ApiConfig.shared.openAiApiKey
+        let apiUrl = useGroq ? groqApiUrl : openAiApiUrl
+        let modelName = useGroq ? "whisper-large-v3-turbo" : (ApiConfig.shared.whisperModel.isEmpty ? ApiConfig.defaultWhisperModel : ApiConfig.shared.whisperModel)
         
         if apiKey.isEmpty {
             throw WhisperError.apiKeyNotSet
         }
         
-        var request = URLRequest(url: whisperApiUrl)
+        var request = URLRequest(url: apiUrl)
         request.httpMethod = "POST"
         request.timeoutInterval = 90
         request.addValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")

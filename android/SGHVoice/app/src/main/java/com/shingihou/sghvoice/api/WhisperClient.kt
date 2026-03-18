@@ -43,7 +43,9 @@ class WhisperClient(private val apiConfig: ApiConfig) {
      * @throws WhisperException 當 API 呼叫失敗時拋出
      */
     suspend fun transcribe(wavData: ByteArray, initialPrompt: String = ""): String {
-        val useGroq = apiConfig.groqApiKey.isNotBlank()
+        val sttEngine = apiConfig.sttEngine
+        val useGroq = sttEngine == "groq" || (sttEngine == "openai" && apiConfig.openAiApiKey.isBlank() && apiConfig.groqApiKey.isNotBlank())
+        
         val apiKey = if (useGroq) apiConfig.groqApiKey else apiConfig.openAiApiKey
         val apiUrl = if (useGroq) GROQ_API_URL else WHISPER_API_URL
         val modelName = if (useGroq) "whisper-large-v3-turbo" else apiConfig.whisperModel

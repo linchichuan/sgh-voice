@@ -100,9 +100,9 @@ class MainViewModel: ObservableObject, TranscriptionProgressDelegate {
         }
     }
     
-    nonisolated func onClaudeStarted() {
+    nonisolated func onLlmStarted() {
         Task { @MainActor in
-            self.statusMessage = "正在潤飾文句與繁體處理 (Claude)..."
+            self.statusMessage = "正在潤飾文句與繁體處理 (AI)..."
         }
     }
     

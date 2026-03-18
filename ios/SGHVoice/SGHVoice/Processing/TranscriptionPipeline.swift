@@ -17,7 +17,7 @@ struct TranscriptionResult {
 protocol TranscriptionProgressDelegate: AnyObject {
     func onWhisperStarted()
     func onWhisperCompleted(text: String)
-    func onClaudeStarted()
+    func onLlmStarted()
     func onCompleted(result: TranscriptionResult)
     func onError(error: String)
 }
@@ -26,13 +26,13 @@ protocol TranscriptionProgressDelegate: AnyObject {
 /// 四層處理流程：
 /// 1. Whisper STT — 語音轉文字（含三語提示詞）
 /// 2. 詞庫修正 — 自訂詞彙替換（最長匹配優先）
-/// 3. Claude 後處理 — 去填充詞、修正標點、潤稿
-/// 4. 繁體中文最終防護 (iOS 版目前依賴 Claude 提示詞，後續可擴充 OpenCC)
+/// 3. LLM 後處理 — 去填充詞、修正標點、潤稿 (支援 Claude/OpenAI/Groq)
+/// 4. 繁體中文最終防護 (iOS 版目前依賴 LLM 提示詞，後續可擴充 OpenCC)
 class TranscriptionPipeline {
     static let shared = TranscriptionPipeline()
     
     private let whisperClient = WhisperClient.shared
-    private let claudeClient = ClaudeClient.shared
+    private let llmClient = LlmClient.shared
     private let dictionaryManager = DictionaryManager.shared
     
     weak var delegate: TranscriptionProgressDelegate?
@@ -56,16 +56,15 @@ class TranscriptionPipeline {
             // === 第二層：詞庫修正 ===
             let correctedText = dictionaryManager.applyCorrections(to: rawText)
             
-            // === 第三層：Claude 後處理（含場景指令）===
-            DispatchQueue.main.async { self.delegate?.onClaudeStarted() }
-            let sceneExtra = dictionaryManager.getSceneSystemPromptExtra()
+            // === 第三層：LLM 後處理（含場景指令）===
+            DispatchQueue.main.async { self.delegate?.onLlmStarted() }
             
             var finalText = correctedText
             do {
-                finalText = try await claudeClient.postProcess(text: correctedText, sceneExtra: sceneExtra)
+                finalText = try await llmClient.postProcess(text: correctedText)
             } catch {
-                // Claude 失敗時降級為使用詞庫修正後的結果
-                print("Claude processing failed: \(error)")
+                // LLM 失敗時降級為使用詞庫修正後的結果
+                print("LLM processing failed: \(error)")
             }
             
             // === 第四層：(留給 OpenCC 擴充，目前依靠 Claude prompt 強制切換繁體) ===
