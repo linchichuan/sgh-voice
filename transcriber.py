@@ -189,18 +189,45 @@ class Transcriber:
                     return None
                 print(f" 🔐 聲紋驗證通過 (score={vp_score:.4f})")
 
-        # Step 1: Whisper STT (Hybrid Routing)
+        # Step 1: STT 路由（依 stt_engine 設定決定優先順序）
         raw = None
-        # 如果是 numpy 陣列或檔案路徑，優先嘗試 Local Whisper
-        if is_hybrid and (isinstance(audio_source, np.ndarray) or audio_duration <= self.config.get("hybrid_audio_threshold", 15)):
-            raw = self._local_stt(audio_source)
+        stt_engine = self.config.get("stt_engine", "mlx-whisper")
+
+        # STT 路由策略：
+        #   groq       → Groq Whisper（極速）→ Local → OpenAI
+        #   mlx-whisper → Local Whisper → Groq → OpenAI
+        #   cloud-only  → Groq → OpenAI（跳過本地）
+        if stt_engine == "groq":
+            # Groq 優先
+            raw = self._groq_stt(audio_source)
             if raw:
-                stt_source = "local"
-                print(f" ⚡ [Local Whisper 處理成功] 耗時: {time.time()-t0:.2f}s")
-        
-        # 若 Hybrid 失敗或音訊太長，Fallback 回 OpenAI API
+                stt_source = "groq"
+                print(f" ⚡ [Groq Whisper] 耗時: {time.time()-t0:.2f}s")
+            # Fallback: 本地
+            if not raw and is_hybrid:
+                raw = self._local_stt(audio_source)
+                if raw:
+                    stt_source = "local"
+                    print(f" ⚡ [Local Whisper fallback] 耗時: {time.time()-t0:.2f}s")
+        elif stt_engine != "cloud-only" and is_hybrid:
+            # 本地優先（mlx-whisper / qwen3-asr）
+            if isinstance(audio_source, np.ndarray) or audio_duration <= self.config.get("hybrid_audio_threshold", 15):
+                raw = self._local_stt(audio_source)
+                if raw:
+                    stt_source = "local"
+                    print(f" ⚡ [Local Whisper] 耗時: {time.time()-t0:.2f}s")
+
+        # Cloud fallback（Groq → OpenAI）
         if not raw:
-            # 如果 audio_source 是 numpy 陣列，先存成臨時 WAV 以供 OpenAI API 使用
+            # Groq fallback（如果還沒試過）
+            if stt_engine != "groq" and self.config.get("groq_api_key"):
+                raw = self._groq_stt(audio_source)
+                if raw:
+                    stt_source = "groq"
+                    print(f" ⚡ [Groq Whisper fallback] 耗時: {time.time()-t0:.2f}s")
+
+        if not raw:
+            # OpenAI Whisper API 最終 fallback
             api_audio_path = audio_source if isinstance(audio_source, str) else None
             is_temp_file = False
             if api_audio_path is None and isinstance(audio_source, np.ndarray):
@@ -215,7 +242,7 @@ class Transcriber:
                     is_temp_file = True
                 except Exception as e:
                     print(f" ⚠️ 無法建立臨時音訊檔: {e}")
-            
+
             if api_audio_path:
                 raw = self._whisper(api_audio_path)
                 if raw:
@@ -281,10 +308,10 @@ class Transcriber:
                 print(" ⚡ [短句跳過 LLM 後處理，極速模式]")
 
         if not skip_llm:
-            # ──── LLM 路由：Local Ollama 優先 → Cloud Fallback ────
-            # 有 Ollama 就先用（省 API 費用），1.5 秒超時後無感切換雲端
+            # ──── LLM 路由：依使用者首選引擎，自動 fallback ────
             has_anthropic = bool(self.config.get("anthropic_api_key"))
             has_openai = bool(self.config.get("openai_api_key"))
+            has_groq = bool(self.config.get("groq_api_key"))
 
             should_polish = (
                 self.config.get("enable_claude_polish")
@@ -293,7 +320,14 @@ class Transcriber:
 
             if should_polish:
                 pref_engine = self.config.get("llm_engine", "ollama")
-                
+
+                def try_groq():
+                    if has_groq:
+                        res = self._groq_llm_process(corrected, mode, edit_context)
+                        if res: return res, "groq"
+                        print(" ⚠️ Groq LLM 失敗")
+                    return None, None
+
                 def try_ollama():
                     if is_hybrid and mode == "dictate":
                         return self._local_llm_process(corrected), "local"
@@ -312,14 +346,16 @@ class Transcriber:
                         if res: return res, "openai"
                         print(" ⚠️ OpenAI 失敗")
                     return None, None
-                
+
                 # 依據使用者選擇的首選引擎決定嘗試順序
-                if pref_engine == "claude":
-                    routes = [try_claude, try_openai, try_ollama]
+                if pref_engine == "groq":
+                    routes = [try_groq, try_claude, try_openai, try_ollama]
+                elif pref_engine == "claude":
+                    routes = [try_claude, try_groq, try_openai, try_ollama]
                 elif pref_engine == "openai":
-                    routes = [try_openai, try_claude, try_ollama]
-                else:
-                    routes = [try_ollama, try_claude, try_openai]
+                    routes = [try_openai, try_groq, try_claude, try_ollama]
+                else:  # ollama
+                    routes = [try_ollama, try_groq, try_claude, try_openai]
 
                 for route in routes:
                     res, source = route()
@@ -429,6 +465,59 @@ class Transcriber:
             except Exception as e:
                 print(f"Whisper API error (timeout/network): {e}")
                 return None
+
+    def _groq_stt(self, audio_source):
+        """Groq Whisper API — 極速雲端 STT（164x 即時速度）"""
+        groq_key = self.config.get("groq_api_key")
+        if not groq_key:
+            return None
+        try:
+            import tempfile
+            import soundfile as sf
+
+            # 如果是 numpy 陣列，先存成臨時 WAV
+            audio_path = audio_source
+            is_temp = False
+            if isinstance(audio_source, np.ndarray):
+                sr = self.config.get("sample_rate", 16000)
+                tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
+                sf.write(tmp.name, audio_source, sr)
+                tmp.close()
+                audio_path = tmp.name
+                is_temp = True
+
+            groq_client = openai.OpenAI(
+                base_url="https://api.groq.com/openai/v1",
+                api_key=groq_key,
+                timeout=10.0,
+            )
+            with open(audio_path, "rb") as f:
+                kwargs = {
+                    "model": self.config.get("groq_whisper_model", "whisper-large-v3-turbo"),
+                    "file": f,
+                }
+                lang = self.config.get("language", "auto")
+                if lang != "auto":
+                    kwargs["language"] = lang
+                # Groq Whisper 支援 prompt
+                scene = self.config.get("active_scene", "general")
+                scene_words = SCENE_PRESETS.get(scene, {}).get("custom_words")
+                prompt = self.memory.build_whisper_prompt(
+                    self.config.get("custom_words", []), scene_words=scene_words
+                )
+                if prompt:
+                    kwargs["prompt"] = prompt
+                resp = groq_client.audio.transcriptions.create(**kwargs)
+
+            # 清理臨時檔
+            if is_temp:
+                import os
+                os.unlink(audio_path)
+
+            return resp.text
+        except Exception as e:
+            print(f" ⚠️ Groq Whisper 錯誤: {e}")
+            return None
 
     def _local_stt(self, audio_source):
         """統一本地 STT 入口，根據 stt_engine 路由"""
@@ -583,6 +672,76 @@ class Transcriber:
                     self._ollama_last_warn = now
             else:
                 print(f" ⚠️ Local LLM 錯誤: {e}")
+            return None
+
+    def _groq_llm_process(self, text, mode="dictate", edit_context=""):
+        """Groq LLM 後處理 — 極速雲端推論（Qwen3 32B 中文最強）"""
+        groq_key = self.config.get("groq_api_key")
+        if not groq_key or not text.strip():
+            return None
+        try:
+            groq_client = openai.OpenAI(
+                base_url="https://api.groq.com/openai/v1",
+                api_key=groq_key,
+                timeout=8.0,
+            )
+            # 根據模式選擇 system prompt
+            if mode == "edit":
+                system = "根據語音指令修改文字。只輸出修改結果。"
+                user_msg = self._build_edit_prompt(text, edit_context)
+            elif mode == "translate":
+                system = "翻譯助手。只輸出翻譯結果。"
+                user_msg = self._build_translate_prompt(text)
+            else:
+                system = self.config.get("claude_system_prompt", self._DICTATE_SYSTEM)
+                scene = self.config.get("active_scene", "general")
+                scene_extra = SCENE_PRESETS.get(scene, {}).get("system_prompt_extra", "")
+                if scene_extra:
+                    system = system + "\n" + scene_extra
+                app_prompt = detect_app_style(self.config).get("prompt", "")
+                if app_prompt:
+                    system = system + "\n" + app_prompt
+                user_msg = f"[語音轉錄原文，請修正後直接輸出]\n{text}"
+
+            t0 = time.time()
+            resp = groq_client.chat.completions.create(
+                model=self.config.get("groq_model", "qwen3-32b"),
+                messages=[
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user_msg},
+                ],
+                max_tokens=min(2048, max(256, len(text) * 3)),
+                temperature=0.3,
+            )
+            elapsed = time.time() - t0
+
+            # 追蹤 token 用量
+            self._track_usage(resp, "groq")
+
+            result = resp.choices[0].message.content.strip()
+            # 移除推理模型的 <think> 標籤（QwQ 等 reasoning model）
+            result = re.sub(r'<think>[\s\S]*?</think>', '', result).strip()
+            # 有時 QwQ 不輸出閉合標籤
+            result = re.sub(r'<think>[\s\S]*$', '', result).strip()
+            print(f" ⚡ [Groq LLM] 完成 ({elapsed:.2f}s)")
+
+            # 安全檢查
+            if mode == "dictate" and self._is_llm_hallucination(result, text):
+                print(f" ⚠️ Groq LLM 回覆疑似自我介紹，改用原文")
+                return text
+            if len(result) > len(text) * 3 and mode == "dictate":
+                lines = result.split('\n')
+                trimmed = []
+                total = 0
+                for line in lines:
+                    total += len(line)
+                    trimmed.append(line)
+                    if total > len(text) * 2:
+                        break
+                return '\n'.join(trimmed).strip()
+            return result
+        except Exception as e:
+            print(f" ⚠️ Groq LLM 錯誤: {e}")
             return None
 
     # 固定的高效 system prompt（不從 config 讀取，避免使用者破壞品質）
@@ -805,7 +964,7 @@ class Transcriber:
             if source == "claude":
                 input_tokens = getattr(response.usage, 'input_tokens', 0)
                 output_tokens = getattr(response.usage, 'output_tokens', 0)
-            elif source == "openai":
+            elif source in ("openai", "groq"):
                 input_tokens = getattr(response.usage, 'prompt_tokens', 0)
                 output_tokens = getattr(response.usage, 'completion_tokens', 0)
 
@@ -836,6 +995,13 @@ class Transcriber:
                 m["openai_input_tokens"] += input_tokens
                 m["openai_output_tokens"] += output_tokens
                 m["openai_calls"] += 1
+            elif source == "groq":
+                if "groq_input_tokens" not in m: m["groq_input_tokens"] = 0
+                if "groq_output_tokens" not in m: m["groq_output_tokens"] = 0
+                if "groq_calls" not in m: m["groq_calls"] = 0
+                m["groq_input_tokens"] += input_tokens
+                m["groq_output_tokens"] += output_tokens
+                m["groq_calls"] += 1
 
             save_stats(stats)
         except Exception:
@@ -878,6 +1044,7 @@ class Transcriber:
             **detector.get_status_dict(),
             "has_openai_key": bool(self.config.get("openai_api_key")),
             "has_anthropic_key": bool(self.config.get("anthropic_api_key")),
+            "has_groq_key": bool(self.config.get("groq_api_key")),
             "hybrid_mode": self.config.get("enable_hybrid_mode", True),
             "local_model": self.config.get("local_llm_model", "qwen2.5:3b"),
             "stt_engine": self.config.get("stt_engine", "mlx-whisper"),

@@ -268,6 +268,7 @@ def api_service_status():
         **detector.get_status_dict(),
         "has_openai_key": bool(config.get("openai_api_key")),
         "has_anthropic_key": bool(config.get("anthropic_api_key")),
+        "has_groq_key": bool(config.get("groq_api_key")),
         "hybrid_mode": config.get("enable_hybrid_mode", True),
         "local_model": config.get("local_llm_model", "qwen2.5:3b"),
     })

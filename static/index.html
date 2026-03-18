@@ -1319,15 +1319,23 @@
           </div>
           <div class="form-row" style="margin-top:16px">
             <div class="form-group">
-              <label data-i18n="label_stt_engine">本地辨識引擎</label>
+              <label data-i18n="label_stt_engine">語音辨識引擎（STT）</label>
               <select id="cfg-stt-engine" onchange="onSttEngineChange()">
-                <option value="mlx-whisper">Whisper（預設，已安裝）</option>
-                <option value="qwen3-asr">Qwen3-ASR（多語最強，需下載 1.2 GB）</option>
-                <option value="cloud-only">僅雲端 API</option>
+                <option value="groq">☁️ Groq Whisper（極速，~0.5s）</option>
+                <option value="mlx-whisper">💻 本地 MLX-Whisper（離線可用）</option>
+                <option value="qwen3-asr">💻 Qwen3-ASR（多語，需下載 1.2 GB）</option>
+                <option value="cloud-only">☁️ 僅雲端 API（OpenAI）</option>
+              </select>
+            </div>
+            <div class="form-group" id="groq-whisper-model-group" style="display:none">
+              <label>Groq Whisper 模型</label>
+              <select id="cfg-groq-whisper-model">
+                <option value="whisper-large-v3-turbo">Large V3 Turbo（推薦：最快最便宜）</option>
+                <option value="whisper-large-v3">Large V3（最精確）</option>
               </select>
             </div>
             <div class="form-group" id="whisper-model-group">
-              <label data-i18n="label_whisper_local">Whisper 模型</label>
+              <label data-i18n="label_whisper_local">本地 Whisper 模型</label>
               <select id="cfg-local-whisper-model">
                 <option value="mlx-community/whisper-turbo">Turbo（推薦，快速）</option>
                 <option value="breeze-asr-25-4bit">Breeze-ASR-25 4bit（繁中最強，0.8 GB）</option>
@@ -1354,14 +1362,24 @@
 
           <div class="form-row">
             <div class="form-group">
-              <label>首選主要 LLM 引擎</label>
-              <select id="cfg-llm-engine">
-                <option value="ollama">Ollama 本地模型 (免費、無限量)</option>
-                <option value="claude">Claude API (Anthropic)</option>
-                <option value="openai">OpenAI API (GPT-4o)</option>
+              <label>首選 LLM 引擎（後處理）</label>
+              <select id="cfg-llm-engine" onchange="onLlmEngineChange()">
+                <option value="groq">☁️ Groq（極速，Qwen3 中文最強）</option>
+                <option value="claude">☁️ Claude API (Anthropic)</option>
+                <option value="openai">☁️ OpenAI API (GPT-4o)</option>
+                <option value="ollama">💻 Ollama 本地模型 (免費、離線)</option>
               </select>
             </div>
-            <div class="form-group">
+            <div class="form-group" id="groq-model-group">
+              <label>Groq 模型</label>
+              <select id="cfg-groq-model">
+                <option value="qwen3-32b">Qwen3 32B（推薦：中文最強）</option>
+                <option value="qwen-qwq-32b">Qwen QwQ 32B（推理模型，較慢）</option>
+                <option value="llama-3.3-70b-versatile">Llama 3.3 70B（英文強）</option>
+                <option value="llama-4-scout-17b-16e-instruct">Llama 4 Scout（最便宜）</option>
+              </select>
+            </div>
+            <div class="form-group" id="ollama-model-group">
               <label data-i18n="label_llm_model">本地 LLM 模型（Ollama）</label>
               <select id="cfg-local-llm-model">
                 <option value="qwen2.5:3b">qwen2.5:3b（預設）</option>
@@ -2497,11 +2515,14 @@
 
       // Hybrid & LLM 設定
       document.getElementById('cfg-llm-engine').value = cfg.llm_engine || 'ollama';
+      document.getElementById('cfg-groq-model').value = cfg.groq_model || 'qwen-qwq-32b';
+      document.getElementById('cfg-groq-whisper-model').value = cfg.groq_whisper_model || 'whisper-large-v3-turbo';
       setToggle('tog-hybrid', cfg.enable_hybrid_mode);
       document.getElementById('cfg-stt-engine').value = cfg.stt_engine || 'mlx-whisper';
       document.getElementById('cfg-local-whisper-model').value = cfg.local_whisper_model || 'mlx-community/whisper-turbo';
       document.getElementById('cfg-backup-dir').value = cfg.backup_audio_dir || '';
-      onSttEngineChange(); // 根據引擎選擇顯示/隱藏 Whisper 子選項
+      onSttEngineChange(); // 根據引擎選擇顯示/隱藏子選項
+      onLlmEngineChange();
 
       // 聲紋
       setToggle('tog-voiceprint', cfg.enable_voiceprint);
@@ -2619,8 +2640,8 @@
 
     async function onSttEngineChange() {
       const engine = document.getElementById('cfg-stt-engine').value;
-      const whisperGroup = document.getElementById('whisper-model-group');
-      whisperGroup.style.display = engine === 'mlx-whisper' ? '' : 'none';
+      document.getElementById('whisper-model-group').style.display = engine === 'mlx-whisper' ? '' : 'none';
+      document.getElementById('groq-whisper-model-group').style.display = engine === 'groq' ? '' : 'none';
 
       // 選了 qwen3-asr → 檢查模型是否已下載
       if (engine === 'qwen3-asr') {
@@ -2633,6 +2654,12 @@
           }
         } catch (e) { /* ignore */ }
       }
+    }
+
+    function onLlmEngineChange() {
+      const engine = document.getElementById('cfg-llm-engine').value;
+      document.getElementById('groq-model-group').style.display = engine === 'groq' ? '' : 'none';
+      document.getElementById('ollama-model-group').style.display = engine === 'ollama' ? '' : 'none';
     }
 
     function startModelDownload(modelKey) {
@@ -2735,6 +2762,8 @@
         typing_speed_cpm: parseInt(document.getElementById('cfg-cpm').value) || 50,
         claude_system_prompt: document.getElementById('cfg-system-prompt').value,
         llm_engine: document.getElementById('cfg-llm-engine').value,
+        groq_model: document.getElementById('cfg-groq-model').value,
+        groq_whisper_model: document.getElementById('cfg-groq-whisper-model').value,
         enable_hybrid_mode: getToggle('tog-hybrid'),
         stt_engine: document.getElementById('cfg-stt-engine').value,
         local_whisper_model: document.getElementById('cfg-local-whisper-model').value,
