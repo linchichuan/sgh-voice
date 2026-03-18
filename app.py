@@ -30,6 +30,18 @@ from overlay import StatusOverlay
 
 # ─── Utility ─────────────────────────────────────────────
 
+def _paste_log(msg):
+    """將貼上除錯資訊寫入檔案（.app 的 stdout 不可見）"""
+    try:
+        import os
+        log_path = os.path.expanduser("~/.voice-input/paste_debug.log")
+        with open(log_path, "a", encoding="utf-8") as f:
+            from datetime import datetime
+            f.write(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}\n")
+    except Exception:
+        pass
+
+
 def paste_text(text):
     """複製到剪貼簿 + Cmd+V 貼上，完成後還原原有剪貼簿內容"""
     if not text:
@@ -38,7 +50,7 @@ def paste_text(text):
     try:
         import pyperclip
     except ImportError:
-        print("⚠️ pyperclip not available")
+        _paste_log("pyperclip not available")
         return
 
     # 保存原有剪貼簿內容
@@ -50,28 +62,36 @@ def paste_text(text):
 
     try:
         pyperclip.copy(text)
+        _paste_log(f"已複製到剪貼簿: {text[:50]}...")
     except Exception as e:
-        print(f"Clipboard copy error: {e}")
+        _paste_log(f"Clipboard copy error: {e}")
         return
 
-    # ★ 等待修飾鍵完全放開 + 辨識處理動畫消失
+    # ★ 等待修飾鍵完全放開
     time.sleep(0.5)
 
     pasted = False
 
-    # 方法 1: osascript System Events keystroke（最可靠，.app / CLI 都能用）
+    # 檢查輔助使用權限
+    is_trusted = False
+    try:
+        import ApplicationServices
+        is_trusted = ApplicationServices.AXIsProcessTrusted()
+    except Exception:
+        is_trusted = None  # 無法判斷
+    _paste_log(f"AXIsProcessTrusted={is_trusted}, frozen={getattr(sys, 'frozen', False)}")
+
+    # 方法 1: osascript System Events keystroke
     try:
         result = subprocess.run([
             "osascript", "-e",
             'tell application "System Events" to keystroke "v" using command down'
         ], capture_output=True, text=True, timeout=5)
+        _paste_log(f"osascript returncode={result.returncode}, stderr={result.stderr.strip()}")
         if result.returncode == 0:
             pasted = True
-            print(" ✅ osascript 貼上成功")
-        else:
-            print(f" ⚠️ osascript 貼上失敗: {result.stderr.strip()}")
     except Exception as e:
-        print(f"osascript paste error (non-fatal): {e}")
+        _paste_log(f"osascript exception: {e}")
 
     # 方法 2: Quartz CGEvent fallback
     if not pasted:
@@ -80,7 +100,7 @@ def paste_text(text):
                 CGEventCreateKeyboardEvent, CGEventPost, kCGSessionEventTap,
                 CGEventSetFlags, kCGEventFlagMaskCommand
             )
-            V_KEYCODE = 9  # 'v' 鍵的 macOS virtual keycode
+            V_KEYCODE = 9
             event_down = CGEventCreateKeyboardEvent(None, V_KEYCODE, True)
             CGEventSetFlags(event_down, kCGEventFlagMaskCommand)
             event_up = CGEventCreateKeyboardEvent(None, V_KEYCODE, False)
@@ -89,16 +109,33 @@ def paste_text(text):
             time.sleep(0.02)
             CGEventPost(kCGSessionEventTap, event_up)
             pasted = True
-            print(" ✅ CGEvent 貼上成功 (fallback)")
+            _paste_log("CGEvent 貼上完成 (fallback)")
         except Exception as e:
-            print(f"CGEvent paste error (non-fatal): {e}")
+            _paste_log(f"CGEvent exception: {e}")
+
+    # 方法 3: pbpaste + AppleScript 直接插入文字（終極 fallback）
+    if not pasted:
+        try:
+            # 用 AppleScript 直接對前景 App 插入文字，不依賴 Cmd+V
+            escaped = text.replace('\\', '\\\\').replace('"', '\\"')
+            result = subprocess.run([
+                "osascript", "-e",
+                f'tell application "System Events" to set value of attribute "AXValue" '
+                f'of focused UI element of focused window of first application process '
+                f'whose frontmost is true to "{escaped}"'
+            ], capture_output=True, text=True, timeout=5)
+            _paste_log(f"AXValue 插入 returncode={result.returncode}, stderr={result.stderr.strip()}")
+            if result.returncode == 0:
+                pasted = True
+        except Exception as e:
+            _paste_log(f"AXValue exception: {e}")
+
+    _paste_log(f"最終結果: pasted={pasted}")
 
     if not pasted:
-        # 兩種方法都失敗：保留文字在剪貼簿，不還原
-        print(f"⚠️ 自動貼上失敗，文字已複製到剪貼簿，請手動 Cmd+V")
+        _paste_log("全部方法失敗，文字保留在剪貼簿")
         notify("SGH Voice", "📋 文字已複製到剪貼簿，請 Cmd+V 貼上")
     elif old_clipboard is not None:
-        # 貼上成功：延遲還原原有剪貼簿內容
         def _restore():
             time.sleep(2.0)
             try:
