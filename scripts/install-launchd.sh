@@ -10,6 +10,7 @@ AGENT_DIR="$HOME/Library/LaunchAgents"
 PLISTS=(
   "com.shingihou.hf-watch"
   "com.shingihou.dict-update"
+  "com.shingihou.pipeline-health"
 )
 
 if [ "$1" = "--uninstall" ]; then
@@ -62,13 +63,19 @@ done
 
 echo
 echo "📋 排程說明："
-echo "  • com.shingihou.hf-watch    — 每天 08:00 監控 HuggingFace 新 ASR 模型"
-echo "  • com.shingihou.dict-update  — 每週日 03:00 自動擴充醫療辭書"
+echo "  • com.shingihou.hf-watch        — 每天 08:00 監控 HuggingFace 新 ASR 模型"
+echo "  • com.shingihou.dict-update      — 每週日 03:00 自動擴充醫療辭書"
+echo "  • com.shingihou.pipeline-health  — 每天 23:00 管線健康診斷 + 自動優化"
 echo
 echo "🔧 手動測試："
 echo "  bash scripts/hf-model-watch.sh"
 echo "  python3 scripts/dict-update.py --dry-run"
+echo "  python3 scripts/pipeline_health.py"
 echo
 echo "📝 Log 位置："
 echo "  ~/.voice-input/hf-watch.stdout.log"
 echo "  ~/.voice-input/dict-update.stdout.log"
+echo "  ~/.voice-input/pipeline-health.stdout.log"
+echo
+echo "📊 健康報告："
+echo "  ~/.voice-input/reports/health_latest.md"
