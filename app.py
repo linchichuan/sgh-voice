@@ -569,6 +569,18 @@ def run_menubar():
     engine = VoiceEngine()
     config = engine.config
 
+    # 啟動時檢查輔助使用權限（自動貼上必需）
+    try:
+        import ApplicationServices
+        if not ApplicationServices.AXIsProcessTrusted():
+            # 觸發 macOS 的權限提示對話框
+            import CoreFoundation
+            options = {CoreFoundation.kAXTrustedCheckOptionPrompt: True}
+            ApplicationServices.AXIsProcessTrustedWithOptions(options)
+            _paste_log("啟動時偵測到無輔助使用權限，已觸發系統授權對話框")
+    except Exception as e:
+        _paste_log(f"輔助使用權限檢查失敗: {e}")
+
     class App(rumps.App):
         def __init__(self):
             super().__init__("🎙", quit_button=None)
