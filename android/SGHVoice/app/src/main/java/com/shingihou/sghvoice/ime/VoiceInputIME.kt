@@ -9,7 +9,7 @@ import android.util.Log
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import com.shingihou.sghvoice.api.ApiConfig
-import com.shingihou.sghvoice.api.ClaudeClient
+import com.shingihou.sghvoice.api.LlmClient
 import com.shingihou.sghvoice.api.WhisperClient
 import com.shingihou.sghvoice.audio.AudioRecorder
 import com.shingihou.sghvoice.processing.DictionaryManager
@@ -77,12 +77,12 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
                 Log.d(TAG, "Starting pipeline initialization...")
                 val config = apiConfig ?: ApiConfig(this@VoiceInputIME)
                 val whisperClient = WhisperClient(config)
-                val claudeClient = ClaudeClient(config)
+                val llmClient = LlmClient(config)
                 val dictionaryManager = DictionaryManager(this@VoiceInputIME)
                 val openCCConverter = OpenCCConverter()
 
                 pipeline = TranscriptionPipeline(
-                    whisperClient, claudeClient, dictionaryManager, openCCConverter
+                    whisperClient, llmClient, dictionaryManager, openCCConverter
                 )
                 Log.d(TAG, "Pipeline initialized successfully")
             } catch (e: Exception) {
@@ -123,8 +123,10 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
         Log.d(TAG, "onMicPressed")
         if (currentState == ImeState.PROCESSING) return
         
-        val apiKey = apiConfig?.openAiApiKey ?: ""
-        if (apiKey.isBlank()) {
+        val config = apiConfig ?: ApiConfig(this)
+        val hasSttKey = if (config.sttEngine == "groq") config.groqApiKey.isNotBlank() else config.openAiApiKey.isNotBlank()
+        
+        if (!hasSttKey) {
             keyboardView?.setStatusText("請先至 App 設定 API Key")
             return
         }
@@ -184,7 +186,7 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
             pipeline?.process(wavData, object : TranscriptionPipeline.ProgressCallback {
                 override fun onWhisperStarted() { keyboardView?.setStatusText("語音辨識中...") }
                 override fun onWhisperCompleted(text: String) { keyboardView?.setStatusText("後處理中...") }
-                override fun onClaudeStarted() { keyboardView?.setStatusText("AI 潤稿中...") }
+                override fun onLlmStarted() { keyboardView?.setStatusText("AI 潤稿中...") }
                 override fun onCompleted(result: TranscriptionPipeline.Result) {
                     if (result.success && result.text.isNotBlank()) {
                         currentInputConnection?.commitText(result.text, 1)

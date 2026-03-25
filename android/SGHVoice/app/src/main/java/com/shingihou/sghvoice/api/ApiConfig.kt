@@ -22,10 +22,13 @@ class ApiConfig(context: Context) {
         private const val KEY_LANGUAGE_PREF = "language_preference"
         private const val KEY_SETUP_COMPLETE = "setup_complete"
         private const val KEY_OUTPUT_STYLE = "output_style"
+        private const val KEY_STT_ENGINE = "stt_engine"
+        private const val KEY_LLM_ENGINE = "llm_engine"
 
         // 預設模型
         const val DEFAULT_WHISPER_MODEL = "whisper-1"
         const val DEFAULT_CLAUDE_MODEL = "claude-haiku-4-5-20251001"
+        const val DEFAULT_GROQ_LLM_MODEL = "llama-3.3-70b-versatile"
     }
 
     private val masterKey = MasterKey.Builder(context)
@@ -39,6 +42,16 @@ class ApiConfig(context: Context) {
         EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
         EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
     )
+
+    /** 語音辨識引擎 (openai / groq) */
+    var sttEngine: String
+        get() = prefs.getString(KEY_STT_ENGINE, "openai") ?: "openai"
+        set(value) = prefs.edit().putString(KEY_STT_ENGINE, value).apply()
+
+    /** 後處理引擎 (claude / openai / groq / none) */
+    var llmEngine: String
+        get() = prefs.getString(KEY_LLM_ENGINE, "claude") ?: "claude"
+        set(value) = prefs.edit().putString(KEY_LLM_ENGINE, value).apply()
 
     /** OpenAI API 金鑰 */
     var openAiApiKey: String
@@ -85,10 +98,10 @@ class ApiConfig(context: Context) {
         get() = prefs.getBoolean(KEY_SETUP_COMPLETE, false)
         set(value) = prefs.edit().putBoolean(KEY_SETUP_COMPLETE, value).apply()
 
-    /** 檢查 API 金鑰是否已設定 (至少需有 Whisper 和 Claude 其中一套) */
+    /** 檢查 API 金鑰是否已設定 (支援 OpenAI, Anthropic 或 Groq) */
     fun hasApiKeys(): Boolean {
         val hasStt = openAiApiKey.isNotBlank() || groqApiKey.isNotBlank()
-        val hasLlm = anthropicApiKey.isNotBlank() || openAiApiKey.isNotBlank()
+        val hasLlm = anthropicApiKey.isNotBlank() || openAiApiKey.isNotBlank() || groqApiKey.isNotBlank()
         return hasStt && hasLlm
     }
 

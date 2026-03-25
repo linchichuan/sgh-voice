@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SGH Voice — AI 音声入力アシスタント</title>
     <meta name="description" content="話すだけで、プロ品質のテキストに。中国語・日本語・英語 3言語対応 AI 音声入力ツール。医療場面モード搭載。macOS &amp; Android 対応。">
-    <meta property="og:title" content="SGH Voice — AI 音声入力アシスタント v1.2.1">
+    <meta property="og:title" content="SGH Voice — AI 音声入力アシスタント v1.4.0">
     <meta property="og:description" content="話すだけで、プロ品質のテキストに。AI が自動校正・フォーマットまで完了。医療場面モード対応。">
     <meta property="og:url" content="https://voice.shingihou.com">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -35,7 +35,7 @@
                 <a href="#how-it-works" data-i18n="nav.howItWorks">使い方</a>
                 <a href="#pricing" data-i18n="nav.pricing">料金</a>
                 <a href="#download" data-i18n="nav.download">ダウンロード</a>
-                <a href="#contact" data-i18n="nav.contact">お問い合わせ</a>
+                <a href="#beta" data-i18n="nav.beta">Beta申請</a>
                 <a href="privacy.html" data-i18n="nav.privacy">プライバシー</a>
             </div>
             <div class="nav-right">
@@ -74,7 +74,7 @@
             <div class="hero-orb hero-orb-3"></div>
         </div>
         <div class="container hero-content">
-            <div class="hero-badge" data-i18n="hero.badge">macOS & Android 対応</div>
+            <div class="hero-badge" data-i18n="hero.badge">macOS & iOS & Android 対応</div>
             <h1 class="hero-title">
                 <span data-i18n="hero.title1">話すだけで、</span><br>
                 <span class="gradient-text" data-i18n="hero.title2">プロ品質のテキストに。</span>
@@ -166,13 +166,17 @@
                 </div>
                 <div class="feature-card">
                     <div class="feature-icon">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="28"
-                            height="28">
-                            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="28" height="28">
+                            <rect x="4" y="4" width="16" height="16" rx="2" />
+                            <rect x="9" y="9" width="6" height="6" />
+                            <line x1="9" y1="1" x2="9" y2="4" /><line x1="15" y1="1" x2="15" y2="4" />
+                            <line x1="9" y1="20" x2="9" y2="23" /><line x1="15" y1="20" x2="15" y2="23" />
+                            <line x1="20" y1="9" x2="23" y2="9" /><line x1="20" y1="15" x2="23" y2="15" />
+                            <line x1="1" y1="9" x2="4" y2="9" /><line x1="1" y1="15" x2="4" y2="15" />
                         </svg>
                     </div>
-                    <h3 data-i18n="features.f3.title">Groq 超高速処理</h3>
-                    <p data-i18n="features.f3.desc">Groq のハードウェアで Whisper を実行。0.5秒以下で文字起こし完了。</p>
+                    <h3 data-i18n="features.f3.title">Breeze-ASR-25 搭載</h3>
+                    <p data-i18n="features.f3.desc">MediaTek製の繁体字中国語特化ASRモデルをApple Silicon上でオフライン実行。Whisper-turbo比3.5倍高速。0.8GBの4bit量子化モデルで、インターネット接続不要です。</p>
                 </div>
                 <div class="feature-card">
                     <div class="feature-icon">
@@ -207,6 +211,26 @@
                     </div>
                     <h3 data-i18n="features.f6.title">Android IME 対応</h3>
                     <p data-i18n="features.f6.desc">Androidキーボードとして動作。どのアプリでも音声入力が可能。</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="28" height="28">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                            <circle cx="12" cy="11" r="3" />
+                            <path d="M7 20c0-3.3 2.2-6 5-6s5 2.7 5 6" />
+                        </svg>
+                    </div>
+                    <h3 data-i18n="features.f8.title">🔐 声紋認証 (v1.3.0)</h3>
+                    <p data-i18n="features.f8.desc">本人の声だけを識別し、周囲の雑音や他人の話し声を自動でフィルタリング。</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="28" height="28">
+                            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+                        </svg>
+                    </div>
+                    <h3 data-i18n="features.f9.title">極速 Groq 統合 (v1.4.0)</h3>
+                    <p data-i18n="features.f9.desc">Llama 3 と Whisper-large-v3-turbo を Groq 上で実行。驚異的な応答速度を実現。</p>
                 </div>
             </div>
         </div>
@@ -353,7 +377,7 @@
                     </div>
                     <h3>macOS</h3>
                     <p class="download-desc" data-i18n="download.macDesc">Apple Silicon (M1/M2/M3/M4)</p>
-                    <a href="https://github.com/linchichuan/sgh-voice/releases/download/v1.2.1/SGH.Voice-1.2.1-apple-silicon.dmg"
+                    <a href="https://github.com/linchichuan/sgh-voice/releases/download/v1.4.0/SGH.Voice-1.4.0-apple-silicon.dmg"
                         class="btn btn-primary download-btn">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18"
                             height="18">
@@ -361,8 +385,19 @@
                             <polyline points="7 10 12 15 17 10" />
                             <line x1="12" y1="15" x2="12" y2="3" />
                         </svg>
-                        DMG v1.2.1
+                        DMG v1.4.0
                     </a>
+                </div>
+                <div class="download-card">
+                    <div class="download-icon">
+                        <svg viewBox="0 0 24 24" fill="currentColor" width="40" height="40">
+                            <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z" />
+                        </svg>
+                    </div>
+                    <h3>iOS</h3>
+                    <p class="download-desc" data-i18n="download.iosDesc">iPhone / iPad (iOS 16+)</p>
+                    <a href="https://github.com/linchichuan/sgh-voice/releases/tag/v1.4.0"
+                        class="btn btn-outline download-btn" data-i18n="download.iosCta">リリースページ</a>
                 </div>
                 <div class="download-card">
                     <div class="download-icon">
@@ -374,40 +409,37 @@
                     </div>
                     <h3>Android</h3>
                     <p class="download-desc" data-i18n="download.androidDesc">Android 8.0+ (Google Play 審査中)</p>
-                    <a href="https://github.com/linchichuan/sgh-voice/releases/tag/v1.2.1"
+                    <a href="https://github.com/linchichuan/sgh-voice/releases/tag/v1.4.0"
                         class="btn btn-outline download-btn" data-i18n="download.androidCta">リリースページ</a>
                 </div>
             </div>
         </div>
     </section>
 
-    <!-- ===== Contact Form ===== -->
-    <section class="contact" id="contact">
+    <!-- ===== Beta Request Form ===== -->
+    <section class="beta" id="beta">
         <div class="container">
             <div class="section-header">
-                <span class="section-label" data-i18n="contact.label">お問い合わせ</span>
-                <h2 class="section-title" data-i18n="contact.title">ご質問・ご要望はこちら</h2>
-                <p class="section-subtitle" data-i18n="contact.subtitle">お気軽にお問い合わせください。通常1営業日以内にご返信いたします。</p>
+                <span class="section-label" data-i18n="beta.label">Beta申請</span>
+                <h2 class="section-title" data-i18n="beta.title">Beta版を利用する</h2>
+                <p class="section-subtitle" data-i18n="beta.subtitle">現在、機能制限なしのPro版をBetaテスト中です。以下のフォームから理由を添えて申請してください。
+                </p>
             </div>
             <div class="contact-card">
-                <form class="contact-form" id="contactForm">
+                <form class="contact-form" id="betaForm">
                     <div class="form-row">
                         <div class="form-group">
-                            <label for="contactName" data-i18n="contact.name">お名前</label>
-                            <input type="text" id="contactName" required>
+                            <label for="betaName" data-i18n="beta.name">お名前 / 企業名</label>
+                            <input type="text" id="betaName" required>
                         </div>
                         <div class="form-group">
-                            <label for="contactEmail" data-i18n="contact.email">メールアドレス</label>
-                            <input type="email" id="contactEmail" required>
+                            <label for="betaEmail" data-i18n="beta.email">メールアドレス</label>
+                            <input type="email" id="betaEmail" required>
                         </div>
                     </div>
                     <div class="form-group">
-                        <label for="contactSubject" data-i18n="contact.subject">件名</label>
-                        <input type="text" id="contactSubject">
-                    </div>
-                    <div class="form-group">
-                        <label for="contactMessage" data-i18n="contact.message">メッセージ</label>
-                        <textarea id="contactMessage" rows="5" required></textarea>
+                        <label for="betaMessage" data-i18n="beta.message">利用目的・理由</label>
+                        <textarea id="betaMessage" rows="5" required></textarea>
                     </div>
                     <button type="submit" class="btn btn-primary contact-submit-btn">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18"
@@ -415,17 +447,17 @@
                             <line x1="22" y1="2" x2="11" y2="13" />
                             <polygon points="22 2 15 22 11 13 2 9 22 2" />
                         </svg>
-                        <span data-i18n="contact.send">送信する</span>
+                        <span data-i18n="beta.send">申請を送る</span>
                     </button>
-                    <div class="contact-success" id="contactSuccess" style="display:none;">
+                    <div class="contact-success" id="betaSuccess" style="display:none;">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20"
                             height="20">
                             <polyline points="20 6 9 17 4 12" />
                         </svg>
-                        <span data-i18n="contact.success">お問い合わせを受け付けました。ありがとうございます！</span>
+                        <span data-i18n="beta.success">申請を受け付けました。追ってご連絡します。</span>
                     </div>
-                    <div class="contact-error" id="contactError" style="display:none;">
-                        <span data-i18n="contact.error">送信に失敗しました。もう一度お試しください。</span>
+                    <div class="contact-error" id="betaError" style="display:none;">
+                        <span data-i18n="beta.error">送信に失敗しました。もう一度お試しください。</span>
                     </div>
                 </form>
             </div>

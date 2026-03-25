@@ -10,8 +10,9 @@ import numpy as np
 from datetime import datetime
 import openai
 import anthropic
-from config import load_smart_replace, SCENE_PRESETS, DEFAULT_APP_STYLES, detect_app_style
+from config import load_smart_replace, SCENE_PRESETS, DEFAULT_APP_STYLES, detect_app_style, LOCAL_MODEL_PATHS, BREEZE_MODELS
 from ollama_detector import get_detector, OllamaStatus
+from voiceprint import VoiceprintManager
 
 
 class Transcriber:
@@ -35,6 +36,8 @@ class Transcriber:
         # Ollama timeout 退避：避免連續超時時每次都卡住並重複洗版 warning
         self._ollama_backoff_until = 0.0
         self._ollama_fail_count = 0
+        # 聲紋驗證器
+        self._voiceprint_mgr = VoiceprintManager()
         self._ollama_last_warn = 0.0
 
     def reset_clients(self):
@@ -98,12 +101,16 @@ class Transcriber:
                 sf.write(tmp.name, silence, 16000)
                 tmp.close()
 
+                warmup_model_name = self.config.get("local_whisper_model", "mlx-community/whisper-turbo")
+                warmup_model_path = LOCAL_MODEL_PATHS.get(warmup_model_name, warmup_model_name)
+                warmup_kwargs = {
+                    "path_or_hf_repo": warmup_model_path,
+                    "language": "en",
+                }
+                if warmup_model_name in BREEZE_MODELS:
+                    warmup_kwargs["fp16"] = True
                 with Transcriber._metal_lock:
-                    mlx_whisper.transcribe(
-                        tmp.name,
-                        path_or_hf_repo="mlx-community/whisper-turbo",
-                        language="en",
-                    )
+                    mlx_whisper.transcribe(tmp.name, **warmup_kwargs)
                 import os
                 os.unlink(tmp.name)
                 print(" ✅ mlx-whisper 模型預熱完成")
@@ -168,22 +175,59 @@ class Transcriber:
         # Step 0: 音訊能量檢查（防止靜音送入 Whisper 產生幻覺）
         if isinstance(audio_source, np.ndarray):
             rms = np.sqrt(np.mean(audio_source ** 2))
-            if rms < 0.0005:  # 靜音閾值 (Lowered from 0.005 to 0.0005)
+            if rms < 0.003:  # 靜音閾值（Webcam 麥克風背景噪音約 0.001，正常說話 > 0.01）
                 print(f" 🔇 音訊能量過低 (RMS={rms:.5f})，跳過辨識")
                 return None
 
-        # Step 1: Whisper STT (Hybrid Routing)
+        # Step 0.5: 聲紋驗證（只接受已註冊聲紋的語音）
+        if isinstance(audio_source, np.ndarray) and self.config.get("enable_voiceprint", False):
+            if self._voiceprint_mgr.is_enrolled:
+                vp_threshold = self.config.get("voiceprint_threshold", 0.97)
+                vp_score = self._voiceprint_mgr.verify(audio_source)
+                if vp_score < vp_threshold:
+                    print(f" 🔇 聲紋不符 (score={vp_score:.4f} < {vp_threshold})，跳過辨識")
+                    return None
+                print(f" 🔐 聲紋驗證通過 (score={vp_score:.4f})")
+
+        # Step 1: STT 路由（依 stt_engine 設定決定優先順序）
         raw = None
-        # 如果是 numpy 陣列或檔案路徑，優先嘗試 Local Whisper
-        if is_hybrid and (isinstance(audio_source, np.ndarray) or audio_duration <= self.config.get("hybrid_audio_threshold", 15)):
-            raw = self._local_stt(audio_source)
+        stt_engine = self.config.get("stt_engine", "mlx-whisper")
+
+        # STT 路由策略：
+        #   groq       → Groq Whisper（極速）→ Local → OpenAI
+        #   mlx-whisper → Local Whisper → Groq → OpenAI
+        #   cloud-only  → Groq → OpenAI（跳過本地）
+        if stt_engine == "groq":
+            # Groq 優先
+            raw = self._groq_stt(audio_source)
             if raw:
-                stt_source = "local"
-                print(f" ⚡ [Local Whisper 處理成功] 耗時: {time.time()-t0:.2f}s")
-        
-        # 若 Hybrid 失敗或音訊太長，Fallback 回 OpenAI API
+                stt_source = "groq"
+                print(f" ⚡ [Groq Whisper] 耗時: {time.time()-t0:.2f}s")
+            # Fallback: 本地
+            if not raw and is_hybrid:
+                raw = self._local_stt(audio_source)
+                if raw:
+                    stt_source = "local"
+                    print(f" ⚡ [Local Whisper fallback] 耗時: {time.time()-t0:.2f}s")
+        elif stt_engine != "cloud-only" and is_hybrid:
+            # 本地優先（mlx-whisper / qwen3-asr）
+            if isinstance(audio_source, np.ndarray) or audio_duration <= self.config.get("hybrid_audio_threshold", 15):
+                raw = self._local_stt(audio_source)
+                if raw:
+                    stt_source = "local"
+                    print(f" ⚡ [Local Whisper] 耗時: {time.time()-t0:.2f}s")
+
+        # Cloud fallback（Groq → OpenAI）
         if not raw:
-            # 如果 audio_source 是 numpy 陣列，先存成臨時 WAV 以供 OpenAI API 使用
+            # Groq fallback（如果還沒試過）
+            if stt_engine != "groq" and self.config.get("groq_api_key"):
+                raw = self._groq_stt(audio_source)
+                if raw:
+                    stt_source = "groq"
+                    print(f" ⚡ [Groq Whisper fallback] 耗時: {time.time()-t0:.2f}s")
+
+        if not raw:
+            # OpenAI Whisper API 最終 fallback
             api_audio_path = audio_source if isinstance(audio_source, str) else None
             is_temp_file = False
             if api_audio_path is None and isinstance(audio_source, np.ndarray):
@@ -198,7 +242,7 @@ class Transcriber:
                     is_temp_file = True
                 except Exception as e:
                     print(f" ⚠️ 無法建立臨時音訊檔: {e}")
-            
+
             if api_audio_path:
                 raw = self._whisper(api_audio_path)
                 if raw:
@@ -216,15 +260,26 @@ class Transcriber:
 
         # 幻覺偵測：Whisper 靜音時容易產生重複文字
         raw_stripped = raw.strip()
-        if len(raw_stripped) > 30:
-            # 檢查是否有連續重複片段（典型幻覺模式）
-            words = raw_stripped.replace('，', ',').replace('、', ',').split(',')
-            words = [w.strip() for w in words if w.strip()]
-            if len(words) >= 5:
-                unique = set(words)
-                if len(unique) <= 3:  # 5+ 個詞但只有 ≤3 種，明顯是幻覺
-                    print(f" 🔇 偵測到 Whisper 幻覺（重複 {len(words)} 次），跳過")
+        if len(raw_stripped) > 10:
+            # 1) 單字元重複偵測：同一個字佔全文 70% 以上（如「整整整整整整整整...」）
+            from collections import Counter
+            char_counts = Counter(raw_stripped.replace(' ', ''))
+            if char_counts:
+                most_common_char, most_common_count = char_counts.most_common(1)[0]
+                total_chars = sum(char_counts.values())
+                if total_chars > 5 and most_common_count / total_chars > 0.7:
+                    print(f" 🔇 偵測到 Whisper 幻覺（「{most_common_char}」重複 {most_common_count}/{total_chars} 次），跳過")
                     return None
+
+            # 2) 逗號分隔重複偵測（如「嗯, 嗯, 嗯, 嗯, 嗯」）
+            if len(raw_stripped) > 30:
+                words = raw_stripped.replace('，', ',').replace('、', ',').split(',')
+                words = [w.strip() for w in words if w.strip()]
+                if len(words) >= 5:
+                    unique = set(words)
+                    if len(unique) <= 3:  # 5+ 個詞但只有 ≤3 種，明顯是幻覺
+                        print(f" 🔇 偵測到 Whisper 幻覺（重複 {len(words)} 次），跳過")
+                        return None
 
         # Step 2: 本地詞庫修正（含場景修正）
         scene = self.config.get("active_scene", "general")
@@ -253,10 +308,10 @@ class Transcriber:
                 print(" ⚡ [短句跳過 LLM 後處理，極速模式]")
 
         if not skip_llm:
-            # ──── LLM 路由：Local Ollama 優先 → Cloud Fallback ────
-            # 有 Ollama 就先用（省 API 費用），1.5 秒超時後無感切換雲端
+            # ──── LLM 路由：依使用者首選引擎，自動 fallback ────
             has_anthropic = bool(self.config.get("anthropic_api_key"))
             has_openai = bool(self.config.get("openai_api_key"))
+            has_groq = bool(self.config.get("groq_api_key"))
 
             should_polish = (
                 self.config.get("enable_claude_polish")
@@ -264,27 +319,50 @@ class Transcriber:
             )
 
             if should_polish:
-                # ── 優先順序 A: 本地 Ollama（1.5 秒超時）──
-                if is_hybrid and mode == "dictate":
-                    local_res = self._local_llm_process(corrected)
-                    if local_res:
-                        final = local_res
-                        llm_source = "local"
+                pref_engine = self.config.get("llm_engine", "ollama")
 
-                # ── 優先順序 B: Cloud Fallback（Local 失敗或不可用時）──
-                if final is None and has_anthropic:
-                    final = self._claude_process(corrected, mode, edit_context)
-                    if final:
-                        llm_source = "claude"
-                    else:
-                        print(" ⚠️ Claude 失敗，嘗試下一個 fallback")
+                def try_groq():
+                    if has_groq:
+                        res = self._groq_llm_process(corrected, mode, edit_context)
+                        if res: return res, "groq"
+                        print(" ⚠️ Groq LLM 失敗")
+                    return None, None
 
-                if final is None and has_openai:
-                    final = self._openai_process(corrected, mode, edit_context)
-                    if final:
-                        llm_source = "openai"
-                    else:
+                def try_ollama():
+                    if is_hybrid and mode == "dictate":
+                        return self._local_llm_process(corrected), "local"
+                    return None, None
+
+                def try_claude():
+                    if has_anthropic:
+                        res = self._claude_process(corrected, mode, edit_context)
+                        if res: return res, "claude"
+                        print(" ⚠️ Claude 失敗")
+                    return None, None
+
+                def try_openai():
+                    if has_openai:
+                        res = self._openai_process(corrected, mode, edit_context)
+                        if res: return res, "openai"
                         print(" ⚠️ OpenAI 失敗")
+                    return None, None
+
+                # 依據使用者選擇的首選引擎決定嘗試順序
+                if pref_engine == "groq":
+                    routes = [try_groq, try_claude, try_openai, try_ollama]
+                elif pref_engine == "claude":
+                    routes = [try_claude, try_groq, try_openai, try_ollama]
+                elif pref_engine == "openai":
+                    routes = [try_openai, try_groq, try_claude, try_ollama]
+                else:  # ollama
+                    routes = [try_ollama, try_groq, try_claude, try_openai]
+
+                for route in routes:
+                    res, source = route()
+                    if res:
+                        final = res
+                        llm_source = source
+                        break
 
             # ── 最終 Fallback: 本地正則去填充詞 ──
             if final is None:
@@ -315,6 +393,10 @@ class Transcriber:
         }
         self.memory.add_to_history(entry)
 
+        # 異步執行自動新詞萃取 (模仿 Typeless)
+        if mode == "dictate":
+            self._async_extract_keywords(final)
+
         return {
             "raw": raw,
             "corrected": corrected,
@@ -322,6 +404,30 @@ class Transcriber:
             "process_time": process_time,
             "entry": entry,
         }
+
+    def _async_extract_keywords(self, text):
+        """非同步背景提取專有名詞與外文，加入自動詞庫。"""
+        def task():
+            try:
+                if len(text) < 5: return
+                import re
+                # 提取長度 3 以上且包含字母的單字 (e.g. Firebase, Sendgrid, Genostar, stripe)
+                words = re.findall(r'[A-Za-z][A-Za-z0-9\-]{2,}', text)
+                
+                # 常見的非關鍵字排除名單
+                common = {
+                    "the", "and", "that", "this", "with", "from", "your", "have", "you",
+                    "for", "not", "are", "but", "all", "can", "out", "our", "has", "who", "get"
+                }
+                
+                keywords = [w for w in set(words) if w.lower() not in common]
+                
+                for kw in keywords:
+                    self.memory.add_auto_word(kw)
+            except Exception as e:
+                print(f" Keyword extraction failed: {e}")
+                
+        threading.Thread(target=task, daemon=True).start()
 
     def _whisper(self, audio_path):
         """Whisper API 語音轉文字 — 使用 custom_words prompt 提升三語辨識"""
@@ -359,6 +465,59 @@ class Transcriber:
             except Exception as e:
                 print(f"Whisper API error (timeout/network): {e}")
                 return None
+
+    def _groq_stt(self, audio_source):
+        """Groq Whisper API — 極速雲端 STT（164x 即時速度）"""
+        groq_key = self.config.get("groq_api_key")
+        if not groq_key:
+            return None
+        try:
+            import tempfile
+            import soundfile as sf
+
+            # 如果是 numpy 陣列，先存成臨時 WAV
+            audio_path = audio_source
+            is_temp = False
+            if isinstance(audio_source, np.ndarray):
+                sr = self.config.get("sample_rate", 16000)
+                tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
+                sf.write(tmp.name, audio_source, sr)
+                tmp.close()
+                audio_path = tmp.name
+                is_temp = True
+
+            groq_client = openai.OpenAI(
+                base_url="https://api.groq.com/openai/v1",
+                api_key=groq_key,
+                timeout=10.0,
+            )
+            with open(audio_path, "rb") as f:
+                kwargs = {
+                    "model": self.config.get("groq_whisper_model", "whisper-large-v3-turbo"),
+                    "file": f,
+                }
+                lang = self.config.get("language", "auto")
+                if lang != "auto":
+                    kwargs["language"] = lang
+                # Groq Whisper 支援 prompt
+                scene = self.config.get("active_scene", "general")
+                scene_words = SCENE_PRESETS.get(scene, {}).get("custom_words")
+                prompt = self.memory.build_whisper_prompt(
+                    self.config.get("custom_words", []), scene_words=scene_words
+                )
+                if prompt:
+                    kwargs["prompt"] = prompt
+                resp = groq_client.audio.transcriptions.create(**kwargs)
+
+            # 清理臨時檔
+            if is_temp:
+                import os
+                os.unlink(audio_path)
+
+            return resp.text
+        except Exception as e:
+            print(f" ⚠️ Groq Whisper 錯誤: {e}")
+            return None
 
     def _local_stt(self, audio_source):
         """統一本地 STT 入口，根據 stt_engine 路由"""
@@ -409,11 +568,21 @@ class Transcriber:
         """使用 Mac 本地 mlx-whisper，支援傳入 numpy 陣列或路徑"""
         try:
             import mlx_whisper
+            model_name = self.config.get("local_whisper_model", "mlx-community/whisper-turbo")
+            # 解析模型路徑：短名稱 → 實際路徑
+            model_path = LOCAL_MODEL_PATHS.get(model_name, model_name)
+            is_breeze = model_name in BREEZE_MODELS
+
             kwargs = {
-                "path_or_hf_repo": self.config.get("local_whisper_model", "mlx-community/whisper-turbo"),
+                "path_or_hf_repo": model_path,
                 "temperature": 0.0,                     # 確定性輸出，greedy decoding
                 "condition_on_previous_text": False,    # 不需要上下文，減少計算量
             }
+
+            # Breeze-ASR-25 基於 whisper-large-v2（80 mel bins, fp16 推理）
+            if is_breeze:
+                kwargs["fp16"] = True
+
             lang = self.config.get("language", "auto")
             if lang != "auto":
                 kwargs["language"] = lang
@@ -505,16 +674,86 @@ class Transcriber:
                 print(f" ⚠️ Local LLM 錯誤: {e}")
             return None
 
+    def _groq_llm_process(self, text, mode="dictate", edit_context=""):
+        """Groq LLM 後處理 — 極速雲端推論（Qwen3 32B 中文最強）"""
+        groq_key = self.config.get("groq_api_key")
+        if not groq_key or not text.strip():
+            return None
+        try:
+            groq_client = openai.OpenAI(
+                base_url="https://api.groq.com/openai/v1",
+                api_key=groq_key,
+                timeout=8.0,
+            )
+            # 根據模式選擇 system prompt
+            if mode == "edit":
+                system = "根據語音指令修改文字。只輸出修改結果。"
+                user_msg = self._build_edit_prompt(text, edit_context)
+            elif mode == "translate":
+                system = "翻譯助手。只輸出翻譯結果。"
+                user_msg = self._build_translate_prompt(text)
+            else:
+                system = self.config.get("claude_system_prompt", self._DICTATE_SYSTEM)
+                scene = self.config.get("active_scene", "general")
+                scene_extra = SCENE_PRESETS.get(scene, {}).get("system_prompt_extra", "")
+                if scene_extra:
+                    system = system + "\n" + scene_extra
+                app_prompt = detect_app_style(self.config).get("prompt", "")
+                if app_prompt:
+                    system = system + "\n" + app_prompt
+                user_msg = f"[語音轉錄原文，請修正後直接輸出]\n{text}"
+
+            t0 = time.time()
+            resp = groq_client.chat.completions.create(
+                model=self.config.get("groq_model", "qwen3-32b"),
+                messages=[
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user_msg},
+                ],
+                max_tokens=min(2048, max(256, len(text) * 3)),
+                temperature=0.3,
+            )
+            elapsed = time.time() - t0
+
+            # 追蹤 token 用量
+            self._track_usage(resp, "groq")
+
+            result = resp.choices[0].message.content.strip()
+            # 移除推理模型的 <think> 標籤（QwQ 等 reasoning model）
+            result = re.sub(r'<think>[\s\S]*?</think>', '', result).strip()
+            # 有時 QwQ 不輸出閉合標籤
+            result = re.sub(r'<think>[\s\S]*$', '', result).strip()
+            print(f" ⚡ [Groq LLM] 完成 ({elapsed:.2f}s)")
+
+            # 安全檢查
+            if mode == "dictate" and self._is_llm_hallucination(result, text):
+                print(f" ⚠️ Groq LLM 回覆疑似自我介紹，改用原文")
+                return text
+            if len(result) > len(text) * 3 and mode == "dictate":
+                lines = result.split('\n')
+                trimmed = []
+                total = 0
+                for line in lines:
+                    total += len(line)
+                    trimmed.append(line)
+                    if total > len(text) * 2:
+                        break
+                return '\n'.join(trimmed).strip()
+            return result
+        except Exception as e:
+            print(f" ⚠️ Groq LLM 錯誤: {e}")
+            return None
+
     # 固定的高效 system prompt（不從 config 讀取，避免使用者破壞品質）
     _DICTATE_SYSTEM = (
-        "語音辨識後處理。規則：\n"
-        "1. 刪除所有填充詞：嗯、啊、那個、就是、然後、對、欸、所以說、基本上、えーと、あの、えー、まあ、um、uh、like、you know、basically、actually、so yeah、I mean\n"
-        "2. 刪除冗餘詞：這個、那個（非必要指代時）、就是說、我想說一下\n"
-        "3. 口語自我修正→只保留最終版本（例：不是A啦，我的意思是B→只留B）\n"
-        "4. 標點符號必加：中文用全形標點（，。？！、：；），日文用全形標點，英文用半形標點且後面空一格。長篇大論適當分段，提升閱讀性。\n"
-        "5. 不要改寫核心句子結構，保持講者的原意與語氣\n"
-        "6. 多語混合保持原樣\n"
-        "7. 只輸出結果，不加任何解釋"
+        "你是一個語音辨識後處理與文法檢查助手。規則：\n"
+        "1. 語言判斷：自動判斷原文是中文、日文還是英文。絕對不要翻譯（例如英文不要翻成中文，日文不要翻成中文）。保持講者的原語言！\n"
+        "2. 文法與語氣（Grammar & Tone）：修正明顯的文法錯誤、錯別字、不通順的語句，並優化語氣使其聽起來像母語人士的書面語或流暢口語。\n"
+        "3. 刪除所有填充詞：嗯、啊、那個、就是、然後、對、欸、所以說、基本上、えーと、あの、えー、まあ、um、uh、like、you know、basically、actually 等\n"
+        "4. 口語自我修正→只保留最終版本（例：不是A啦，我的意思是B→只留B）\n"
+        "5. 標點符號必加：中文用全形標點（，。？！、：；），日文用全形標點，英文用半形標點且後面空一格。長篇大論適當分段，提升閱讀性。\n"
+        "6. 多語混合時保持混合狀態，不要翻譯。\n"
+        "7. 只輸出結果，不加任何解釋。"
     )
 
     def _openai_process(self, text, mode, edit_context=""):
@@ -725,7 +964,7 @@ class Transcriber:
             if source == "claude":
                 input_tokens = getattr(response.usage, 'input_tokens', 0)
                 output_tokens = getattr(response.usage, 'output_tokens', 0)
-            elif source == "openai":
+            elif source in ("openai", "groq"):
                 input_tokens = getattr(response.usage, 'prompt_tokens', 0)
                 output_tokens = getattr(response.usage, 'completion_tokens', 0)
 
@@ -756,6 +995,13 @@ class Transcriber:
                 m["openai_input_tokens"] += input_tokens
                 m["openai_output_tokens"] += output_tokens
                 m["openai_calls"] += 1
+            elif source == "groq":
+                if "groq_input_tokens" not in m: m["groq_input_tokens"] = 0
+                if "groq_output_tokens" not in m: m["groq_output_tokens"] = 0
+                if "groq_calls" not in m: m["groq_calls"] = 0
+                m["groq_input_tokens"] += input_tokens
+                m["groq_output_tokens"] += output_tokens
+                m["groq_calls"] += 1
 
             save_stats(stats)
         except Exception:
@@ -798,6 +1044,7 @@ class Transcriber:
             **detector.get_status_dict(),
             "has_openai_key": bool(self.config.get("openai_api_key")),
             "has_anthropic_key": bool(self.config.get("anthropic_api_key")),
+            "has_groq_key": bool(self.config.get("groq_api_key")),
             "hybrid_mode": self.config.get("enable_hybrid_mode", True),
             "local_model": self.config.get("local_llm_model", "qwen2.5:3b"),
             "stt_engine": self.config.get("stt_engine", "mlx-whisper"),

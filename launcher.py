@@ -57,6 +57,19 @@ if __name__ == "__main__":
 
     # 設定 bundle 路徑環境變數，讓其他模組可以使用
     os.environ["VOICEINPUT_BUNDLE_DIR"] = get_bundle_dir()
+
+    # ★ .app bundle 啟動時，HuggingFace cache 路徑可能沒設定
+    #   導致 mlx-whisper 找不到已下載的模型，靜默失敗 fallback 到 Cloud Whisper
+    #   Cloud Whisper + 長 prompt → 幻覺（輸出字典詞彙而非你說的話）
+    if not os.environ.get("HF_HOME"):
+        # 優先用外接 SSD
+        if os.path.isdir("/Volumes/Satechi_SSD/huggingface"):
+            os.environ["HF_HOME"] = "/Volumes/Satechi_SSD/huggingface"
+        else:
+            # 使用預設的 ~/.cache/huggingface
+            default_hf = os.path.expanduser("~/.cache/huggingface")
+            os.environ["HF_HOME"] = default_hf
+
     init_user_data()
     from app import main
     main()

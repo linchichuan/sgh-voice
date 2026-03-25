@@ -77,27 +77,25 @@ document.getElementById("subscribeForm").addEventListener("submit", function (e)
     });
 });
 
-// --- Contact form → Firestore ---
-document.getElementById("contactForm").addEventListener("submit", function (e) {
+// --- Beta Request form → Firestore ---
+document.getElementById("betaForm").addEventListener("submit", function (e) {
     e.preventDefault();
-    const name = document.getElementById("contactName").value.trim();
-    const email = document.getElementById("contactEmail").value.trim();
-    const subject = document.getElementById("contactSubject").value.trim();
-    const message = document.getElementById("contactMessage").value.trim();
+    const name = document.getElementById("betaName").value.trim();
+    const email = document.getElementById("betaEmail").value.trim();
+    const message = document.getElementById("betaMessage").value.trim();
     if (!name || !email || !message) return;
 
     const submitBtn = this.querySelector('button[type="submit"]');
     submitBtn.disabled = true;
     submitBtn.style.opacity = "0.6";
 
-    document.getElementById("contactError").style.display = "none";
+    document.getElementById("betaError").style.display = "none";
 
     waitForFirestore(async ({ db, collection, addDoc, serverTimestamp }) => {
         try {
-            await addDoc(collection(db, "sgh-voice-contacts"), {
+            await addDoc(collection(db, "sgh-voice-beta-requests"), {
                 name: name,
                 email: email,
-                subject: subject,
                 message: message,
                 createdAt: serverTimestamp(),
                 lang: document.documentElement.lang || "ja",
@@ -105,12 +103,12 @@ document.getElementById("contactForm").addEventListener("submit", function (e) {
             });
             // Hide form, show success
             this.querySelectorAll(".form-row, .form-group, .contact-submit-btn").forEach(el => el.style.display = "none");
-            document.getElementById("contactSuccess").style.display = "flex";
+            document.getElementById("betaSuccess").style.display = "flex";
         } catch (err) {
-            console.error("Contact error:", err);
+            console.error("Beta Request error:", err);
             submitBtn.disabled = false;
             submitBtn.style.opacity = "1";
-            document.getElementById("contactError").style.display = "block";
+            document.getElementById("betaError").style.display = "block";
         }
     });
 });

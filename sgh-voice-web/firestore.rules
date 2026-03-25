@@ -9,8 +9,8 @@ service cloud.firestore {
                     && request.resource.data.email.size() < 256;
       allow read, update, delete: if false;
     }
-    // Contact form — anyone can create, no one can read/update/delete
-    match /sgh-voice-contacts/{docId} {
+    // Beta request form — anyone can create, no one can read/update/delete
+    match /sgh-voice-beta-requests/{docId} {
       allow create: if request.resource.data.keys().hasAll(['name', 'email', 'message', 'createdAt'])
                     && request.resource.data.name is string
                     && request.resource.data.email is string

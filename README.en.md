@@ -9,7 +9,7 @@
 [![Android](https://img.shields.io/badge/Android-8.0+-green?logo=android)](https://github.com/linchichuan/sgh-voice/releases)
 [![Python](https://img.shields.io/badge/Python-3.12+-blue?logo=python)](https://www.python.org/)
 [![License](https://img.shields.io/badge/License-Private-gray)]()
-[![Version](https://img.shields.io/badge/Version-1.2.1-green)]()
+[![Version](https://img.shields.io/badge/Version-1.4.0-green)]()
 [![Website](https://img.shields.io/badge/Website-voice.shingihou.com-blue)](https://voice.shingihou.com)
 
 ---
@@ -26,6 +26,8 @@
 | **Smart Replace** | Trigger words like `@mail`, `@phone` auto-expand to configured values |
 | **9 Rewrite Modes** | Concise / Formal / Meeting / Email / Technical / Casual / EN / JA / ZH translation |
 | **🏥 Medical Scene Mode** | Japanese medical terminology, drug names, biotech glossary (v1.2) |
+| **🩺 Medical Consultation** | Automatically condenses doctor-patient dialogue into a professional SOAP note format |
+| **📋 Clipboard Auto-Learn** | Select and copy manually corrected text, and the system automatically learns the corrections for your personal dictionary |
 | **Push-to-Talk / Toggle** | Hold Right Cmd to dictate, or tap once to start/stop |
 | **Cross-Application** | System-level voice input, auto-paste to cursor position |
 | **Web Dashboard** | Usage stats, history, dictionary management, settings |
@@ -68,7 +70,7 @@ This tool offers maximum flexibility — run entirely locally for free, or use p
 
 ### Installation
 
-1. Download `SGH Voice-1.2.1-apple-silicon.dmg` from [Releases](https://github.com/linchichuan/sgh-voice/releases)
+1. Download `SGH Voice-1.4.0-apple-silicon.dmg` from [Releases](https://github.com/linchichuan/sgh-voice/releases)
 2. Drag **Voice Input** to Applications
 3. First launch: Right-click → **Open** (allow macOS Gatekeeper once)
 4. Menu bar shows 🎙 icon → click **Open Dashboard**

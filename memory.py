@@ -8,7 +8,7 @@ import threading
 from datetime import datetime
 from config import (
     load_dictionary, save_dictionary, load_history, save_history,
-    BASE_CUSTOM_WORDS, BASE_CORRECTIONS,
+    BASE_CUSTOM_WORDS, BASE_CORRECTIONS, CASE_INSENSITIVE_CORRECTIONS,
 )
 
 
@@ -26,35 +26,47 @@ class Memory:
     # ─── Whisper Prompt ──────────────────────────────────
 
     def build_whisper_prompt(self, custom_words, scene_words=None):
-        """合併 BASE_CUSTOM_WORDS + scene_words + custom_words + auto_added 去重後注入 Whisper prompt。
-        基礎詞庫不顯示在 UI，但提升辨識精度。限制 50 個以內（醫療術語較多）。"""
-        auto_added = self.dictionary.get("auto_added", [])
-        # 合併去重：基礎詞庫 + 場景詞彙 + 使用者 config 詞彙 + 自動學習詞彙
+        """合併 custom_words + scene_words + BASE_CUSTOM_WORDS 去重後注入 Whisper prompt。
+        ⚠️ 嚴格限制數量（≤20 詞）和長度（≤200 字元），
+        否則 Whisper 會在短音訊/低音量時幻覺出字典詞彙。
+        優先順序：使用者 config 詞彙 > 場景詞彙 > 基礎詞庫。
+        auto_added（73+ 個人名地名）不再注入 prompt，改由 corrections 機制處理。"""
+        MAX_TERMS = 20   # 超過 20 個就容易讓 Whisper 過度「腦補」
+        MAX_CHARS = 200  # prompt 太長 Whisper 會把 prompt 內容當成辨識結果
+        # 優先順序：使用者自訂 > 場景 > 基礎（不含 auto_added）
         seen = set()
         terms = []
-        all_words = BASE_CUSTOM_WORDS + (scene_words or []) + list(custom_words) + auto_added
+        all_words = list(custom_words) + (scene_words or []) + BASE_CUSTOM_WORDS
         for w in all_words:
             if w not in seen:
                 seen.add(w)
                 terms.append(w)
-            if len(terms) >= 50:
+            if len(terms) >= MAX_TERMS:
                 break
         if not terms:
             return ""
         prompt = ", ".join(terms)
-        return prompt[:800]
+        return prompt[:MAX_CHARS]
 
     # ─── Apply Corrections ───────────────────────────────
 
     def apply_corrections(self, text, scene_corrections=None):
-        """套用修正：基礎修正 + 場景修正 + 使用者自訂修正（使用者規則 > 場景規則 > 基底規則）"""
+        """套用修正：基礎修正 + 場景修正 + 使用者自訂修正（使用者規則 > 場景規則 > 基底規則）
+        支援不分大小寫匹配（CASE_INSENSITIVE_CORRECTIONS），解決 Whisper 大小寫不穩定問題。
+        """
         merged = {**BASE_CORRECTIONS}
         if scene_corrections:
             merged.update(scene_corrections)
         merged.update(self.dictionary.get("corrections", {}))
         result = text
+        # 長詞優先，避免短詞先匹配破壞長詞
         for wrong, right in sorted(merged.items(), key=lambda x: -len(x[0])):
-            result = result.replace(wrong, right)
+            if CASE_INSENSITIVE_CORRECTIONS:
+                # 不分大小寫替換：用正則 re.IGNORECASE
+                pattern = re.escape(wrong)
+                result = re.sub(pattern, right, result, flags=re.IGNORECASE)
+            else:
+                result = result.replace(wrong, right)
         return result
 
     # ─── Auto Learn ──────────────────────────────────────
@@ -93,6 +105,15 @@ class Memory:
 
     def add_custom_word(self, word):
         """手動新增詞彙到詞庫"""
+        manual = self.dictionary.setdefault("manual_added", [])
+        if word not in manual:
+            manual.append(word)
+            save_dictionary(self.dictionary)
+            return True
+        return False
+
+    def add_auto_word(self, word):
+        """系統自動提取的詞彙"""
         auto = self.dictionary.setdefault("auto_added", [])
         if word not in auto:
             auto.append(word)
@@ -101,13 +122,18 @@ class Memory:
         return False
 
     def remove_custom_word(self, word):
-        """刪除自訂詞彙"""
-        auto = self.dictionary.get("auto_added", [])
-        if word in auto:
-            auto.remove(word)
+        """刪除自訂詞彙（會檢查自動或手動）"""
+        removed = False
+        if word in self.dictionary.get("auto_added", []):
+            self.dictionary["auto_added"].remove(word)
+            removed = True
+        if word in self.dictionary.setdefault("manual_added", []):
+            self.dictionary["manual_added"].remove(word)
+            removed = True
+        
+        if removed:
             save_dictionary(self.dictionary)
-            return True
-        return False
+        return removed
 
     def add_correction(self, wrong, right):
         """手動新增修正規則"""
@@ -127,20 +153,31 @@ class Memory:
         return self.dictionary.get("corrections", {})
 
     def get_all_custom_words(self):
-        return self.dictionary.get("auto_added", [])
+        # 兼容原本寫法，返回全部
+        return self.dictionary.get("auto_added", []) + self.dictionary.get("manual_added", [])
+
+    def get_dictionary_words(self):
+        """為 UI 返回區分來源的單字"""
+        return {
+            "auto_added": self.dictionary.get("auto_added", []),
+            "manual_added": self.dictionary.get("manual_added", [])
+        }
 
     # ─── Personalization Progress ────────────────────────
 
     def get_personalization_score(self):
         """計算個人化進度（模仿 Typeless）"""
         corrections_count = len(self.dictionary.get("corrections", {}))
-        words_count = len(self.dictionary.get("auto_added", []))
+        words_count = len(self.dictionary.get("auto_added", [])) + len(self.dictionary.get("manual_added", []))
         history_count = len(self.history)
 
-        # 各項權重評分（滿分 100）
-        dict_score = min(30, corrections_count * 2)
-        vocab_score = min(30, words_count * 1.5)
-        usage_score = min(40, history_count * 0.2)
+        # 各項權重評分（滿分 100，調高門檻讓 100% 變難）
+        # 需要 100 個 correction 才能滿 30 分
+        dict_score = min(30.0, corrections_count * 0.3)
+        # 需要 150 個 vocabulary 才能滿 30 分
+        vocab_score = min(30.0, words_count * 0.2)
+        # 需要 1000 次錄音才能滿 40 分
+        usage_score = min(40.0, history_count * 0.04)
 
         return {
             "total": min(100, int(dict_score + vocab_score + usage_score)),

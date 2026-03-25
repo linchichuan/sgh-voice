@@ -11,15 +11,19 @@ class ApiConfig {
     // Keys
     private let keyOpenAIApiKey = "openai_api_key"
     private let keyAnthropicApiKey = "anthropic_api_key"
+    private let keyGroqApiKey = "groq_api_key"
     private let keyWhisperModel = "whisper_model"
     private let keyClaudeModel = "claude_model"
     private let keyLanguagePref = "language_preference"
     private let keyOutputStyle = "output_style"
     private let keySetupComplete = "setup_complete"
+    private let keySttEngine = "stt_engine"
+    private let keyLlmEngine = "llm_engine"
     
     // 預設模型
     static let defaultWhisperModel = "whisper-1"
     static let defaultClaudeModel = "claude-haiku-4-5-20251001"
+    static let defaultGroqLlmModel = "llama-3.3-70b-versatile"
     
     // MARK: - Keychain Methods
     private func saveToKeychain(key: String, value: String) {
@@ -90,6 +94,19 @@ class ApiConfig {
         }
     }
     
+    var groqApiKey: String {
+        get {
+            return (loadFromKeychain(key: keyGroqApiKey) ?? "")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        set {
+            saveToKeychain(
+                key: keyGroqApiKey,
+                value: newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+            )
+        }
+    }
+    
     // MARK: - Settings (UserDefaults)
     var whisperModel: String {
         get {
@@ -130,13 +147,26 @@ class ApiConfig {
         set { defaults.set(newValue, forKey: keySetupComplete) }
     }
     
+    var sttEngine: String {
+        get { return defaults.string(forKey: keySttEngine) ?? "openai" }
+        set { defaults.set(newValue, forKey: keySttEngine) }
+    }
+    
+    var llmEngine: String {
+        get { return defaults.string(forKey: keyLlmEngine) ?? "claude" }
+        set { defaults.set(newValue, forKey: keyLlmEngine) }
+    }
+    
     var hasApiKeys: Bool {
-        return !openAiApiKey.isEmpty && !anthropicApiKey.isEmpty
+        let hasStt = !openAiApiKey.isEmpty || !groqApiKey.isEmpty
+        let hasLlm = !anthropicApiKey.isEmpty || !openAiApiKey.isEmpty || !groqApiKey.isEmpty
+        return hasStt && hasLlm
     }
     
     func clearAll() {
         deleteFromKeychain(key: keyOpenAIApiKey)
         deleteFromKeychain(key: keyAnthropicApiKey)
+        deleteFromKeychain(key: keyGroqApiKey)
         
         defaults.removeObject(forKey: keyWhisperModel)
         defaults.removeObject(forKey: keyClaudeModel)

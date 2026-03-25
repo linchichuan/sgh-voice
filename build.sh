@@ -12,7 +12,7 @@ R='\033[0;31m'
 C='\033[0;36m'
 N='\033[0m'
 
-VERSION="1.2.1"
+VERSION="1.4.0"
 APP_NAME="SGH Voice"
 DMG_NAME="${APP_NAME}-${VERSION}-apple-silicon"
 
@@ -103,6 +103,13 @@ if [ ! -f "dist/${DMG_NAME}.dmg" ]; then
 fi
 
 DMG_SIZE=$(du -sh "dist/${DMG_NAME}.dmg" | cut -f1)
+
+# ── Step 5: 重置輔助使用權限（重新打包後簽名變更，macOS 會拒絕舊授權）──
+echo ""
+echo -e "${Y}[5/5] 重置輔助使用權限...${N}"
+tccutil reset Accessibility com.shingihou.sghvoice 2>/dev/null && \
+    echo -e "${G}✓${N} 已重置 TCC 權限（啟動 App 時會自動彈出授權對話框）" || \
+    echo -e "${Y}⚠${N} TCC 重置需要管理員權限，啟動 App 時會自動提示授權"
 
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

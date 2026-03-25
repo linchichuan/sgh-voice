@@ -77,6 +77,8 @@ private fun BasicSettingsTab(apiConfig: ApiConfig) {
     var saveMessage by remember { mutableStateOf("") }
     val msgSaved = stringResource(R.string.msg_keys_saved)
     var selectedStyle by remember { mutableStateOf(apiConfig.outputStyle) }
+    var selectedSttEngine by remember { mutableStateOf(apiConfig.sttEngine) }
+    var selectedLlmEngine by remember { mutableStateOf(apiConfig.llmEngine) }
 
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(scrollState),
@@ -84,8 +86,35 @@ private fun BasicSettingsTab(apiConfig: ApiConfig) {
     ) {
         Text(stringResource(R.string.title_basic_settings), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
 
-        // === 步驟一：API 金鑰 ===
-        StepCard(stepNumber = 1, title = stringResource(R.string.step_api_keys)) {
+        // === 步驟一：引擎選擇 ===
+        StepCard(stepNumber = 1, title = "選擇服務引擎") {
+            Text(stringResource(R.string.label_stt_engine), fontWeight = FontWeight.SemiBold)
+            val sttEngines = listOf("openai" to stringResource(R.string.engine_openai), "groq" to stringResource(R.string.engine_groq))
+            sttEngines.forEach { (id, name) ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    RadioButton(selected = selectedSttEngine == id, onClick = { selectedSttEngine = id })
+                    Text(text = name)
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(stringResource(R.string.label_llm_engine), fontWeight = FontWeight.SemiBold)
+            val llmEngines = listOf(
+                "claude" to stringResource(R.string.engine_claude),
+                "openai" to "OpenAI (GPT-4o)",
+                "groq" to "Groq (Llama 3)",
+                "none" to stringResource(R.string.engine_none)
+            )
+            llmEngines.forEach { (id, name) ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    RadioButton(selected = selectedLlmEngine == id, onClick = { selectedLlmEngine = id })
+                    Text(text = name)
+                }
+            }
+        }
+
+        // === 步驟二：API 金鑰 ===
+        StepCard(stepNumber = 2, title = stringResource(R.string.step_api_keys)) {
             OutlinedTextField(
                 value = openAiKey,
                 onValueChange = { openAiKey = it },
@@ -161,6 +190,8 @@ private fun BasicSettingsTab(apiConfig: ApiConfig) {
                     apiConfig.groqApiKey = groqKey.trim()
                     apiConfig.elevenlabsApiKey = elevenLabsKey.trim()
                     apiConfig.outputStyle = selectedStyle
+                    apiConfig.sttEngine = selectedSttEngine
+                    apiConfig.llmEngine = selectedLlmEngine
                     saveMessage = msgSaved
                 },
                 modifier = Modifier.fillMaxWidth()
@@ -170,8 +201,8 @@ private fun BasicSettingsTab(apiConfig: ApiConfig) {
             }
         }
 
-        // === 步驟二：啟用輸入法 ===
-        StepCard(stepNumber = 2, title = stringResource(R.string.step_enable_ime)) {
+        // === 步驟三：啟用輸入法 ===
+        StepCard(stepNumber = 3, title = stringResource(R.string.step_enable_ime)) {
             Text(stringResource(R.string.desc_enable_ime), style = MaterialTheme.typography.bodyMedium)
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = {

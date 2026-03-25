@@ -9,15 +9,17 @@
 [![Android](https://img.shields.io/badge/Android-8.0+-green?logo=android)](https://github.com/linchichuan/sgh-voice/releases)
 [![Python](https://img.shields.io/badge/Python-3.12+-blue?logo=python)](https://www.python.org/)
 [![License](https://img.shields.io/badge/License-Private-gray)]()
-[![Version](https://img.shields.io/badge/Version-1.2.1-green)]()
+[![Version](https://img.shields.io/badge/Version-1.4.0-green)]()
 [![Website](https://img.shields.io/badge/Website-voice.shingihou.com-blue)](https://voice.shingihou.com)
 
 ---
 
 ## 特色功能
 
-| 功能 | 說明 |
+| 特色功能 | 說明 |
 |------|------|
+| **整合 Breeze-ASR-25 (v1.4.0)** | 專為繁中優化，Apple Silicon 速度比 Whisper-turbo 快 3.5 倍 |
+| **🔐 聲紋驗證 (v1.3.0)** | 只辨識綁定的聲音，自動過濾其他人說話與環境噪音 |
 | **三語混合辨識** | 同一句話中繁體中文、日文、英文自由切換，不會被翻譯 |
 | **繁體中文三層防護** | Whisper prompt → Claude system prompt → OpenCC s2twp |
 | **Hybrid 智慧分流** | 短音訊用本地 mlx-whisper，長音訊上 OpenAI Cloud |
@@ -26,6 +28,8 @@
 | **Smart Replace** | `@mail`、`@phone` 等觸發詞自動展開 |
 | **9 種改寫模式** | 精簡 / 正式 / 會議 / Email / 技術 / 口語 / 翻英 / 翻日 / 翻中 |
 | **🏥 醫療場景模式** | 日文醫療術語・藥品名・生技名詞專用詞庫（v1.2） |
+| **🩺 醫療看診摘要** | 自動將醫病對話濃縮整理為專業 SOAP 病歷摘要格式 |
+| **📋 剪貼簿自動回修學習** | 在對話筐改字後直接 Cmd+C 複製，系統自動將修正加入個人詞庫 |
 | **Push-to-Talk / Toggle** | 按住 Right Cmd 說話，或按一下開始、再按一下停止 |
 | **跨應用程式** | 系統級語音輸入，辨識完自動貼到游標位置 |
 | **Web Dashboard** | 使用統計、歷史紀錄、詞庫管理、設定 |
@@ -80,7 +84,7 @@
 
 ### 安裝步驟
 
-1. 從 [Releases](https://github.com/linchichuan/sgh-voice/releases) 下載 `SGH Voice-1.2.1-apple-silicon.dmg`
+1. 從 [Releases](https://github.com/linchichuan/sgh-voice/releases) 下載 `SGH Voice-1.4.0-apple-silicon.dmg`
 2. 雙擊 DMG，將 **Voice Input** 拖入 Applications 資料夾
 3. 首次開啟：在應用程式點擊右鍵 → **打開**（macOS Gatekeeper 需要允許一次）
 4. 選單列出現 🎙 圖示後，點擊 **Open Dashboard**
@@ -260,7 +264,7 @@ python app.py --dashboard  # 只開 Dashboard
 ```bash
 chmod +x build.sh
 ./build.sh
-# 產出：dist/SGH Voice-1.2.1-apple-silicon.dmg
+# 產出：dist/SGH Voice-1.4.0-apple-silicon.dmg
 ```
 
 ---

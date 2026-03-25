@@ -26,16 +26,20 @@ BASE_CORRECTIONS = {
     "薬日本": "kusurijapan",
     "林紀泉": "林紀全",
     "林記全": "林紀全",
-    # Claude 常被 Whisper 辨識為 cloud/Cloud
+    # Claude 常被 Whisper 辨識為 cloud/Cloud/CLOUD（發音相似）
     "cloud code": "Claude Code",
-    "Cloud Code": "Claude Code",
     "cloud AI": "Claude AI",
-    "Cloud AI": "Claude AI",
     "cloud haiku": "Claude Haiku",
-    "Cloud Haiku": "Claude Haiku",
     "cloud sonnet": "Claude Sonnet",
-    "Cloud Sonnet": "Claude Sonnet",
+    "cloud opus": "Claude Opus",
+    "cloud API": "Claude API",
+    "cloud desktop": "Claude Desktop",
+    "cloud": "Claude",  # 獨立的 cloud → Claude（最後匹配，長詞優先）
 }
+
+# 不分大小寫的修正規則（key 全部小寫，匹配時做 case-insensitive 替換）
+# 適用於 Whisper 輸出大小寫不穩定的情況（如 CLOUD、Cloud、cloud 都應修正為 Claude）
+CASE_INSENSITIVE_CORRECTIONS = True
 
 # ─── 使用場景預設（醫療、一般等）────────────────────────
 SCENE_PRESETS = {
@@ -76,6 +80,26 @@ SCENE_PRESETS = {
             "8. 醫療場景專用：保留所有醫療術語、藥品名、檢查名稱的原文，不得簡化或改寫。"
             "日文醫療術語（カルテ、処方箋等）保持原樣。"
             "藥品名稱保持原文拼寫（アムロジピン、Opdivo 等）。"
+        ),
+    },
+    "medical_consultation": {
+        "label": "看診紀錄（SOAP病歷摘要）",
+        "custom_words": [
+            "BP", "DM", "HTN", "SOB", "URI", "Appt", "Sx", "Tx", "Dx", "Hx",
+            "心電図", "CT", "MRI", "エコー", "カルテ", "レントゲン"
+        ],
+        "corrections": {
+            "逼批": "BP", "低欸姆": "DM", "逼低": "BD",
+        },
+        "system_prompt_extra": (
+            "\n【⚠️看診紀錄特別指令：強行覆寫上述格式】\n"
+            "這是一場「醫生與病患/家屬的看診對話」。請扮演專業醫療助理，忽略前述『商務短文』的排版要求，將對話直接轉寫並整理為一份專業的「醫療看診摘要 (Medical Summary)」。\n"
+            "格式請採用 SOAP 架構或結構化的臨床病歷筆記：\n"
+            "- [S] 主觀陳述 (Subjective, 病患症狀感)\n"
+            "- [O] 客觀發現 (Objective, 醫生觀察/檢查)\n"
+            "- [A] 評估 diagnoses (Assessment)\n"
+            "- [P] 計畫 (Plan, 處置/用藥)\n"
+            "請將對話中的症狀與醫療縮寫保留（若有需要，可自動展開以便醫生閱讀），此份摘要將直接讓醫生貼入電子病歷系統中。"
         ),
     },
 }
@@ -196,6 +220,15 @@ HISTORY_FILE = os.path.join(DATA_DIR, "history.json")
 STATS_FILE = os.path.join(DATA_DIR, "stats.json")
 SMART_REPLACE_FILE = os.path.join(DATA_DIR, "smart_replace.json")
 
+# ─── 本地模型路徑映射（短名稱 → 實際路徑）────────────────
+LOCAL_MODEL_PATHS = {
+    "breeze-asr-25-4bit": "/Volumes/Satechi_SSD/huggingface/hub/breeze-asr-25-mlx-4bit",
+    "breeze-asr-25": "/Volumes/Satechi_SSD/huggingface/hub/breeze-asr-25-mlx",
+}
+
+# Breeze-ASR-25 基於 whisper-large-v2（80 mel bins），需要特殊處理
+BREEZE_MODELS = {"breeze-asr-25-4bit", "breeze-asr-25"}
+
 DEFAULT_CONFIG = {
     "openai_api_key": "",
     "anthropic_api_key": "",
@@ -216,10 +249,14 @@ DEFAULT_CONFIG = {
     "hybrid_audio_threshold": 15,           # 錄音小於 15 秒用 Local Whisper
     "hybrid_text_threshold": 30,            # 句子小於 30 字用 Local LLM (Qwen)
     "stt_engine": "mlx-whisper",                           # mlx-whisper | qwen3-asr | cloud-only
-    "local_whisper_model": "mlx-community/whisper-turbo",  # 本地 Whisper 模型
+    "local_whisper_model": "breeze-asr-25-4bit",           # 本地 Whisper 模型（Breeze-ASR-25 繁中最強）
     "local_llm_model": "qwen2.5:3b",        # Ollama 上的本地模型名稱
+    "groq_model": "qwen3-32b",                  # Groq LLM 模型（中文最強 CP 值）
+    "groq_whisper_model": "whisper-large-v3-turbo",  # Groq STT 模型
     "local_llm_timeout_sec": 6.0,           # 本地 Ollama 超時秒數（避免 1.5 秒過短造成頻繁 fallback）
     "backup_audio_dir": "",                  # 音訊備份目錄（空字串=不備份）
+    "enable_voiceprint": False,              # 聲紋驗證開關
+    "voiceprint_threshold": 0.97,            # 聲紋相似度閾值（0.95~0.99）
     "sample_rate": 16000,
     "silence_threshold": 0.001,
     "silence_duration": 2.0,
@@ -241,9 +278,9 @@ DEFAULT_CONFIG = {
         "en": ["um", "uh", "like", "you know", "basically", "actually", "so yeah"],
     },
     "claude_system_prompt": (
-        "你是語音轉文字後處理助手。\n"
-        "請只做以下處理：修正明顯錯字、補上基本標點、移除少量口語填充詞。\n"
-        "保留原本語言與語氣，不要翻譯，不要新增內容。\n"
+        "你是語音轉文字後處理與文法助手。\n"
+        "請只做以下處理：修正明顯錯別字與文法錯誤、補上基本標點、移除少量口語填充詞、優化語氣（Grammar & Tone）使其聽起來流暢自然。\n"
+        "【絕對不要翻譯！】自動判斷原文是中文、日文還是英文，保持講者的語言。多語混合時也保持原狀。\n"
         "只輸出修正後文字。"
     ),
     "active_scene": "general",

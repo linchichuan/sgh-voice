@@ -411,8 +411,11 @@
     td.td-final {
       max-width: 420px;
       white-space: normal;
-      word-break: break-all;
-      overflow: visible;
+      word-break: break-word;
+      overflow: hidden;
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
       line-height: 1.5;
       cursor: pointer;
       position: relative;
@@ -965,7 +968,7 @@
           <div id="sidebar-led" style="width:7px; height:7px; border-radius:50%; background:var(--text3);"></div>
           <span id="sidebar-led-text" style="font-size:10px;">偵測中</span>
         </div>
-        v1.2.1 · 本地運行 · 零資料保留
+        v1.4.0 · 本地運行 · 零資料保留
       </div>
     </aside>
 
@@ -1084,7 +1087,15 @@
               <button class="btn btn-ghost btn-sm" onclick="clearHistory()">清除全部</button>
             </div>
           </div>
-          <table>
+          <table style="table-layout:fixed">
+            <colgroup>
+              <col style="width:100px">
+              <col style="width:140px">
+              <col style="width:30%">
+              <col style="width:auto">
+              <col style="width:60px">
+              <col style="width:200px">
+            </colgroup>
             <thead>
               <tr>
                 <th>時間</th>
@@ -1113,9 +1124,17 @@
           <p style="font-size:12px;color:var(--text2);margin-bottom:12px">
             新增專業術語、人名、公司名，提高語音辨識準確度。
           </p>
-          <div style="display:flex;gap:8px;margin-bottom:12px">
+          <div style="display:flex;gap:8px;margin-bottom:12px; align-items:center;">
             <input type="text" id="new-word" placeholder="輸入新詞彙..." style="max-width:300px">
             <button class="btn btn-primary" onclick="addWord()">新增</button>
+            <div style="margin-left:auto; display:flex; gap:12px; font-size:13px; color:var(--text2)">
+              <span style="display:flex; align-items:center; gap:4px">
+                <span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:var(--blue); opacity:0.15; border:1px solid var(--blue)"></span> ✨ 自動新增
+              </span>
+              <span style="display:flex; align-items:center; gap:4px">
+                <span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:var(--bg3); border:1px solid var(--border)"></span> ✍️ 手動新增
+              </span>
+            </div>
           </div>
           <div class="word-tags" id="word-tags"></div>
         </div>
@@ -1210,8 +1229,9 @@
             <div class="form-group">
               <label data-i18n="label_scene">使用場景</label>
               <select id="cfg-scene">
-                <option value="general">一般</option>
-                <option value="medical">醫療・藥品・生技</option>
+                <option value="general" data-i18n="scene_general">一般</option>
+                <option value="medical" data-i18n="scene_medical">醫療・藥品・生技</option>
+                <option value="medical_consultation" data-i18n="scene_medical_consultation">醫療看診（SOAP紀錄）</option>
               </select>
               <small data-i18n="label_scene_desc"
                 style="color:var(--text3);display:block;margin-top:4px">切換場景會自動載入對應的專業詞庫和 LLM 提示詞</small>
@@ -1300,17 +1320,27 @@
           </div>
           <div class="form-row" style="margin-top:16px">
             <div class="form-group">
-              <label data-i18n="label_stt_engine">本地辨識引擎</label>
+              <label data-i18n="label_stt_engine">語音辨識引擎（STT）</label>
               <select id="cfg-stt-engine" onchange="onSttEngineChange()">
-                <option value="mlx-whisper">Whisper（預設，已安裝）</option>
-                <option value="qwen3-asr">Qwen3-ASR（多語最強，需下載 1.2 GB）</option>
-                <option value="cloud-only">僅雲端 API</option>
+                <option value="groq">☁️ Groq Whisper（極速，~0.5s）</option>
+                <option value="mlx-whisper">💻 本地 MLX-Whisper（離線可用）</option>
+                <option value="qwen3-asr">💻 Qwen3-ASR（多語，需下載 1.2 GB）</option>
+                <option value="cloud-only">☁️ 僅雲端 API（OpenAI）</option>
+              </select>
+            </div>
+            <div class="form-group" id="groq-whisper-model-group" style="display:none">
+              <label>Groq Whisper 模型</label>
+              <select id="cfg-groq-whisper-model">
+                <option value="whisper-large-v3-turbo">Large V3 Turbo（推薦：最快最便宜）</option>
+                <option value="whisper-large-v3">Large V3（最精確）</option>
               </select>
             </div>
             <div class="form-group" id="whisper-model-group">
-              <label data-i18n="label_whisper_local">Whisper 模型</label>
+              <label data-i18n="label_whisper_local">本地 Whisper 模型</label>
               <select id="cfg-local-whisper-model">
                 <option value="mlx-community/whisper-turbo">Turbo（推薦，快速）</option>
+                <option value="breeze-asr-25-4bit">Breeze-ASR-25 4bit（繁中最強，0.8 GB）</option>
+                <option value="breeze-asr-25">Breeze-ASR-25 fp16（繁中最強，2.9 GB）</option>
                 <option value="mlx-community/whisper-large-v3-mlx">Large V3（最精確，2.9 GB）</option>
                 <option value="mlx-community/whisper-large-v3-turbo">Large V3 Turbo</option>
                 <option value="mlx-community/whisper-small">Small（輕量）</option>
@@ -1333,6 +1363,24 @@
 
           <div class="form-row">
             <div class="form-group">
+              <label>首選 LLM 引擎（後處理）</label>
+              <select id="cfg-llm-engine" onchange="onLlmEngineChange()">
+                <option value="groq">☁️ Groq（極速，Qwen3 中文最強）</option>
+                <option value="claude">☁️ Claude API (Anthropic)</option>
+                <option value="openai">☁️ OpenAI API (GPT-4o)</option>
+                <option value="ollama">💻 Ollama 本地模型 (免費、離線)</option>
+              </select>
+            </div>
+            <div class="form-group" id="groq-model-group">
+              <label>Groq 模型</label>
+              <select id="cfg-groq-model">
+                <option value="qwen3-32b">Qwen3 32B（推薦：中文最強）</option>
+                <option value="qwen-qwq-32b">Qwen QwQ 32B（推理模型，較慢）</option>
+                <option value="llama-3.3-70b-versatile">Llama 3.3 70B（英文強）</option>
+                <option value="llama-4-scout-17b-16e-instruct">Llama 4 Scout（最便宜）</option>
+              </select>
+            </div>
+            <div class="form-group" id="ollama-model-group">
               <label data-i18n="label_llm_model">本地 LLM 模型（Ollama）</label>
               <select id="cfg-local-llm-model">
                 <option value="qwen2.5:3b">qwen2.5:3b（預設）</option>
@@ -1352,6 +1400,33 @@
           <div class="form-group">
             <label data-i18n="label_backup_dir">音訊備份路徑（空白 = 不備份）</label>
             <input type="text" id="cfg-backup-dir" placeholder="/Volumes/SSD/voice-data">
+          </div>
+        </div>
+
+        <div class="form-section">
+          <h3>🔐 聲紋辨識</h3>
+          <div id="voiceprint-status" style="padding:10px 14px; background:var(--surface2); border-radius:var(--radius-sm); margin-bottom:16px; font-size:13px;">
+            載入中...
+          </div>
+          <div class="toggle-row">
+            <div>
+              <div class="toggle-label">啟用聲紋驗證</div>
+              <div class="toggle-desc">只辨識已註冊的聲紋，自動過濾其他人和環境噪音</div>
+            </div>
+            <div class="toggle" id="tog-voiceprint" onclick="toggleSwitch(this)"></div>
+          </div>
+          <div class="form-group" style="margin-top:16px">
+            <label>相似度閾值（越高越嚴格）</label>
+            <div style="display:flex; align-items:center; gap:12px;">
+              <input type="range" id="cfg-vp-threshold" min="0.90" max="0.99" step="0.01" value="0.97"
+                style="flex:1; accent-color:var(--accent);"
+                oninput="document.getElementById('vp-threshold-val').textContent=this.value">
+              <span id="vp-threshold-val" style="font-family:'JetBrains Mono',monospace; font-size:14px; font-weight:600; color:var(--accent2); min-width:40px;">0.97</span>
+            </div>
+          </div>
+          <div style="display:flex; gap:8px; margin-top:8px;">
+            <button class="btn btn-primary" onclick="enrollVoiceprint()">📥 建立聲紋</button>
+            <button class="btn btn-ghost" onclick="deleteVoiceprint()">🗑️ 刪除聲紋</button>
           </div>
         </div>
 
@@ -1476,6 +1551,7 @@
         label_groq_key: 'Groq API Key（極速 LLM 處理）',
         label_whisper_model: 'Whisper 模型', label_claude_model: 'Claude 模型',
         label_scene: '使用場景', label_scene_desc: '切換場景會自動載入對應的專業詞庫和 LLM 提示詞',
+        scene_general: '一般', scene_medical: '醫療・藥品・生技', scene_medical_consultation: '醫療看診（SOAP紀錄）',
         label_language: '辨識語言', label_target_lang: '翻譯目標語言（空 = 不翻譯）',
         label_hotkey_mode: '快捷鍵模式', label_hotkey: '快捷鍵',
         label_stt_engine: '本地辨識引擎', label_whisper_local: 'Whisper 模型',
@@ -1540,6 +1616,7 @@
         label_claude_model: 'Claudeモデル',
         label_scene: '使用シーン',
         label_scene_desc: 'シーンを切り替えると、対応する専門辞書とLLMプロンプトがロードされます。',
+        scene_general: '一般', scene_medical: '医療・医薬品・バイオ', scene_medical_consultation: '医療診察（SOAP記録）',
         label_language: '認識言語',
         label_target_lang: '翻訳先言語（空＝翻訳しない）',
         label_hotkey_mode: 'ショートカットモード',
@@ -1612,6 +1689,7 @@
         label_claude_model: 'Claude Model',
         label_scene: 'Use Case',
         label_scene_desc: 'Switching scenes will automatically load custom dictionaries and LLM prompts.',
+        scene_general: 'General', scene_medical: 'Medical, Pharma & Biotech', scene_medical_consultation: 'Medical Consultation (SOAP)',
         label_language: 'Recognition Language',
         label_target_lang: 'Target Translation (Blank = None)',
         label_hotkey_mode: 'Hotkey Mode',
@@ -1684,6 +1762,7 @@
         label_claude_model: 'Claude 모델',
         label_scene: '사용 환경',
         label_scene_desc: '환경을 전환하면 해당 사전과 프롬프트가 로드됩니다.',
+        scene_general: '일반', scene_medical: '의료·의약품·바이오', scene_medical_consultation: '의료 진찰 (SOAP 기록)',
         label_language: '인식 언어',
         label_target_lang: '번역 대상 (공백 = 안함)',
         label_hotkey_mode: '단축키 모드',
@@ -1756,7 +1835,8 @@
         label_claude_model: 'โมเดล Claude',
         label_scene: 'สถานการณ์ใช้งาน',
         label_scene_desc: 'เปลี่ยนสถานการณ์เพื่อโหลดพจนานุกรมเฉพาะ',
-        label_language: 'ภาษาชที่จำ',
+        scene_general: 'ทั่วไป', scene_medical: 'การแพทย์・ยา・ชีวเทคโนโลยี', scene_medical_consultation: 'การปรึกษาแพทย์ (บันทึก SOAP)',
+        label_language: 'ภาษาที่จดจำ',
         label_target_lang: 'เป้าหมายการแปล',
         label_hotkey_mode: 'โหมดปุ่มลัด',
         label_hotkey: 'ปุ่มลัด',
@@ -1828,6 +1908,7 @@
         label_claude_model: 'Mô hình Claude',
         label_scene: 'Ngữ cảnh',
         label_scene_desc: 'Chuyển ngữ cảnh để tải từ điển riêng.',
+        scene_general: 'Tổng quát', scene_medical: 'Y tế・Dược phẩm・Công nghệ sinh học', scene_medical_consultation: 'Tư vấn y tế (Ghi chú SOAP)',
         label_language: 'Ngôn ngữ nhận dạng',
         label_target_lang: 'Dịch sang',
         label_hotkey_mode: 'Phím tắt',
@@ -2233,7 +2314,7 @@
       <td style="white-space:nowrap;color:var(--text2)">${time}</td>
       <td>${modeTag} ${sttTag} ${llmTag}</td>
       <td title="${esc(rawText)}">${esc(trunc(rawText, 40))}</td>
-      <td class="td-final" onclick="copyHistoryText(${idx}, 'final')" title="點擊複製全文"><strong>${esc(finalText)}</strong></td>
+      <td class="td-final" onclick="copyHistoryText(${idx}, 'final')" title="${esc(finalText)}"><strong>${esc(trunc(finalText, 80))}</strong></td>
       <td style="color:var(--text2)">${h.process_time || 0}s</td>
       <td style="white-space:nowrap">
         <button class="btn btn-primary btn-sm" onclick="copyHistoryText(${idx}, 'final')">複製</button>
@@ -2360,11 +2441,20 @@
     // ── Dictionary ──
     async function loadDictionary() {
       const data = await api('/dictionary');
-      // Words
+      // Words (auto vs manual)
       const tags = document.getElementById('word-tags');
-      tags.innerHTML = (data.custom_words || []).map(w =>
-        `<span class="word-tag">${esc(w)} <span class="remove" onclick="removeWord('${esc(w)}')">✕</span></span>`
+      let customWords = data.custom_words;
+      // Handle legacy case if custom_words is just an array
+      if (Array.isArray(customWords)) {
+        customWords = { auto_added: customWords, manual_added: [] };
+      }
+      const autoTags = (customWords.auto_added || []).map(w =>
+        `<span class="word-tag" style="background:rgba(10,132,255,0.08); border-color:rgba(10,132,255,0.3); color:var(--blue)">✨ ${esc(w)} <span class="remove" onclick="removeWord('${esc(w)}')">✕</span></span>`
       ).join('');
+      const manualTags = (customWords.manual_added || []).map(w =>
+        `<span class="word-tag">✍️ ${esc(w)} <span class="remove" onclick="removeWord('${esc(w)}')">✕</span></span>`
+      ).join('');
+      tags.innerHTML = autoTags + manualTags;
       // Corrections
       const body = document.getElementById('corrections-body');
       const corr = data.corrections || {};
@@ -2430,12 +2520,23 @@
       window._appStyles = cfg.app_styles || {};
       renderAppStyles();
 
-      // Hybrid 設定
+      // Hybrid & LLM 設定
+      document.getElementById('cfg-llm-engine').value = cfg.llm_engine || 'ollama';
+      document.getElementById('cfg-groq-model').value = cfg.groq_model || 'qwen-qwq-32b';
+      document.getElementById('cfg-groq-whisper-model').value = cfg.groq_whisper_model || 'whisper-large-v3-turbo';
       setToggle('tog-hybrid', cfg.enable_hybrid_mode);
       document.getElementById('cfg-stt-engine').value = cfg.stt_engine || 'mlx-whisper';
       document.getElementById('cfg-local-whisper-model').value = cfg.local_whisper_model || 'mlx-community/whisper-turbo';
       document.getElementById('cfg-backup-dir').value = cfg.backup_audio_dir || '';
-      onSttEngineChange(); // 根據引擎選擇顯示/隱藏 Whisper 子選項
+      onSttEngineChange(); // 根據引擎選擇顯示/隱藏子選項
+      onLlmEngineChange();
+
+      // 聲紋
+      setToggle('tog-voiceprint', cfg.enable_voiceprint);
+      const vpThreshold = cfg.voiceprint_threshold || 0.97;
+      document.getElementById('cfg-vp-threshold').value = vpThreshold;
+      document.getElementById('vp-threshold-val').textContent = vpThreshold;
+      loadVoiceprintStatus();
 
       setToggle('tog-claude', cfg.enable_claude_polish);
       setToggle('tog-filler', cfg.enable_filler_removal);
@@ -2546,8 +2647,8 @@
 
     async function onSttEngineChange() {
       const engine = document.getElementById('cfg-stt-engine').value;
-      const whisperGroup = document.getElementById('whisper-model-group');
-      whisperGroup.style.display = engine === 'mlx-whisper' ? '' : 'none';
+      document.getElementById('whisper-model-group').style.display = engine === 'mlx-whisper' ? '' : 'none';
+      document.getElementById('groq-whisper-model-group').style.display = engine === 'groq' ? '' : 'none';
 
       // 選了 qwen3-asr → 檢查模型是否已下載
       if (engine === 'qwen3-asr') {
@@ -2560,6 +2661,12 @@
           }
         } catch (e) { /* ignore */ }
       }
+    }
+
+    function onLlmEngineChange() {
+      const engine = document.getElementById('cfg-llm-engine').value;
+      document.getElementById('groq-model-group').style.display = engine === 'groq' ? '' : 'none';
+      document.getElementById('ollama-model-group').style.display = engine === 'ollama' ? '' : 'none';
     }
 
     function startModelDownload(modelKey) {
@@ -2661,11 +2768,16 @@
         max_recording_duration: parseInt(document.getElementById('cfg-max-dur').value) || 360,
         typing_speed_cpm: parseInt(document.getElementById('cfg-cpm').value) || 50,
         claude_system_prompt: document.getElementById('cfg-system-prompt').value,
+        llm_engine: document.getElementById('cfg-llm-engine').value,
+        groq_model: document.getElementById('cfg-groq-model').value,
+        groq_whisper_model: document.getElementById('cfg-groq-whisper-model').value,
         enable_hybrid_mode: getToggle('tog-hybrid'),
         stt_engine: document.getElementById('cfg-stt-engine').value,
         local_whisper_model: document.getElementById('cfg-local-whisper-model').value,
         local_llm_model: document.getElementById('cfg-local-llm-model').value,
         backup_audio_dir: document.getElementById('cfg-backup-dir').value,
+        enable_voiceprint: getToggle('tog-voiceprint'),
+        voiceprint_threshold: parseFloat(document.getElementById('cfg-vp-threshold').value) || 0.97,
         enable_claude_polish: getToggle('tog-claude'),
         enable_filler_removal: getToggle('tog-filler'),
         enable_self_correction: getToggle('tog-selfcorr'),
@@ -2735,6 +2847,49 @@
         }
       } catch (e) { }
     })();
+
+    // ─── Voiceprint Management ─────────────────────────
+    async function loadVoiceprintStatus() {
+      try {
+        const info = await api('/voiceprint/status');
+        const el = document.getElementById('voiceprint-status');
+        if (info.enrolled) {
+          el.innerHTML = `<span style="color:var(--green)">✅ 聲紋已建立</span> — 維度: ${info.embedding_dim}，檔案: ${info.file_size} bytes`;
+        } else {
+          el.innerHTML = `<span style="color:var(--orange)">⚠️ 尚未建立聲紋</span> — 請先點擊「建立聲紋」`;
+        }
+      } catch (e) {
+        document.getElementById('voiceprint-status').textContent = '❌ 無法取得聲紋狀態';
+      }
+    }
+
+    async function enrollVoiceprint() {
+      const dir = prompt('請輸入語音檔目錄路徑:', '/Volumes/Satechi_SSD/voice-input/voice-data-lin');
+      if (!dir) return;
+      document.getElementById('voiceprint-status').innerHTML = '⏳ 正在建立聲紋...';
+      try {
+        const res = await fetch('/api/voiceprint/enroll', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({wav_dir: dir})
+        });
+        const data = await res.json();
+        if (data.ok) {
+          document.getElementById('voiceprint-status').innerHTML =
+            `<span style="color:var(--green)">✅ 聲紋建立成功！</span> 使用 ${data.valid_files}/${data.total_files} 個檔案，自我相似度: ${data.self_similarity_mean.toFixed(4)}`;
+        } else {
+          document.getElementById('voiceprint-status').innerHTML = `❌ ${data.error}`;
+        }
+      } catch (e) {
+        document.getElementById('voiceprint-status').innerHTML = `❌ 建立失敗: ${e.message}`;
+      }
+    }
+
+    async function deleteVoiceprint() {
+      if (!confirm('確定要刪除聲紋？')) return;
+      await fetch('/api/voiceprint/delete', {method: 'POST'});
+      loadVoiceprintStatus();
+    }
   </script>
 </body>
 

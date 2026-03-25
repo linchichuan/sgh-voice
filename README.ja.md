@@ -9,7 +9,7 @@
 [![Android](https://img.shields.io/badge/Android-8.0+-green?logo=android)](https://github.com/linchichuan/sgh-voice/releases)
 [![Python](https://img.shields.io/badge/Python-3.12+-blue?logo=python)](https://www.python.org/)
 [![License](https://img.shields.io/badge/License-Private-gray)]()
-[![Version](https://img.shields.io/badge/Version-1.2.1-green)]()
+[![Version](https://img.shields.io/badge/Version-1.4.0-green)]()
 [![Website](https://img.shields.io/badge/Website-voice.shingihou.com-blue)](https://voice.shingihou.com)
 
 ---
@@ -26,6 +26,8 @@
 | **スマート置換** | `@mail`、`@phone` などのトリガーワードを自動展開 |
 | **9種類のリライト** | 簡潔 / フォーマル / 議事録 / メール / 技術文書 / カジュアル / 英訳 / 日訳 / 中訳 |
 | **🏥 医療シーンモード** | 日本語医療用語・薬品名・バイオテク用語の専用辞書（v1.2） |
+| **🩺 医療診察記録** | 医師と患者の会話から専門的なSOAP形式のカルテ概要を自動生成 |
+| **📋 自動学習 (Auto-Learn)** | 入力枠で修正後、Cmd+Cでコピーするだけでシステムが自動的に修正ルールを学習 |
 | **Push-to-Talk / Toggle** | Right Cmd 長押しで録音、またはワンタップで開始/停止 |
 | **クロスアプリケーション** | システムレベルの音声入力、認識後カーソル位置に自動貼り付け |
 | **Web ダッシュボード** | 使用統計、履歴、辞書管理、設定 |
@@ -68,7 +70,7 @@
 
 ### インストール手順
 
-1. [Releases](https://github.com/linchichuan/sgh-voice/releases) から `SGH Voice-1.2.1-apple-silicon.dmg` をダウンロード
+1. [Releases](https://github.com/linchichuan/sgh-voice/releases) から `SGH Voice-1.4.0-apple-silicon.dmg` をダウンロード
 2. DMG を開き、**Voice Input** を Applications フォルダへドラッグ
 3. 初回起動：右クリック → **開く**（macOS Gatekeeper を一度許可）
 4. メニューバーに 🎙 アイコンが表示されたら **Open Dashboard** をクリック
