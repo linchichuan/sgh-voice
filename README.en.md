@@ -26,6 +26,8 @@
 | **Smart Replace** | Trigger words like `@mail`, `@phone` auto-expand to configured values |
 | **9 Rewrite Modes** | Concise / Formal / Meeting / Email / Technical / Casual / EN / JA / ZH translation |
 | **🏥 Medical Scene Mode** | Japanese medical terminology, drug names, biotech glossary (v1.2) |
+| **🩺 Medical Consultation** | Automatically condenses doctor-patient dialogue into a professional SOAP note format |
+| **📋 Clipboard Auto-Learn** | Select and copy manually corrected text, and the system automatically learns the corrections for your personal dictionary |
 | **Push-to-Talk / Toggle** | Hold Right Cmd to dictate, or tap once to start/stop |
 | **Cross-Application** | System-level voice input, auto-paste to cursor position |
 | **Web Dashboard** | Usage stats, history, dictionary management, settings |

@@ -82,6 +82,26 @@ SCENE_PRESETS = {
             "藥品名稱保持原文拼寫（アムロジピン、Opdivo 等）。"
         ),
     },
+    "medical_consultation": {
+        "label": "看診紀錄（SOAP病歷摘要）",
+        "custom_words": [
+            "BP", "DM", "HTN", "SOB", "URI", "Appt", "Sx", "Tx", "Dx", "Hx",
+            "心電図", "CT", "MRI", "エコー", "カルテ", "レントゲン"
+        ],
+        "corrections": {
+            "逼批": "BP", "低欸姆": "DM", "逼低": "BD",
+        },
+        "system_prompt_extra": (
+            "\n【⚠️看診紀錄特別指令：強行覆寫上述格式】\n"
+            "這是一場「醫生與病患/家屬的看診對話」。請扮演專業醫療助理，忽略前述『商務短文』的排版要求，將對話直接轉寫並整理為一份專業的「醫療看診摘要 (Medical Summary)」。\n"
+            "格式請採用 SOAP 架構或結構化的臨床病歷筆記：\n"
+            "- [S] 主觀陳述 (Subjective, 病患症狀感)\n"
+            "- [O] 客觀發現 (Objective, 醫生觀察/檢查)\n"
+            "- [A] 評估 diagnoses (Assessment)\n"
+            "- [P] 計畫 (Plan, 處置/用藥)\n"
+            "請將對話中的症狀與醫療縮寫保留（若有需要，可自動展開以便醫生閱讀），此份摘要將直接讓醫生貼入電子病歷系統中。"
+        ),
+    },
 }
 
 # ─── App 感知場景風格（偵測前景 App 自動切換 prompt）─────────

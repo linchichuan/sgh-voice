@@ -17,6 +17,59 @@ if not os.environ.get("HF_HOME") and os.path.isdir("/Volumes/Satechi_SSD/hugging
 
 import subprocess
 import threading
+import tempfile
+import locale
+
+# ─── 介面多語言支援 (i18n) ─────────────────────────────────
+def get_i18n(key, fallback=""):
+    try:
+        lang, _ = locale.getdefaultlocale()
+    except Exception:
+        lang = 'en_US'
+    if not lang:
+        lang = 'en_US'
+        
+    msgs = {
+        'en': {
+            'menu_dashboard': '📊 Open Dashboard',
+            'menu_record': '🎤 Start Recording',
+            'menu_quit': 'Quit',
+            'notif_learn_title': 'SGH Voice Auto-Learn',
+            'notif_learn_body': '📚 Added to dictionary: ',
+            'alert_title': 'SGH Voice',
+            'alert_body': 'SGH Voice needs "Accessibility" permission to auto-paste text.\n\nPlease enable it in "System Settings -> Privacy & Security -> Accessibility".',
+            'alert_btn': 'Open System Settings'
+        },
+        'ja': {
+            'menu_dashboard': '📊 ダッシュボード設定',
+            'menu_record': '🎤 録音開始/停止',
+            'menu_quit': '終了',
+            'notif_learn_title': 'SGH Voice 自動学習',
+            'notif_learn_body': '📚 個人辞書に追加しました: ',
+            'alert_title': 'SGH Voice',
+            'alert_body': 'テキストを自動ペーストするには「アクセシビリティ」権限が必要です。\n\nシステム設定 > プライバシーとセキュリティからSGH Voiceを有効にしてください。',
+            'alert_btn': 'システム設定を開く'
+        },
+        'zh': {
+            'menu_dashboard': '📊 開啟 Dashboard',
+            'menu_record': '🎤 開始錄音',
+            'menu_quit': '退出',
+            'notif_learn_title': 'SGH Voice 自動學習',
+            'notif_learn_body': '📚 已新增至詞庫：',
+            'alert_title': 'SGH Voice',
+            'alert_body': 'SGH Voice 需要「輔助使用」權限才能自動貼上文字。\n\n請在「系統設定 → 隱私與安全性 → 輔助使用」中開啟 SGH Voice。',
+            'alert_btn': '打開系統設定'
+        }
+    }
+    
+    lang_group = 'en'
+    if lang.startswith('zh'):
+        lang_group = 'zh'
+    elif lang.startswith('ja'):
+        lang_group = 'ja'
+        
+    return msgs.get(lang_group, msgs['en']).get(key, fallback or key)
+
 import time
 import argparse
 import webbrowser
@@ -53,6 +106,14 @@ def paste_text(text):
         _paste_log("pyperclip not available")
         return
 
+    # 記錄當前前景 App (協助除錯)
+    try:
+        from AppKit import NSWorkspace
+        curr_app = NSWorkspace.sharedWorkspace().frontmostApplication()
+        app_info = f"{curr_app.localizedName()} ({curr_app.bundleIdentifier()})"
+    except Exception:
+        app_info = "Unknown"
+
     # 保存原有剪貼簿內容
     old_clipboard = None
     try:
@@ -62,13 +123,13 @@ def paste_text(text):
 
     try:
         pyperclip.copy(text)
-        _paste_log(f"已複製到剪貼簿: {text[:50]}...")
+        _paste_log(f"已複製到剪貼簿 [{app_info}]: {text[:50]}...")
     except Exception as e:
         _paste_log(f"Clipboard copy error: {e}")
         return
 
-    # ★ 等待修飾鍵完全放開
-    time.sleep(0.5)
+    # ★ 等待修飾鍵完全放開 (稍微增加到 0.6s)
+    time.sleep(0.6)
 
     pasted = False
 
@@ -78,23 +139,11 @@ def paste_text(text):
         import ApplicationServices
         is_trusted = ApplicationServices.AXIsProcessTrusted()
     except Exception:
-        is_trusted = None  # 無法判斷
-    _paste_log(f"AXIsProcessTrusted={is_trusted}, frozen={getattr(sys, 'frozen', False)}")
+        is_trusted = None
+    _paste_log(f"AXIsProcessTrusted={is_trusted}, app={app_info}")
 
-    # 方法 1: osascript System Events keystroke
-    try:
-        result = subprocess.run([
-            "osascript", "-e",
-            'tell application "System Events" to keystroke "v" using command down'
-        ], capture_output=True, text=True, timeout=5)
-        _paste_log(f"osascript returncode={result.returncode}, stderr={result.stderr.strip()}")
-        if result.returncode == 0:
-            pasted = True
-    except Exception as e:
-        _paste_log(f"osascript exception: {e}")
-
-    # 方法 2: Quartz CGEvent fallback
-    if not pasted:
+    # 方法 1: Quartz CGEvent (最原生可靠，如果已授權)
+    if is_trusted:
         try:
             from Quartz import (
                 CGEventCreateKeyboardEvent, CGEventPost, kCGSessionEventTap,
@@ -105,28 +154,47 @@ def paste_text(text):
             CGEventSetFlags(event_down, kCGEventFlagMaskCommand)
             event_up = CGEventCreateKeyboardEvent(None, V_KEYCODE, False)
             CGEventSetFlags(event_up, kCGEventFlagMaskCommand)
-            CGEventPost(kCGSessionEventTap, event_down)
-            time.sleep(0.02)
-            CGEventPost(kCGSessionEventTap, event_up)
+            
+            # 使用兩次發送以提升成功率 (有時第一次會被忽略)
+            for _ in range(1):
+                CGEventPost(kCGSessionEventTap, event_down)
+                time.sleep(0.02)
+                CGEventPost(kCGSessionEventTap, event_up)
+                time.sleep(0.05)
+            
             pasted = True
-            _paste_log("CGEvent 貼上完成 (fallback)")
+            _paste_log("Quartz CGEvent 貼上發送完成")
         except Exception as e:
             _paste_log(f"CGEvent exception: {e}")
 
-    # 方法 3: pbpaste + AppleScript 直接插入文字（終極 fallback）
+    # 方法 2: osascript System Events keystroke (傳統方法)
     if not pasted:
         try:
-            # 用 AppleScript 直接對前景 App 插入文字，不依賴 Cmd+V
-            escaped = text.replace('\\', '\\\\').replace('"', '\\"')
+            # 確保 System Events 知道要對誰發送
+            result = subprocess.run([
+                "osascript", "-e",
+                'tell application "System Events" to keystroke "v" using command down'
+            ], capture_output=True, text=True, timeout=5)
+            _paste_log(f"osascript returncode={result.returncode}")
+            if result.returncode == 0:
+                pasted = True
+        except Exception as e:
+            _paste_log(f"osascript exception: {e}")
+
+    # 方法 3: AXValue 直接插入 (終極 fallback，限支援 Accessibility 的 App)
+    if not pasted or (is_trusted and len(text) > 100):
+        # 即使方法 1/2 "成功"，如果是長文也嘗試 AXValue 直接寫入 (速度更快，不依賴剪貼簿)
+        try:
+            escaped = text.replace('\\', '\\\\').replace('"', '\\"').replace('\n', '\\r')
             result = subprocess.run([
                 "osascript", "-e",
                 f'tell application "System Events" to set value of attribute "AXValue" '
                 f'of focused UI element of focused window of first application process '
                 f'whose frontmost is true to "{escaped}"'
             ], capture_output=True, text=True, timeout=5)
-            _paste_log(f"AXValue 插入 returncode={result.returncode}, stderr={result.stderr.strip()}")
             if result.returncode == 0:
                 pasted = True
+                _paste_log("AXValue 直接插入成功")
         except Exception as e:
             _paste_log(f"AXValue exception: {e}")
 
@@ -134,10 +202,11 @@ def paste_text(text):
 
     if not pasted:
         _paste_log("全部方法失敗，文字保留在剪貼簿")
-        notify("SGH Voice", "📋 文字已複製到剪貼簿，請 Cmd+V 貼上")
+        notify("SGH Voice", "📋 文字已複製到剪貼簿，請手動貼上")
     elif old_clipboard is not None:
         def _restore():
-            time.sleep(2.0)
+            # 延遲還原剪貼簿，確保貼上動作已完成
+            time.sleep(3.0)
             try:
                 pyperclip.copy(old_clipboard)
             except Exception:
@@ -555,6 +624,75 @@ def run_cli():
         print()
 
 
+# ─── Clipboard Auto-Learn Observer ───────────────────────
+def start_clipboard_observer(engine):
+    """
+    背景監聽剪貼簿變化，若使用者複製的文字與最後一次語音辨識非常相似，
+    即判定為「使用者手動修正後複製」，自動萃取差異並加入詞庫。
+    """
+    try:
+        from AppKit import NSPasteboard
+    except ImportError:
+        return  # 不在 macOS 或沒安裝 PyObjC
+
+    pb = NSPasteboard.generalPasteboard()
+    last_count = pb.changeCount()
+
+    def _observer():
+        nonlocal last_count
+        while True:
+            time.sleep(1.5)
+            # 檢查有無新語音紀錄
+            if getattr(engine, "is_recording", False):
+                continue
+            
+            # 使用者最近一次的語音輸出
+            recent = engine.memory.get_recent_context(1)
+            if not recent:
+                continue
+            last_dictated = recent[0]
+            if len(last_dictated) < 4:
+                continue
+
+            current_count = pb.changeCount()
+            if current_count != last_count:
+                last_count = current_count
+                
+                # 讀取剪貼簿文字
+                items = pb.pasteboardItems()
+                if not items:
+                    continue
+                copied_text = pb.stringForType_("public.utf8-plain-text")
+                if not copied_text or not copied_text.strip():
+                    continue
+                
+                copied_text = copied_text.strip()
+                
+                # 若完全相同或差太多，不處理
+                if copied_text == last_dictated:
+                    continue
+                
+                import difflib
+                ratio = difflib.SequenceMatcher(None, last_dictated, copied_text).ratio()
+                
+                # 若相似度介於 60% ~ 98%，視為人工修正版
+                if 0.60 < ratio < 0.98:
+                    learned = engine.memory.learn_correction(last_dictated, copied_text)
+                    if learned:
+                        updates = ", ".join([f"{item['wrong']}→{item['right']}" for item in learned])
+                        print(f" 📚 由剪貼簿自動學習：{updates}")
+                        notify(get_i18n("notif_learn_title"), f"{get_i18n('notif_learn_body')}{updates}")
+                        
+                        # 把歷史紀錄更新成正確版，避免重複學習與提供更好的上下文
+                        for h in reversed(engine.memory.history):
+                            if h.get("final_text") == last_dictated:
+                                h["final_text"] = copied_text
+                                break
+
+    t = threading.Thread(target=_observer, daemon=True)
+    t.start()
+
+
 # ─── Menu Bar Mode ───────────────────────────────────────
 
 def run_menubar():
@@ -573,12 +711,13 @@ def run_menubar():
     try:
         from ApplicationServices import AXIsProcessTrusted
         if not AXIsProcessTrusted():
-            # 用 osascript 彈出提示引導使用者到系統設定
+            alert_body = get_i18n("alert_body")
+            alert_btn = get_i18n("alert_btn")
+            alert_title = get_i18n("alert_title")
             subprocess.Popen([
                 "osascript", "-e",
-                'display dialog "SGH Voice 需要「輔助使用」權限才能自動貼上文字。\n\n'
-                '請在「系統設定 → 隱私與安全性 → 輔助使用」中開啟 SGH Voice。" '
-                'buttons {"打開系統設定"} default button 1 with title "SGH Voice" with icon caution',
+                f'display dialog "{alert_body}" '
+                f'buttons {{"{alert_btn}"}} default button 1 with title "{alert_title}" with icon caution',
                 "-e",
                 'tell application "System Settings" to activate',
                 "-e",
@@ -592,11 +731,11 @@ def run_menubar():
         def __init__(self):
             super().__init__("🎙", quit_button=None)
             self.menu = [
-                rumps.MenuItem("📊 開啟 Dashboard", callback=self.open_dash),
+                rumps.MenuItem(get_i18n("menu_dashboard"), callback=self.open_dash),
                 None,
-                rumps.MenuItem("🎤 開始錄音", callback=self.toggle_rec),
+                rumps.MenuItem(get_i18n("menu_record"), callback=self.toggle_rec),
                 None,
-                rumps.MenuItem("退出", callback=rumps.quit_application),
+                rumps.MenuItem(get_i18n("menu_quit"), callback=rumps.quit_application),
             ]
 
             # Status callback
@@ -604,6 +743,9 @@ def run_menubar():
 
             # Start hotkey listener
             setup_hotkey(engine)
+            
+            # Start Clipboard AI Learning observer
+            start_clipboard_observer(engine)
 
             # Start dashboard server in background
             _start_dashboard_bg(config, engine.memory, engine)

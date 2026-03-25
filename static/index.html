@@ -1229,8 +1229,9 @@
             <div class="form-group">
               <label data-i18n="label_scene">使用場景</label>
               <select id="cfg-scene">
-                <option value="general">一般</option>
-                <option value="medical">醫療・藥品・生技</option>
+                <option value="general" data-i18n="scene_general">一般</option>
+                <option value="medical" data-i18n="scene_medical">醫療・藥品・生技</option>
+                <option value="medical_consultation" data-i18n="scene_medical_consultation">醫療看診（SOAP紀錄）</option>
               </select>
               <small data-i18n="label_scene_desc"
                 style="color:var(--text3);display:block;margin-top:4px">切換場景會自動載入對應的專業詞庫和 LLM 提示詞</small>
@@ -1550,6 +1551,7 @@
         label_groq_key: 'Groq API Key（極速 LLM 處理）',
         label_whisper_model: 'Whisper 模型', label_claude_model: 'Claude 模型',
         label_scene: '使用場景', label_scene_desc: '切換場景會自動載入對應的專業詞庫和 LLM 提示詞',
+        scene_general: '一般', scene_medical: '醫療・藥品・生技', scene_medical_consultation: '醫療看診（SOAP紀錄）',
         label_language: '辨識語言', label_target_lang: '翻譯目標語言（空 = 不翻譯）',
         label_hotkey_mode: '快捷鍵模式', label_hotkey: '快捷鍵',
         label_stt_engine: '本地辨識引擎', label_whisper_local: 'Whisper 模型',
@@ -1614,6 +1616,7 @@
         label_claude_model: 'Claudeモデル',
         label_scene: '使用シーン',
         label_scene_desc: 'シーンを切り替えると、対応する専門辞書とLLMプロンプトがロードされます。',
+        scene_general: '一般', scene_medical: '医療・医薬品・バイオ', scene_medical_consultation: '医療診察（SOAP記録）',
         label_language: '認識言語',
         label_target_lang: '翻訳先言語（空＝翻訳しない）',
         label_hotkey_mode: 'ショートカットモード',
@@ -1686,6 +1689,7 @@
         label_claude_model: 'Claude Model',
         label_scene: 'Use Case',
         label_scene_desc: 'Switching scenes will automatically load custom dictionaries and LLM prompts.',
+        scene_general: 'General', scene_medical: 'Medical, Pharma & Biotech', scene_medical_consultation: 'Medical Consultation (SOAP)',
         label_language: 'Recognition Language',
         label_target_lang: 'Target Translation (Blank = None)',
         label_hotkey_mode: 'Hotkey Mode',
@@ -1758,6 +1762,7 @@
         label_claude_model: 'Claude 모델',
         label_scene: '사용 환경',
         label_scene_desc: '환경을 전환하면 해당 사전과 프롬프트가 로드됩니다.',
+        scene_general: '일반', scene_medical: '의료·의약품·바이오', scene_medical_consultation: '의료 진찰 (SOAP 기록)',
         label_language: '인식 언어',
         label_target_lang: '번역 대상 (공백 = 안함)',
         label_hotkey_mode: '단축키 모드',
@@ -1830,7 +1835,8 @@
         label_claude_model: 'โมเดล Claude',
         label_scene: 'สถานการณ์ใช้งาน',
         label_scene_desc: 'เปลี่ยนสถานการณ์เพื่อโหลดพจนานุกรมเฉพาะ',
-        label_language: 'ภาษาชที่จำ',
+        scene_general: 'ทั่วไป', scene_medical: 'การแพทย์・ยา・ชีวเทคโนโลยี', scene_medical_consultation: 'การปรึกษาแพทย์ (บันทึก SOAP)',
+        label_language: 'ภาษาที่จดจำ',
         label_target_lang: 'เป้าหมายการแปล',
         label_hotkey_mode: 'โหมดปุ่มลัด',
         label_hotkey: 'ปุ่มลัด',
@@ -1902,6 +1908,7 @@
         label_claude_model: 'Mô hình Claude',
         label_scene: 'Ngữ cảnh',
         label_scene_desc: 'Chuyển ngữ cảnh để tải từ điển riêng.',
+        scene_general: 'Tổng quát', scene_medical: 'Y tế・Dược phẩm・Công nghệ sinh học', scene_medical_consultation: 'Tư vấn y tế (Ghi chú SOAP)',
         label_language: 'Ngôn ngữ nhận dạng',
         label_target_lang: 'Dịch sang',
         label_hotkey_mode: 'Phím tắt',
