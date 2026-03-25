@@ -48,14 +48,15 @@ class LlmClient {
     ]
     
     // 系統提示詞
-    private let basePrompt = "語音辨識後處理。規則：
-1. 刪除填充詞：嗯、啊、那個、就是、えー特、あの、um、uh、like
-2. 口語自我修正→只保留最終版本
-3. 標點符號：加上正確標點，適當分段
-4. 不改寫核心句意，保持原語言（中/日/英混合保持原樣）
-5. 只輸出結果，不加解釋
-6. 所有中文必須是繁體中文
-"
+    private let basePrompt = """
+        語音辨識後處理。規則：
+        1. 刪除填充詞：嗯、啊、那個、就是、えー特、あの、um、uh、like
+        2. 口語自我修正→只保留最終版本
+        3. 標點符號：加上正確標點，適當分段
+        4. 不改寫核心句意，保持原語言（中/日/英混合保持原樣）
+        5. 只輸出結果，不加解釋
+        6. 所有中文必須是繁體中文
+        """
     
     private func getSystemPrompt() -> String {
         let style = ApiConfig.shared.outputStyle
@@ -73,8 +74,7 @@ class LlmClient {
         
         let sceneExtra = DictionaryManager.shared.getSceneSystemPromptExtra()
         if !sceneExtra.isEmpty {
-            prompt += "
-" + sceneExtra
+            prompt += "\n" + sceneExtra
         }
         return prompt
     }
