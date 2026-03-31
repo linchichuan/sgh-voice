@@ -644,7 +644,7 @@ class Transcriber:
         try:
             t0 = time.time()
             resp = self.local_llm.chat.completions.create(
-                model=self.config.get("local_llm_model", "qwen2.5:3b"),
+                model=self.config.get("local_llm_model", "qwen3.5:latest"),
                 messages=[
                     {"role": "system", "content": system},
                     {"role": "user", "content": text}
@@ -675,7 +675,7 @@ class Transcriber:
             return None
 
     def _groq_llm_process(self, text, mode="dictate", edit_context=""):
-        """Groq LLM 後處理 — 極速雲端推論（Qwen3 32B 中文最強）"""
+        """Groq LLM 後處理 — 極速雲端推理（Qwen 2.5 32B 中文最強）"""
         groq_key = self.config.get("groq_api_key")
         if not groq_key or not text.strip():
             return None
@@ -704,8 +704,10 @@ class Transcriber:
                 user_msg = f"[語音轉錄原文，請修正後直接輸出]\n{text}"
 
             t0 = time.time()
+            target_model = self.config.get("groq_model", "llama-3.3-70b-versatile")
+            print(f" 🤖 [Groq LLM] 正在啟動 Groq 模型: {target_model}")
             resp = groq_client.chat.completions.create(
-                model=self.config.get("groq_model", "qwen3-32b"),
+                model=target_model,
                 messages=[
                     {"role": "system", "content": system},
                     {"role": "user", "content": user_msg},
@@ -719,9 +721,9 @@ class Transcriber:
             self._track_usage(resp, "groq")
 
             result = resp.choices[0].message.content.strip()
-            # 移除推理模型的 <think> 標籤（QwQ 等 reasoning model）
+            # 移除推理模型的 <think> 標籤（QwQ / DeepSeek R1 等 reasoning model）
             result = re.sub(r'<think>[\s\S]*?</think>', '', result).strip()
-            # 有時 QwQ 不輸出閉合標籤
+            # 有時推理模型不輸出閉合標籤
             result = re.sub(r'<think>[\s\S]*$', '', result).strip()
             print(f" ⚡ [Groq LLM] 完成 ({elapsed:.2f}s)")
 
@@ -746,18 +748,17 @@ class Transcriber:
 
     # 固定的高效 system prompt（不從 config 讀取，避免使用者破壞品質）
     _DICTATE_SYSTEM = (
-        "你是一個語音辨識後處理與文法檢查助手。規則：\n"
-        "1. 語言判斷：自動判斷原文是中文、日文還是英文。絕對不要翻譯（例如英文不要翻成中文，日文不要翻成中文）。保持講者的原語言！\n"
-        "2. 文法與語氣（Grammar & Tone）：修正明顯的文法錯誤、錯別字、不通順的語句，並優化語氣使其聽起來像母語人士的書面語或流暢口語。\n"
-        "3. 刪除所有填充詞：嗯、啊、那個、就是、然後、對、欸、所以說、基本上、えーと、あの、えー、まあ、um、uh、like、you know、basically、actually 等\n"
-        "4. 口語自我修正→只保留最終版本（例：不是A啦，我的意思是B→只留B）\n"
-        "5. 標點符號必加：中文用全形標點（，。？！、：；），日文用全形標點，英文用半形標點且後面空一格。長篇大論適當分段，提升閱讀性。\n"
-        "6. 多語混合時保持混合狀態，不要翻譯。\n"
-        "7. 只輸出結果，不加任何解釋。"
+        "你是一個專業的語音辨識後處理與文法檢查助手。請遵循以下規則執行任務：\n"
+        "1. 語言一致性：自動偵測原文語言（中/日/英）。嚴禁翻譯！保持講者的原始語言。\n"
+        "2. 智慧修正：根據前後語境修正明顯的同音異字、文法錯誤與不通順的語句。優化為流暢的書面語或專業口語。\n"
+        "3. 徹底去雜訊：刪除所有填充詞（嗯、啊、那個、えーと、um、you know 等）與猶豫改口處。\n"
+        "4. 標點與排版：中文使用全形標點（，。？！），英文使用半形標點並正確留空。長篇內容請適當分段或以條列式 (Bullet points) 呈現，提升閱讀效率。\n"
+        "5. 專有名詞保護：若出現縮寫或專業術語（如 AI, API, CRM, n8n 等），請確保拼寫正確。\n"
+        "6. 簡潔輸出：只輸出整理後的最終文字，嚴禁包含任何解釋、問候或自我介紹。"
     )
 
     def _openai_process(self, text, mode, edit_context=""):
-        """OpenAI (GPT-4o) 後處理：介面與 _claude_process 相容"""
+        """OpenAI (GPT-4o) 後處理：極速雲端推理"""
         if not text.strip():
             return text
 

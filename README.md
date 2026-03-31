@@ -1,343 +1,62 @@
-# 🎙 SGH Voice — AI 語音輸入工具
+# 🎙 SGH Voice — 極致 AI 語音輸入助手 (v1.5.0)
 
-**[English](README.en.md)** | **[日本語](README.ja.md)** | **繁體中文**
+**[English](README.en.md) | [日本語](README.ja.md) | 繁體中文**
 
-> 替代 Typeless（$12/月）的自建方案。Whisper 語音辨識 + Claude/Qwen 智慧後處理，支援中日英三語混合，資料 100% 掌控在自己手中。
+> 說話即成專業文章。中日英三語自動辨識 + AI 智慧潤稿，資料 100% 掌控。
 
 [![macOS](https://img.shields.io/badge/macOS-Apple_Silicon-black?logo=apple)](https://github.com/linchichuan/sgh-voice/releases)
 [![iOS](https://img.shields.io/badge/iOS-17.0+-blue?logo=apple)](https://github.com/linchichuan/sgh-voice/releases)
 [![Android](https://img.shields.io/badge/Android-8.0+-green?logo=android)](https://github.com/linchichuan/sgh-voice/releases)
-[![Python](https://img.shields.io/badge/Python-3.12+-blue?logo=python)](https://www.python.org/)
-[![License](https://img.shields.io/badge/License-Private-gray)]()
-[![Version](https://img.shields.io/badge/Version-1.4.0-green)]()
-[![Website](https://img.shields.io/badge/Website-voice.shingihou.com-blue)](https://voice.shingihou.com)
+[![Version](https://img.shields.io/badge/Version-1.5.0-green)]()
 
 ---
 
-## 特色功能
+## 🌟 2026 旗艦級更新 (v1.5.0)
+
+SGH Voice v1.5.0 帶來了效能與品質的全面躍升，支援最新的旗艦 AI 模型，並實現了不到一秒的處理延遲。
 
 | 特色功能 | 說明 |
 |------|------|
-| **整合 Breeze-ASR-25 (v1.4.0)** | 專為繁中優化，Apple Silicon 速度比 Whisper-turbo 快 3.5 倍 |
-| **🔐 聲紋驗證 (v1.3.0)** | 只辨識綁定的聲音，自動過濾其他人說話與環境噪音 |
-| **三語混合辨識** | 同一句話中繁體中文、日文、英文自由切換，不會被翻譯 |
-| **繁體中文三層防護** | Whisper prompt → Claude system prompt → OpenCC s2twp |
-| **Hybrid 智慧分流** | 短音訊用本地 mlx-whisper，長音訊上 OpenAI Cloud |
-| **AI 後處理** | 去填充詞（嗯、啊、えーと、um）、自我修正偵測、標點分段 |
-| **個人詞庫學習** | 自動累積修正規則，越用越準 |
-| **Smart Replace** | `@mail`、`@phone` 等觸發詞自動展開 |
-| **9 種改寫模式** | 精簡 / 正式 / 會議 / Email / 技術 / 口語 / 翻英 / 翻日 / 翻中 |
-| **🏥 醫療場景模式** | 日文醫療術語・藥品名・生技名詞專用詞庫（v1.2） |
-| **🩺 醫療看診摘要** | 自動將醫病對話濃縮整理為專業 SOAP 病歷摘要格式 |
-| **📋 剪貼簿自動回修學習** | 在對話筐改字後直接 Cmd+C 複製，系統自動將修正加入個人詞庫 |
-| **Push-to-Talk / Toggle** | 按住 Right Cmd 說話，或按一下開始、再按一下停止 |
-| **跨應用程式** | 系統級語音輸入，辨識完自動貼到游標位置 |
-| **Web Dashboard** | 使用統計、歷史紀錄、詞庫管理、設定 |
-| **Android IME** | Android 鍵盤輸入法，任何 App 都能用語音輸入 |
-| **iOS App** | iPhone / iPad 原生 App，按下錄音即時辨識（v1.3） |
+| **旗艦模型支援** | 內建優化對 **Qwen 3.5 (本地)** 與 **Llama 3.3 70B (雲端)** 的整合 |
+| **極致反應速度** | 透過 Groq 與本地 MLX 加速，平均處理時間低於 **1 秒** |
+| **三語自動檢測** | 同一句話中繁體中文、日文、英文自由切換，自動校正不翻譯 |
+| **🔐 聲紋驗證** | 只辨識綁定的聲音，自動過濾其他人說話與環境噪音 |
+| **Hybrid 智慧分流** | 短音訊本地、長音訊雲端，兼顧隱私與效能 |
+| **AI 智慧潤稿** | 去填充詞、語氣優化、自我修正偵測、專業排版 |
+| **🏥 醫療特化模式** | 支援繁中、日文醫療術語・藥品名・生技名詞專用詞庫 |
+| **跨平台支援** | macOS (DMG), Android (IME), iOS App 全面升級 |
 
 ---
 
-## 快速開始（DMG 安裝）
+## 🚀 快速開始 (macOS)
 
-### 系統需求
+### 1. 下載安裝
+前往 [Releases](https://github.com/linchichuan/sgh-voice/releases) 下載最新的 `.dmg` 檔案 (Apple Silicon 專用)。
 
-- macOS 14.0+ (Sonoma 或更新)
-- Apple Silicon (M1/M2/M3/M4)
-- 網路連線（若使用雲端 API）
-- **儲存空間**：約 100MB（若僅用雲端）/ 約 3~6GB（若使用本地模型）
+### 2. 環境準備 (選配，建議使用)
+- **本地端 (推薦)**: 安裝 [Ollama](https://ollama.com/) 並執行 `ollama run qwen3.5:latest`。
+- **本地 ASR**: 執行 `pip install mlx-whisper` 以獲得最快的本地轉錄體驗。
 
-### API 金鑰與模型準備（支援全本地或雲端）
-
-本工具提供極高的彈性，您可以選擇**完全免費的本地端運行**，或是**使用強大的雲端 API**。請依據您的需求準備：
-
-#### 方案 A：全雲端模式（推薦，最省電、最精確）
-
-若不想佔用電腦效能及空間，請準備以下 API Keys：
-
-1. **OpenAI API Key** (`sk-...`)
-   - **用途**：語音轉文字 (STT)
-   - **取得方式**：前往 [OpenAI Platform](https://platform.openai.com/api-keys) 註冊綁定信用卡並取得金鑰。
-2. **Anthropic API Key** (`sk-ant-...`) (選用但極度推薦)
-   - **用途**：AI 智慧後處理（去填充詞、術語修正、自動排版）
-   - **取得方式**：前往 [Anthropic Console](https://console.anthropic.com/settings/keys) 取得金鑰。
-
-#### 方案 B：Hybrid 智能分流（本地 STT + 雲端 LLM）
-
-最平衡的設定，短句零延遲，長句與後處理交給雲端：
-
-1. **本地 Whisper 模型**
-   - 不需特別下載，首次在 Dashboard 啟用 Hybrid 模式時，會在背景自動下載 `mlx-community/whisper-turbo` (約 1.5GB)。
-2. **Anthropic API Key** (同方案 A)
-
-#### 方案 C：全本地模式（完全免費、隱私最高）
-
-完全不需要任何 API Key 即可使用！斷網也能運作：
-
-1. **本地 Whisper 模型**（同方案 B，自動下載）
-2. **本地 Ollama 模型**（用於取代 Claude 進行後處理）
-   - 請先安裝 [Ollama for Mac](https://ollama.com/download/mac)
-   - 開啟終端機執行：`ollama run qwen2.5:3b`（下載約 2GB）
-   - 模型下載完成後，保持 Ollama 運行並在 Dashboard 中選擇該模型。
-
-> 💡 **提示**：除了 OpenAI 跟 Anthropic 以外，進階使用者也可在 Dashboard 填入 **ElevenLabs** 或是 **Groq** 的 API Key 以啟用特定極速功能。
-
-### 安裝步驟
-
-1. 從 [Releases](https://github.com/linchichuan/sgh-voice/releases) 下載 `SGH Voice-1.4.0-apple-silicon.dmg`
-2. 雙擊 DMG，將 **Voice Input** 拖入 Applications 資料夾
-3. 首次開啟：在應用程式點擊右鍵 → **打開**（macOS Gatekeeper 需要允許一次）
-4. 選單列出現 🎙 圖示後，點擊 **Open Dashboard**
-5. 在 Dashboard 設定頁填入您準備好的 API Key，或是啟用 **Hybrid 模式** 並設定為本地 Ollama。
-
-### macOS 權限授權
-
-首次使用需授權以下權限（系統設定 → 隱私與安全性）：
-
-| 權限 | 用途 | 授權對象 |
-|------|------|---------|
-| 麥克風 | 錄音 | Voice Input |
-| 輔助使用 | 自動貼上（Cmd+V） | Voice Input |
-| 輸入監控 | 全域快捷鍵監聽 | Voice Input |
+### 3. API 金鑰設定
+啟動 App 後，在選單列圖示旁開啟 **Dashboard**，填入您的 Groq API Key 或 Anthropic API Key。
 
 ---
 
-## 使用方式
+## 🛠 技術架構
 
-### Push-to-Talk（預設）
-
-1. 選單列出現 🎙
-2. **按住 Right Cmd（⌘）** 開始錄音
-3. **放開** 停止，自動辨識並貼到游標位置
-
-> 可在 Dashboard 設定中改為 Toggle 模式或其他快捷鍵。
-
-### Dashboard
-
-點擊選單列 🎙 → **Open Dashboard**，或瀏覽器開啟 `http://localhost:7865`
-
-- **總覽**：節省時間、月費估算、使用統計
-- **歷史紀錄**：搜尋、複製、改寫所有辨識結果
-- **詞庫記憶**：管理自訂詞彙和修正規則
-- **設定**：API Key、語言、快捷鍵、Hybrid 模式開關
+- **音訊層**: 高性能聲紋驗證與靜音偵測，防止幻覺產生。
+- **ASR 層**: 混合模式 (Hybrid)，15 秒內音訊本地 MLX 辨識，長音訊走 Groq/OpenAI。
+- **LLM 層**: 
+  - **本地**: Ollama Qwen 3.5 (最新 2026 旗艦)。
+  - **雲端**: Groq Llama 3.3 70B / Anthropic Claude 4.5。
+- **系統層**: 使用 macOS Quartz CGEvent 實現無縫自動貼上。
 
 ---
 
-## 技術架構
-
-### 五層處理管線
-
-```
-按住快捷鍵 → 麥克風錄音
-       ↓
-Layer 1: Whisper STT（Hybrid 路由：本地 mlx-whisper / Cloud OpenAI）
-       ↓
-Layer 2: 詞庫修正（memory.apply_corrections）
-       ↓
-Layer 3: Smart Replace（@mail → email 等觸發詞展開）
-       ↓
-Layer 4: LLM 後處理（Hybrid：本地 Ollama Qwen / Cloud Claude Haiku 4.5）
-       ↓
-Layer 5: OpenCC s2twp（繁體中文最終防護）
-       ↓
-       自動貼到游標位置
-```
-
-### Hybrid 智慧分流
-
-| 條件 | 路由 | 延遲 |
-|------|------|------|
-| 錄音 < 15 秒 | 本地 mlx-whisper | ~0.5s |
-| 錄音 ≥ 15 秒 | Cloud OpenAI Whisper | ~1-2s |
-| 文字 < 30 字且無填充詞 | 跳過 LLM，直接用詞庫修正 | ~0s |
-| 文字 < 30 字 | 本地 Ollama Qwen 2.5 | ~0.3s |
-| 文字 ≥ 30 字 | Cloud Claude Haiku 4.5 | ~0.5-1s |
-
-### 技術堆疊
-
-```
-Runtime:         Python 3.12+
-語音辨識（本地）: mlx-whisper (Apple Silicon 優化)
-語音辨識（雲端）: OpenAI Whisper API
-後處理（本地）:   Ollama + Qwen 2.5 3B
-後處理（雲端）:   Anthropic Claude Haiku 4.5
-繁中轉換:        OpenCC (s2twp)
-錄音:            sounddevice + numpy
-快捷鍵:          pynput
-系統整合:        rumps (macOS 選單列)
-Dashboard:       Flask + 原生 HTML/JS
-自動貼上:        pyperclip + AppleScript (Cmd+V)
-打包:            PyInstaller + create-dmg
-```
-
-### API 整合方式
-
-**OpenAI Whisper API**
-
-- 用途：語音轉文字（Cloud 路由）
-- 音檔格式：WAV 16kHz mono
-- 特色：`initial_prompt` 帶入自訂詞庫提升辨識精度
-- 費用：約 $0.006/分鐘
-
-**Anthropic Claude API**
-
-- 用途：後處理潤稿（去填充詞、自我修正偵測、標點分段）
-- 模型：Claude Haiku 4.5（速度優先）
-- 特色：自訂 system prompt，保持三語混合不翻譯
-- 費用：約 $0.001/次
-
-**本地 Whisper (mlx-whisper)**
-
-- 用途：短音訊快速辨識，無需網路
-- 模型：`mlx-community/whisper-turbo`
-- 特色：Apple Silicon Neural Engine 加速，beam_size=1 貪婪解碼
-
-**本地 LLM (Ollama)**
-
-- 用途：短文字快速後處理
-- 模型：`qwen2.5:3b`
-- 特色：完全離線，適合簡單去填充詞
+## 📝 授權與隱私
+- **100% 資料自主**: 本地模式下所有音訊與文字處理均在您的設備上完成。
+- **通用 Prompt**: 內建專業商務潤稿邏輯，不含任何個人資訊或特定習慣。
 
 ---
 
-## 費用比較
-
-| 方案 | 月費 |
-|------|------|
-| Typeless Pro | $12/月 |
-| Wispr Flow | $12/月 |
-| Superwhisper | $8.49/月 |
-| **SGH Voice（正常使用）** | **~$3-8/月（API 費用）** |
-| **SGH Voice（短句為主）** | **~$1-3/月（多數走本地）** |
-
----
-
-## 從原始碼開發
-
-### 環境準備
-
-```bash
-# Clone
-git clone https://github.com/linchichuan/sgh-voice.git
-cd sgh-voice
-
-# Python 虛擬環境
-python3 -m venv venv
-source venv/bin/activate
-
-# 安裝依賴
-pip install -r requirements.txt
-
-# 本地 Whisper（選用，Apple Silicon）
-pip install mlx-whisper
-
-# 本地 LLM（選用）
-brew install ollama
-ollama pull qwen2.5:3b
-```
-
-### 執行
-
-```bash
-python app.py              # 選單列 + Dashboard（日常使用）
-python app.py --cli        # CLI 模式（初期訓練詞庫推薦）
-python app.py --dashboard  # 只開 Dashboard
-```
-
-### CLI 模式操作
-
-```
-▶                          ← 按 Enter 開始錄音
-🔴 錄音中... 按 Enter 停止
-⏳ 辨識中...
-
-📝 Whisper: 請幫我跟新义丰的客戶發一封信
-📖 詞庫修正: 請幫我跟新義豊的客戶發一封信
-🤖 Claude:  請幫我跟新義豊的客戶發一封信。
-✅ 最終: 請幫我跟新義豊的客戶發一封信。
-
-✏️  修正 (Enter 跳過): ← 手動修正後系統會自動學習
-```
-
-### 打包 DMG
-
-```bash
-chmod +x build.sh
-./build.sh
-# 產出：dist/SGH Voice-1.4.0-apple-silicon.dmg
-```
-
----
-
-## 專案結構
-
-```
-sgh-voice/
-├── app.py              # 主程式（選單列 + CLI + 快捷鍵）
-├── transcriber.py      # Whisper + LLM 五層處理管線
-├── recorder.py         # 音訊錄製（sounddevice）
-├── memory.py           # 詞庫記憶 + 自動學習
-├── config.py           # 設定、場景預設、資料持久化
-├── dashboard.py        # Flask Web Dashboard
-├── dashboard_window.py # WebView 視窗啟動器
-├── overlay.py          # 狀態覆蓋 UI
-├── launcher.py         # App 啟動入口
-├── build.sh            # 一鍵打包 DMG
-├── requirements.txt    # Python 依賴
-├── resources/
-│   ├── icon.icns       # App 圖示
-│   └── entitlements.plist
-├── static/
-│   └── index.html      # Dashboard UI
-├── android/SGHVoice/   # Android IME 專案 (Kotlin + Jetpack Compose)
-├── ios/SGHVoice/       # iOS App 專案 (Swift + SwiftUI)
-│   └── SGHVoice/
-│       ├── API/        # ApiConfig, WhisperClient, ClaudeClient
-│       ├── Audio/      # AudioRecorder (AVFoundation)
-│       ├── Processing/ # DictionaryManager, TranscriptionPipeline
-│       └── UI/         # MainView, MainViewModel, SettingsView
-└── sgh-voice-web/      # 產品網站 (voice.shingihou.com)
-    ├── index.html      # Landing Page
-    ├── style.css
-    ├── i18n.js         # 5 語翻譯
-    ├── main.js         # Firebase Firestore 互動
-    ├── privacy.html    # 隱私權政策
-    └── firebase.json   # Firebase 部署設定
-```
-
-本地資料位置：`~/.voice-input/`
-
-```
-~/.voice-input/
-├── config.json         # 設定（含 API Key）
-├── dictionary.json     # 詞庫（修正規則 + 自訂詞彙）
-├── history.json        # 歷史紀錄
-├── stats.json          # 使用統計
-└── smart_replace.json  # Smart Replace 規則
-```
-
----
-
-## 隱私與安全
-
-| 項目 | 做法 |
-|------|------|
-| 語音資料 | 僅傳送至 OpenAI/Anthropic API，不經過其他伺服器 |
-| API Key | 存在本機 `~/.voice-input/config.json`，不上傳 |
-| 歷史紀錄 | 全部存本地，最多保留 2000 筆 |
-| 需要帳號 | 否 |
-| 資料追蹤 | 無 |
-
----
-
-## 授權
-
-Private — 新義豊株式会社 (Shingihou Co., Ltd.) 內部使用
-
-## 開發者
-
-**林紀全 (Lin Chichuan)** — CEO, 新義豊株式会社
-
-- 🌐 [shingihou.com](https://shingihou.com)
-- 🎙️ [voice.shingihou.com](https://voice.shingihou.com)
-- 📧 <service@shingihou.com>
+© 2026 Shingihou Co., Ltd. All rights reserved.

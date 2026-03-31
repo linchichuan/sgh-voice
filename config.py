@@ -250,8 +250,8 @@ DEFAULT_CONFIG = {
     "hybrid_text_threshold": 30,            # 句子小於 30 字用 Local LLM (Qwen)
     "stt_engine": "mlx-whisper",                           # mlx-whisper | qwen3-asr | cloud-only
     "local_whisper_model": "breeze-asr-25-4bit",           # 本地 Whisper 模型（Breeze-ASR-25 繁中最強）
-    "local_llm_model": "qwen2.5:3b",        # Ollama 上的本地模型名稱
-    "groq_model": "qwen3-32b",                  # Groq LLM 模型（中文最強 CP 值）
+    "local_llm_model": "qwen3.5:latest",    # Ollama 上的本地模型名稱 (使用 2026 最新 Qwen 3.5)
+    "groq_model": "llama-3.3-70b-versatile",      # Groq LLM 模型 (目前的旗艦穩定版)
     "groq_whisper_model": "whisper-large-v3-turbo",  # Groq STT 模型
     "local_llm_timeout_sec": 6.0,           # 本地 Ollama 超時秒數（避免 1.5 秒過短造成頻繁 fallback）
     "backup_audio_dir": "",                  # 音訊備份目錄（空字串=不備份）
