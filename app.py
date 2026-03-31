@@ -20,19 +20,38 @@ import threading
 import tempfile
 import locale
 
-# ─── 介面多語言支援 (i18n) ─────────────────────────────────
-def get_i18n(key, fallback=""):
+# ─── 系統語言偵測 ─────────────────────────────────────────
+def get_sys_lang():
+    """獲取系統語系群組 (ja, zh, en)"""
     try:
-        lang, _ = locale.getdefaultlocale()
+        # macOS 優先檢查環境變數或 locale
+        lang = os.environ.get('LANG', '')
+        if not lang:
+            import locale
+            lang, _ = locale.getdefaultlocale()
     except Exception:
         lang = 'en_US'
-    if not lang:
-        lang = 'en_US'
-        
+    
+    if not lang: lang = 'en_US'
+    lang = lang.lower()
+    
+    if 'ja' in lang: return 'ja'
+    if 'zh' in lang: return 'zh'
+    return 'en'
+
+def get_i18n(key, fallback=""):
+    lang_group = get_sys_lang()
+    
     msgs = {
         'en': {
+            'log_warmup': ' 🔄 Background warming up models...',
+            'log_ollama_ok': ' ✅ Ollama detected: ',
+            'log_whisper_ok': ' ✅ mlx-whisper model warmed up',
+            'log_recording': ' 🔴 Recording...',
+            'log_processing': ' ⏳ Processing...',
             'menu_dashboard': '📊 Open Dashboard',
             'menu_record': '🎤 Start Recording',
+            'menu_stop': '⏹ Stop Recording',
             'menu_quit': 'Quit',
             'notif_learn_title': 'SGH Voice Auto-Learn',
             'notif_learn_body': '📚 Added to dictionary: ',
@@ -41,18 +60,30 @@ def get_i18n(key, fallback=""):
             'alert_btn': 'Open System Settings'
         },
         'ja': {
+            'log_warmup': ' 🔄 バックグラウンドでモデルを予熱中...',
+            'log_ollama_ok': ' ✅ Ollama を検出しました: ',
+            'log_whisper_ok': ' ✅ mlx-whisper モデルの準備が完了しました',
+            'log_recording': ' 🔴 録音中...',
+            'log_processing': ' ⏳ 処理中...',
             'menu_dashboard': '📊 ダッシュボード設定',
-            'menu_record': '🎤 録音開始/停止',
+            'menu_record': '🎤 録音開始',
+            'menu_stop': '⏹ 録音停止',
             'menu_quit': '終了',
             'notif_learn_title': 'SGH Voice 自動学習',
-            'notif_learn_body': '📚 個人辞書に追加しました: ',
+            'notif_learn_body': '📚 辞書に追加されました: ',
             'alert_title': 'SGH Voice',
             'alert_body': 'テキストを自動ペーストするには「アクセシビリティ」権限が必要です。\n\nシステム設定 > プライバシーとセキュリティからSGH Voiceを有効にしてください。',
             'alert_btn': 'システム設定を開く'
         },
         'zh': {
+            'log_warmup': ' 🔄 背景預熱 Whisper + Ollama 模型...',
+            'log_ollama_ok': ' ✅ Ollama 偵測成功: ',
+            'log_whisper_ok': ' ✅ mlx-whisper 模型預熱完成',
+            'log_recording': ' 🔴 錄音中...',
+            'log_processing': ' ⏳ 辨識處理中...',
             'menu_dashboard': '📊 開啟 Dashboard',
             'menu_record': '🎤 開始錄音',
+            'menu_stop': '⏹ 停止錄音',
             'menu_quit': '退出',
             'notif_learn_title': 'SGH Voice 自動學習',
             'notif_learn_body': '📚 已新增至詞庫：',
@@ -62,12 +93,6 @@ def get_i18n(key, fallback=""):
         }
     }
     
-    lang_group = 'en'
-    if lang.startswith('zh'):
-        lang_group = 'zh'
-    elif lang.startswith('ja'):
-        lang_group = 'ja'
-        
     return msgs.get(lang_group, msgs['en']).get(key, fallback or key)
 
 import time
@@ -256,7 +281,7 @@ class VoiceEngine:
 
         # 背景預熱模型（不阻塞啟動）
         if self.config.get("enable_hybrid_mode", True):
-            print(" 🔄 背景預熱 Whisper + Ollama 模型...")
+            print(get_i18n("log_warmup"))
             threading.Thread(target=self.transcriber.warmup, daemon=True).start()
 
     def reload_config(self):

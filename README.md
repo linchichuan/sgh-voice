@@ -1,4 +1,4 @@
-# 🎙 SGH Voice — 極致 AI 語音輸入助手 (v1.5.0)
+# 🎙 SGH Voice — 極致 AI 語音輸入助手 (v1.5.1)
 
 **[English](README.en.md) | [日本語](README.ja.md) | 繁體中文**
 

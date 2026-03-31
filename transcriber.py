@@ -13,6 +13,29 @@ import anthropic
 from config import load_smart_replace, SCENE_PRESETS, DEFAULT_APP_STYLES, detect_app_style, LOCAL_MODEL_PATHS, BREEZE_MODELS
 from ollama_detector import get_detector, OllamaStatus
 from voiceprint import VoiceprintManager
+import os
+
+# ─── 系統語言偵測 ─────────────────────────────────────────
+def _get_sys_lang():
+    try:
+        lang = os.environ.get('LANG', '')
+        if not lang:
+            import locale
+            lang, _ = locale.getdefaultlocale()
+    except Exception:
+        lang = 'en_US'
+    if not lang: lang = 'en_US'
+    lang = lang.lower()
+    if 'ja' in lang: return 'ja'
+    if 'zh' in lang: return 'zh'
+    return 'en'
+
+_LANG = _get_sys_lang()
+
+def _t(zh, ja, en):
+    if _LANG == 'ja': return ja
+    if _LANG == 'zh': return zh
+    return en
 
 
 class Transcriber:
@@ -113,9 +136,9 @@ class Transcriber:
                     mlx_whisper.transcribe(tmp.name, **warmup_kwargs)
                 import os
                 os.unlink(tmp.name)
-                print(" ✅ mlx-whisper 模型預熱完成")
+                print(" " + _t("✅ mlx-whisper 模型預熱完成", "✅ mlx-whisper モデルの準備が完了しました", "✅ mlx-whisper model warmed up"))
             except Exception as e:
-                print(f" ⚠️ mlx-whisper 預熱失敗: {e}")
+                print(" " + _t(f"⚠️ mlx-whisper 預熱失敗: {e}", f"⚠️ mlx-whisper 予熱失敗: {e}", f"⚠️ mlx-whisper warmup failed: {e}"))
 
         def _warmup_ollama():
             # Step 1: 偵測 Ollama 服務
@@ -145,9 +168,9 @@ class Transcriber:
                 )
                 models = detector.available_models
                 model_str = ", ".join(models[:5]) if models else "unknown"
-                print(f" ✅ Ollama 預熱完成 (可用模型: {model_str})")
+                print(" " + _t(f"✅ Ollama 預熱完成 (可用模型: {model_str})", f"✅ Ollama 予熱完了 (利用可能なモデル: {model_str})", f"✅ Ollama warmup completed (Available models: {model_str})"))
             except Exception as e:
-                print(f" ⚠️ Ollama 預熱失敗: {e}")
+                print(" " + _t(f"⚠️ Ollama 預熱失敗: {e}", f"⚠️ Ollama 予熱失敗: {e}", f"⚠️ Ollama warmup failed: {e}"))
 
         def _sequential_warmup():
             """序列執行：先偵測+預熱 Ollama（不用 GPU），再 Whisper（Metal GPU）"""
@@ -185,9 +208,9 @@ class Transcriber:
                 vp_threshold = self.config.get("voiceprint_threshold", 0.97)
                 vp_score = self._voiceprint_mgr.verify(audio_source)
                 if vp_score < vp_threshold:
-                    print(f" 🔇 聲紋不符 (score={vp_score:.4f} < {vp_threshold})，跳過辨識")
+                    print(" " + _t(f"🔇 聲紋不符 (score={vp_score:.4f} < {vp_threshold})，跳過辨識", f"🔇 声紋不一致 (score={vp_score:.4f} < {vp_threshold})、認識をスキップします", f"🔇 Voiceprint mismatch (score={vp_score:.4f} < {vp_threshold}), skipping"))
                     return None
-                print(f" 🔐 聲紋驗證通過 (score={vp_score:.4f})")
+                print(" " + _t(f"🔐 聲紋驗證通過 (score={vp_score:.4f})", f"🔐 声紋認証に合格しました (score={vp_score:.4f})", f"🔐 Voiceprint verified (score={vp_score:.4f})"))
 
         # Step 1: STT 路由（依 stt_engine 設定決定優先順序）
         raw = None
@@ -705,7 +728,7 @@ class Transcriber:
 
             t0 = time.time()
             target_model = self.config.get("groq_model", "llama-3.3-70b-versatile")
-            print(f" 🤖 [Groq LLM] 正在啟動 Groq 模型: {target_model}")
+            print(" " + _t(f"🤖 [Groq LLM] 正在啟動 Groq 模型: {target_model}", f"🤖 [Groq LLM] Groq モデルを起動中: {target_model}", f"🤖 [Groq LLM] Launching Groq model: {target_model}"))
             resp = groq_client.chat.completions.create(
                 model=target_model,
                 messages=[
@@ -725,7 +748,7 @@ class Transcriber:
             result = re.sub(r'<think>[\s\S]*?</think>', '', result).strip()
             # 有時推理模型不輸出閉合標籤
             result = re.sub(r'<think>[\s\S]*$', '', result).strip()
-            print(f" ⚡ [Groq LLM] 完成 ({elapsed:.2f}s)")
+            print(" " + _t(f"⚡ [Groq LLM] 完成 ({elapsed:.2f}s)", f"⚡ [Groq LLM] 完了 ({elapsed:.2f}s)", f"⚡ [Groq LLM] Done ({elapsed:.2f}s)"))
 
             # 安全檢查
             if mode == "dictate" and self._is_llm_hallucination(result, text):
