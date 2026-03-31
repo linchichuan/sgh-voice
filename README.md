@@ -7,16 +7,17 @@
 [![macOS](https://img.shields.io/badge/macOS-Apple_Silicon-black?logo=apple)](https://github.com/linchichuan/sgh-voice/releases)
 [![iOS](https://img.shields.io/badge/iOS-17.0+-blue?logo=apple)](https://github.com/linchichuan/sgh-voice/releases)
 [![Android](https://img.shields.io/badge/Android-8.0+-green?logo=android)](https://github.com/linchichuan/sgh-voice/releases)
-[![Version](https://img.shields.io/badge/Version-1.5.0-green)]()
+[![Version](https://img.shields.io/badge/Version-1.5.1-green)]()
 
 ---
 
-## 🌟 2026 旗艦級更新 (v1.5.0)
+## 🌟 2026 旗艦級更新 (v1.5.1)
 
-SGH Voice v1.5.0 帶來了效能與品質的全面躍升，支援最新的旗艦 AI 模型，並實現了不到一秒的處理延遲。
+SGH Voice v1.5.1 針對全球化使用體驗進行了深度優化，支援最新的旗艦 AI 模型，並實作了全自動的語言適配。
 
 | 特色功能 | 說明 |
 |------|------|
+| **🌐 系統語言自動適配** | **(New)** 選單、浮動視窗與後台日誌自動根據 macOS 系統語系 (日/中/英) 切換 |
 | **旗艦模型支援** | 內建優化對 **Qwen 3.5 (本地)** 與 **Llama 3.3 70B (雲端)** 的整合 |
 | **極致反應速度** | 透過 Groq 與本地 MLX 加速，平均處理時間低於 **1 秒** |
 | **三語自動檢測** | 同一句話中繁體中文、日文、英文自由切換，自動校正不翻譯 |
@@ -44,6 +45,7 @@ SGH Voice v1.5.0 帶來了效能與品質的全面躍升，支援最新的旗艦
 
 ## 🛠 技術架構
 
+- **語言感知層**: 自動偵測 OS 環境，即時切換 UI 與 Log 語言 (Supports ja, zh, en)。
 - **音訊層**: 高性能聲紋驗證與靜音偵測，防止幻覺產生。
 - **ASR 層**: 混合模式 (Hybrid)，15 秒內音訊本地 MLX 辨識，長音訊走 Groq/OpenAI。
 - **LLM 層**: 
