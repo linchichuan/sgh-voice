@@ -809,7 +809,7 @@ class Transcriber:
                 user_msg = f"[語音轉錄原文，請修正後直接輸出]\n{text}"
 
             t0 = time.time()
-            target_model = self.config.get("openrouter_model", "qwen/qwen3.6-plus-preview:free")
+            target_model = self.config.get("openrouter_model", "qwen/qwen3-30b-a3b:free")
             print(" " + _t(f"🌐 [OpenRouter] 正在呼叫模型: {target_model}", f"🌐 [OpenRouter] モデルを呼び出し中: {target_model}", f"🌐 [OpenRouter] Calling model: {target_model}"))
             resp = or_client.chat.completions.create(
                 model=target_model,

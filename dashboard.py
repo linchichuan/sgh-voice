@@ -68,6 +68,9 @@ def api_save_config():
             data.pop(key)  # 不更新被遮蔽的 key
     config.update(data)
     save_config(config)
+    # 即時重新載入設定到引擎（免重啟）
+    if _engine and hasattr(_engine, 'reload_config'):
+        _engine.reload_config()
     return jsonify({"ok": True})
 
 
