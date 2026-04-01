@@ -4,9 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SGH Voice — 極致 AI 音聲輸入助手</title>
-    <meta name="description" content="說話即成專業文章。中日英三語自動辨識、AI 潤稿、格式化排版。內建 Qwen 3.5 與 Llama 3.3 旗艦模型。macOS、iOS 與 Android 全平台支援。">
-    <meta property="og:title" content="SGH Voice — 極致 AI 音聲輸入助手 v1.5.1">
+    <title>SGH Voice — 極致 AI 音聲輸入助手 v1.6.0</title>
+    <meta name="description" content="說話即成專業文章。中日英三語自動辨識、AI 潤稿、格式化排版。支援 OpenRouter。macOS、iOS 與 Android 全平台。">
+    <meta property="og:title" content="SGH Voice — 極致 AI 音聲輸入助手 v1.6.0">
     <meta property="og:description" content="說話即成專業文章。AI 自動校正、排版、移除冗贅詞。內建 2026 最新旗艦 AI 模型支援。">
     <meta property="og:url" content="https://voice.shingihou.com">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -416,53 +416,76 @@
         </div>
     </section>
 
-    <!-- ===== Beta Request Form ===== -->
+    <!-- ===== Android NPP Test Section ===== -->
     <section class="beta" id="beta">
         <div class="container">
             <div class="section-header">
-                <span class="section-label" data-i18n="beta.label">Beta申請</span>
-                <h2 class="section-title" data-i18n="beta.title">Beta版を利用する</h2>
-                <p class="section-subtitle" data-i18n="beta.subtitle">現在、機能制限なしのPro版をBetaテスト中です。以下のフォームから理由を添えて申請してください。
-                </p>
+                <span class="section-label" data-i18n="beta.label">Android 測試招募</span>
+                <h2 class="section-title" data-i18n="beta.title">Android 封測計畫 (NPP)</h2>
+                <p class="section-subtitle">我們正在招募 20 位以上的外部測試者。加入封測，搶先體驗 Android 智慧語音輸入！</p>
             </div>
             <div class="contact-card">
-                <form class="contact-form" id="betaForm">
+                <form class="contact-form" id="nppForm">
                     <div class="form-row">
                         <div class="form-group">
-                            <label for="betaName" data-i18n="beta.name">お名前 / 企業名</label>
-                            <input type="text" id="betaName" required>
+                            <label for="nppName">姓名 / 暱稱</label>
+                            <input type="text" id="nppName" required>
                         </div>
                         <div class="form-group">
-                            <label for="betaEmail" data-i18n="beta.email">メールアドレス</label>
-                            <input type="email" id="betaEmail" required>
+                            <label for="nppEmail">Gmail (Google Play 必要)</label>
+                            <input type="email" id="nppEmail" required>
                         </div>
                     </div>
                     <div class="form-group">
-                        <label for="betaMessage" data-i18n="beta.message">利用目的・理由</label>
-                        <textarea id="betaMessage" rows="5" required></textarea>
+                        <label for="nppDevice">您的 Android 手機型號</label>
+                        <input type="text" id="nppDevice" placeholder="例如：Pixel 8, S24..." required>
                     </div>
                     <button type="submit" class="btn btn-primary contact-submit-btn">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18"
-                            height="18">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
                             <line x1="22" y1="2" x2="11" y2="13" />
                             <polygon points="22 2 15 22 11 13 2 9 22 2" />
                         </svg>
-                        <span data-i18n="beta.send">申請を送る</span>
+                        <span>申請加入 Android 封測</span>
                     </button>
-                    <div class="contact-success" id="betaSuccess" style="display:none;">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20"
-                            height="20">
+                    <div class="contact-success" id="nppSuccess" style="display:none;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
                             <polyline points="20 6 9 17 4 12" />
                         </svg>
-                        <span data-i18n="beta.success">申請を受け付けました。追ってご連絡します。</span>
-                    </div>
-                    <div class="contact-error" id="betaError" style="display:none;">
-                        <span data-i18n="beta.error">送信に失敗しました。もう一度お試しください。</span>
+                        <span>感謝參與！我們會將您的帳號加入測試名單，並通知您下一步。</span>
                     </div>
                 </form>
             </div>
         </div>
     </section>
+
+    <!-- ===== JS for Firestore NPP Form ===== -->
+    <script type="module">
+        const nppForm = document.getElementById('nppForm');
+        if (nppForm) {
+            nppForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const { db, collection, addDoc, serverTimestamp } = window._firestore;
+                const btn = nppForm.querySelector('button');
+                btn.disabled = true;
+                btn.innerHTML = '正在傳送...';
+                try {
+                    await addDoc(collection(db, "npp_testers"), {
+                        name: document.getElementById('nppName').value,
+                        email: document.getElementById('nppEmail').value,
+                        device: document.getElementById('nppDevice').value,
+                        timestamp: serverTimestamp()
+                    });
+                    nppForm.style.display = 'none';
+                    document.getElementById('nppSuccess').style.display = 'flex';
+                } catch (error) {
+                    console.error("Error adding document: ", error);
+                    alert("傳送失敗，請稍後再試。");
+                    btn.disabled = false;
+                    btn.innerHTML = '重試傳送';
+                }
+            });
+        }
+    </script>
 
     <!-- ===== Footer ===== -->
     <footer class="footer">

@@ -780,6 +780,59 @@ class Transcriber:
             return None
 
     def _openrouter_process(self, text, mode="dictate", edit_context=""):
+        """OpenRouter 後處理 — 萬用雲端備援 (支援 DeepSeek, Qwen 等)"""
+        api_key = self.config.get("openrouter_api_key")
+        if not api_key or not text.strip():
+            return None
+        
+        try:
+            client = openai.OpenAI(
+                base_url="https://openrouter.ai/api/v1",
+                api_key=api_key,
+                timeout=20.0, # OpenRouter 響應通常較慢
+            )
+            
+            # 根據模式選擇 system prompt
+            if mode == "edit":
+                system = "根據語音指令修改文字。只輸出修改結果。"
+                user_msg = self._build_edit_prompt(text, edit_context)
+            elif mode == "translate":
+                system = "翻譯助手。只輸出翻譯結果。"
+                user_msg = self._build_translate_prompt(text)
+            else:
+                system = self.config.get("claude_system_prompt", self._DICTATE_SYSTEM)
+                user_msg = f"[語音轉錄原文，請修正後直接輸出]\n{text}"
+
+            t0 = time.time()
+            model = self.config.get("openrouter_model", "qwen/qwen-2.5-72b-instruct")
+            print(" " + _t(f"🌐 [OpenRouter] 正在呼叫模型: {model}", f"🌐 [OpenRouter] モデルを呼び出し中: {model}", f"🌐 [OpenRouter] Calling model: {model}"))
+            
+            resp = client.chat.completions.create(
+                model=model,
+                messages=[
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user_msg},
+                ],
+                max_tokens=2048,
+                temperature=0.3,
+                extra_headers={
+                    "HTTP-Referer": "https://shingihou.com", # 依 OpenRouter 規定
+                    "X-Title": "SGH Voice",
+                }
+            )
+            elapsed = time.time() - t0
+            result = resp.choices[0].message.content.strip()
+            # 移除推理標籤
+            result = re.sub(r'<think>[\s\S]*?</think>', '', result).strip()
+            result = re.sub(r'<think>[\s\S]*$', '', result).strip()
+            
+            print(" " + _t(f"✅ [OpenRouter] 完成 ({elapsed:.2f}s)", f"✅ [OpenRouter] 完了 ({elapsed:.2f}s)", f"✅ [OpenRouter] Completed ({elapsed:.2f}s)"))
+            return result
+        except Exception as e:
+            print(f" ⚠️ OpenRouter 錯誤: {e}")
+            return None
+
+    def _openrouter_process(self, text, mode="dictate", edit_context=""):
         """OpenRouter LLM 後處理 — 支援 200+ 模型（Qwen 3.6、Llama 等免費/付費模型）"""
         or_key = self.config.get("openrouter_api_key")
         if not or_key or not text.strip():
