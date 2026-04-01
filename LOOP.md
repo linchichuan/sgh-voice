@@ -55,7 +55,7 @@ One full rotation = 1 cycle. Increment cycle number when last role completes.
 
 ## Current Pointer
 
-Next: **品質工程師** (role 1) | Cycle 1
+Next: **UX 設計師** (role 2) | Cycle 1
 
 ---
 
@@ -63,6 +63,7 @@ Next: **品質工程師** (role 1) | Cycle 1
 
 | Date | Role | Summary | Files | Result |
 |------|------|---------|-------|--------|
+| 2026-03-31 | 品質工程師 | 建立 _DICTATE_SYSTEM prompt 自動化品質測試（5 樣本 × 7 檢查規則），發現翻譯問題：Groq Llama 違反「禁止翻譯」規則（中→日、英→中） | `scripts/test_prompt_quality.py`, `test/results/PROMPT_QUALITY.md` | pass (3/5 樣本通過, 16/18 檢查通過) |
 
 ---
 
@@ -79,7 +80,7 @@ Next: **品質工程師** (role 1) | Cycle 1
 **Focus**: 辨識品質、LLM 後處理準確度、錯誤處理
 
 **Pending**:
-- 為 _DICTATE_SYSTEM prompt 建立自動化品質測試：準備 5 組語音轉錄範例（中/日/英/混合/長文），驗證 LLM 輸出符合 7 條規則
+- ~~為 _DICTATE_SYSTEM prompt 建立自動化品質測試~~ done（發現翻譯問題，Groq Llama 對語言一致性指令遵從度不足）
 - 檢查所有 LLM 函數的 fallback 鏈是否完整覆蓋（特別是 OpenRouter 新加入後的邊界情況）
 - history.json 的 threading lock 是否有 deadlock 風險（高併發場景）
 
