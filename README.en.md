@@ -79,7 +79,7 @@ This tool offers maximum flexibility — run entirely locally for free, or use p
 
 ### Installation
 
-1. Download `SGH Voice-1.4.0-apple-silicon.dmg` from [Releases](https://github.com/linchichuan/sgh-voice/releases)
+1. Download `SGH Voice-1.6.0-apple-silicon.dmg` from [Releases](https://github.com/linchichuan/sgh-voice/releases)
 2. Drag **Voice Input** to Applications
 3. First launch: Right-click → **Open** (allow macOS Gatekeeper once)
 4. Menu bar shows 🎙 icon → click **Open Dashboard**

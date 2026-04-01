@@ -79,7 +79,7 @@
 
 ### インストール手順
 
-1. [Releases](https://github.com/linchichuan/sgh-voice/releases) から `SGH Voice-1.4.0-apple-silicon.dmg` をダウンロード
+1. [Releases](https://github.com/linchichuan/sgh-voice/releases) から `SGH Voice-1.6.0-apple-silicon.dmg` をダウンロード
 2. DMG を開き、**Voice Input** を Applications フォルダへドラッグ
 3. 初回起動：右クリック → **開く**（macOS Gatekeeper を一度許可）
 4. メニューバーに 🎙 アイコンが表示されたら **Open Dashboard** をクリック
