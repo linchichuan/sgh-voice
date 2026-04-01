@@ -392,7 +392,9 @@ class Transcriber:
             if model_name in BREEZE_MODELS: kwargs["fp16"] = True
             
             prompt = self.memory.build_whisper_prompt(self.config.get("custom_words", []))
-            kwargs["initial_prompt"] = f"繁體中文、日本語、English mixed conversation。{prompt}"
+            # 加入關鍵字引導，防止將日文誤判為韓文
+            prefix = "繁體中文、日本語（ウェブリーティング、ミーティング）、English mixed conversation。"
+            kwargs["initial_prompt"] = f"{prefix}{prompt}"
             
             with Transcriber._metal_lock:
                 result = mlx_whisper.transcribe(audio_source, **kwargs)
@@ -420,8 +422,29 @@ class Transcriber:
 
     # ─── 其他工具方法 ───
 
+    # 所有 LLM 引擎共用的內建 system prompt（config 留空時自動使用）
     _DICTATE_SYSTEM = (
-        "你是一個專業的語音辨識後處理助手。請移除填充詞、修正同音錯字，並加上正確標點與分段。只輸出最終文字。"
+        "輸入＝Whisper 語音轉錄原文。輸出＝清理後純文字。\n"
+        "目標：保留使用者最終意圖，移除語音噪音與中途修正。嚴禁改寫、擴寫、翻譯。\n\n"
+        "【規則】\n\n"
+        "1. 刪除填充詞與噪音\n"
+        "刪除：嗯、啊、呃、那個、就是說、其實、然後、えーと、あの、えっと、um、uh、like 及所有重複變體。連續重複詞只保留一次。\n\n"
+        "2. 自我修正\n"
+        "「不是A，是B」「應該說B」「我改一下」→ 僅保留最終版本，刪除被推翻內容與過渡語。\n\n"
+        "3. 專有名詞校正（拼寫與大小寫必須正確）\n"
+        "KusuriJapan｜MedicalSupporter｜SGH Phone｜新義豊｜薬機法｜PMD Act｜n8n｜Twilio｜Ultravox｜"
+        "LINE Bot｜Claude Code｜MCP｜Repo｜GitHub｜API｜Zeabur\n"
+        "辨識錯誤時自動修正。\n\n"
+        "4. 語言保留\n"
+        "中日英混合全部保留原語言。不翻譯、不統一語言、不改寫術語。\n"
+        "嚴禁將日文外來語（如ウェブミーティング）轉換成韓文或其他語言。\n\n"
+        "5. 標點與格式\n"
+        "中文／日文用全形標點（，。？！、：；）。英文用半形標點，標點後留一空格。"
+        "長段落依語意自然分段。不改寫句意、不擴充、不補充。\n\n"
+        "6. 長文整理\n"
+        "超過三句時，依邏輯分段。多要點時以條列呈現。完整整理文辭用句，內容須合理，不得臆測幻想。\n\n"
+        "7. 輸出限制\n"
+        "僅輸出最終文字。禁止：說明文字、Markdown、引號、前言結語、系統語氣。"
     )
 
     def _apply_smart_replace(self, text):
