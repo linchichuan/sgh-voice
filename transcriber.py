@@ -335,6 +335,7 @@ class Transcriber:
             has_anthropic = bool(self.config.get("anthropic_api_key"))
             has_openai = bool(self.config.get("openai_api_key"))
             has_groq = bool(self.config.get("groq_api_key"))
+            has_openrouter = bool(self.config.get("openrouter_api_key"))
 
             should_polish = (
                 self.config.get("enable_claude_polish")
@@ -370,15 +371,24 @@ class Transcriber:
                         print(" ⚠️ OpenAI 失敗")
                     return None, None
 
+                def try_openrouter():
+                    if has_openrouter:
+                        res = self._openrouter_process(corrected, mode, edit_context)
+                        if res: return res, "openrouter"
+                        print(" ⚠️ OpenRouter 失敗")
+                    return None, None
+
                 # 依據使用者選擇的首選引擎決定嘗試順序
                 if pref_engine == "groq":
-                    routes = [try_groq, try_claude, try_openai, try_ollama]
+                    routes = [try_groq, try_openrouter, try_claude, try_openai, try_ollama]
                 elif pref_engine == "claude":
-                    routes = [try_claude, try_groq, try_openai, try_ollama]
+                    routes = [try_claude, try_groq, try_openrouter, try_openai, try_ollama]
                 elif pref_engine == "openai":
-                    routes = [try_openai, try_groq, try_claude, try_ollama]
+                    routes = [try_openai, try_groq, try_openrouter, try_claude, try_ollama]
+                elif pref_engine == "openrouter":
+                    routes = [try_openrouter, try_groq, try_claude, try_openai, try_ollama]
                 else:  # ollama
-                    routes = [try_ollama, try_groq, try_claude, try_openai]
+                    routes = [try_ollama, try_groq, try_openrouter, try_claude, try_openai]
 
                 for route in routes:
                     res, source = route()
@@ -769,15 +779,89 @@ class Transcriber:
             print(f" ⚠️ Groq LLM 錯誤: {e}")
             return None
 
+    def _openrouter_process(self, text, mode="dictate", edit_context=""):
+        """OpenRouter LLM 後處理 — 支援 200+ 模型（Qwen 3.6、Llama 等免費/付費模型）"""
+        or_key = self.config.get("openrouter_api_key")
+        if not or_key or not text.strip():
+            return None
+        try:
+            or_client = openai.OpenAI(
+                base_url="https://openrouter.ai/api/v1",
+                api_key=or_key,
+                timeout=10.0,
+            )
+            # 根據模式選擇 system prompt
+            if mode == "edit":
+                system = "根據語音指令修改文字。只輸出修改結果。"
+                user_msg = self._build_edit_prompt(text, edit_context)
+            elif mode == "translate":
+                system = "翻譯助手。只輸出翻譯結果。"
+                user_msg = self._build_translate_prompt(text)
+            else:
+                system = self.config.get("claude_system_prompt", self._DICTATE_SYSTEM)
+                scene = self.config.get("active_scene", "general")
+                scene_extra = SCENE_PRESETS.get(scene, {}).get("system_prompt_extra", "")
+                if scene_extra:
+                    system = system + "\n" + scene_extra
+                app_prompt = detect_app_style(self.config).get("prompt", "")
+                if app_prompt:
+                    system = system + "\n" + app_prompt
+                user_msg = f"[語音轉錄原文，請修正後直接輸出]\n{text}"
+
+            t0 = time.time()
+            target_model = self.config.get("openrouter_model", "qwen/qwen3.6-plus-preview:free")
+            print(" " + _t(f"🌐 [OpenRouter] 正在呼叫模型: {target_model}", f"🌐 [OpenRouter] モデルを呼び出し中: {target_model}", f"🌐 [OpenRouter] Calling model: {target_model}"))
+            resp = or_client.chat.completions.create(
+                model=target_model,
+                messages=[
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user_msg},
+                ],
+                max_tokens=min(2048, max(256, len(text) * 3)),
+                temperature=0.3,
+            )
+            elapsed = time.time() - t0
+
+            # 追蹤 token 用量
+            self._track_usage(resp, "openrouter")
+
+            result = resp.choices[0].message.content.strip()
+            # 移除推理模型的 <think> 標籤（Qwen QwQ / DeepSeek R1 等 reasoning model）
+            result = re.sub(r'<think>[\s\S]*?</think>', '', result).strip()
+            result = re.sub(r'<think>[\s\S]*$', '', result).strip()
+            print(" " + _t(f"🌐 [OpenRouter] 完成 ({elapsed:.2f}s)", f"🌐 [OpenRouter] 完了 ({elapsed:.2f}s)", f"🌐 [OpenRouter] Done ({elapsed:.2f}s)"))
+
+            # 安全檢查
+            if mode == "dictate" and self._is_llm_hallucination(result, text):
+                print(f" ⚠️ OpenRouter LLM 回覆疑似自我介紹，改用原文")
+                return text
+            if len(result) > len(text) * 3 and mode == "dictate":
+                lines = result.split('\n')
+                trimmed = []
+                total = 0
+                for line in lines:
+                    total += len(line)
+                    trimmed.append(line)
+                    if total > len(text) * 2:
+                        break
+                return '\n'.join(trimmed).strip()
+            return result
+        except Exception as e:
+            print(f" ⚠️ OpenRouter 錯誤: {e}")
+            return None
+
     # 固定的高效 system prompt（不從 config 讀取，避免使用者破壞品質）
     _DICTATE_SYSTEM = (
         "你是一個專業的語音辨識後處理與文法檢查助手。請遵循以下規則執行任務：\n"
         "1. 語言一致性：自動偵測原文語言（中/日/英）。嚴禁翻譯！保持講者的原始語言。\n"
         "2. 智慧修正：根據前後語境修正明顯的同音異字、文法錯誤與不通順的語句。優化為流暢的書面語或專業口語。\n"
         "3. 徹底去雜訊：刪除所有填充詞（嗯、啊、那個、えーと、um、you know 等）與猶豫改口處。\n"
-        "4. 標點與排版：中文使用全形標點（，。？！），英文使用半形標點並正確留空。長篇內容請適當分段或以條列式 (Bullet points) 呈現，提升閱讀效率。\n"
-        "5. 專有名詞保護：若出現縮寫或專業術語（如 AI, API, CRM, n8n 等），請確保拼寫正確。\n"
-        "6. 簡潔輸出：只輸出整理後的最終文字，嚴禁包含任何解釋、問候或自我介紹。"
+        "4. 標點與排版：中文使用全形標點（，。？！），英文使用半形標點並正確留空。\n"
+        "5. 結構化整理：當內容涉及多個要點、步驟或話題時，主動以條列式（- 或 1. 2. 3.）呈現，每點一行。"
+        "若內容為單一短句或簡短回覆，則保持自然段落，不強制條列。"
+        "超過 3 句以上的長篇內容，請依邏輯分段，段落間空一行。\n"
+        "6. 專有名詞保護：若出現縮寫或專業術語（如 AI, API, CRM, n8n 等），請確保拼寫正確。\n"
+        "7. 簡潔輸出：只輸出整理後的最終文字，嚴禁包含任何解釋、問候或自我介紹。"
     )
 
     def _openai_process(self, text, mode, edit_context=""):

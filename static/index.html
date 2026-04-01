@@ -1208,6 +1208,15 @@
           </div>
           <div class="form-row">
             <div class="form-group">
+              <label>OpenRouter API Key（200+ 模型、含免費模型）</label>
+              <input type="password" id="cfg-openrouter-key" placeholder="sk-or-...">
+            </div>
+            <div class="form-group" style="display:flex;align-items:flex-end;">
+              <a href="https://openrouter.ai/keys" target="_blank" style="font-size:12px;color:var(--accent2);text-decoration:none;">申請 OpenRouter Key →</a>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
               <label data-i18n="label_whisper_model">Whisper 模型</label>
               <select id="cfg-whisper-model">
                 <option value="whisper-1">whisper-1</option>
@@ -1366,6 +1375,7 @@
               <label>首選 LLM 引擎（後處理）</label>
               <select id="cfg-llm-engine" onchange="onLlmEngineChange()">
                 <option value="groq">☁️ Groq (旗艦 Llama 3.3、極速穩定)</option>
+                <option value="openrouter">🌐 OpenRouter (200+ 模型、含免費)</option>
                 <option value="claude">☁️ Claude API (Anthropic)</option>
                 <option value="openai">☁️ OpenAI API (GPT-4o)</option>
                 <option value="ollama">💻 Ollama 本地模型 (免費、離線)</option>
@@ -1379,6 +1389,20 @@
                 <option value="qwen-qwq-32b">Qwen QwQ 32B (推理模型、較慢)</option>
                 <option value="llama-4-scout-17b-16e-instruct">Llama 4 Scout (高吞吐、最新)</option>
               </select>
+            </div>
+            <div class="form-group" id="openrouter-model-group">
+              <label>OpenRouter 模型</label>
+              <select id="cfg-openrouter-model">
+                <option value="qwen/qwen3.6-plus-preview:free">Qwen 3.6 Plus Preview (免費)</option>
+                <option value="qwen/qwen3-235b-a22b:free">Qwen 3 235B (免費)</option>
+                <option value="qwen/qwen3-30b-a3b:free">Qwen 3 30B (免費)</option>
+                <option value="deepseek/deepseek-chat-v3-0324:free">DeepSeek V3 0324 (免費)</option>
+                <option value="deepseek/deepseek-r1:free">DeepSeek R1 (免費、推理)</option>
+                <option value="google/gemini-2.5-flash-preview:free">Gemini 2.5 Flash (免費)</option>
+                <option value="meta-llama/llama-4-maverick:free">Llama 4 Maverick (免費)</option>
+              </select>
+              <small style="color:var(--text3);display:block;margin-top:4px">也可手動輸入任意 OpenRouter 模型 ID</small>
+              <input type="text" id="cfg-openrouter-model-custom" placeholder="或輸入自訂模型 ID，如 qwen/qwen3.5-plus" style="margin-top:6px;font-size:12px;">
             </div>
             <div class="form-group" id="ollama-model-group">
               <label data-i18n="label_llm_model">本地 LLM 模型（Ollama）</label>
@@ -2504,6 +2528,7 @@
       document.getElementById('cfg-anthropic-key').value = cfg.anthropic_api_key || '';
       document.getElementById('cfg-elevenlabs-key').value = cfg.elevenlabs_api_key || '';
       document.getElementById('cfg-groq-key').value = cfg.groq_api_key || '';
+      document.getElementById('cfg-openrouter-key').value = cfg.openrouter_api_key || '';
       document.getElementById('cfg-whisper-model').value = cfg.whisper_model || 'whisper-1';
       document.getElementById('cfg-claude-model').value = cfg.claude_model || 'claude-haiku-4-5-20251001';
       document.getElementById('cfg-scene').value = cfg.active_scene || 'general';
@@ -2524,6 +2549,18 @@
       document.getElementById('cfg-llm-engine').value = cfg.llm_engine || 'ollama';
       document.getElementById('cfg-groq-model').value = cfg.groq_model || 'qwen-qwq-32b';
       document.getElementById('cfg-groq-whisper-model').value = cfg.groq_whisper_model || 'whisper-large-v3-turbo';
+      // OpenRouter 模型
+      const orModel = cfg.openrouter_model || 'qwen/qwen3.6-plus-preview:free';
+      const orSelect = document.getElementById('cfg-openrouter-model');
+      const orCustom = document.getElementById('cfg-openrouter-model-custom');
+      // 如果是下拉選項中的模型，選中它；否則放到自訂欄位
+      if ([...orSelect.options].some(o => o.value === orModel)) {
+        orSelect.value = orModel;
+        orCustom.value = '';
+      } else {
+        orSelect.value = orSelect.options[0].value;
+        orCustom.value = orModel;
+      }
       setToggle('tog-hybrid', cfg.enable_hybrid_mode);
       document.getElementById('cfg-stt-engine').value = cfg.stt_engine || 'mlx-whisper';
       document.getElementById('cfg-local-whisper-model').value = cfg.local_whisper_model || 'mlx-community/whisper-turbo';
@@ -2666,6 +2703,7 @@
     function onLlmEngineChange() {
       const engine = document.getElementById('cfg-llm-engine').value;
       document.getElementById('groq-model-group').style.display = engine === 'groq' ? '' : 'none';
+      document.getElementById('openrouter-model-group').style.display = engine === 'openrouter' ? '' : 'none';
       document.getElementById('ollama-model-group').style.display = engine === 'ollama' ? '' : 'none';
     }
 
@@ -2757,6 +2795,8 @@
         anthropic_api_key: document.getElementById('cfg-anthropic-key').value,
         elevenlabs_api_key: document.getElementById('cfg-elevenlabs-key').value,
         groq_api_key: document.getElementById('cfg-groq-key').value,
+        openrouter_api_key: document.getElementById('cfg-openrouter-key').value,
+        openrouter_model: document.getElementById('cfg-openrouter-model-custom').value.trim() || document.getElementById('cfg-openrouter-model').value,
         whisper_model: document.getElementById('cfg-whisper-model').value,
         claude_model: document.getElementById('cfg-claude-model').value,
         active_scene: document.getElementById('cfg-scene').value,

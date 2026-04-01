@@ -51,7 +51,7 @@ def api_get_config():
     # 隱藏 API key 的中間部分
     safe = config.copy()
     safe["app_styles"] = config.get("app_styles", DEFAULT_APP_STYLES)
-    for key in ["openai_api_key", "anthropic_api_key", "elevenlabs_api_key", "groq_api_key"]:
+    for key in ["openai_api_key", "anthropic_api_key", "elevenlabs_api_key", "groq_api_key", "openrouter_api_key"]:
         v = safe.get(key, "")
         if len(v) > 12:
             safe[key] = v[:6] + "..." + v[-4:]
@@ -63,7 +63,7 @@ def api_save_config():
     config = load_config()
     data = request.json
     # 只更新非空的 API key（避免覆蓋隱藏的 key）
-    for key in ["openai_api_key", "anthropic_api_key", "elevenlabs_api_key", "groq_api_key"]:
+    for key in ["openai_api_key", "anthropic_api_key", "elevenlabs_api_key", "groq_api_key", "openrouter_api_key"]:
         if key in data and "..." in str(data[key]):
             data.pop(key)  # 不更新被遮蔽的 key
     config.update(data)
@@ -269,6 +269,7 @@ def api_service_status():
         "has_openai_key": bool(config.get("openai_api_key")),
         "has_anthropic_key": bool(config.get("anthropic_api_key")),
         "has_groq_key": bool(config.get("groq_api_key")),
+        "has_openrouter_key": bool(config.get("openrouter_api_key")),
         "hybrid_mode": config.get("enable_hybrid_mode", True),
         "local_model": config.get("local_llm_model", "qwen2.5:3b"),
     })
