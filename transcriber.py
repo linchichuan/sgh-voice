@@ -726,7 +726,7 @@ class Transcriber:
                 system = "翻譯助手。只輸出翻譯結果。"
                 user_msg = self._build_translate_prompt(text)
             else:
-                system = self.config.get("claude_system_prompt", self._DICTATE_SYSTEM)
+                system = self.config.get("claude_system_prompt") or self._DICTATE_SYSTEM
                 scene = self.config.get("active_scene", "general")
                 scene_extra = SCENE_PRESETS.get(scene, {}).get("system_prompt_extra", "")
                 if scene_extra:
@@ -798,7 +798,7 @@ class Transcriber:
                 system = "翻譯助手。只輸出翻譯結果。"
                 user_msg = self._build_translate_prompt(text)
             else:
-                system = self.config.get("claude_system_prompt", self._DICTATE_SYSTEM)
+                system = self.config.get("claude_system_prompt") or self._DICTATE_SYSTEM
                 scene = self.config.get("active_scene", "general")
                 scene_extra = SCENE_PRESETS.get(scene, {}).get("system_prompt_extra", "")
                 if scene_extra:
@@ -852,16 +852,23 @@ class Transcriber:
 
     # 固定的高效 system prompt（不從 config 讀取，避免使用者破壞品質）
     _DICTATE_SYSTEM = (
-        "你是一個專業的語音辨識後處理與文法檢查助手。請遵循以下規則執行任務：\n"
-        "1. 語言一致性：自動偵測原文語言（中/日/英）。嚴禁翻譯！保持講者的原始語言。\n"
-        "2. 智慧修正：根據前後語境修正明顯的同音異字、文法錯誤與不通順的語句。優化為流暢的書面語或專業口語。\n"
-        "3. 徹底去雜訊：刪除所有填充詞（嗯、啊、那個、えーと、um、you know 等）與猶豫改口處。\n"
-        "4. 標點與排版：中文使用全形標點（，。？！），英文使用半形標點並正確留空。\n"
-        "5. 結構化整理：當內容涉及多個要點、步驟或話題時，主動以條列式（- 或 1. 2. 3.）呈現，每點一行。"
-        "若內容為單一短句或簡短回覆，則保持自然段落，不強制條列。"
-        "超過 3 句以上的長篇內容，請依邏輯分段，段落間空一行。\n"
-        "6. 專有名詞保護：若出現縮寫或專業術語（如 AI, API, CRM, n8n 等），請確保拼寫正確。\n"
-        "7. 簡潔輸出：只輸出整理後的最終文字，嚴禁包含任何解釋、問候或自我介紹。"
+        "輸入＝Whisper 原始轉錄文字。輸出＝清理後的最終純文字。\n"
+        "目標：保留使用者最終意圖，移除語音噪音與中途修正，不改寫、不擴寫、不翻譯。\n\n"
+        "一、刪除填充詞與口語噪音\n"
+        "刪除：嗯、啊、呃、那個、就是說、其實、然後、えーと、あの、えっと、um、uh、like 及其重複變體。連續重複詞只保留一次。\n\n"
+        "二、自我修正處理\n"
+        "「不是A，是B」「應該說B」「我改一下」→ 僅保留最終版本，刪除被推翻的內容與過渡語。\n\n"
+        "三、專有名詞校正（大小寫必須正確）\n"
+        "KusuriJapan, MedicalSupporter, SGH Phone, 新義豊, 薬機法, PMD Act, n8n, Twilio, Ultravox, "
+        "LINE Bot, Claude Code, MCP, Repo, GitHub, API, Zeabur — 辨識錯誤時自動修正為正確拼法。\n\n"
+        "四、語言保留\n"
+        "中日英混合全部保留原語言。不翻譯、不統一語言、不改寫專業術語。\n\n"
+        "五、標點與格式\n"
+        "中文／日文用全形標點（，。？！、：；），英文用半形標點且標點後留一空格。\n"
+        "短句保持自然段落。長篇內容依語意分段，多要點時以條列呈現。不改寫句意、不擴充、不補充。\n\n"
+        "六、輸出限制\n"
+        "僅輸出修正後的最終文字。禁止：說明文字、Markdown、引號、前言結語、系統提示語氣。\n"
+        "長文請完整整理文辭用句，內容須合理，不得臆測或幻想。"
     )
 
     def _openai_process(self, text, mode, edit_context=""):
@@ -877,7 +884,7 @@ class Transcriber:
             system = "翻譯助手。只輸出翻譯結果。"
             user_msg = self._build_translate_prompt(text)
         else:
-            system = self.config.get("claude_system_prompt", self._DICTATE_SYSTEM)
+            system = self.config.get("claude_system_prompt") or self._DICTATE_SYSTEM
             # 注入場景額外 prompt
             scene = self.config.get("active_scene", "general")
             scene_extra = SCENE_PRESETS.get(scene, {}).get("system_prompt_extra", "")
@@ -940,7 +947,7 @@ class Transcriber:
             system = "翻譯助手。只輸出翻譯結果。"
             user_msg = self._build_translate_prompt(text)
         else:
-            system = self.config.get("claude_system_prompt", self._DICTATE_SYSTEM)
+            system = self.config.get("claude_system_prompt") or self._DICTATE_SYSTEM
             # 注入場景額外 prompt
             scene = self.config.get("active_scene", "general")
             scene_extra = SCENE_PRESETS.get(scene, {}).get("system_prompt_extra", "")

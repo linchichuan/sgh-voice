@@ -279,12 +279,7 @@ DEFAULT_CONFIG = {
         "ja": ["えーと", "あの", "えー", "まあ", "なんか", "ちょっと"],
         "en": ["um", "uh", "like", "you know", "basically", "actually", "so yeah"],
     },
-    "claude_system_prompt": (
-        "你是語音轉文字後處理與文法助手。\n"
-        "請只做以下處理：修正明顯錯別字與文法錯誤、補上基本標點、移除少量口語填充詞、優化語氣（Grammar & Tone）使其聽起來流暢自然。\n"
-        "【絕對不要翻譯！】自動判斷原文是中文、日文還是英文，保持講者的語言。多語混合時也保持原狀。\n"
-        "只輸出修正後文字。"
-    ),
+    "claude_system_prompt": "",  # 空字串 = 使用 _DICTATE_SYSTEM 內建 prompt
     "active_scene": "general",
     "dashboard_port": 7865,
 }
