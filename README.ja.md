@@ -1,16 +1,25 @@
-# 🎙 SGH Voice — AI 音声入力ツール
+# 🎙 SGH Voice — AI 音声入力ツール (v1.6.0)
 
 **[English](README.en.md)** | **日本語** | **[繁體中文](README.md)**
 
-> Typeless（$12/月）の代替となる自社開発ソリューション。Whisper 音声認識 + Claude/Qwen スマート後処理により、中国語・日本語・英語の3言語混在をサポート。データは100%自社管理。
+> 話すだけでプロの文章に。中国語・日本語・英語の3言語を自動認識 + スマート AI 後処理。データは100%自社管理。
 
 [![macOS](https://img.shields.io/badge/macOS-Apple_Silicon-black?logo=apple)](https://github.com/linchichuan/sgh-voice/releases)
 [![iOS](https://img.shields.io/badge/iOS-17.0+-blue?logo=apple)](https://github.com/linchichuan/sgh-voice/releases)
 [![Android](https://img.shields.io/badge/Android-8.0+-green?logo=android)](https://github.com/linchichuan/sgh-voice/releases)
-[![Python](https://img.shields.io/badge/Python-3.12+-blue?logo=python)](https://www.python.org/)
-[![License](https://img.shields.io/badge/License-Private-gray)]()
-[![Version](https://img.shields.io/badge/Version-1.4.0-green)]()
-[![Website](https://img.shields.io/badge/Website-voice.shingihou.com-blue)](https://voice.shingihou.com)
+[![Version](https://img.shields.io/badge/Version-1.6.0-green)]()
+
+---
+
+## 🌟 v1.6.0 の新機能
+
+| 機能 | 詳細 |
+|------|------|
+| **🌐 OpenRouter 統合** | 200以上のモデル対応（無料モデルあり：Qwen 3.6、DeepSeek V3、Gemini 2.5 Flash）。クラウドバックアップでサービスの安定性を確保。 |
+| **🧠 7ルール System Prompt** | LLM 後処理を刷新：フィラー除去、自己修正検出、固有名詞校正、長文の構造化整形。1つのプロンプトで全5エンジンに対応。 |
+| **📱 Android ベータ募集** | Android 版がテスト準備完了！最初のテスターを募集中。 |
+| **⚡ 5エンジン LLM ルーティング** | Ollama（ローカル）/ Groq / Claude / OpenAI / OpenRouter、自動フォールバック。 |
+| **🌍 OS 言語適応** | macOS の言語設定（日/中/英）を自動検出し、UIを最適化。 |
 
 ---
 
@@ -163,7 +172,7 @@ Layer 2: 辞書修正（memory.apply_corrections）
        ↓
 Layer 3: スマート置換（@mail → email 等）
        ↓
-Layer 4: LLM 後処理（Hybrid: ローカル Qwen / クラウド Claude Haiku 4.5）
+Layer 4: LLM 後処理（5エンジン: Ollama / Groq / Claude / OpenAI / OpenRouter）
        ↓
 Layer 5: OpenCC s2twp（繁体中国語最終防御）
        ↓
@@ -186,8 +195,8 @@ Layer 5: OpenCC s2twp（繁体中国語最終防御）
 ランタイム:         Python 3.12+
 音声認識（ローカル）: mlx-whisper（Apple Silicon 最適化）
 音声認識（クラウド）: OpenAI Whisper API
-後処理（ローカル）:   Ollama + Qwen 2.5 3B
-後処理（クラウド）:   Anthropic Claude Haiku 4.5
+後処理（ローカル）:   Ollama + Qwen 3.5
+後処理（クラウド）:   Groq / Claude / OpenAI / OpenRouter（5エンジン自動フォールバック）
 繁体中国語変換:      OpenCC (s2twp)
 録音:              sounddevice + numpy
 ホットキー:         pynput

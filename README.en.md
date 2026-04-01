@@ -1,16 +1,25 @@
-# 🎙 SGH Voice — AI Voice Input Tool
+# 🎙 SGH Voice — AI Voice Input Tool (v1.6.0)
 
 **English** | **[日本語](README.ja.md)** | **[繁體中文](README.md)**
 
-> A self-hosted alternative to Typeless ($12/mo). Whisper speech recognition + Claude/Qwen smart post-processing. Supports trilingual Chinese-Japanese-English mixing. 100% data ownership.
+> Speak and get professional text. Trilingual Chinese-Japanese-English auto-detection + smart AI post-processing. 100% data ownership.
 
 [![macOS](https://img.shields.io/badge/macOS-Apple_Silicon-black?logo=apple)](https://github.com/linchichuan/sgh-voice/releases)
 [![iOS](https://img.shields.io/badge/iOS-17.0+-blue?logo=apple)](https://github.com/linchichuan/sgh-voice/releases)
 [![Android](https://img.shields.io/badge/Android-8.0+-green?logo=android)](https://github.com/linchichuan/sgh-voice/releases)
-[![Python](https://img.shields.io/badge/Python-3.12+-blue?logo=python)](https://www.python.org/)
-[![License](https://img.shields.io/badge/License-Private-gray)]()
-[![Version](https://img.shields.io/badge/Version-1.4.0-green)]()
-[![Website](https://img.shields.io/badge/Website-voice.shingihou.com-blue)](https://voice.shingihou.com)
+[![Version](https://img.shields.io/badge/Version-1.6.0-green)]()
+
+---
+
+## 🌟 What's New in v1.6.0
+
+| Feature | Details |
+|---------|---------|
+| **🌐 OpenRouter Integration** | 200+ models including free ones (Qwen 3.6, DeepSeek V3, Gemini 2.5 Flash). Cloud backup ensures service never goes down. |
+| **🧠 7-Rule System Prompt** | Redesigned LLM post-processing: filler removal, self-correction detection, proper noun correction, structured long-text formatting. One prompt powers all 5 engines. |
+| **📱 Android Beta Recruitment** | Android version ready for testing! Join the first wave of testers. |
+| **⚡ 5-Engine LLM Routing** | Ollama (local) / Groq / Claude / OpenAI / OpenRouter with automatic fallback chain. |
+| **🌍 OS Language Adaptation** | Auto-detects your macOS language (JA/ZH/EN) for the friendliest UI experience. |
 
 ---
 
@@ -163,7 +172,7 @@ Layer 2: Dictionary correction (memory.apply_corrections)
        ↓
 Layer 3: Smart Replace (@mail → email, etc.)
        ↓
-Layer 4: LLM post-processing (Hybrid: local Qwen / Cloud Claude Haiku 4.5)
+Layer 4: LLM post-processing (5 engines: Ollama / Groq / Claude / OpenAI / OpenRouter)
        ↓
 Layer 5: OpenCC s2twp (Traditional Chinese final protection)
        ↓
@@ -186,8 +195,8 @@ Layer 5: OpenCC s2twp (Traditional Chinese final protection)
 Runtime:          Python 3.12+
 STT (Local):      mlx-whisper (Apple Silicon optimized)
 STT (Cloud):      OpenAI Whisper API
-LLM (Local):      Ollama + Qwen 2.5 3B
-LLM (Cloud):      Anthropic Claude Haiku 4.5
+LLM (Local):      Ollama + Qwen 3.5
+LLM (Cloud):      Groq / Claude / OpenAI / OpenRouter (5-engine auto-fallback)
 TradChinese:      OpenCC (s2twp)
 Recording:        sounddevice + numpy
 Hotkeys:          pynput
