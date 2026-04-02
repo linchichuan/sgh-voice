@@ -55,7 +55,7 @@ One full rotation = 1 cycle. Increment cycle number when last role completes.
 
 ## Current Pointer
 
-Next: **UX 設計師** (role 2) | Cycle 1
+Next: **效能工程師** (role 3) | Cycle 1
 
 ---
 
@@ -64,6 +64,7 @@ Next: **UX 設計師** (role 2) | Cycle 1
 | Date | Role | Summary | Files | Result |
 |------|------|---------|-------|--------|
 | 2026-03-31 | 品質工程師 | 建立 _DICTATE_SYSTEM prompt 自動化品質測試（5 樣本 × 7 檢查規則），發現翻譯問題：Groq Llama 違反「禁止翻譯」規則（中→日、英→中） | `scripts/test_prompt_quality.py`, `test/results/PROMPT_QUALITY.md` | pass (3/5 樣本通過, 16/18 檢查通過) |
+| 2026-04-02 | UX 設計師 | Dashboard 加入「測試 LLM 連線」按鈕：後端 POST /api/test-llm 支援 5 引擎，前端即時顯示延遲與模型，6 語言 i18n | `dashboard.py`, `static/index.html` | pass |
 
 ---
 
@@ -90,7 +91,7 @@ Next: **UX 設計師** (role 2) | Cycle 1
 **Focus**: Dashboard 使用體驗、設定流程、視覺回饋
 
 **Pending**:
-- Dashboard 設定頁 OpenRouter 模型選擇：加入「測試連線」按鈕，一鍵驗證 API Key + 模型是否可用
+- ~~Dashboard 設定頁加入「測試連線」按鈕~~ done（POST /api/test-llm，5 引擎皆支援，顯示延遲+模型名稱）
 - 設定儲存後加入引擎狀態即時更新（目前只有 toast）
 - Dashboard 首頁加入當前 LLM 引擎 + 模型的即時狀態顯示
 

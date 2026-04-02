@@ -257,6 +257,65 @@ def api_usage():
     return jsonify(usage)
 
 
+@app.route("/api/test-llm", methods=["POST"])
+def api_test_llm():
+    """測試 LLM 引擎連線：發送簡短測試訊息驗證 API Key + 模型可用性"""
+    import time as _time
+    data = request.json or {}
+    engine = data.get("engine", "groq")
+    config = load_config()
+    test_msg = "Hello"
+    t0 = _time.time()
+
+    try:
+        if engine == "groq":
+            import openai as openai_lib
+            key = config.get("groq_api_key")
+            if not key: return jsonify({"ok": False, "error": "No Groq API Key"}), 200
+            client = openai_lib.OpenAI(base_url="https://api.groq.com/openai/v1", api_key=key, timeout=10.0)
+            model = config.get("groq_model", "llama-3.3-70b-versatile")
+            client.chat.completions.create(model=model, messages=[{"role": "user", "content": test_msg}], max_tokens=5)
+
+        elif engine == "openrouter":
+            import openai as openai_lib
+            key = config.get("openrouter_api_key")
+            if not key: return jsonify({"ok": False, "error": "No OpenRouter API Key"}), 200
+            client = openai_lib.OpenAI(base_url="https://openrouter.ai/api/v1", api_key=key, timeout=15.0)
+            model = config.get("openrouter_model", "qwen/qwen3-30b-a3b:free")
+            client.chat.completions.create(model=model, messages=[{"role": "user", "content": test_msg}], max_tokens=5,
+                                           extra_headers={"HTTP-Referer": "https://shingihou.com", "X-Title": "SGH Voice"})
+
+        elif engine == "claude":
+            key = config.get("anthropic_api_key")
+            if not key: return jsonify({"ok": False, "error": "No Anthropic API Key"}), 200
+            client = anthropic.Anthropic(api_key=key, timeout=10.0)
+            model = config.get("claude_model", "claude-3-5-haiku-20241022")
+            client.messages.create(model=model, messages=[{"role": "user", "content": test_msg}], max_tokens=5)
+
+        elif engine == "openai":
+            import openai as openai_lib
+            key = config.get("openai_api_key")
+            if not key: return jsonify({"ok": False, "error": "No OpenAI API Key"}), 200
+            client = openai_lib.OpenAI(api_key=key, timeout=10.0)
+            model = config.get("openai_model", "gpt-4o")
+            client.chat.completions.create(model=model, messages=[{"role": "user", "content": test_msg}], max_tokens=5)
+
+        elif engine == "ollama":
+            import openai as openai_lib
+            client = openai_lib.OpenAI(base_url="http://127.0.0.1:11434/v1", api_key="ollama", timeout=8.0)
+            model = config.get("local_llm_model", "qwen2.5:3b")
+            client.chat.completions.create(model=model, messages=[{"role": "user", "content": test_msg}], max_tokens=5)
+
+        else:
+            return jsonify({"ok": False, "error": f"Unknown engine: {engine}"}), 200
+
+        latency = round(_time.time() - t0, 2)
+        return jsonify({"ok": True, "engine": engine, "model": model, "latency": latency})
+
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)[:200]}), 200
+
+
 @app.route("/api/service-status")
 def api_service_status():
     """服務狀態：Ollama / Cloud API 連線情況（供狀態燈使用）"""

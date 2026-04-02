@@ -1422,6 +1422,14 @@
               <div id="ollama-model-hint" style="font-size:11px; color:var(--text3); margin-top:4px;"></div>
             </div>
           </div>
+          <div style="margin-top:-4px; margin-bottom:12px;">
+            <button onclick="testLlmConnection()" id="btn-test-llm"
+              style="padding:6px 16px; font-size:12px; border-radius:6px; border:1px solid var(--accent2); background:transparent; color:var(--accent2); cursor:pointer; transition:all .2s;"
+              onmouseover="this.style.background='var(--accent2)';this.style.color='#fff'" onmouseout="this.style.background='transparent';this.style.color='var(--accent2)'">
+              <span data-i18n="btn_test_llm">🔌 測試 LLM 連線</span>
+            </button>
+            <span id="test-llm-result" style="margin-left:10px; font-size:12px;"></span>
+          </div>
           <div id="hybrid-notice"
             style="font-size: 11px; color: var(--orange); margin-bottom: 16px; margin-top: -8px; line-height: 1.4; padding: 8px 12px; background: #fdcb6e15; border-radius: 6px; border-left: 3px solid var(--orange);">
             ⚠️ <b>初次啟用注意：</b><br>
@@ -1595,6 +1603,10 @@
         label_silence_dur: '靜音自動停止（秒）', label_max_dur: '最長錄音（秒）',
         label_cpm: '打字速度（每分鐘字數，用於計算節省時間，中文約 30-60）',
         label_system_prompt: '📝 LLM 後處理系統提示詞',
+        btn_test_llm: '🔌 測試 LLM 連線',
+        test_llm_testing: '測試中...',
+        test_llm_ok: '✅ 連線成功',
+        test_llm_fail: '❌ 連線失敗',
         // Toggles
         toggle_hybrid: '啟用 Hybrid 模式',
         toggle_hybrid_desc: 'Apple Silicon 本地 Whisper + Ollama，長句自動 fallback 雲端',
@@ -1664,6 +1676,10 @@
         label_max_dur: '最大録音時間 (秒)',
         label_cpm: 'タイピング速度（文字/分、時間節約の計算用、通常30-60）',
         label_system_prompt: '📝 LLM 後処理システムプロンプト',
+        btn_test_llm: '🔌 LLM接続テスト',
+        test_llm_testing: 'テスト中...',
+        test_llm_ok: '✅ 接続成功',
+        test_llm_fail: '❌ 接続失敗',
         toggle_hybrid: 'ハイブリッドモードを有効にする',
         toggle_hybrid_desc: 'Apple Silicon ローカル Whisper + Ollama。長い文は自動的にクラウドにフォールバック。',
         toggle_claude: 'Claude 校正',
@@ -1737,6 +1753,10 @@
         label_max_dur: 'Max Recording (sec)',
         label_cpm: 'Typing Speed (chars/min, used for saved time)',
         label_system_prompt: '📝 LLM Post-processing System Prompt',
+        btn_test_llm: '🔌 Test LLM Connection',
+        test_llm_testing: 'Testing...',
+        test_llm_ok: '✅ Connected',
+        test_llm_fail: '❌ Connection Failed',
         toggle_hybrid: 'Enable Hybrid Mode',
         toggle_hybrid_desc: 'Apple Silicon local Whisper + Ollama, fallback to cloud for long phrases',
         toggle_claude: 'Claude Polishing',
@@ -1810,6 +1830,10 @@
         label_max_dur: '최대 녹음 (초)',
         label_cpm: '타이핑 속도 (분당 글자 수)',
         label_system_prompt: '📝 LLM 후처리 시스템 프롬프트',
+        btn_test_llm: '🔌 LLM 연결 테스트',
+        test_llm_testing: '테스트 중...',
+        test_llm_ok: '✅ 연결 성공',
+        test_llm_fail: '❌ 연결 실패',
         toggle_hybrid: '하이브리드 모드 활성화',
         toggle_hybrid_desc: '로컬 Whisper + 클라우드 우회',
         toggle_claude: 'Claude 교정',
@@ -1883,6 +1907,10 @@
         label_max_dur: 'บันทึกสูงสุด (วินาที)',
         label_cpm: 'ความเร็วการพิมพ์',
         label_system_prompt: '📝 LLM พรอมต์ระบบ',
+        btn_test_llm: '🔌 ทดสอบ LLM',
+        test_llm_testing: 'กำลังทดสอบ...',
+        test_llm_ok: '✅ เชื่อมต่อสำเร็จ',
+        test_llm_fail: '❌ เชื่อมต่อไม่สำเร็จ',
         toggle_hybrid: 'เปิดใช้งานไฮบริด',
         toggle_hybrid_desc: 'ใช้ Whisper สลับกับคลาวด์',
         toggle_claude: 'ปรับปรุงด้วย Claude',
@@ -1956,6 +1984,10 @@
         label_max_dur: 'Thời lượng tối đa (giây)',
         label_cpm: 'Tốc độ gõ phím',
         label_system_prompt: '📝 LLM Post-processing System Prompt',
+        btn_test_llm: '🔌 Test kết nối LLM',
+        test_llm_testing: 'Đang test...',
+        test_llm_ok: '✅ Kết nối thành công',
+        test_llm_fail: '❌ Kết nối thất bại',
         toggle_hybrid: 'Bật chế độ Hybrid',
         toggle_hybrid_desc: 'Kết hợp Whisper và Cloud',
         toggle_claude: 'Sửa lỗi với Claude',
@@ -2716,6 +2748,34 @@
       document.getElementById('groq-model-group').style.display = engine === 'groq' ? '' : 'none';
       document.getElementById('openrouter-model-group').style.display = engine === 'openrouter' ? '' : 'none';
       document.getElementById('ollama-model-group').style.display = engine === 'ollama' ? '' : 'none';
+    }
+
+    async function testLlmConnection() {
+      const btn = document.getElementById('btn-test-llm');
+      const result = document.getElementById('test-llm-result');
+      const engine = document.getElementById('cfg-llm-engine').value;
+      btn.disabled = true;
+      result.style.color = 'var(--text3)';
+      result.textContent = t('test_llm_testing') || '測試中...';
+      try {
+        const resp = await fetch('/api/test-llm', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({engine: engine})
+        });
+        const data = await resp.json();
+        if (data.ok) {
+          result.style.color = 'var(--green)';
+          result.textContent = (t('test_llm_ok') || '✅ 連線成功') + ` (${data.model}, ${data.latency}s)`;
+        } else {
+          result.style.color = 'var(--red, #e74c3c)';
+          result.textContent = (t('test_llm_fail') || '❌ 連線失敗') + `: ${data.error}`;
+        }
+      } catch(e) {
+        result.style.color = 'var(--red, #e74c3c)';
+        result.textContent = (t('test_llm_fail') || '❌ 連線失敗') + `: ${e.message}`;
+      }
+      btn.disabled = false;
     }
 
     function startModelDownload(modelKey) {
