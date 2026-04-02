@@ -359,6 +359,20 @@ class Transcriber:
     def _build_edit_prompt(self, cmd, original):
         return f"原文：「{original}」\n指令：{cmd}\n請直接輸出修改後的結果。"
 
+    def get_service_status(self):
+        """回傳服務狀態（供 Dashboard 狀態燈使用）"""
+        detector = self.ollama_detector
+        status = detector.get_status_dict() if hasattr(detector, 'get_status_dict') else {}
+        return {
+            **status,
+            "has_openai_key": bool(self.config.get("openai_api_key")),
+            "has_anthropic_key": bool(self.config.get("anthropic_api_key")),
+            "has_groq_key": bool(self.config.get("groq_api_key")),
+            "has_openrouter_key": bool(self.config.get("openrouter_api_key")),
+            "hybrid_mode": self.config.get("enable_hybrid_mode", True),
+            "local_model": self.config.get("local_llm_model", "qwen2.5:3b"),
+        }
+
     def _async_extract_keywords(self, text):
         def task():
             words = re.findall(r'[A-Za-z][A-Za-z0-9\-]{2,}', text)
