@@ -55,7 +55,7 @@ One full rotation = 1 cycle. Increment cycle number when last role completes.
 
 ## Current Pointer
 
-Next: **UX 設計師** (role 2) | Cycle 2
+Next: **效能工程師** (role 3) | Cycle 2
 
 ---
 
@@ -68,6 +68,7 @@ Next: **UX 設計師** (role 2) | Cycle 2
 | 2026-04-02 | 效能工程師 | OpenRouter 基準測試：6 模型 × 3 樣本實測。🥇Nemotron Nano 1.62s、移除已下架模型（Qwen 30B MoE/DeepSeek V3/Gemini）、預設改為 Nemotron | `scripts/benchmark_openrouter.py`, `config.py`, `transcriber.py`, `static/index.html` | pass |
 | 2026-04-02 | 安全工程師 | API Key 安全加固：config.json 強制 chmod 600、資料目錄 chmod 700、POST /api/config 加入 dict 驗證 + 白名單欄位過濾 | `config.py`, `dashboard.py` | pass |
 | 2026-04-02 | 品質工程師 | LLM fallback 鏈修正：(1) `llm_engine` 加入 DEFAULT_CONFIG 防被白名單丟棄 (2) Ollama fallback 在非 Hybrid 模式下也可觸發 | `config.py`, `transcriber.py` | pass |
+| 2026-04-02 | UX 設計師 | Dashboard 概覽頁新增引擎狀態列：即時顯示 STT 引擎、LLM 引擎+模型、使用場景，6 語言 i18n | `static/index.html` | pass |
 
 ---
 
@@ -96,7 +97,7 @@ Next: **UX 設計師** (role 2) | Cycle 2
 **Pending**:
 - ~~Dashboard 設定頁加入「測試連線」按鈕~~ done（POST /api/test-llm，5 引擎皆支援，顯示延遲+模型名稱）
 - 設定儲存後加入引擎狀態即時更新（目前只有 toast）
-- Dashboard 首頁加入當前 LLM 引擎 + 模型的即時狀態顯示
+- ~~Dashboard 首頁引擎狀態即時顯示~~ done（STT/LLM/場景三欄狀態列，讀取 /api/config 渲染）
 
 **Next Ideas**: 深色/淺色主題切換、行動裝置響應式佈局優化
 

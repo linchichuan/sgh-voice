@@ -1022,6 +1022,22 @@
           </div>
         </div>
 
+        <!-- Engine Status Bar -->
+        <div id="engine-status-bar" style="display:flex; gap:12px; margin-bottom:20px; flex-wrap:wrap;">
+          <div style="flex:1; min-width:200px; padding:10px 14px; background:var(--surface2); border-radius:8px; border-left:3px solid var(--accent);">
+            <div style="font-size:11px; color:var(--text3); margin-bottom:2px;" data-i18n="status_stt">🎙 語音辨識引擎</div>
+            <div style="font-size:13px; font-weight:600;" id="status-stt-engine">—</div>
+          </div>
+          <div style="flex:1; min-width:200px; padding:10px 14px; background:var(--surface2); border-radius:8px; border-left:3px solid var(--accent2);">
+            <div style="font-size:11px; color:var(--text3); margin-bottom:2px;" data-i18n="status_llm">🤖 LLM 後處理引擎</div>
+            <div style="font-size:13px; font-weight:600;" id="status-llm-engine">—</div>
+          </div>
+          <div style="flex:1; min-width:140px; padding:10px 14px; background:var(--surface2); border-radius:8px; border-left:3px solid var(--green);">
+            <div style="font-size:11px; color:var(--text3); margin-bottom:2px;" data-i18n="status_scene">🎯 使用場景</div>
+            <div style="font-size:13px; font-weight:600;" id="status-scene">—</div>
+          </div>
+        </div>
+
         <!-- Personalization Progress -->
         <div class="progress-section">
           <div class="progress-ring-wrap">
@@ -1605,6 +1621,9 @@
         test_llm_testing: '測試中...',
         test_llm_ok: '✅ 連線成功',
         test_llm_fail: '❌ 連線失敗',
+        status_stt: '🎙 語音辨識引擎',
+        status_llm: '🤖 LLM 後處理引擎',
+        status_scene: '🎯 使用場景',
         // Toggles
         toggle_hybrid: '啟用 Hybrid 模式',
         toggle_hybrid_desc: 'Apple Silicon 本地 Whisper + Ollama，長句自動 fallback 雲端',
@@ -1678,6 +1697,9 @@
         test_llm_testing: 'テスト中...',
         test_llm_ok: '✅ 接続成功',
         test_llm_fail: '❌ 接続失敗',
+        status_stt: '🎙 音声認識エンジン',
+        status_llm: '🤖 LLM後処理エンジン',
+        status_scene: '🎯 使用シーン',
         toggle_hybrid: 'ハイブリッドモードを有効にする',
         toggle_hybrid_desc: 'Apple Silicon ローカル Whisper + Ollama。長い文は自動的にクラウドにフォールバック。',
         toggle_claude: 'Claude 校正',
@@ -1755,6 +1777,9 @@
         test_llm_testing: 'Testing...',
         test_llm_ok: '✅ Connected',
         test_llm_fail: '❌ Connection Failed',
+        status_stt: '🎙 STT Engine',
+        status_llm: '🤖 LLM Engine',
+        status_scene: '🎯 Scene',
         toggle_hybrid: 'Enable Hybrid Mode',
         toggle_hybrid_desc: 'Apple Silicon local Whisper + Ollama, fallback to cloud for long phrases',
         toggle_claude: 'Claude Polishing',
@@ -1832,6 +1857,9 @@
         test_llm_testing: '테스트 중...',
         test_llm_ok: '✅ 연결 성공',
         test_llm_fail: '❌ 연결 실패',
+        status_stt: '🎙 음성인식 엔진',
+        status_llm: '🤖 LLM 엔진',
+        status_scene: '🎯 사용 장면',
         toggle_hybrid: '하이브리드 모드 활성화',
         toggle_hybrid_desc: '로컬 Whisper + 클라우드 우회',
         toggle_claude: 'Claude 교정',
@@ -1909,6 +1937,9 @@
         test_llm_testing: 'กำลังทดสอบ...',
         test_llm_ok: '✅ เชื่อมต่อสำเร็จ',
         test_llm_fail: '❌ เชื่อมต่อไม่สำเร็จ',
+        status_stt: '🎙 STT เอนจิน',
+        status_llm: '🤖 LLM เอนจิน',
+        status_scene: '🎯 โหมด',
         toggle_hybrid: 'เปิดใช้งานไฮบริด',
         toggle_hybrid_desc: 'ใช้ Whisper สลับกับคลาวด์',
         toggle_claude: 'ปรับปรุงด้วย Claude',
@@ -1986,6 +2017,9 @@
         test_llm_testing: 'Đang test...',
         test_llm_ok: '✅ Kết nối thành công',
         test_llm_fail: '❌ Kết nối thất bại',
+        status_stt: '🎙 STT Engine',
+        status_llm: '🤖 LLM Engine',
+        status_scene: '🎯 Scene',
         toggle_hybrid: 'Bật chế độ Hybrid',
         toggle_hybrid_desc: 'Kết hợp Whisper và Cloud',
         toggle_claude: 'Sửa lỗi với Claude',
@@ -2272,6 +2306,24 @@
         document.getElementById('stat-cost').textContent = '$' + totalCost.toFixed(2);
         document.getElementById('stat-cost-detail').textContent =
           `Whisper $${whisperCost.toFixed(3)} + Claude $${claudeCost.toFixed(3)}`;
+      } catch (e) { }
+
+      // Engine status bar
+      try {
+        const cfg = await api('/config');
+        const sttEngine = cfg.stt_engine || 'mlx-whisper';
+        const sttModel = cfg.local_whisper_model || 'whisper-turbo';
+        const llmEngine = cfg.llm_engine || 'ollama';
+        const engineLabels = {groq:'Groq',openrouter:'OpenRouter',claude:'Claude',openai:'OpenAI',ollama:'Ollama'};
+        const modelKeys = {groq:'groq_model',openrouter:'openrouter_model',claude:'claude_model',openai:'openai_model',ollama:'local_llm_model'};
+        const llmModel = cfg[modelKeys[llmEngine]] || '—';
+        const shortModel = (m) => m.length > 30 ? m.split('/').pop().split(':')[0] : m;
+        document.getElementById('status-stt-engine').textContent =
+          (sttEngine === 'groq' ? 'Groq Whisper' : sttEngine === 'cloud-only' ? 'OpenAI Cloud' : sttModel);
+        document.getElementById('status-llm-engine').innerHTML =
+          `<span style="color:var(--accent2)">${engineLabels[llmEngine]||llmEngine}</span> · ${shortModel(llmModel)}`;
+        const sceneLabels = {general:t('scene_general')||'一般',medical:t('scene_medical')||'醫療',medical_consultation:t('scene_medical_consultation')||'醫療看診'};
+        document.getElementById('status-scene').textContent = sceneLabels[cfg.active_scene] || cfg.active_scene || '一般';
       } catch (e) { }
 
       // Progress ring
