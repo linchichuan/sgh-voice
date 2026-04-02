@@ -241,6 +241,7 @@ DEFAULT_CONFIG = {
     "hotkey": "right_cmd",                  # right_cmd, ctrl+shift+space, etc.
     "language": "auto",                     # auto, zh, ja, en
     "target_language": "",                  # 翻譯目標語言（空 = 不翻譯）
+    "llm_engine": "groq",                   # 首選 LLM 引擎（groq/openrouter/claude/openai/ollama）
     "enable_claude_polish": True,           # Claude 後處理潤稿
     "enable_auto_learn": True,              # 自動學習修正
     "enable_filler_removal": True,          # 移除填充詞

@@ -150,8 +150,8 @@ class Transcriber:
             def try_claude(): return self._claude_process(corrected, mode, edit_context), "claude"
             def try_openai(): return self._openai_process(corrected, mode, edit_context), "openai"
             def try_ollama():
-                if is_hybrid and mode == "dictate": return self._local_llm_process(corrected), "local"
-                return None, None
+                res = self._local_llm_process(corrected)
+                return res, "local" if res else None
 
             routes_map = {
                 "groq": [try_groq, try_or, try_claude, try_openai, try_ollama],

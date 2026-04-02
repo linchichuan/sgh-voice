@@ -55,7 +55,7 @@ One full rotation = 1 cycle. Increment cycle number when last role completes.
 
 ## Current Pointer
 
-Next: **品質工程師** (role 1) | Cycle 2
+Next: **UX 設計師** (role 2) | Cycle 2
 
 ---
 
@@ -67,6 +67,7 @@ Next: **品質工程師** (role 1) | Cycle 2
 | 2026-04-02 | UX 設計師 | Dashboard 加入「測試 LLM 連線」按鈕：後端 POST /api/test-llm 支援 5 引擎，前端即時顯示延遲與模型，6 語言 i18n | `dashboard.py`, `static/index.html` | pass |
 | 2026-04-02 | 效能工程師 | OpenRouter 基準測試：6 模型 × 3 樣本實測。🥇Nemotron Nano 1.62s、移除已下架模型（Qwen 30B MoE/DeepSeek V3/Gemini）、預設改為 Nemotron | `scripts/benchmark_openrouter.py`, `config.py`, `transcriber.py`, `static/index.html` | pass |
 | 2026-04-02 | 安全工程師 | API Key 安全加固：config.json 強制 chmod 600、資料目錄 chmod 700、POST /api/config 加入 dict 驗證 + 白名單欄位過濾 | `config.py`, `dashboard.py` | pass |
+| 2026-04-02 | 品質工程師 | LLM fallback 鏈修正：(1) `llm_engine` 加入 DEFAULT_CONFIG 防被白名單丟棄 (2) Ollama fallback 在非 Hybrid 模式下也可觸發 | `config.py`, `transcriber.py` | pass |
 
 ---
 
@@ -84,7 +85,7 @@ Next: **品質工程師** (role 1) | Cycle 2
 
 **Pending**:
 - ~~為 _DICTATE_SYSTEM prompt 建立自動化品質測試~~ done（發現翻譯問題，Groq Llama 對語言一致性指令遵從度不足）
-- 檢查所有 LLM 函數的 fallback 鏈是否完整覆蓋（特別是 OpenRouter 新加入後的邊界情況）
+- ~~檢查 LLM fallback 鏈完整覆蓋~~ done（修復 `llm_engine` 未在 DEFAULT_CONFIG + Ollama 非 Hybrid 失效兩個 bug）
 - history.json 的 threading lock 是否有 deadlock 風險（高併發場景）
 
 **Next Ideas**: LLM 幻覺偵測強化（目前只檢查自我介紹特徵詞，可加入更多 pattern）
