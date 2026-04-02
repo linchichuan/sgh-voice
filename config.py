@@ -280,6 +280,8 @@ DEFAULT_CONFIG = {
         "ja": ["えーと", "あの", "えー", "まあ", "なんか", "ちょっと"],
         "en": ["um", "uh", "like", "you know", "basically", "actually", "so yeah"],
     },
+    "openai_model": "gpt-4o",                 # OpenAI LLM 模型
+    "app_styles": {},                          # App 感知風格（空 = 使用 DEFAULT_APP_STYLES）
     "claude_system_prompt": "",  # 空字串 = 使用 _DICTATE_SYSTEM 內建 prompt
     "active_scene": "general",
     "dashboard_port": 7865,

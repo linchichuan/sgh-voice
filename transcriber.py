@@ -76,7 +76,7 @@ class Transcriber:
                 model_path = LOCAL_MODEL_PATHS.get(warmup_model_name, warmup_model_name)
                 kwargs = {"path_or_hf_repo": model_path, "language": "en"}
                 if warmup_model_name in BREEZE_MODELS: kwargs["fp16"] = True
-                with Transcriber._metal_lock: mlx_whisper.transcribe(tmp.name, **warmup_kwargs)
+                with Transcriber._metal_lock: mlx_whisper.transcribe(tmp.name, **kwargs)
                 os.unlink(tmp.name)
                 print(" " + _t("✅ mlx-whisper 模型預熱完成", "✅ mlx-whisper モデルの準備が完了しました", "✅ mlx-whisper model warmed up"))
             except Exception: pass

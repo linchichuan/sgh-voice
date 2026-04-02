@@ -1,4 +1,4 @@
-# 🎙 SGH Voice — AI Voice Input Tool (v1.6.0)
+# 🎙 SGH Voice — AI Voice Input Tool (v1.6.1)
 
 **English** | **[日本語](README.ja.md)** | **[繁體中文](README.md)**
 
@@ -7,18 +7,20 @@
 [![macOS](https://img.shields.io/badge/macOS-Apple_Silicon-black?logo=apple)](https://github.com/linchichuan/sgh-voice/releases)
 [![iOS](https://img.shields.io/badge/iOS-17.0+-blue?logo=apple)](https://github.com/linchichuan/sgh-voice/releases)
 [![Android](https://img.shields.io/badge/Android-8.0+-green?logo=android)](https://github.com/linchichuan/sgh-voice/releases)
-[![Version](https://img.shields.io/badge/Version-1.6.0-green)]()
+[![Version](https://img.shields.io/badge/Version-1.6.1-green)]()
 
 ---
 
-## 🌟 What's New in v1.6.0
+## 🌟 What's New in v1.6.1
 
 | Feature | Details |
 |---------|---------|
-| **🌐 OpenRouter Integration** | 200+ models including free ones (Qwen 3.6, DeepSeek V3, Gemini 2.5 Flash). Cloud backup ensures service never goes down. |
-| **🧠 7-Rule System Prompt** | Redesigned LLM post-processing: filler removal, self-correction detection, proper noun correction, structured long-text formatting. One prompt powers all 5 engines. |
-| **📱 Android Beta Recruitment** | Android version ready for testing! Join the first wave of testers. |
-| **⚡ 5-Engine LLM Routing** | Ollama (local) / Groq / Claude / OpenAI / OpenRouter with automatic fallback chain. |
+| **🌐 OpenRouter Integration** | 200+ models including free ones. Default: Nemotron Nano (~1.6s). Cloud backup ensures service never goes down. |
+| **🔌 One-Click Connection Test** | New "Test LLM Connection" button in Dashboard settings — instantly shows latency and model status. |
+| **📊 Engine Status Dashboard** | Overview page now shows current STT engine, LLM engine + model, and active scene at a glance. |
+| **🔒 Security Hardening** | config.json enforced 600 permissions, API field whitelist validation, prevents unauthorized access. |
+| **🧠 Business Secretary Prompt** | Redesigned LLM post-processing: logic correction, structured formatting, Japanese keigo conversion, humanized wording. One prompt powers all 5 engines. |
+| **⚡ 5-Engine LLM Routing** | Ollama (local) / Groq / Claude / OpenAI / OpenRouter with full fallback chain coverage. |
 | **🌍 OS Language Adaptation** | Auto-detects your macOS language (JA/ZH/EN) for the friendliest UI experience. |
 
 ---
@@ -79,7 +81,7 @@ This tool offers maximum flexibility — run entirely locally for free, or use p
 
 ### Installation
 
-1. Download `SGH Voice-1.6.0-apple-silicon.dmg` from [Releases](https://github.com/linchichuan/sgh-voice/releases)
+1. Download `SGH Voice-1.6.1-apple-silicon.dmg` from [Releases](https://github.com/linchichuan/sgh-voice/releases)
 2. Drag **Voice Input** to Applications
 3. First launch: Right-click → **Open** (allow macOS Gatekeeper once)
 4. Menu bar shows 🎙 icon → click **Open Dashboard**

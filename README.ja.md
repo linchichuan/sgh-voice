@@ -1,4 +1,4 @@
-# 🎙 SGH Voice — AI 音声入力ツール (v1.6.0)
+# 🎙 SGH Voice — AI 音声入力ツール (v1.6.1)
 
 **[English](README.en.md)** | **日本語** | **[繁體中文](README.md)**
 
@@ -7,18 +7,20 @@
 [![macOS](https://img.shields.io/badge/macOS-Apple_Silicon-black?logo=apple)](https://github.com/linchichuan/sgh-voice/releases)
 [![iOS](https://img.shields.io/badge/iOS-17.0+-blue?logo=apple)](https://github.com/linchichuan/sgh-voice/releases)
 [![Android](https://img.shields.io/badge/Android-8.0+-green?logo=android)](https://github.com/linchichuan/sgh-voice/releases)
-[![Version](https://img.shields.io/badge/Version-1.6.0-green)]()
+[![Version](https://img.shields.io/badge/Version-1.6.1-green)]()
 
 ---
 
-## 🌟 v1.6.0 の新機能
+## 🌟 v1.6.1 の新機能
 
 | 機能 | 詳細 |
 |------|------|
-| **🌐 OpenRouter 統合** | 200以上のモデル対応（無料モデルあり：Qwen 3.6、DeepSeek V3、Gemini 2.5 Flash）。クラウドバックアップでサービスの安定性を確保。 |
-| **🧠 7ルール System Prompt** | LLM 後処理を刷新：フィラー除去、自己修正検出、固有名詞校正、長文の構造化整形。1つのプロンプトで全5エンジンに対応。 |
-| **📱 Android ベータ募集** | Android 版がテスト準備完了！最初のテスターを募集中。 |
-| **⚡ 5エンジン LLM ルーティング** | Ollama（ローカル）/ Groq / Claude / OpenAI / OpenRouter、自動フォールバック。 |
+| **🌐 OpenRouter 統合** | 200以上のモデル対応（無料モデルあり）。デフォルト：Nemotron Nano（実測 ~1.6s）。クラウドバックアップでサービスの安定性を確保。 |
+| **🔌 ワンクリック接続テスト** | Dashboard 設定ページに「LLM接続テスト」ボタンを追加。レイテンシとモデル状態を即時表示。 |
+| **📊 エンジンステータス表示** | 概要ページに現在のSTTエンジン、LLMエンジン＋モデル、使用シーンをリアルタイム表示。 |
+| **🔒 セキュリティ強化** | config.json の権限を 600 に強制、API 設定のホワイトリスト検証で不正アクセスを防止。 |
+| **🧠 ビジネス秘書 Prompt** | LLM 後処理を刷新：論理校正・構造化整形・敬語変換・人間味のある表現。1つのプロンプトで全5エンジンに対応。 |
+| **⚡ 5エンジン LLM ルーティング** | Ollama（ローカル）/ Groq / Claude / OpenAI / OpenRouter、完全フォールバックチェーン。 |
 | **🌍 OS 言語適応** | macOS の言語設定（日/中/英）を自動検出し、UIを最適化。 |
 
 ---
@@ -79,7 +81,7 @@
 
 ### インストール手順
 
-1. [Releases](https://github.com/linchichuan/sgh-voice/releases) から `SGH Voice-1.6.0-apple-silicon.dmg` をダウンロード
+1. [Releases](https://github.com/linchichuan/sgh-voice/releases) から `SGH Voice-1.6.1-apple-silicon.dmg` をダウンロード
 2. DMG を開き、**Voice Input** を Applications フォルダへドラッグ
 3. 初回起動：右クリック → **開く**（macOS Gatekeeper を一度許可）
 4. メニューバーに 🎙 アイコンが表示されたら **Open Dashboard** をクリック
