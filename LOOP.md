@@ -55,7 +55,7 @@ One full rotation = 1 cycle. Increment cycle number when last role completes.
 
 ## Current Pointer
 
-Next: **效能工程師** (role 3) | Cycle 1
+Next: **安全工程師** (role 4) | Cycle 1
 
 ---
 
@@ -65,6 +65,7 @@ Next: **效能工程師** (role 3) | Cycle 1
 |------|------|---------|-------|--------|
 | 2026-03-31 | 品質工程師 | 建立 _DICTATE_SYSTEM prompt 自動化品質測試（5 樣本 × 7 檢查規則），發現翻譯問題：Groq Llama 違反「禁止翻譯」規則（中→日、英→中） | `scripts/test_prompt_quality.py`, `test/results/PROMPT_QUALITY.md` | pass (3/5 樣本通過, 16/18 檢查通過) |
 | 2026-04-02 | UX 設計師 | Dashboard 加入「測試 LLM 連線」按鈕：後端 POST /api/test-llm 支援 5 引擎，前端即時顯示延遲與模型，6 語言 i18n | `dashboard.py`, `static/index.html` | pass |
+| 2026-04-02 | 效能工程師 | OpenRouter 基準測試：6 模型 × 3 樣本實測。🥇Nemotron Nano 1.62s、移除已下架模型（Qwen 30B MoE/DeepSeek V3/Gemini）、預設改為 Nemotron | `scripts/benchmark_openrouter.py`, `config.py`, `transcriber.py`, `static/index.html` | pass |
 
 ---
 
@@ -101,7 +102,7 @@ Next: **效能工程師** (role 3) | Cycle 1
 **Focus**: 延遲優化、資源使用、Token 成本
 
 **Pending**:
-- OpenRouter 免費模型延遲基準測試：自動測試 3 個極速模型的平均回應時間，產出報告
+- ~~OpenRouter 免費模型延遲基準測試~~ done（🥇Nemotron Nano 1.62s，移除 3 個已下架模型，預設改為 Nemotron）
 - LLM 路由智慧化：根據文字長度自動選擇模型（短句用小模型、長文用大模型）
 - Whisper 預熱時間優化（目前 sleep(3) 等待 UI，可改為事件驅動）
 

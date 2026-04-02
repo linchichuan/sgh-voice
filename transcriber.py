@@ -226,7 +226,7 @@ class Transcriber:
         if not api_key: return None
         try:
             client = openai.OpenAI(base_url="https://openrouter.ai/api/v1", api_key=api_key, timeout=15.0)
-            model = self.config.get("openrouter_model", "qwen/qwen-2.5-72b-instruct")
+            model = self.config.get("openrouter_model", "nvidia/nemotron-3-nano-30b-a3b:free")
             system = "根據指令修改文字。" if mode == "edit" else self._get_system_prompt()
             user_msg = self._build_edit_prompt(text, edit_context) if mode == "edit" else text
             print(" " + _t(f"🌐 [OpenRouter] 啟動: {model}", f"🌐 [OpenRouter] 起動中: {model}", f"🌐 [OpenRouter] Launching: {model}"))

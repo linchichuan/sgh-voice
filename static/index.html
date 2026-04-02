@@ -1394,21 +1394,19 @@
               <label>OpenRouter 模型</label>
               <select id="cfg-openrouter-model">
                 <optgroup label="⚡ 極速（推薦用於語音後處理）">
-                  <option value="qwen/qwen3-30b-a3b:free">Qwen 3 30B MoE (極速、中文強)</option>
-                  <option value="nvidia/nemotron-3-nano-30b-a3b:free">Nemotron 3 Nano 30B (極速 MoE)</option>
+                  <option value="nvidia/nemotron-3-nano-30b-a3b:free">Nemotron 3 Nano 30B (🥇 實測最快 ~1.6s)</option>
                   <option value="stepfun/step-3.5-flash:free">Step 3.5 Flash (極速推理)</option>
+                  <option value="liquid/lfm-2.5-1.2b-instruct:free">LFM 2.5 1.2B (超輕量)</option>
                 </optgroup>
                 <optgroup label="🌟 旗艦（品質優先、較慢）">
-                  <option value="qwen/qwen3.6-plus-preview:free">Qwen 3.6 Plus Preview</option>
-                  <option value="qwen/qwen3-235b-a22b:free">Qwen 3 235B</option>
-                  <option value="deepseek/deepseek-chat-v3-0324:free">DeepSeek V3 0324</option>
+                  <option value="qwen/qwen3.6-plus-preview:free">Qwen 3.6 Plus Preview (品質最高、24-57s)</option>
                   <option value="nvidia/nemotron-3-super-120b-a12b:free">Nemotron 3 Super 120B</option>
+                  <option value="arcee-ai/trinity-large-preview:free">Arcee Trinity Large</option>
                 </optgroup>
                 <optgroup label="🔀 其他免費模型">
-                  <option value="deepseek/deepseek-r1:free">DeepSeek R1 (推理)</option>
-                  <option value="google/gemini-2.5-flash-preview:free">Gemini 2.5 Flash</option>
-                  <option value="meta-llama/llama-4-maverick:free">Llama 4 Maverick</option>
                   <option value="minimax/minimax-m2.5:free">MiniMax M2.5</option>
+                  <option value="meta-llama/llama-4-maverick:free">Llama 4 Maverick</option>
+                  <option value="deepseek/deepseek-r1:free">DeepSeek R1 (推理)</option>
                 </optgroup>
               </select>
               <small style="color:var(--text3);display:block;margin-top:4px">也可手動輸入任意 OpenRouter 模型 ID</small>
