@@ -62,6 +62,12 @@ def api_get_config():
 def api_save_config():
     config = load_config()
     data = request.json
+    if not isinstance(data, dict):
+        return jsonify({"error": "invalid data"}), 400
+    # 只接受 DEFAULT_CONFIG 中已定義的欄位（防止注入未知欄位）
+    from config import DEFAULT_CONFIG
+    allowed_keys = set(DEFAULT_CONFIG.keys())
+    data = {k: v for k, v in data.items() if k in allowed_keys}
     # 只更新非空的 API key（避免覆蓋隱藏的 key）
     for key in ["openai_api_key", "anthropic_api_key", "elevenlabs_api_key", "groq_api_key", "openrouter_api_key"]:
         if key in data and "..." in str(data[key]):

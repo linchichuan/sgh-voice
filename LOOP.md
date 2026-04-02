@@ -55,7 +55,7 @@ One full rotation = 1 cycle. Increment cycle number when last role completes.
 
 ## Current Pointer
 
-Next: **安全工程師** (role 4) | Cycle 1
+Next: **品質工程師** (role 1) | Cycle 2
 
 ---
 
@@ -66,6 +66,7 @@ Next: **安全工程師** (role 4) | Cycle 1
 | 2026-03-31 | 品質工程師 | 建立 _DICTATE_SYSTEM prompt 自動化品質測試（5 樣本 × 7 檢查規則），發現翻譯問題：Groq Llama 違反「禁止翻譯」規則（中→日、英→中） | `scripts/test_prompt_quality.py`, `test/results/PROMPT_QUALITY.md` | pass (3/5 樣本通過, 16/18 檢查通過) |
 | 2026-04-02 | UX 設計師 | Dashboard 加入「測試 LLM 連線」按鈕：後端 POST /api/test-llm 支援 5 引擎，前端即時顯示延遲與模型，6 語言 i18n | `dashboard.py`, `static/index.html` | pass |
 | 2026-04-02 | 效能工程師 | OpenRouter 基準測試：6 模型 × 3 樣本實測。🥇Nemotron Nano 1.62s、移除已下架模型（Qwen 30B MoE/DeepSeek V3/Gemini）、預設改為 Nemotron | `scripts/benchmark_openrouter.py`, `config.py`, `transcriber.py`, `static/index.html` | pass |
+| 2026-04-02 | 安全工程師 | API Key 安全加固：config.json 強制 chmod 600、資料目錄 chmod 700、POST /api/config 加入 dict 驗證 + 白名單欄位過濾 | `config.py`, `dashboard.py` | pass |
 
 ---
 
@@ -112,8 +113,8 @@ Next: **安全工程師** (role 4) | Cycle 1
 **Focus**: API Key 安全、輸入驗證、資料保護
 
 **Pending**:
-- 審計所有 API Key 存取路徑，確保 config.json 的檔案權限正確（600）
-- Dashboard API endpoint 輸入驗證（POST /api/config 的 data 類型檢查）
+- ~~審計 API Key 存取路徑 + config.json 權限加固~~ done（chmod 600/700 + POST 白名單過濾）
+- ~~Dashboard API endpoint 輸入驗證~~ done（dict 類型檢查 + DEFAULT_CONFIG 白名單）
 - OpenRouter API Key 格式驗證（sk-or- 前綴檢查）
 
 **Next Ideas**: config.json 加密儲存（目前明文）、API 呼叫 audit log

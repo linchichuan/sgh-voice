@@ -287,6 +287,11 @@ DEFAULT_CONFIG = {
 
 def _ensure_dir():
     os.makedirs(DATA_DIR, exist_ok=True)
+    # 確保資料目錄權限為 700（僅本人可存取）
+    try:
+        os.chmod(DATA_DIR, 0o700)
+    except OSError:
+        pass
 
 
 # ─── Config ──────────────────────────────────────────────
@@ -304,6 +309,11 @@ def save_config(config):
     _ensure_dir()
     with open(CONFIG_FILE, "w", encoding="utf-8") as f:
         json.dump(config, f, ensure_ascii=False, indent=2)
+    # 強制 config.json 權限為 600（含 API Key，僅本人可讀寫）
+    try:
+        os.chmod(CONFIG_FILE, 0o600)
+    except OSError:
+        pass
 
 
 # ─── Dictionary ──────────────────────────────────────────
