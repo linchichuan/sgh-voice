@@ -140,6 +140,19 @@ class Memory:
         self.dictionary.setdefault("corrections", {})[wrong] = right
         save_dictionary(self.dictionary)
 
+    def get_style_profile(self):
+        """獲取用戶個人風格特徵描述（用於注入 Prompt）"""
+        profile = self.dictionary.get("style_profile", "")
+        if not profile:
+            # 預設一些通用的商務偏好
+            return "偏好專業、精確且有禮貌的商務語氣。"
+        return profile
+
+    def update_style_profile(self, new_profile):
+        """更新風格特徵描述"""
+        self.dictionary["style_profile"] = new_profile
+        save_dictionary(self.dictionary)
+
     def remove_correction(self, wrong):
         """刪除修正規則"""
         corrections = self.dictionary.get("corrections", {})

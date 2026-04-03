@@ -2955,8 +2955,12 @@
         cfg.app_styles = window._appStyles;
       }
 
-      await api('/config', { method: 'POST', body: cfg });
-      toast('✅ 設定已儲存');
+      const saveResult = await api('/config', { method: 'POST', body: cfg });
+      if (saveResult.warnings && saveResult.warnings.length > 0) {
+        toast('⚠️ 設定已儲存，但有警告：' + saveResult.warnings.join('、'));
+      } else {
+        toast('✅ 設定已儲存');
+      }
     }
 
     function renderAppStyles() {

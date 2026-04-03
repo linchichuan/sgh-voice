@@ -55,7 +55,7 @@ One full rotation = 1 cycle. Increment cycle number when last role completes.
 
 ## Current Pointer
 
-Next: **安全工程師** (role 4) | Cycle 2
+Next: **品質工程師** (role 1) | Cycle 3
 
 ---
 
@@ -71,6 +71,7 @@ Next: **安全工程師** (role 4) | Cycle 2
 | 2026-04-02 | UX 設計師 | Dashboard 概覽頁新增引擎狀態列：即時顯示 STT 引擎、LLM 引擎+模型、使用場景，6 語言 i18n | `static/index.html` | pass |
 | 2026-04-03 | 品質工程師 | 修復 4 個 bug：warmup_kwargs typo、get_service_status 缺失、openai_model/app_styles 白名單缺漏；README 三語版本號升至 v1.6.5 | `transcriber.py`, `config.py`, `dashboard.py`, `README*.md` | pass |
 | 2026-04-03 | 效能工程師 | LLM 路由智慧化：短句（≤30字）優先 Ollama→Groq，長文依 pref_engine 走旗艦，大幅降低短句 API 成本 | `transcriber.py` | pass |
+| 2026-04-03 | 安全工程師 | API Key 格式驗證：5 種 key 前綴驗證（sk-/sk-ant-/gsk_/sk-or-/sk_），儲存時回傳 warnings，前端 toast 提示 | `dashboard.py`, `static/index.html` | pass |
 
 ---
 
@@ -119,6 +120,6 @@ Next: **安全工程師** (role 4) | Cycle 2
 **Pending**:
 - ~~審計 API Key 存取路徑 + config.json 權限加固~~ done（chmod 600/700 + POST 白名單過濾）
 - ~~Dashboard API endpoint 輸入驗證~~ done（dict 類型檢查 + DEFAULT_CONFIG 白名單）
-- OpenRouter API Key 格式驗證（sk-or- 前綴檢查）
+- ~~OpenRouter API Key 格式驗證~~ done（5 種 key 全部驗證 + 前端 warning toast）
 
 **Next Ideas**: config.json 加密儲存（目前明文）、API 呼叫 audit log

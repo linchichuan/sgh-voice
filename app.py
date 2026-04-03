@@ -279,7 +279,8 @@ class VoiceEngine:
         self.is_recording = False
         self._on_status_change = None  # callback(status_str)
 
-        # 背景預熱模型（不阻塞啟動）
+    def start_background_tasks(self):
+        """主程式啟動後再跑背景任務，避免搶佔啟動時的系統資源"""
         if self.config.get("enable_hybrid_mode", True):
             print(get_i18n("log_warmup"))
             threading.Thread(target=self.transcriber.warmup, daemon=True).start()
@@ -774,6 +775,9 @@ def run_menubar():
 
             # Start dashboard server in background
             _start_dashboard_bg(config, engine.memory, engine)
+
+            # 延遲 1.5 秒啟動背景任務，避開 macOS 啟動時的 IMK 通訊高峰
+            rumps.Timer(lambda t: (engine.start_background_tasks(), t.stop()), 1.5).start()
 
         def _status(self, s):
             if s == "recording":

@@ -58,6 +58,15 @@ def api_get_config():
     return jsonify(safe)
 
 
+_API_KEY_FORMATS = {
+    "openai_api_key":      ("sk-",    10),
+    "anthropic_api_key":   ("sk-ant-", 10),
+    "groq_api_key":        ("gsk_",   10),
+    "openrouter_api_key":  ("sk-or-", 10),
+    "elevenlabs_api_key":  ("sk_",    10),
+}
+
+
 @app.route("/api/config", methods=["POST"])
 def api_save_config():
     config = load_config()
@@ -69,15 +78,21 @@ def api_save_config():
     allowed_keys = set(DEFAULT_CONFIG.keys())
     data = {k: v for k, v in data.items() if k in allowed_keys}
     # 只更新非空的 API key（避免覆蓋隱藏的 key）
-    for key in ["openai_api_key", "anthropic_api_key", "elevenlabs_api_key", "groq_api_key", "openrouter_api_key"]:
-        if key in data and "..." in str(data[key]):
-            data.pop(key)  # 不更新被遮蔽的 key
+    warnings = []
+    for key in list(_API_KEY_FORMATS.keys()):
+        val = data.get(key, "")
+        if not val or "..." in str(val):
+            data.pop(key, None)  # 不更新被遮蔽或空的 key
+            continue
+        prefix, min_len = _API_KEY_FORMATS[key]
+        if not str(val).startswith(prefix) or len(val) < min_len:
+            warnings.append(f"{key} 格式可能有誤（應以 {prefix} 開頭）")
     config.update(data)
     save_config(config)
     # 即時重新載入設定到引擎（免重啟）
     if _engine and hasattr(_engine, 'reload_config'):
         _engine.reload_config()
-    return jsonify({"ok": True})
+    return jsonify({"ok": True, "warnings": warnings})
 
 
 @app.route("/api/history")
