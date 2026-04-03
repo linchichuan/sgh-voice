@@ -144,7 +144,11 @@ class Transcriber:
             print(" ⚡ [短句跳過 LLM 後處理]")
 
         if not skip_llm and self.config.get("enable_claude_polish"):
-            pref_engine = self.config.get("llm_engine", "ollama")
+            pref_engine = self.config.get("llm_engine", "groq")
+            text_len = len(corrected)
+            short_threshold = self.config.get("hybrid_text_threshold", 30)
+            is_short = (mode == "dictate" and text_len <= short_threshold)
+
             def try_groq(): return self._groq_llm_process(corrected, mode, edit_context), "groq"
             def try_or(): return self._openrouter_process(corrected, mode, edit_context), "openrouter"
             def try_claude(): return self._claude_process(corrected, mode, edit_context), "claude"
@@ -153,14 +157,22 @@ class Transcriber:
                 res = self._local_llm_process(corrected)
                 return res, "local" if res else None
 
-            routes_map = {
-                "groq": [try_groq, try_or, try_claude, try_openai, try_ollama],
-                "openrouter": [try_or, try_groq, try_claude, try_openai, try_ollama],
-                "claude": [try_claude, try_groq, try_or, try_openai, try_ollama],
-                "openai": [try_openai, try_groq, try_or, try_claude, try_ollama],
-                "ollama": [try_ollama, try_groq, try_or, try_claude, try_openai],
-            }
-            for route in routes_map.get(pref_engine, routes_map["ollama"]):
+            if is_short:
+                # 短句：本地優先（免費、極速），Groq 備援，不用旗艦模型
+                print(" ⚡ [短句路由] 優先本地/Groq")
+                route_list = [try_ollama, try_groq, try_or, try_claude, try_openai]
+            else:
+                # 長文：依使用者設定的首選引擎，走完整 fallback 鏈
+                routes_map = {
+                    "groq": [try_groq, try_or, try_claude, try_openai, try_ollama],
+                    "openrouter": [try_or, try_groq, try_claude, try_openai, try_ollama],
+                    "claude": [try_claude, try_groq, try_or, try_openai, try_ollama],
+                    "openai": [try_openai, try_groq, try_or, try_claude, try_ollama],
+                    "ollama": [try_ollama, try_groq, try_or, try_claude, try_openai],
+                }
+                route_list = routes_map.get(pref_engine, routes_map["groq"])
+
+            for route in route_list:
                 res, source = route()
                 if res: final, llm_source = res, source; break
 

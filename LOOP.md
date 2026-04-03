@@ -55,7 +55,7 @@ One full rotation = 1 cycle. Increment cycle number when last role completes.
 
 ## Current Pointer
 
-Next: **效能工程師** (role 3) | Cycle 2
+Next: **安全工程師** (role 4) | Cycle 2
 
 ---
 
@@ -69,6 +69,8 @@ Next: **效能工程師** (role 3) | Cycle 2
 | 2026-04-02 | 安全工程師 | API Key 安全加固：config.json 強制 chmod 600、資料目錄 chmod 700、POST /api/config 加入 dict 驗證 + 白名單欄位過濾 | `config.py`, `dashboard.py` | pass |
 | 2026-04-02 | 品質工程師 | LLM fallback 鏈修正：(1) `llm_engine` 加入 DEFAULT_CONFIG 防被白名單丟棄 (2) Ollama fallback 在非 Hybrid 模式下也可觸發 | `config.py`, `transcriber.py` | pass |
 | 2026-04-02 | UX 設計師 | Dashboard 概覽頁新增引擎狀態列：即時顯示 STT 引擎、LLM 引擎+模型、使用場景，6 語言 i18n | `static/index.html` | pass |
+| 2026-04-03 | 品質工程師 | 修復 4 個 bug：warmup_kwargs typo、get_service_status 缺失、openai_model/app_styles 白名單缺漏；README 三語版本號升至 v1.6.5 | `transcriber.py`, `config.py`, `dashboard.py`, `README*.md` | pass |
+| 2026-04-03 | 效能工程師 | LLM 路由智慧化：短句（≤30字）優先 Ollama→Groq，長文依 pref_engine 走旗艦，大幅降低短句 API 成本 | `transcriber.py` | pass |
 
 ---
 
@@ -106,7 +108,7 @@ Next: **效能工程師** (role 3) | Cycle 2
 
 **Pending**:
 - ~~OpenRouter 免費模型延遲基準測試~~ done（🥇Nemotron Nano 1.62s，移除 3 個已下架模型，預設改為 Nemotron）
-- LLM 路由智慧化：根據文字長度自動選擇模型（短句用小模型、長文用大模型）
+- ~~LLM 路由智慧化~~ done（短句≤30字走 Ollama→Groq，長文走 pref_engine 旗艦）
 - Whisper 預熱時間優化（目前 sleep(3) 等待 UI，可改為事件驅動）
 
 **Next Ideas**: 串流式 LLM 回應（邊生成邊貼上）、模型自動降級（延遲超標時自動切換輕量模型）
