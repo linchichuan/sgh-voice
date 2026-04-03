@@ -55,7 +55,7 @@ One full rotation = 1 cycle. Increment cycle number when last role completes.
 
 ## Current Pointer
 
-Next: **品質工程師** (role 1) | Cycle 3
+Next: **UX 設計師** (role 2) | Cycle 3
 
 ---
 
@@ -72,6 +72,7 @@ Next: **品質工程師** (role 1) | Cycle 3
 | 2026-04-03 | 品質工程師 | 修復 4 個 bug：warmup_kwargs typo、get_service_status 缺失、openai_model/app_styles 白名單缺漏；README 三語版本號升至 v1.6.5 | `transcriber.py`, `config.py`, `dashboard.py`, `README*.md` | pass |
 | 2026-04-03 | 效能工程師 | LLM 路由智慧化：短句（≤30字）優先 Ollama→Groq，長文依 pref_engine 走旗艦，大幅降低短句 API 成本 | `transcriber.py` | pass |
 | 2026-04-03 | 安全工程師 | API Key 格式驗證：5 種 key 前綴驗證（sk-/sk-ant-/gsk_/sk-or-/sk_），儲存時回傳 warnings，前端 toast 提示 | `dashboard.py`, `static/index.html` | pass |
+| 2026-04-03 | 品質工程師 | history.json 執行緒安全稽核：無 deadlock 風險（Lock 不嵌套），修復 3 個無鎖讀取競態（get_recent_context/get_history 加鎖、delete_history_item 改原地修改避免 list 重賦值） | `memory.py` | pass |
 
 ---
 
@@ -90,7 +91,7 @@ Next: **品質工程師** (role 1) | Cycle 3
 **Pending**:
 - ~~為 _DICTATE_SYSTEM prompt 建立自動化品質測試~~ done（發現翻譯問題，Groq Llama 對語言一致性指令遵從度不足）
 - ~~檢查 LLM fallback 鏈完整覆蓋~~ done（修復 `llm_engine` 未在 DEFAULT_CONFIG + Ollama 非 Hybrid 失效兩個 bug）
-- history.json 的 threading lock 是否有 deadlock 風險（高併發場景）
+- ~~history.json 的 threading lock 是否有 deadlock 風險（高併發場景）~~ done（無 deadlock；修復 3 個無鎖讀取競態）
 
 **Next Ideas**: LLM 幻覺偵測強化（目前只檢查自我介紹特徵詞，可加入更多 pattern）
 

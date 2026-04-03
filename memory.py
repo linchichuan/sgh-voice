@@ -223,12 +223,14 @@ class Memory:
 
     def get_recent_context(self, n=5):
         """取得最近 N 筆辨識結果（供 Claude 上下文）"""
-        recent = self.history[-n:] if self.history else []
+        with self._history_lock:
+            recent = self.history[-n:] if self.history else []
         return [h.get("final_text", "") for h in recent]
 
     def get_history(self, n=100, search=None):
         """取得歷史紀錄（支援搜尋）"""
-        items = self.history
+        with self._history_lock:
+            items = list(self.history)  # 拷貝快照，釋鎖後再過濾
         if search:
             search = search.lower()
             items = [h for h in items
@@ -251,7 +253,8 @@ class Memory:
     def delete_history_item(self, timestamp):
         """刪除單一歷史紀錄"""
         with self._history_lock:
-            self.history = [h for h in self.history if h.get("timestamp") != timestamp]
+            # 原地修改避免重新賦值 — 其他執行緒持有同一 list 參考才安全
+            self.history[:] = [h for h in self.history if h.get("timestamp") != timestamp]
             save_history(self.history)
             self._history_write_count = 0
 
