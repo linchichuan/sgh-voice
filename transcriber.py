@@ -350,3 +350,27 @@ class Transcriber:
             words = re.findall(r'[A-Za-z][A-Za-z0-9\-]{2,}', text)
             for kw in set(words): self.memory.add_auto_word(kw)
         threading.Thread(target=task, daemon=True).start()
+
+    def get_service_status(self) -> dict:
+        """回傳當前各服務的狀態（供 Dashboard 狀態燈使用）"""
+        detector = self.ollama_detector
+        if detector.status == OllamaStatus.UNKNOWN:
+            detector.detect()
+        # 偵測 Qwen3-ASR 安裝狀態
+        try:
+            import mlx_qwen3_asr
+            qwen3_installed = True
+        except ImportError:
+            qwen3_installed = False
+
+        return {
+            **detector.get_status_dict(),
+            "has_openai_key": bool(self.config.get("openai_api_key")),
+            "has_anthropic_key": bool(self.config.get("anthropic_api_key")),
+            "has_groq_key": bool(self.config.get("groq_api_key")),
+            "has_openrouter_key": bool(self.config.get("openrouter_api_key")),
+            "hybrid_mode": self.config.get("enable_hybrid_mode", True),
+            "local_model": self.config.get("local_llm_model", "qwen3.5:latest"),
+            "stt_engine": self.config.get("stt_engine", "mlx-whisper"),
+            "qwen3_asr_installed": qwen3_installed,
+        }
