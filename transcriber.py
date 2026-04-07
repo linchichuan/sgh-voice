@@ -206,10 +206,11 @@ class Transcriber:
         try:
             client = openai.OpenAI(base_url="https://api.groq.com/openai/v1", api_key=api_key, timeout=8.0)
             model = self.config.get("groq_model", "llama-3.3-70b-versatile")
-            system = "根據指令修改文字。" if mode == "edit" else self._get_system_prompt()
+            system = self._EDIT_SYSTEM if mode == "edit" else self._get_system_prompt()
+            user_msg = self._build_edit_prompt(cmd=text, original=edit_context) if mode == "edit" else text
             print(" " + _t(f"🤖 [Groq LLM] 啟動: {model}", f"🤖 [Groq LLM] 起動中: {model}", f"🤖 [Groq LLM] Launching: {model}"))
             t0 = time.time()
-            resp = client.chat.completions.create(model=model, messages=[{"role": "system", "content": system}, {"role": "user", "content": text}], temperature=0.3, max_tokens=2048)
+            resp = client.chat.completions.create(model=model, messages=[{"role": "system", "content": system}, {"role": "user", "content": user_msg}], temperature=0.3, max_tokens=2048)
             res = re.sub(r'<think>[\s\S]*?</think>|<think>[\s\S]*$', '', resp.choices[0].message.content).strip()
             print(" " + _t(f"⚡ [Groq LLM] 完成 ({time.time()-t0:.2f}s)", f"⚡ [Groq LLM] 完了", f"⚡ [Groq LLM] Done"))
             return res if not self._is_llm_hallucination(res, text) else text
@@ -221,10 +222,11 @@ class Transcriber:
         try:
             client = openai.OpenAI(base_url="https://openrouter.ai/api/v1", api_key=api_key, timeout=15.0)
             model = self.config.get("openrouter_model", "qwen/qwen-2.5-72b-instruct")
-            system = "根據指令修改文字。" if mode == "edit" else self._get_system_prompt()
+            system = self._EDIT_SYSTEM if mode == "edit" else self._get_system_prompt()
+            user_msg = self._build_edit_prompt(cmd=text, original=edit_context) if mode == "edit" else text
             print(" " + _t(f"🌐 [OpenRouter] 啟動: {model}", f"🌐 [OpenRouter] 起動中: {model}", f"🌐 [OpenRouter] Launching: {model}"))
             t0 = time.time()
-            resp = client.chat.completions.create(model=model, messages=[{"role": "system", "content": system}, {"role": "user", "content": text}], temperature=0.3, max_tokens=2048, extra_headers={"HTTP-Referer": "https://shingihou.com", "X-Title": "SGH Voice"})
+            resp = client.chat.completions.create(model=model, messages=[{"role": "system", "content": system}, {"role": "user", "content": user_msg}], temperature=0.3, max_tokens=2048, extra_headers={"HTTP-Referer": "https://shingihou.com", "X-Title": "SGH Voice"})
             res = re.sub(r'<think>[\s\S]*?</think>|<think>[\s\S]*$', '', resp.choices[0].message.content).strip()
             print(" " + _t(f"✅ [OpenRouter] 完成 ({time.time()-t0:.2f}s)", f"✅ [OpenRouter] 完了", f"✅ [OpenRouter] Done"))
             return res if not self._is_llm_hallucination(res, text) else text
@@ -236,9 +238,13 @@ class Transcriber:
         try:
             client = anthropic.Anthropic(api_key=api_key, timeout=10.0)
             model = self.config.get("claude_model", "claude-3-5-haiku-20241022")
-            resp = client.messages.create(model=model, system=self._get_system_prompt(), messages=[{"role": "user", "content": text}], max_tokens=2048, temperature=0.3)
+            system = self._EDIT_SYSTEM if mode == "edit" else self._get_system_prompt()
+            user_msg = self._build_edit_prompt(cmd=text, original=edit_context) if mode == "edit" else text
+            print(" " + _t(f"☁️ [Claude] 啟動: {model}", f"☁️ [Claude] 起動中: {model}", f"☁️ [Claude] Launching: {model}"))
+            t0 = time.time()
+            resp = client.messages.create(model=model, system=system, messages=[{"role": "user", "content": user_msg}], max_tokens=2048, temperature=0.3)
             res = resp.content[0].text.strip()
-            print(" " + _t(f"⚡ [Claude] 完成", f"⚡ [Claude] 完了", f"⚡ [Claude] Done"))
+            print(" " + _t(f"⚡ [Claude] 完成 ({time.time()-t0:.2f}s)", f"⚡ [Claude] 完了", f"⚡ [Claude] Done"))
             return res if not self._is_llm_hallucination(res, text) else text
         except Exception: return None
 
@@ -248,9 +254,13 @@ class Transcriber:
         try:
             client = openai.OpenAI(api_key=api_key, timeout=10.0)
             model = self.config.get("openai_model", "gpt-4o")
-            resp = client.chat.completions.create(model=model, messages=[{"role": "system", "content": self._get_system_prompt()}, {"role": "user", "content": text}], temperature=0.3, max_tokens=2048)
+            system = self._EDIT_SYSTEM if mode == "edit" else self._get_system_prompt()
+            user_msg = self._build_edit_prompt(cmd=text, original=edit_context) if mode == "edit" else text
+            print(" " + _t(f"🤖 [OpenAI] 啟動: {model}", f"🤖 [OpenAI] 起動中: {model}", f"🤖 [OpenAI] Launching: {model}"))
+            t0 = time.time()
+            resp = client.chat.completions.create(model=model, messages=[{"role": "system", "content": system}, {"role": "user", "content": user_msg}], temperature=0.3, max_tokens=2048)
             res = resp.choices[0].message.content.strip()
-            print(" " + _t(f"⚡ [OpenAI] 完成", f"⚡ [OpenAI] 完了", f"⚡ [OpenAI] Done"))
+            print(" " + _t(f"⚡ [OpenAI] 完成 ({time.time()-t0:.2f}s)", f"⚡ [OpenAI] 完了", f"⚡ [OpenAI] Done"))
             return res if not self._is_llm_hallucination(res, text) else text
         except Exception: return None
 
@@ -342,8 +352,24 @@ class Transcriber:
         if any(result.startswith(m) for m in ["好的", "沒問題", "了解", "為您", "以下是", "I appreciate"]): return True
         return len(result) > len(original_text) * 4 and len(original_text) > 10
 
+    _EDIT_SYSTEM = (
+        "你是一個精準的文字編輯助手。你的任務是嚴格根據使用者的【語音指令】來修改【原文】。\n\n"
+        "【核心守則】\n"
+        "1. 最小更動原則：除非指令要求重寫，否則必須 100% 保留原文的語氣、排版與未提及的部分。\n"
+        "2. 語意對齊：語音指令可能包含辨識錯誤（例如同音字），請根據原文語境理解真實意圖。\n"
+        "3. 絕對純淨：只輸出修改後的最終完整文字。嚴禁包含任何引言、Markdown 代碼區塊標籤 (如 ```)、解釋或問候語。"
+    )
+
     def _build_edit_prompt(self, cmd, original):
-        return f"原文：「{original}」\n指令：{cmd}\n請直接輸出修改後的結果。"
+        return (
+            "<original_text>\n"
+            f"{original}\n"
+            "</original_text>\n\n"
+            "<voice_command>\n"
+            f"{cmd}\n"
+            "</voice_command>\n\n"
+            "請直接輸出修改後的最終文字："
+        )
 
     def _async_extract_keywords(self, text):
         def task():
