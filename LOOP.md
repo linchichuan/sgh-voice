@@ -55,7 +55,7 @@ One full rotation = 1 cycle. Increment cycle number when last role completes.
 
 ## Current Pointer
 
-Next: **效能工程師** (role 3) | Cycle 3
+Next: **安全工程師** (role 4) | Cycle 3
 
 ---
 
@@ -74,6 +74,7 @@ Next: **效能工程師** (role 3) | Cycle 3
 | 2026-04-03 | 安全工程師 | API Key 格式驗證：5 種 key 前綴驗證（sk-/sk-ant-/gsk_/sk-or-/sk_），儲存時回傳 warnings，前端 toast 提示 | `dashboard.py`, `static/index.html` | pass |
 | 2026-04-03 | 品質工程師 | history.json 執行緒安全稽核：無 deadlock 風險（Lock 不嵌套），修復 3 個無鎖讀取競態（get_recent_context/get_history 加鎖、delete_history_item 改原地修改避免 list 重賦值） | `memory.py` | pass |
 | 2026-04-07 | UX 設計師 | 設定儲存後引擎狀態列即時更新：抽出 updateEngineStatusBar(cfg) 獨立函數，saveConfig() 成功後直接傳入 cfg 更新，省去額外 API 請求 | `static/index.html` | pass |
+| 2026-04-08 | 效能工程師 | Whisper 預熱事件驅動化：移除 sleep(3)、Ollama/Whisper 改並行預熱、加 _whisper_ready Event、_local_stt() 第一次呼叫時等待事件（max 15s）而非盲等 | `transcriber.py` | pass |
 
 ---
 
@@ -112,7 +113,7 @@ Next: **效能工程師** (role 3) | Cycle 3
 **Pending**:
 - ~~OpenRouter 免費模型延遲基準測試~~ done（🥇Nemotron Nano 1.62s，移除 3 個已下架模型，預設改為 Nemotron）
 - ~~LLM 路由智慧化~~ done（短句≤30字走 Ollama→Groq，長文走 pref_engine 旗艦）
-- Whisper 預熱時間優化（目前 sleep(3) 等待 UI，可改為事件驅動）
+- ~~Whisper 預熱時間優化（目前 sleep(3) 等待 UI，可改為事件驅動）~~ done（並行預熱 + _whisper_ready Event，節省 3s+ 啟動延遲）
 
 **Next Ideas**: 串流式 LLM 回應（邊生成邊貼上）、模型自動降級（延遲超標時自動切換輕量模型）
 
