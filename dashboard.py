@@ -573,6 +573,17 @@ def _track_usage(response, source="anthropic"):
             }
         m = stats["usage"][month_key]
         
+        # 補齊可能缺失的欄位
+        fields = [
+            "openai_input_tokens", "openai_output_tokens", "openai_whisper_seconds",
+            "anthropic_input_tokens", "anthropic_output_tokens",
+            "groq_input_tokens", "groq_output_tokens", "groq_whisper_seconds",
+            "openrouter_input_tokens", "openrouter_output_tokens"
+        ]
+        for f in fields:
+            if f not in m: m[f] = 0
+        if "details" not in m: m["details"] = []
+        
         if source == "anthropic":
             m["anthropic_input_tokens"] += input_tokens
             m["anthropic_output_tokens"] += output_tokens
