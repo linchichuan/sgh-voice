@@ -55,7 +55,7 @@ One full rotation = 1 cycle. Increment cycle number when last role completes.
 
 ## Current Pointer
 
-Next: **UX 設計師** (role 2) | Cycle 3
+Next: **效能工程師** (role 3) | Cycle 3
 
 ---
 
@@ -73,6 +73,7 @@ Next: **UX 設計師** (role 2) | Cycle 3
 | 2026-04-03 | 效能工程師 | LLM 路由智慧化：短句（≤30字）優先 Ollama→Groq，長文依 pref_engine 走旗艦，大幅降低短句 API 成本 | `transcriber.py` | pass |
 | 2026-04-03 | 安全工程師 | API Key 格式驗證：5 種 key 前綴驗證（sk-/sk-ant-/gsk_/sk-or-/sk_），儲存時回傳 warnings，前端 toast 提示 | `dashboard.py`, `static/index.html` | pass |
 | 2026-04-03 | 品質工程師 | history.json 執行緒安全稽核：無 deadlock 風險（Lock 不嵌套），修復 3 個無鎖讀取競態（get_recent_context/get_history 加鎖、delete_history_item 改原地修改避免 list 重賦值） | `memory.py` | pass |
+| 2026-04-07 | UX 設計師 | 設定儲存後引擎狀態列即時更新：抽出 updateEngineStatusBar(cfg) 獨立函數，saveConfig() 成功後直接傳入 cfg 更新，省去額外 API 請求 | `static/index.html` | pass |
 
 ---
 
@@ -100,7 +101,7 @@ Next: **UX 設計師** (role 2) | Cycle 3
 
 **Pending**:
 - ~~Dashboard 設定頁加入「測試連線」按鈕~~ done（POST /api/test-llm，5 引擎皆支援，顯示延遲+模型名稱）
-- 設定儲存後加入引擎狀態即時更新（目前只有 toast）
+- ~~設定儲存後加入引擎狀態即時更新（目前只有 toast）~~ done（updateEngineStatusBar 獨立函數，saveConfig 儲存後即時刷新）
 - ~~Dashboard 首頁引擎狀態即時顯示~~ done（STT/LLM/場景三欄狀態列，讀取 /api/config 渲染）
 
 **Next Ideas**: 深色/淺色主題切換、行動裝置響應式佈局優化

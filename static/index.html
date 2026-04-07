@@ -2311,19 +2311,7 @@
       // Engine status bar
       try {
         const cfg = await api('/config');
-        const sttEngine = cfg.stt_engine || 'mlx-whisper';
-        const sttModel = cfg.local_whisper_model || 'whisper-turbo';
-        const llmEngine = cfg.llm_engine || 'ollama';
-        const engineLabels = {groq:'Groq',openrouter:'OpenRouter',claude:'Claude',openai:'OpenAI',ollama:'Ollama'};
-        const modelKeys = {groq:'groq_model',openrouter:'openrouter_model',claude:'claude_model',openai:'openai_model',ollama:'local_llm_model'};
-        const llmModel = cfg[modelKeys[llmEngine]] || '—';
-        const shortModel = (m) => m.length > 30 ? m.split('/').pop().split(':')[0] : m;
-        document.getElementById('status-stt-engine').textContent =
-          (sttEngine === 'groq' ? 'Groq Whisper' : sttEngine === 'cloud-only' ? 'OpenAI Cloud' : sttModel);
-        document.getElementById('status-llm-engine').innerHTML =
-          `<span style="color:var(--accent2)">${engineLabels[llmEngine]||llmEngine}</span> · ${shortModel(llmModel)}`;
-        const sceneLabels = {general:t('scene_general')||'一般',medical:t('scene_medical')||'醫療',medical_consultation:t('scene_medical_consultation')||'醫療看診'};
-        document.getElementById('status-scene').textContent = sceneLabels[cfg.active_scene] || cfg.active_scene || '一般';
+        updateEngineStatusBar(cfg);
       } catch (e) { }
 
       // Progress ring
@@ -2910,6 +2898,24 @@
     }
     function getToggle(id) { return document.getElementById(id).classList.contains('on'); }
 
+    function updateEngineStatusBar(cfg) {
+      const sttEngine = cfg.stt_engine || 'mlx-whisper';
+      const sttModel = cfg.local_whisper_model || 'whisper-turbo';
+      const llmEngine = cfg.llm_engine || 'ollama';
+      const engineLabels = {groq:'Groq',openrouter:'OpenRouter',claude:'Claude',openai:'OpenAI',ollama:'Ollama'};
+      const modelKeys = {groq:'groq_model',openrouter:'openrouter_model',claude:'claude_model',openai:'openai_model',ollama:'local_llm_model'};
+      const llmModel = cfg[modelKeys[llmEngine]] || '—';
+      const shortModel = (m) => m.length > 30 ? m.split('/').pop().split(':')[0] : m;
+      const el = (id) => document.getElementById(id);
+      if (!el('status-stt-engine')) return;
+      el('status-stt-engine').textContent =
+        (sttEngine === 'groq' ? 'Groq Whisper' : sttEngine === 'cloud-only' ? 'OpenAI Cloud' : sttModel);
+      el('status-llm-engine').innerHTML =
+        `<span style="color:var(--accent2)">${engineLabels[llmEngine]||llmEngine}</span> · ${shortModel(llmModel)}`;
+      const sceneLabels = {general:t('scene_general')||'一般',medical:t('scene_medical')||'醫療',medical_consultation:t('scene_medical_consultation')||'醫療看診'};
+      el('status-scene').textContent = sceneLabels[cfg.active_scene] || cfg.active_scene || '一般';
+    }
+
     async function saveConfig() {
       const cfg = {
         openai_api_key: document.getElementById('cfg-openai-key').value,
@@ -2961,6 +2967,7 @@
       } else {
         toast('✅ 設定已儲存');
       }
+      updateEngineStatusBar(cfg);
     }
 
     function renderAppStyles() {
