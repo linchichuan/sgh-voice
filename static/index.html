@@ -2300,12 +2300,32 @@
         const now = new Date();
         const monthKey = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
         const m = usage[monthKey] || {};
-        const claudeCost = ((m.claude_input_tokens || 0) * 0.0000008) + ((m.claude_output_tokens || 0) * 0.000004);
-        const whisperCost = ((m.whisper_seconds || 0) / 60) * 0.006;
-        const totalCost = claudeCost + whisperCost;
+        
+        // OpenAI Costs (GPT-4o approx avg: $5/$15 per 1M, Whisper: $0.006/min)
+        const oaiLlmCost = ((m.openai_input_tokens || 0) * 0.000005) + ((m.openai_output_tokens || 0) * 0.000015);
+        const oaiWhisperCost = ((m.openai_whisper_seconds || 0) / 60) * 0.006;
+        
+        // Anthropic Costs (Haiku 3.5: $0.25/$1.25 per 1M)
+        const antCost = ((m.anthropic_input_tokens || 0) * 0.00000025) + ((m.anthropic_output_tokens || 0) * 0.00000125);
+        
+        // Groq Costs (Llama 3.3 70B: $0.59/$0.79 per 1M, Whisper: assume free for now)
+        const groqCost = ((m.groq_input_tokens || 0) * 0.00000059) + ((m.groq_output_tokens || 0) * 0.00000079);
+        const groqWhisperCost = 0; // Groq currently free
+        
+        // OpenRouter Costs (Assume avg $1 per 1M)
+        const orCost = ((m.openrouter_input_tokens || 0) + (m.openrouter_output_tokens || 0)) * 0.000001;
+        
+        const totalCost = oaiLlmCost + oaiWhisperCost + antCost + groqCost + orCost;
+        
         document.getElementById('stat-cost').textContent = '$' + totalCost.toFixed(2);
-        document.getElementById('stat-cost-detail').textContent =
-          `Whisper $${whisperCost.toFixed(3)} + Claude $${claudeCost.toFixed(3)}`;
+        
+        const details = [];
+        if (oaiWhisperCost > 0 || oaiLlmCost > 0) details.push(`OpenAI $${(oaiWhisperCost + oaiLlmCost).toFixed(3)}`);
+        if (antCost > 0) details.push(`Claude $${antCost.toFixed(3)}`);
+        if (groqCost > 0) details.push(`Groq $${groqCost.toFixed(3)}`);
+        if (orCost > 0) details.push(`OpenRouter $${orCost.toFixed(3)}`);
+        
+        document.getElementById('stat-cost-detail').textContent = details.length > 0 ? details.join(' + ') : 'No cloud costs this month';
       } catch (e) { }
 
       // Engine status bar

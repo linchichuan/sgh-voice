@@ -552,28 +552,39 @@ def api_stop_recording():
     return jsonify({"ok": True, "status": "processing"})
 
 
-def _track_usage(response, source="polish"):
-    """追蹤 Claude API token 用量"""
+def _track_usage(response, source="anthropic"):
+    """追蹤 API 用量並寫入 stats.json"""
     try:
-        input_tokens = getattr(response.usage, 'input_tokens', 0)
-        output_tokens = getattr(response.usage, 'output_tokens', 0)
+        input_tokens = getattr(response.usage, 'input_tokens', getattr(response.usage, 'prompt_tokens', 0))
+        output_tokens = getattr(response.usage, 'output_tokens', getattr(response.usage, 'completion_tokens', 0))
+        model = getattr(response, 'model', 'unknown')
+        
         stats = load_stats()
-        if "usage" not in stats:
-            stats["usage"] = {}
-        from datetime import date
+        if "usage" not in stats: stats["usage"] = {}
+        from datetime import date, datetime
         month_key = date.today().strftime("%Y-%m")
         if month_key not in stats["usage"]:
             stats["usage"][month_key] = {
-                "claude_input_tokens": 0,
-                "claude_output_tokens": 0,
-                "claude_calls": 0,
-                "whisper_seconds": 0,
+                "openai_input_tokens": 0, "openai_output_tokens": 0, "openai_whisper_seconds": 0,
+                "anthropic_input_tokens": 0, "anthropic_output_tokens": 0,
+                "groq_input_tokens": 0, "groq_output_tokens": 0, "groq_whisper_seconds": 0,
+                "openrouter_input_tokens": 0, "openrouter_output_tokens": 0,
+                "details": []
             }
         m = stats["usage"][month_key]
-        m["claude_input_tokens"] += input_tokens
-        m["claude_output_tokens"] += output_tokens
-        m["claude_calls"] += 1
-        from config import save_stats
+        
+        if source == "anthropic":
+            m["anthropic_input_tokens"] += input_tokens
+            m["anthropic_output_tokens"] += output_tokens
+        elif source == "openai":
+            m["openai_input_tokens"] += input_tokens
+            m["openai_output_tokens"] += output_tokens
+        
+        m["details"].append({
+            "t": datetime.now().isoformat(),
+            "s": source, "m": model, "i": input_tokens, "o": output_tokens, "sec": 0, "type": "rewrite"
+        })
+        if len(m["details"]) > 100: m["details"] = m["details"][-100:]
         save_stats(stats)
     except Exception:
         pass

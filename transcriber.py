@@ -113,19 +113,19 @@ class Transcriber:
         raw = None
         stt_engine = self.config.get("stt_engine", "mlx-whisper")
         if stt_engine == "groq":
-            raw = self._groq_stt(audio_source)
+            raw = self._groq_stt(audio_source, duration=audio_duration)
             if raw: stt_source = "groq"
         elif stt_engine != "cloud-only" and is_hybrid:
             if isinstance(audio_source, np.ndarray) or audio_duration <= self.config.get("hybrid_audio_threshold", 15):
                 raw = self._local_stt(audio_source)
                 if raw: stt_source = "local"
 
-        if not raw and self.config.get("groq_api_key"):
-            raw = self._groq_stt(audio_source)
+        if not raw and stt_engine != "groq" and self.config.get("groq_api_key"):
+            raw = self._groq_stt(audio_source, duration=audio_duration)
             if raw: stt_source = "groq"
         
         if not raw and self.config.get("openai_api_key"):
-            raw = self._whisper_api_fallback(audio_source)
+            raw = self._whisper_api_fallback(audio_source, duration=audio_duration)
             if raw: stt_source = "cloud"
             
         if not raw or not raw.strip(): return None
@@ -186,10 +186,11 @@ class Transcriber:
         "- 絕對保留：所有人名、產品名 (VIZZ)、數量、日期、預算、特定要求、冷藏/物流條件。\n"
         "- 邏輯修正：將音近但邏輯錯誤的詞依語境修正（例：クルーボックス -> クールボックス）。\n\n"
         "【第三步：結構重組與優化】\n"
-        "- 商務化：將口語轉換為專業語體，補上得體的問候與敬語。\n"
+        "- 商務化：將口語轉換為專業語體，保留說話者已有的問候與敬語，不得自行添加未說出的內容。\n"
         "- 結構化：若涉及多項內容或複雜邏輯，請主動使用【標題】與條列式排版，使其可直接用於 LINE/Email 傳送。\n\n"
         "【輸出限制】\n"
-        "只輸出編輯後的最終文字，嚴禁任何解釋。"
+        "只輸出編輯後的最終文字，嚴禁任何解釋。\n"
+        "⚠️ 絕對禁止：補全說話者未說出的句子、添加未提及的內容、延伸未完成的想法。"
     )
 
     def _get_system_prompt(self):
@@ -212,6 +213,7 @@ class Transcriber:
             t0 = time.time()
             resp = client.chat.completions.create(model=model, messages=[{"role": "system", "content": system}, {"role": "user", "content": user_msg}], temperature=0.3, max_tokens=2048)
             res = re.sub(r'<think>[\s\S]*?</think>|<think>[\s\S]*$', '', resp.choices[0].message.content).strip()
+            self._track_usage("groq", model, resp.usage.prompt_tokens, resp.usage.completion_tokens)
             print(" " + _t(f"⚡ [Groq LLM] 完成 ({time.time()-t0:.2f}s)", f"⚡ [Groq LLM] 完了", f"⚡ [Groq LLM] Done"))
             return res if not self._is_llm_hallucination(res, text) else text
         except Exception: return None
@@ -228,6 +230,7 @@ class Transcriber:
             t0 = time.time()
             resp = client.chat.completions.create(model=model, messages=[{"role": "system", "content": system}, {"role": "user", "content": user_msg}], temperature=0.3, max_tokens=2048, extra_headers={"HTTP-Referer": "https://shingihou.com", "X-Title": "SGH Voice"})
             res = re.sub(r'<think>[\s\S]*?</think>|<think>[\s\S]*$', '', resp.choices[0].message.content).strip()
+            self._track_usage("openrouter", model, resp.usage.prompt_tokens, resp.usage.completion_tokens)
             print(" " + _t(f"✅ [OpenRouter] 完成 ({time.time()-t0:.2f}s)", f"✅ [OpenRouter] 完了", f"✅ [OpenRouter] Done"))
             return res if not self._is_llm_hallucination(res, text) else text
         except Exception: return None
@@ -244,7 +247,8 @@ class Transcriber:
             t0 = time.time()
             resp = client.messages.create(model=model, system=system, messages=[{"role": "user", "content": user_msg}], max_tokens=2048, temperature=0.3)
             res = resp.content[0].text.strip()
-            print(" " + _t(f"⚡ [Claude] 完成 ({time.time()-t0:.2f}s)", f"⚡ [Claude] 完了", f"⚡ [Claude] Done"))
+            self._track_usage("anthropic", model, resp.usage.input_tokens, resp.usage.output_tokens)
+            print(" " + _t(f"⚡ [Claude] 完成", f"⚡ [Claude] 完了", f"⚡ [Claude] Done"))
             return res if not self._is_llm_hallucination(res, text) else text
         except Exception: return None
 
@@ -260,7 +264,8 @@ class Transcriber:
             t0 = time.time()
             resp = client.chat.completions.create(model=model, messages=[{"role": "system", "content": system}, {"role": "user", "content": user_msg}], temperature=0.3, max_tokens=2048)
             res = resp.choices[0].message.content.strip()
-            print(" " + _t(f"⚡ [OpenAI] 完成 ({time.time()-t0:.2f}s)", f"⚡ [OpenAI] 完了", f"⚡ [OpenAI] Done"))
+            self._track_usage("openai", model, resp.usage.prompt_tokens, resp.usage.completion_tokens)
+            print(" " + _t(f"⚡ [OpenAI] 完成", f"⚡ [OpenAI] 完了", f"⚡ [OpenAI] Done"))
             return res if not self._is_llm_hallucination(res, text) else text
         except Exception: return None
 
@@ -277,7 +282,7 @@ class Transcriber:
             self._ollama_backoff_until = time.time() + min(120, 5 * (2 ** self._ollama_fail_count))
             return None
 
-    def _groq_stt(self, audio_source):
+    def _groq_stt(self, audio_source, duration=0):
         api_key = self.config.get("groq_api_key")
         if not api_key: return None
         try:
@@ -287,12 +292,19 @@ class Transcriber:
                 tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
                 sf.write(tmp.name, audio_source, sr); tmp.close()
                 audio_path = tmp.name; is_temp = True
+                if duration == 0: duration = len(audio_source) / sr
             else: audio_path = audio_source; is_temp = False
+            
             client = openai.OpenAI(base_url="https://api.groq.com/openai/v1", api_key=api_key, timeout=10.0)
             with open(audio_path, "rb") as f:
                 prompt = self.memory.build_whisper_prompt(self.config.get("custom_words", []))
-                resp = client.audio.transcriptions.create(model=self.config.get("groq_whisper_model", "whisper-large-v3-turbo"), file=f, prompt=prompt, language=self.config.get("language", "auto") if self.config.get("language") != "auto" else None)
+                model = self.config.get("groq_whisper_model", "whisper-large-v3-turbo")
+                resp = client.audio.transcriptions.create(
+                    model=model, file=f, prompt=prompt, 
+                    language=self.config.get("language", "auto") if self.config.get("language") != "auto" else None
+                )
             if is_temp: os.unlink(audio_path)
+            self._track_usage("groq", model, seconds=duration)
             return resp.text
         except Exception: return None
 
@@ -306,7 +318,7 @@ class Transcriber:
             return result.get("text", "")
         except Exception: return None
 
-    def _whisper_api_fallback(self, audio_source):
+    def _whisper_api_fallback(self, audio_source, duration=0):
         api_key = self.config.get("openai_api_key")
         if not api_key: return None
         try:
@@ -314,10 +326,13 @@ class Transcriber:
             if isinstance(audio_source, np.ndarray):
                 tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
                 sf.write(tmp.name, audio_source, 16000); tmp.close(); audio_path = tmp.name; is_temp = True
+                if duration == 0: duration = len(audio_source) / 16000
             else: audio_path = audio_source; is_temp = False
             client = openai.OpenAI(api_key=api_key)
-            with open(audio_path, "rb") as f: resp = client.audio.transcriptions.create(model="whisper-1", file=f)
+            with open(audio_path, "rb") as f: 
+                resp = client.audio.transcriptions.create(model="whisper-1", file=f)
             if is_temp: os.unlink(audio_path)
+            self._track_usage("openai", "whisper-1", seconds=duration)
             return resp.text
         except Exception: return None
 
@@ -377,12 +392,60 @@ class Transcriber:
             for kw in set(words): self.memory.add_auto_word(kw)
         threading.Thread(target=task, daemon=True).start()
 
+    def _track_usage(self, source, model, input_tokens=0, output_tokens=0, seconds=0):
+        """追蹤 API 用量並寫入 stats.json"""
+        try:
+            from config import load_stats, save_stats
+            from datetime import date
+            stats = load_stats()
+            if "usage" not in stats: stats["usage"] = {}
+            month_key = date.today().strftime("%Y-%m")
+            if month_key not in stats["usage"]:
+                stats["usage"][month_key] = {
+                    "openai_input_tokens": 0, "openai_output_tokens": 0, "openai_whisper_seconds": 0,
+                    "anthropic_input_tokens": 0, "anthropic_output_tokens": 0,
+                    "groq_input_tokens": 0, "groq_output_tokens": 0, "groq_whisper_seconds": 0,
+                    "openrouter_input_tokens": 0, "openrouter_output_tokens": 0,
+                    "details": []
+                }
+            m = stats["usage"][month_key]
+            
+            # 兼容舊格式
+            if "claude_input_tokens" in m:
+                m["anthropic_input_tokens"] += m.pop("claude_input_tokens")
+                m["anthropic_output_tokens"] += m.pop("claude_output_tokens")
+            if "whisper_seconds" in m:
+                m["openai_whisper_seconds"] += m.pop("whisper_seconds")
+
+            if source == "openai":
+                m["openai_input_tokens"] += input_tokens
+                m["openai_output_tokens"] += output_tokens
+                m["openai_whisper_seconds"] += seconds
+            elif source == "anthropic":
+                m["anthropic_input_tokens"] += input_tokens
+                m["anthropic_output_tokens"] += output_tokens
+            elif source == "groq":
+                m["groq_input_tokens"] += input_tokens
+                m["groq_output_tokens"] += output_tokens
+                m["groq_whisper_seconds"] += seconds
+            elif source == "openrouter":
+                m["openrouter_input_tokens"] += input_tokens
+                m["openrouter_output_tokens"] += output_tokens
+            
+            m["details"].append({
+                "t": datetime.now().isoformat(),
+                "s": source, "m": model, "i": input_tokens, "o": output_tokens, "sec": seconds
+            })
+            if len(m["details"]) > 100: m["details"] = m["details"][-100:]
+            save_stats(stats)
+        except Exception as e:
+            print(f" ⚠️ Usage tracking error: {e}")
+
     def get_service_status(self) -> dict:
         """回傳當前各服務的狀態（供 Dashboard 狀態燈使用）"""
         detector = self.ollama_detector
         if detector.status == OllamaStatus.UNKNOWN:
             detector.detect()
-        # 偵測 Qwen3-ASR 安裝狀態
         try:
             import mlx_qwen3_asr
             qwen3_installed = True
