@@ -167,6 +167,8 @@ class Transcriber:
             "mode": mode, "process_time": round(process_time, 2), "stt_source": stt_source, "llm_source": llm_source,
         })
         if mode == "dictate": self._async_extract_keywords(final)
+        self._write_audit(stt=stt_source, llm=llm_source, mode=mode,
+                          latency_ms=int(process_time * 1000), chars=len(final or ""))
         return {"raw": raw, "final": final, "process_time": process_time}
 
     # ─── LLM 核心 (純文字轉碼器：嚴禁回答，嚴禁對話) ───
@@ -385,6 +387,22 @@ class Transcriber:
             elif source == "groq": m["groq_input_tokens"]+=input_tokens; m["groq_output_tokens"]+=output_tokens; m["groq_whisper_seconds"]+=seconds
             elif source == "openrouter": m["openrouter_input_tokens"]+=input_tokens; m["openrouter_output_tokens"]+=output_tokens
             save_stats(stats)
+        except Exception: pass
+
+    def _write_audit(self, **fields):
+        """寫入 API 呼叫稽核日誌（僅記錄元數據，不記錄文字內容）"""
+        try:
+            import json
+            from config import AUDIT_LOG_FILE
+            entry = json.dumps({"ts": datetime.now().isoformat(), **fields}, ensure_ascii=False)
+            with open(AUDIT_LOG_FILE, "a", encoding="utf-8") as f:
+                f.write(entry + "\n")
+            # 超過 500KB 保留最後 500 行
+            if os.path.getsize(AUDIT_LOG_FILE) > 500_000:
+                with open(AUDIT_LOG_FILE, "r", encoding="utf-8") as f:
+                    lines = f.readlines()
+                with open(AUDIT_LOG_FILE, "w", encoding="utf-8") as f:
+                    f.writelines(lines[-500:])
         except Exception: pass
 
     def get_service_status(self) -> dict:

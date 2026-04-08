@@ -219,6 +219,7 @@ DICTIONARY_FILE = os.path.join(DATA_DIR, "dictionary.json")
 HISTORY_FILE = os.path.join(DATA_DIR, "history.json")
 STATS_FILE = os.path.join(DATA_DIR, "stats.json")
 SMART_REPLACE_FILE = os.path.join(DATA_DIR, "smart_replace.json")
+AUDIT_LOG_FILE = os.path.join(DATA_DIR, "audit.log")
 
 # ─── 本地模型路徑映射（短名稱 → 實際路徑）────────────────
 LOCAL_MODEL_PATHS = {

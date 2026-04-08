@@ -278,6 +278,27 @@ def api_usage():
     return jsonify(usage)
 
 
+@app.route("/api/audit-log")
+def api_audit_log():
+    """API 呼叫稽核日誌：最近 100 筆（元數據，不含文字內容）"""
+    try:
+        from config import AUDIT_LOG_FILE
+        if not os.path.exists(AUDIT_LOG_FILE):
+            return jsonify([])
+        with open(AUDIT_LOG_FILE, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+        n = int(request.args.get("n", 100))
+        entries = []
+        for line in reversed(lines[-n:]):
+            try:
+                entries.append(json.loads(line.strip()))
+            except Exception:
+                pass
+        return jsonify(entries)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/test-llm", methods=["POST"])
 def api_test_llm():
     """測試 LLM 引擎連線：發送簡短測試訊息驗證 API Key + 模型可用性"""

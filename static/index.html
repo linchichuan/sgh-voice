@@ -1085,6 +1085,28 @@
           <h3 data-i18n="weekly_chart">近 7 天使用量</h3>
           <div class="bar-chart" id="weekly-chart"></div>
         </div>
+
+        <!-- API Audit Log -->
+        <div style="margin-top:20px;">
+          <h3 style="font-size:14px; color:var(--text2); margin-bottom:8px;" data-i18n="audit_log_title">🔍 API 呼叫記錄</h3>
+          <div id="audit-log-table" style="font-size:12px; overflow-x:auto;">
+            <table style="width:100%; border-collapse:collapse;">
+              <thead>
+                <tr style="color:var(--text3); border-bottom:1px solid var(--border);">
+                  <th style="text-align:left; padding:4px 8px;" data-i18n="audit_col_time">時間</th>
+                  <th style="text-align:left; padding:4px 8px;" data-i18n="audit_col_stt">STT</th>
+                  <th style="text-align:left; padding:4px 8px;" data-i18n="audit_col_llm">LLM</th>
+                  <th style="text-align:left; padding:4px 8px;" data-i18n="audit_col_mode">模式</th>
+                  <th style="text-align:right; padding:4px 8px;" data-i18n="audit_col_latency">延遲</th>
+                  <th style="text-align:right; padding:4px 8px;" data-i18n="audit_col_chars">字數</th>
+                </tr>
+              </thead>
+              <tbody id="audit-log-body">
+                <tr><td colspan="6" style="padding:8px; color:var(--text3); text-align:center;">載入中…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
 
       <!-- ═══ Styles ═══ -->
@@ -2345,6 +2367,31 @@
       document.getElementById('bar-dict').style.width = (p.dict_score / 30 * 100) + '%';
       document.getElementById('bar-vocab').style.width = (p.vocab_score / 30 * 100) + '%';
       document.getElementById('bar-usage').style.width = (p.usage_score / 40 * 100) + '%';
+
+      // Audit log
+      try {
+        const logs = await api('/audit-log?n=10');
+        const tbody = document.getElementById('audit-log-body');
+        if (tbody) {
+          if (!logs.length) {
+            tbody.innerHTML = '<tr><td colspan="6" style="padding:8px; color:var(--text3); text-align:center;">尚無記錄</td></tr>';
+          } else {
+            tbody.innerHTML = logs.map(e => {
+              const t = e.ts ? e.ts.slice(11, 19) : '—';
+              const latency = e.latency_ms != null ? e.latency_ms + 'ms' : '—';
+              const rowStyle = e.llm === 'skip' ? 'color:var(--text3)' : '';
+              return `<tr style="${rowStyle}; border-bottom:1px solid var(--border)">
+                <td style="padding:4px 8px">${t}</td>
+                <td style="padding:4px 8px">${e.stt||'—'}</td>
+                <td style="padding:4px 8px">${e.llm||'—'}</td>
+                <td style="padding:4px 8px">${e.mode||'—'}</td>
+                <td style="padding:4px 8px; text-align:right">${latency}</td>
+                <td style="padding:4px 8px; text-align:right">${e.chars||0}</td>
+              </tr>`;
+            }).join('');
+          }
+        }
+      } catch(e) {}
 
       // Weekly chart
       const chart = document.getElementById('weekly-chart');

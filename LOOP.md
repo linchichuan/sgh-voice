@@ -55,7 +55,7 @@ One full rotation = 1 cycle. Increment cycle number when last role completes.
 
 ## Current Pointer
 
-Next: **安全工程師** (role 4) | Cycle 3
+Next: **品質工程師** (role 1) | Cycle 4
 
 ---
 
@@ -75,6 +75,7 @@ Next: **安全工程師** (role 4) | Cycle 3
 | 2026-04-03 | 品質工程師 | history.json 執行緒安全稽核：無 deadlock 風險（Lock 不嵌套），修復 3 個無鎖讀取競態（get_recent_context/get_history 加鎖、delete_history_item 改原地修改避免 list 重賦值） | `memory.py` | pass |
 | 2026-04-07 | UX 設計師 | 設定儲存後引擎狀態列即時更新：抽出 updateEngineStatusBar(cfg) 獨立函數，saveConfig() 成功後直接傳入 cfg 更新，省去額外 API 請求 | `static/index.html` | pass |
 | 2026-04-08 | 效能工程師 | Whisper 預熱事件驅動化：移除 sleep(3)、Ollama/Whisper 改並行預熱、加 _whisper_ready Event、_local_stt() 第一次呼叫時等待事件（max 15s）而非盲等 | `transcriber.py` | pass |
+| 2026-04-08 | 安全工程師 | API 呼叫 audit log：JSONL 格式寫入 ~/.voice-input/audit.log（元數據，無文字內容）、500KB 自動輪轉、GET /api/audit-log、Overview 頁末顯示最近 10 筆 | `config.py`, `transcriber.py`, `dashboard.py`, `static/index.html` | pass |
 
 ---
 
@@ -125,4 +126,4 @@ Next: **安全工程師** (role 4) | Cycle 3
 - ~~Dashboard API endpoint 輸入驗證~~ done（dict 類型檢查 + DEFAULT_CONFIG 白名單）
 - ~~OpenRouter API Key 格式驗證~~ done（5 種 key 全部驗證 + 前端 warning toast）
 
-**Next Ideas**: config.json 加密儲存（目前明文）、API 呼叫 audit log
+**Next Ideas**: config.json 加密儲存（目前明文）、~~API 呼叫 audit log~~ done
