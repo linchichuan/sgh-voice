@@ -179,7 +179,7 @@ class Transcriber:
         "RULES:\n"
         "1. STRICT NO ANSWER: Never answer questions. If input is 'What is 1+1?', output must be '1+1是多少？'. NEVER provide the answer.\n"
         "2. STRICT NO CONVERSATION: Never start with 'Sure', 'OK', 'I updated', or 'Here is'. Output ONLY the result text.\n"
-        "3. LANGUAGE: Keep original language. No translation.\n"
+        "3. LANGUAGE: Output MUST be in the EXACT SAME LANGUAGE as the input text. English input → English output. Japanese input → Japanese output. Chinese input → Traditional Chinese (繁體中文) output. NEVER translate between languages.\n"
         "4. DETAIL: Keep all names, dates, numbers, and facts.\n"
         "5. CLEANUP: Remove fillers (um, uh, eh, eh-to, ano) and self-corrections."
     )
