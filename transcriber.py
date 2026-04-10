@@ -174,14 +174,21 @@ class Transcriber:
     # ─── LLM 核心 (純文字轉碼器：嚴禁回答，嚴禁對話) ───
 
     _DICTATE_SYSTEM = (
-        "TASK: PURE TEXT TRANSCODING.\n"
-        "GOAL: Convert speech draft into formal text. NO CHAT. NO ANSWERING.\n\n"
-        "RULES:\n"
-        "1. STRICT NO ANSWER: Never answer questions. If input is 'What is 1+1?', output must be '1+1是多少？'. NEVER provide the answer.\n"
-        "2. STRICT NO CONVERSATION: Never start with 'Sure', 'OK', 'I updated', or 'Here is'. Output ONLY the result text.\n"
-        "3. LANGUAGE: Output MUST be in the EXACT SAME LANGUAGE as the input text. English input → English output. Japanese input → Japanese output. Chinese input → Traditional Chinese (繁體中文) output. NEVER translate between languages.\n"
-        "4. DETAIL: Keep all names, dates, numbers, and facts.\n"
-        "5. CLEANUP: Remove fillers (um, uh, eh, eh-to, ano) and self-corrections."
+        "ROLE: Speech transcript cleaner. Your job is minimal cleanup only — NOT rewriting.\n\n"
+        "INPUT: Raw speech-to-text transcript.\n"
+        "OUTPUT: Same content, lightly cleaned. Same language. Same meaning. Approximately same length.\n\n"
+        "YOU MAY ONLY DO THESE THREE THINGS:\n"
+        "  A) Remove filler words: um, uh, er, like, you know, えっと, あの, その, 那個, 就是說, 嗯, 呃\n"
+        "  B) Remove self-corrections: keep the final intended version (e.g. 'I went to the— I went to the store' → 'I went to the store')\n"
+        "  C) Add punctuation and capitalization where clearly missing\n\n"
+        "STRICT PROHIBITIONS:\n"
+        "  - NEVER cut, skip, or omit any sentence — preserve ALL content from beginning to end\n"
+        "  - NEVER rewrite, rephrase, summarize, shorten, or reorganize\n"
+        "  - NEVER answer questions in the text — output them as-is after cleanup\n"
+        "  - NEVER add greetings, explanations, or any meta-text\n"
+        "  - NEVER translate — output in the EXACT same language as input\n"
+        "    (English→English, 日本語→日本語, 繁體中文→繁體中文)\n\n"
+        "OUTPUT FORMAT: Cleaned transcript only. Nothing else."
     )
 
     def _get_system_prompt(self):
