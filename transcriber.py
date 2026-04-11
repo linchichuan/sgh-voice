@@ -1,6 +1,6 @@
 """
 transcriber.py — 語音辨識管線
-Whisper API → 詞庫修正 → 機械式純文字精修 (v1.9.5)
+Whisper API → 詞庫修正 → 機械式純文字精修 (v1.9.7)
 """
 import re
 import time
@@ -52,7 +52,6 @@ class Transcriber:
         self._ollama_backoff_until = 0.0
         self._ollama_fail_count = 0
         self._voiceprint_mgr = VoiceprintManager()
-        self._whisper_ready = threading.Event()  # 預熱完成後 set，_local_stt 可等待
 
     def reset_clients(self): pass
 
@@ -68,6 +67,8 @@ class Transcriber:
     def warmup(self):
         def _warmup_whisper():
             try:
+                import time as _time
+                _time.sleep(3)
                 import mlx_whisper, tempfile, soundfile as sf
                 silence = np.zeros(1600, dtype=np.float32)
                 tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
@@ -80,8 +81,6 @@ class Transcriber:
                 os.unlink(tmp.name)
                 print(" " + _t("✅ mlx-whisper 預熱完成", "✅ mlx-whisper 準備完了", "✅ mlx-whisper ready"))
             except Exception: pass
-            finally:
-                self._whisper_ready.set()  # 無論成功失敗都標記完成，避免 _local_stt 永久等待
 
         def _warmup_ollama():
             if self.ollama_detector.detect(force=True) != OllamaStatus.CONNECTED: return
@@ -90,9 +89,7 @@ class Transcriber:
                 print(" " + _t(f"✅ Ollama 預熱完成", f"✅ Ollama 準備完了", f"✅ Ollama ready"))
             except Exception: pass
 
-        # 並行預熱：Ollama 與 Whisper 互相獨立，無需序列等待
-        threading.Thread(target=_warmup_ollama, daemon=True).start()
-        threading.Thread(target=_warmup_whisper, daemon=True).start()
+        threading.Thread(target=lambda: (_warmup_ollama(), _warmup_whisper()), daemon=True).start()
 
     def transcribe(self, audio_source, audio_duration=0, mode="dictate", edit_context=""):
         t0 = time.time()
@@ -167,28 +164,19 @@ class Transcriber:
             "mode": mode, "process_time": round(process_time, 2), "stt_source": stt_source, "llm_source": llm_source,
         })
         if mode == "dictate": self._async_extract_keywords(final)
-        self._write_audit(stt=stt_source, llm=llm_source, mode=mode,
-                          latency_ms=int(process_time * 1000), chars=len(final or ""))
         return {"raw": raw, "final": final, "process_time": process_time}
 
-    # ─── LLM 核心 (純文字轉碼器：嚴禁回答，嚴禁對話) ───
+    # ─── LLM 核心 (Transcoder 模式：保持原語，嚴禁翻譯) ───
 
     _DICTATE_SYSTEM = (
-        "ROLE: Speech transcript cleaner. Your job is minimal cleanup only — NOT rewriting.\n\n"
-        "INPUT: Raw speech-to-text transcript.\n"
-        "OUTPUT: Same content, lightly cleaned. Same language. Same meaning. Approximately same length.\n\n"
-        "YOU MAY ONLY DO THESE THREE THINGS:\n"
-        "  A) Remove filler words: um, uh, er, like, you know, えっと, あの, その, 那個, 就是說, 嗯, 呃\n"
-        "  B) Remove self-corrections: keep the final intended version (e.g. 'I went to the— I went to the store' → 'I went to the store')\n"
-        "  C) Add punctuation and capitalization where clearly missing\n\n"
-        "STRICT PROHIBITIONS:\n"
-        "  - NEVER cut, skip, or omit any sentence — preserve ALL content from beginning to end\n"
-        "  - NEVER rewrite, rephrase, summarize, shorten, or reorganize\n"
-        "  - NEVER answer questions in the text — output them as-is after cleanup\n"
-        "  - NEVER add greetings, explanations, or any meta-text\n"
-        "  - NEVER translate — output in the EXACT same language as input\n"
-        "    (English→English, 日本語→日本語, 繁體中文→繁體中文)\n\n"
-        "OUTPUT FORMAT: Cleaned transcript only. Nothing else."
+        "TASK: PURE TEXT TRANSCODING.\n"
+        "GOAL: Convert speech draft into formal text. NO CHAT. NO ANSWERING.\n\n"
+        "RULES:\n"
+        "1. STRICT NO TRANSLATION: Keep the original language used by the speaker. If they speak Japanese, output Japanese. If English, output English. Never translate between languages.\n"
+        "2. STRICT NO ANSWER: Never answer questions. Output the question as text instead.\n"
+        "3. NO CONVERSATION: No 'Sure', 'OK', or 'Here is'. Output ONLY the result text.\n"
+        "4. DETAIL: Keep all names, dates, numbers, and facts.\n"
+        "5. CLEANUP: Remove fillers (um, uh, eh, eh-to, ano) and self-corrections."
     )
 
     def _get_system_prompt(self):
@@ -209,25 +197,24 @@ class Transcriber:
             res = re.sub(r'<think>[\s\S]*?</think>|<think>[\s\S]*$', '', resp.choices[0].message.content).strip()
             self._track_usage("groq", model, resp.usage.prompt_tokens, resp.usage.completion_tokens)
             if self._is_llm_hallucination(res, text): 
-                print(f" ⚠️ [Groq] 偵測到幻覺，回退原文: {res[:20]}..."); return None
+                print(f" ⚠️ [Groq] 偵測到幻覺，已捨棄: {res[:20]}..."); return None
             print(" " + _t(f"⚡ [Groq] 完成 ({time.time()-t0:.2f}s)", f"⚡ [Groq] 完了", f"⚡ [Groq] Done"))
             return res
-        except Exception as e:
-            print(f" ⚠️ Groq 失敗: {e}"); return None
+        except Exception: return None
 
     def _openrouter_process(self, text, mode, edit_context):
         api_key = self.config.get("openrouter_api_key")
         if not api_key: return None
         try:
             client = openai.OpenAI(base_url="https://openrouter.ai/api/v1", api_key=api_key, timeout=10.0)
-            model = self.config.get("openrouter_model", "qwen/qwen-2.5-72b-instruct")
+            model = self.config.get("openrouter_model", "qwen/qwen3.6-plus")
             system = self._EDIT_SYSTEM if mode == "edit" else self._get_system_prompt()
             t0 = time.time()
             resp = client.chat.completions.create(model=model, messages=[{"role": "system", "content": system}, {"role": "user", "content": text}], temperature=0.0, max_tokens=2048, extra_headers={"HTTP-Referer": "https://shingihou.com", "X-Title": "SGH Voice"})
             res = re.sub(r'<think>[\s\S]*?</think>|<think>[\s\S]*$', '', resp.choices[0].message.content).strip()
             self._track_usage("openrouter", model, resp.usage.prompt_tokens, resp.usage.completion_tokens)
             if self._is_llm_hallucination(res, text):
-                print(f" ⚠️ [OpenRouter] 偵測到幻覺，回退原文"); return None
+                print(f" ⚠️ [OpenRouter] 偵測到幻覺，已捨棄"); return None
             print(" " + _t(f"✅ [OpenRouter] 完成 ({time.time()-t0:.2f}s)", f"✅ [OpenRouter] 完了", f"✅ [OpenRouter] Done"))
             return res
         except Exception as e:
@@ -238,18 +225,17 @@ class Transcriber:
         if not api_key: return None
         try:
             client = anthropic.Anthropic(api_key=api_key, timeout=8.0)
-            model = self.config.get("claude_model", "claude-3-5-haiku-20241022")
+            model = self.config.get("claude_model", "claude-haiku-4-5-20251001")
             system = self._EDIT_SYSTEM if mode == "edit" else self._get_system_prompt()
             t0 = time.time()
             resp = client.messages.create(model=model, system=system, messages=[{"role": "user", "content": text}], max_tokens=2048, temperature=0.0)
             res = resp.content[0].text.strip()
             self._track_usage("anthropic", model, resp.usage.input_tokens, resp.usage.output_tokens)
             if self._is_llm_hallucination(res, text):
-                print(f" ⚠️ [Claude] 偵測到幻覺，回退原文: {res[:20]}..."); return None
+                print(f" ⚠️ [Claude] 偵測到幻覺，已捨棄: {res[:20]}..."); return None
             print(" " + _t(f"☁️ [Claude] 完成", f"☁️ [Claude] 完了", f"☁️ [Claude] Done"))
             return res
-        except Exception as e:
-            print(f" ⚠️ Claude 失敗: {e}"); return None
+        except Exception: return None
 
     def _openai_process(self, text, mode, edit_context):
         api_key = self.config.get("openai_api_key")
@@ -263,11 +249,10 @@ class Transcriber:
             res = resp.choices[0].message.content.strip()
             self._track_usage("openai", model, resp.usage.prompt_tokens, resp.usage.completion_tokens)
             if self._is_llm_hallucination(res, text):
-                print(f" ⚠️ [OpenAI] 偵測到幻覺，回退原文"); return None
+                print(f" ⚠️ [OpenAI] 偵測到幻覺，已捨棄"); return None
             print(" " + _t(f"🤖 [OpenAI] 完成", f"🤖 [OpenAI] 完了", f"🤖 [OpenAI] Done"))
             return res
-        except Exception as e:
-            print(f" ⚠️ OpenAI 失敗: {e}"); return None
+        except Exception: return None
 
     def _local_llm_process(self, text):
         if time.time() < self._ollama_backoff_until: return None
@@ -293,7 +278,8 @@ class Transcriber:
             else: audio_path = audio_source; is_temp = False
             client = openai.OpenAI(base_url="https://api.groq.com/openai/v1", api_key=api_key, timeout=10.0)
             with open(audio_path, "rb") as f:
-                prompt = self.memory.build_whisper_prompt(self.config.get("custom_words", []))
+                # 三語混合引導
+                prompt = "繁體中文 (Traditional Chinese), 日本語 (Japanese), English mixed conversation. Please keep the original language."
                 model = self.config.get("groq_whisper_model", "whisper-large-v3-turbo")
                 resp = client.audio.transcriptions.create(model=model, file=f, prompt=prompt, language=self.config.get("language", "auto") if self.config.get("language") != "auto" else None)
             if is_temp: os.unlink(audio_path)
@@ -302,14 +288,15 @@ class Transcriber:
         except Exception: return None
 
     def _local_stt(self, audio_source):
-        # 若 Whisper 尚在預熱，最多等 15 秒，避免第一次錄音拿到空模型
-        if not self._whisper_ready.is_set():
-            self._whisper_ready.wait(timeout=15)
         try:
             import mlx_whisper
             model_path = LOCAL_MODEL_PATHS.get(self.config.get("local_whisper_model"), self.config.get("local_whisper_model", "mlx-community/whisper-turbo"))
             kwargs = {"path_or_hf_repo": model_path, "temperature": 0.0, "condition_on_previous_text": False}
             if "breeze" in str(model_path).lower(): kwargs["fp16"] = True
+            
+            # 三語混合引導
+            kwargs["initial_prompt"] = "繁體中文, 日本語, English mixed conversation. Keep the original language."
+            
             with Transcriber._metal_lock: result = mlx_whisper.transcribe(audio_source, **kwargs)
             return result.get("text", "")
         except Exception: return None
@@ -325,7 +312,10 @@ class Transcriber:
                 if duration == 0: duration = len(audio_source) / 16000
             else: audio_path = audio_source; is_temp = False
             client = openai.OpenAI(api_key=api_key)
-            with open(audio_path, "rb") as f: resp = client.audio.transcriptions.create(model="whisper-1", file=f)
+            with open(audio_path, "rb") as f: 
+                # 三語引導
+                prompt = "Traditional Chinese, Japanese, English mixed."
+                resp = client.audio.transcriptions.create(model="whisper-1", file=f, prompt=prompt)
             if is_temp: os.unlink(audio_path)
             self._track_usage("openai", "whisper-1", seconds=duration)
             return resp.text
@@ -358,7 +348,7 @@ class Transcriber:
         return re.sub(r'\s+', ' ', result).strip()
 
     def _is_llm_hallucination(self, result, original_text):
-        conv_markers = ["好的", "沒問題", "了解", "為您", "以下是", "I appreciate", "您目前", "這是一個", "Sure", "Okay", "Certainly", "I understand", "Hello"]
+        conv_markers = ["好的", "沒問題", "了解", "為您", "以下是", "I appreciate", "您目前", "這是一個", "Sure", "Okay", "Certainly", "I understand", "Hello", "根據您的", "如果您", "我會幫您", "這是一個", "這段文字", "我已經", "我明白", "明白了"]
         if any(result.startswith(m) for m in conv_markers): return True
         if len(result) > len(original_text) * 3 and len(original_text) > 10: return True
         return False
@@ -394,22 +384,6 @@ class Transcriber:
             elif source == "groq": m["groq_input_tokens"]+=input_tokens; m["groq_output_tokens"]+=output_tokens; m["groq_whisper_seconds"]+=seconds
             elif source == "openrouter": m["openrouter_input_tokens"]+=input_tokens; m["openrouter_output_tokens"]+=output_tokens
             save_stats(stats)
-        except Exception: pass
-
-    def _write_audit(self, **fields):
-        """寫入 API 呼叫稽核日誌（僅記錄元數據，不記錄文字內容）"""
-        try:
-            import json
-            from config import AUDIT_LOG_FILE
-            entry = json.dumps({"ts": datetime.now().isoformat(), **fields}, ensure_ascii=False)
-            with open(AUDIT_LOG_FILE, "a", encoding="utf-8") as f:
-                f.write(entry + "\n")
-            # 超過 500KB 保留最後 500 行
-            if os.path.getsize(AUDIT_LOG_FILE) > 500_000:
-                with open(AUDIT_LOG_FILE, "r", encoding="utf-8") as f:
-                    lines = f.readlines()
-                with open(AUDIT_LOG_FILE, "w", encoding="utf-8") as f:
-                    f.writelines(lines[-500:])
         except Exception: pass
 
     def get_service_status(self) -> dict:

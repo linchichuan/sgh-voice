@@ -271,6 +271,7 @@ class VoiceEngine:
     """語音輸入核心引擎，被 CLI / MenuBar / Dashboard 共用"""
 
     def __init__(self):
+        self.version = "1.9.7"
         self.config = load_config()
         self.memory = Memory()
         self.transcriber = Transcriber(self.config, self.memory)
@@ -290,6 +291,7 @@ class VoiceEngine:
         self.transcriber.config = self.config
         self.transcriber.reset_clients()
         self.recorder.config = self.config
+        print(" 🔄 系統設定已重新載入")
 
     def start_recording(self):
         if self.is_recording:

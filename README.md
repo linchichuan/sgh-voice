@@ -1,35 +1,35 @@
-# 🎙 SGH Voice — 讓想法流動，不再卡在鍵盤上 (v1.9.5)
+# 🎙 SGH Voice — 讓想法流動，不再卡在鍵盤上 (v1.9.7)
 
 **[English](README.en.md) | [日本語](README.ja.md) | 繁體中文**
 
-> 說話即成專業文章。中日英三語自動辨識 + **機械式純文字精修**，資料 100% 掌控在手。
+> 說話即成專業文章。中日英三語自動辨識 + **原生語言保持**，資料 100% 掌控在手。
 
 [![macOS](https://img.shields.io/badge/macOS-Apple_Silicon-black?logo=apple)](https://github.com/linchichuan/sgh-voice/releases)
 [![iOS](https://img.shields.io/badge/iOS-17.0+-blue?logo=apple)](https://github.com/linchichuan/sgh-voice/releases)
 [![Android](https://img.shields.io/badge/Android-8.0+-green?logo=android)](https://github.com/linchichuan/sgh-voice/releases)
-[![Version](https://img.shields.io/badge/Version-1.9.5-green)]()
+[![Version](https://img.shields.io/badge/Version-1.9.7-green)]()
 
 ---
 
-## 🌟 v1.9.5 重大更新：純粹輸入，拒絕聊天
+## 🌟 v1.9.7 重大更新：三語混合，原汁原味
 
-這次更新我們解決了 AI 「太愛說話」的問題。SGH Voice 現在回歸工具本質，成為一個安靜且精準的文字轉碼零件。
+這次更新我們優化了多語言環境下的表現，確保您說日文就是日文，說英文就是英文，絕不擅自翻譯。
 
 | 重點功能 | 說明 |
 |------|------|
-| **🤐 絕對禁言模式** | **(New)** 重新定義 LLM 為「機械式轉碼器」，嚴禁 AI 回答使用者的問題或進行任何對話。 |
-| **🛡️ 幻覺自動攔截** | **(New)** 新增語境偵測，若 AI 嘗試說出「好的、了解、您目前...」等廢話，系統將自動捨棄並回退原文。 |
-| **✂️ 外科手術級編輯** | 延續 v1.8.0 的精準局部修改，選取文字後用語音下令，100% 保留您的原始排版。 |
-| **🌍 全球語系適配** | 選單與日誌全面支援日/中/英三語，根據作業系統自動切換。 |
-| **⚡ 毫秒級反應** | 透過優化後的啟動順序與多雲路由，維持不到一秒的處理神速。 |
+| **🌐 原生語言保持** | **(New)** 重新設計的 STT 與 LLM 引導，確保中/日/英混合輸入時能 100% 保持原始語言，嚴禁自動翻譯。 |
+| **🏆 Qwen 3.6 Plus** | **(New)** Dashboard 正式支援 2026 最新旗艦 Qwen 3.6，提供更精準的意圖理解。 |
+| **🎙️ Qwen3-ASR 推薦** | 針對 CJK 語境優化的本地 ASR 引擎，解決漢字同音異義字問題。 |
+| **🤐 絕對禁言模式** | 延續機械轉碼器設計，嚴禁 AI 回答問題或進行多餘對話。 |
+| **🛡️ 幻覺攔截升級** | 強化對話語式偵測，自動過濾所有嘗試聊天的廢話。 |
 
 ---
 
 ## 🚀 30 秒快速開始 (macOS)
 
 1.  **安裝**: 從 [Releases](https://github.com/linchichuan/sgh-voice/releases) 下載 `.dmg` 拖入應用程式。
-2.  **設定**: 打開 Dashboard 填入您的 API Key (Groq 或 OpenRouter)。
-3.  **說話**: 按住快捷鍵，說完放開，乾淨、精準的文字即刻貼上。
+2.  **設定**: 打開 Dashboard 選項，首選 ASR 建議選擇 **Qwen3-ASR**。
+3.  **說話**: 按住快捷鍵，無論是日文、英文或中文，都能精準轉錄並保持原語。
 
 ---
 
@@ -42,9 +42,9 @@
 
 ## 🛠 技術深度
 
--   **轉碼協議**: 採用極低 Temperature (0.0) 與機械式指令集，確保輸出穩定性。
--   **多雲路由**: 智慧分流 ASR (mlx-whisper/Groq) 與 LLM (Llama 3.3/OpenRouter/Claude)。
--   **系統感知**: 自動偵測 OS 語系，並透過 Quartz 事件實現全系統級自動貼上。
+-   **多語引導協議**: 透過三語 Initial Prompt，將模型鎖定在「混合辨識」而非「翻譯」模式。
+-   **轉碼安全**: 結合字數比例檢查與關鍵字過濾，雙重攔截 LLM 聊天幻覺。
+-   **系統感知**: 自動偵測 OS 語系，給你最親切的介面。
 
 ---
 

@@ -255,7 +255,7 @@ DEFAULT_CONFIG = {
     "local_whisper_model": "breeze-asr-25-4bit",           # 本地 Whisper 模型（Breeze-ASR-25 繁中最強）
     "local_llm_model": "qwen3.5:latest",    # Ollama 上的本地模型名稱 (使用 2026 最新 Qwen 3.5)
     "groq_model": "llama-3.3-70b-versatile",      # Groq LLM 模型 (目前的旗艦穩定版)
-    "openrouter_model": "nvidia/nemotron-3-nano-30b-a3b:free",  # OpenRouter 模型（實測最快 ~1.6s）
+    "openrouter_model": "qwen/qwen3.6-plus",               # OpenRouter 模型 (Qwen 3.6 最新旗艦)
     "groq_whisper_model": "whisper-large-v3-turbo",  # Groq STT 模型
     "local_llm_timeout_sec": 6.0,           # 本地 Ollama 超時秒數（避免 1.5 秒過短造成頻繁 fallback）
     "backup_audio_dir": "",                  # 音訊備份目錄（空字串=不備份）
