@@ -31,6 +31,13 @@ def _get_sys_lang():
 
 _LANG = _get_sys_lang()
 
+def _c(color, text):
+    """ANSI 色彩（tty only）"""
+    _MAP = {"gray":"\033[90m","cyan":"\033[96m","blue":"\033[94m",
+            "yellow":"\033[93m","green":"\033[92m","bold":"\033[1m","reset":"\033[0m"}
+    if not sys.stdout.isatty(): return text
+    return f"{_MAP.get(color,'')}{text}{_MAP['reset']}"
+
 def _t(zh, ja, en):
     if _LANG == 'ja': return ja
     if _LANG == 'zh': return zh
@@ -197,8 +204,8 @@ class Transcriber:
             res = re.sub(r'<think>[\s\S]*?</think>|<think>[\s\S]*$', '', resp.choices[0].message.content).strip()
             self._track_usage("groq", model, resp.usage.prompt_tokens, resp.usage.completion_tokens)
             if self._is_llm_hallucination(res, text): 
-                print(f" ⚠️ [Groq] 偵測到幻覺，已捨棄: {res[:20]}..."); return None
-            print(" " + _t(f"⚡ [Groq] 完成 ({time.time()-t0:.2f}s)", f"⚡ [Groq] 完了", f"⚡ [Groq] Done"))
+                print(_c("yellow","  ⚠ [Groq] 幻覺偵測，已捨棄: ") + res[:30]); return None
+            print(_c("cyan", f"  ◈ Groq  ({time.time()-t0:.2f}s)"))
             return res
         except Exception: return None
 
@@ -214,11 +221,11 @@ class Transcriber:
             res = re.sub(r'<think>[\s\S]*?</think>|<think>[\s\S]*$', '', resp.choices[0].message.content).strip()
             self._track_usage("openrouter", model, resp.usage.prompt_tokens, resp.usage.completion_tokens)
             if self._is_llm_hallucination(res, text):
-                print(f" ⚠️ [OpenRouter] 偵測到幻覺，已捨棄"); return None
-            print(" " + _t(f"✅ [OpenRouter] 完成 ({time.time()-t0:.2f}s)", f"✅ [OpenRouter] 完了", f"✅ [OpenRouter] Done"))
+                print(_c("yellow", "  ⚠ [OpenRouter] 幻覺偵測，已捨棄")); return None
+            print(_c("cyan", f"  ◈ OpenRouter  ({time.time()-t0:.2f}s)"))
             return res
         except Exception as e:
-            print(f" ⚠️ OpenRouter 失敗: {e}"); return None
+            print(_c("yellow", f"  ⚠ OpenRouter 失敗: {e}")); return None
 
     def _claude_process(self, text, mode, edit_context):
         api_key = self.config.get("anthropic_api_key")
@@ -232,8 +239,8 @@ class Transcriber:
             res = resp.content[0].text.strip()
             self._track_usage("anthropic", model, resp.usage.input_tokens, resp.usage.output_tokens)
             if self._is_llm_hallucination(res, text):
-                print(f" ⚠️ [Claude] 偵測到幻覺，已捨棄: {res[:20]}..."); return None
-            print(" " + _t(f"☁️ [Claude] 完成", f"☁️ [Claude] 完了", f"☁️ [Claude] Done"))
+                print(_c("yellow", f"  ⚠ [Claude] 幻覺偵測，已捨棄: ") + res[:30]); return None
+            print(_c("cyan", f"  ◈ Claude  ({time.time()-t0:.2f}s)"))
             return res
         except Exception: return None
 
@@ -249,8 +256,8 @@ class Transcriber:
             res = resp.choices[0].message.content.strip()
             self._track_usage("openai", model, resp.usage.prompt_tokens, resp.usage.completion_tokens)
             if self._is_llm_hallucination(res, text):
-                print(f" ⚠️ [OpenAI] 偵測到幻覺，已捨棄"); return None
-            print(" " + _t(f"🤖 [OpenAI] 完成", f"🤖 [OpenAI] 完了", f"🤖 [OpenAI] Done"))
+                print(_c("yellow", "  ⚠ [OpenAI] 幻覺偵測，已捨棄")); return None
+            print(_c("cyan", f"  ◈ OpenAI  ({time.time()-t0:.2f}s)"))
             return res
         except Exception: return None
 

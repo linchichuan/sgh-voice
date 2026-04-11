@@ -106,6 +106,55 @@ from recorder import Recorder
 from overlay import StatusOverlay
 
 
+# ─── Logger ──────────────────────────────────────────────
+
+_ANSI = {
+    "reset": "\033[0m",  "bold": "\033[1m",  "dim": "\033[2m",
+    "red":   "\033[91m", "green": "\033[92m", "yellow": "\033[93m",
+    "blue":  "\033[94m", "magenta": "\033[95m", "cyan": "\033[96m",
+    "gray":  "\033[90m",
+}
+
+def _c(color, text):
+    """套用 ANSI 色彩（僅 terminal 有效，.app bundle 下自動關閉）"""
+    if not sys.stdout.isatty():
+        return text
+    return f"{_ANSI.get(color,'')}{text}{_ANSI['reset']}"
+
+def _now():
+    from datetime import datetime
+    return datetime.now().strftime("%H:%M:%S")
+
+def log(level, msg):
+    """
+    統一 log 格式：
+      INFO  →  灰色時間 + 白字
+      OK    →  綠色 ✓
+      WARN  →  黃色 ⚠
+      ERROR →  紅色 ✕
+      REC   →  紅色錄音狀態
+      STT   →  藍色辨識結果
+      LLM   →  青色 LLM 結果
+      DONE  →  加粗最終輸出
+    """
+    ts = _c("gray", f"[{_now()}]")
+    icons = {
+        "info":  ("  ", ""),
+        "ok":    ("✓ ", "green"),
+        "warn":  ("⚠ ", "yellow"),
+        "error": ("✕ ", "red"),
+        "rec":   ("🔴", "red"),
+        "stt":   ("◎ ", "blue"),
+        "llm":   ("◈ ", "cyan"),
+        "done":  ("▶ ", "bold"),
+    }
+    icon, color = icons.get(level, ("  ", ""))
+    prefix = _c(color, icon) if color else icon
+    print(f"{ts} {prefix}{msg}")
+
+def log_sep(char="─", width=56):
+    print(_c("gray", char * width))
+
 # ─── Utility ─────────────────────────────────────────────
 
 def _paste_log(msg):
@@ -291,7 +340,7 @@ class VoiceEngine:
         self.transcriber.config = self.config
         self.transcriber.reset_clients()
         self.recorder.config = self.config
-        print(" 🔄 系統設定已重新載入")
+        log("ok", "設定已即時重新載入")
 
     def start_recording(self):
         if self.is_recording:
@@ -300,6 +349,7 @@ class VoiceEngine:
         self.overlay.show("recording")
         self._safe_status_change("recording")
         self.recorder.start()
+        log("rec", "錄音中…")
 
     def _safe_status_change(self, status):
         """Thread-safe 狀態更新（rumps NSStatusItem 必須在 main thread 更新）"""
@@ -344,19 +394,26 @@ class VoiceEngine:
             result = self.transcriber.transcribe(audio_input, duration, mode, edit_context)
 
             if result:
+                final = result["final"] or ""
+                proc  = result.get("process_time", 0)
+                log("done", f"{_c('bold', final[:80])}{'…' if len(final)>80 else ''}")
+                log("info", f"錄音 {duration:.1f}s  |  處理 {proc:.1f}s  |  {len(final)} 字元")
+                log_sep()
                 # 更新統計
                 try:
-                    update_stats(result["final"], duration, self.config)
+                    update_stats(final, duration, self.config)
                 except Exception as e:
-                    print(f"Stats update error (non-fatal): {e}")
+                    log("warn", f"Stats update: {e}")
                 # 自動貼上
                 if self.config.get("auto_paste"):
                     try:
-                        paste_text(result["final"])
+                        paste_text(final)
                     except Exception as e:
-                        print(f"Paste error (non-fatal): {e}")
+                        log("warn", f"Paste: {e}")
                 self.overlay.show("done")
             else:
+                log("warn", "無有效音訊，已略過")
+                log_sep()
                 self.overlay.show("idle")
 
             # 非同步處理存檔/備份，不阻塞主流程
@@ -379,8 +436,7 @@ class VoiceEngine:
                 threading.Thread(target=_backup, daemon=True).start()
 
         except Exception as e:
-            # 全面防護：任何未預期的錯誤都不該讓 App 閃退
-            print(f"❌ stop_and_process 發生未預期錯誤: {e}")
+            log("error", f"stop_and_process 未預期錯誤: {e}")
             import traceback
             traceback.print_exc()
             self.is_recording = False
@@ -774,6 +830,19 @@ def run_menubar():
             
             # Start Clipboard AI Learning observer
             start_clipboard_observer(engine)
+
+            # 啟動橫幅
+            port = config.get("dashboard_port", 7865)
+            llm  = config.get("llm_engine", "groq")
+            llm_model = config.get(f"{llm}_model", config.get("local_llm_model", "—"))
+            stt  = config.get("stt_engine", "mlx-whisper")
+            stt_model = config.get("local_whisper_model", "—") if stt == "mlx-whisper" else "Groq Whisper"
+            log_sep("━")
+            print(f"  {_c('bold', '🎙  SGH Voice')}  {_c('gray', 'v' + engine.version)}")
+            print(f"  {_c('gray','STT')}  {stt}  {_c('dim', stt_model)}")
+            print(f"  {_c('gray','LLM')}  {llm}  {_c('dim', llm_model)}")
+            print(f"  {_c('gray','Dashboard')}  http://localhost:{port}")
+            log_sep("━")
 
             # Start dashboard server in background
             _start_dashboard_bg(config, engine.memory, engine)
