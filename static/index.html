@@ -400,13 +400,89 @@
 
     <!-- 歷史與詞庫 (簡化版示意，後續自動填充) -->
     <div id="page-history" class="page"><div class="card"><h3>歷史紀錄</h3><div id="history-list">載入中...</div></div></div>
-    <div id="page-dictionary" class="page"><div class="card"><h3>詞庫管理</h3><div id="dict-list">載入中...</div></div></div>
+    <div id="page-dictionary" class="page">
+
+      <!-- 說明橫幅 -->
+      <div class="card" style="background: linear-gradient(135deg, var(--surface) 0%, var(--surface2) 100%); border-left: 4px solid var(--accent); margin-bottom: 20px;">
+        <h3 style="margin-bottom:12px;">🧠 詞庫記憶如何運作？</h3>
+        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; font-size:13px; color:var(--text2);">
+          <div>
+            <div style="font-weight:700; color:var(--text); margin-bottom:4px;">① Whisper 提示詞</div>
+            自訂詞彙會在辨識時注入 Whisper，讓 AI <em>優先識別</em>你的專業術語、品牌名和人名，提升首次辨識準確率。
+          </div>
+          <div>
+            <div style="font-weight:700; color:var(--text); margin-bottom:4px;">② 修正規則（即時替換）</div>
+            辨識完成後，系統用<em>字串替換</em>自動把錯誤辨識（如「新义丰」）修正為正確字詞（「新義豊」）。可手動追加。
+          </div>
+          <div>
+            <div style="font-weight:700; color:var(--text); margin-bottom:4px;">③ LLM 自動學習</div>
+            在歷史紀錄中編輯文字後，系統會<em>自動比對差異</em>，學習新的修正規則，下次遇到相同錯誤自動修正。
+          </div>
+        </div>
+      </div>
+
+      <!-- 手動新增修正規則 -->
+      <div class="card" style="margin-bottom:20px;">
+        <h3 style="margin-bottom:16px;">➕ 新增修正規則</h3>
+        <p style="font-size:13px; color:var(--text2); margin-bottom:16px;">當 Whisper 把某個詞聽錯時，在這裡設定「聽到什麼 → 改成什麼」的對應規則。</p>
+        <div style="display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap;">
+          <div style="flex:1; min-width:140px;">
+            <div style="font-size:12px; font-weight:600; color:var(--text2); margin-bottom:6px;">Whisper 聽到（錯誤）</div>
+            <input type="text" id="new-wrong" placeholder="例：新义丰、あのー" style="width:100%">
+          </div>
+          <div style="color:var(--text3); padding-bottom:12px; font-size:20px;">→</div>
+          <div style="flex:1; min-width:140px;">
+            <div style="font-size:12px; font-weight:600; color:var(--text2); margin-bottom:6px;">應該修正為（正確）</div>
+            <input type="text" id="new-right" placeholder="例：新義豊、えー" style="width:100%">
+          </div>
+          <button class="btn btn-primary" onclick="addCorrection()" style="white-space:nowrap;">+ 追加規則</button>
+        </div>
+        <div style="margin-top:12px; border-top:1px solid var(--border); padding-top:12px;">
+          <div style="font-size:12px; font-weight:600; color:var(--text2); margin-bottom:6px;">➕ 追加自訂詞彙（提升辨識率）</div>
+          <div style="display:flex; gap:12px;">
+            <input type="text" id="new-word" placeholder="品牌名、人名、專業術語..." style="flex:1">
+            <button class="btn btn-primary" onclick="addWord()">+ 追加詞彙</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 修正規則列表 -->
+      <div class="card" style="margin-bottom:20px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+          <h3 style="margin:0;">🔄 修正規則 <span id="corrections-count" style="font-size:13px; font-weight:400; color:var(--text2);"></span></h3>
+          <input type="text" id="correction-search" placeholder="搜尋..." oninput="filterCorrections()" style="width:180px; padding:6px 12px; font-size:13px;">
+        </div>
+        <div style="font-size:12px; color:var(--text3); margin-bottom:12px;">
+          來源標籤：<span style="background:var(--accent); color:white; border-radius:4px; padding:1px 6px; font-size:11px;">自動學習</span> = 從歷史紀錄學習 &nbsp; <span style="background:var(--surface3); color:var(--text2); border-radius:4px; padding:1px 6px; font-size:11px;">手動添加</span> = 手動設定
+        </div>
+        <div id="corrections-list" style="max-height:320px; overflow-y:auto;"></div>
+      </div>
+
+      <!-- 自訂詞彙列表 -->
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+          <h3 style="margin:0;">📖 自訂詞彙 <span id="words-count" style="font-size:13px; font-weight:400; color:var(--text2);"></span></h3>
+          <input type="text" id="word-search" placeholder="搜尋..." oninput="filterWords()" style="width:180px; padding:6px 12px; font-size:13px;">
+        </div>
+        <div style="font-size:12px; color:var(--text3); margin-bottom:12px;">
+          這些詞彙會注入 Whisper 提示詞，讓語音辨識優先識別。<br>
+          <span style="color:var(--green);">●</span> AI 自動擷取（從口述內容中學習） &nbsp; <span style="color:var(--accent2);">●</span> 手動添加
+        </div>
+        <div id="words-list" style="max-height:320px; overflow-y:auto;"></div>
+      </div>
+    </div>
   </main>
 
   <div class="toast" id="toast">✅ 設定已儲存</div>
 
   <script>
     let currentConfig = {};
+
+    function esc(str) {
+      return String(str)
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+        .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+    }
 
     async function api(path, opts = {}) {
       const res = await fetch('/api' + path, {
@@ -424,6 +500,7 @@
       document.querySelector(`[data-page="${pageId}"]`).classList.add('active');
       if(pageId === 'settings') loadSettings();
       if(pageId === 'dashboard') loadStats();
+      if(pageId === 'dictionary') loadDictionary();
     }
 
     function updateLlmModelPanel() {
@@ -576,6 +653,99 @@
       } catch(e) {
         document.getElementById('stat-cost-detail').textContent = '無法計算';
       }
+    }
+
+    // ── 詞庫管理 ──────────────────────────────
+    let _dictData = { corrections: {}, custom_words: { auto_added: [], manual_added: [] } };
+
+    async function loadDictionary() {
+      _dictData = await api('/dictionary');
+      renderCorrections();
+      renderWords();
+    }
+
+    function renderCorrections(filter = '') {
+      const corrections = _dictData.corrections || {};
+      const entries = Object.entries(corrections).filter(([w, r]) =>
+        !filter || w.includes(filter) || r.includes(filter)
+      );
+      document.getElementById('corrections-count').textContent = `（${entries.length} 條）`;
+      if (entries.length === 0) {
+        document.getElementById('corrections-list').innerHTML =
+          '<div style="color:var(--text3); font-size:13px; padding:12px 0;">尚無修正規則。在上方輸入後點「追加規則」，或在歷史紀錄中編輯文字讓系統自動學習。</div>';
+        return;
+      }
+      document.getElementById('corrections-list').innerHTML = entries.map(([wrong, right]) => `
+        <div style="display:flex; align-items:center; gap:12px; padding:10px 0; border-bottom:1px solid var(--border);">
+          <span style="flex:1; font-family:'JetBrains Mono', monospace; font-size:13px; color:#e74c3c;">${esc(wrong)}</span>
+          <span style="color:var(--text3);">→</span>
+          <span style="flex:1; font-family:'JetBrains Mono', monospace; font-size:13px; color:var(--green);">${esc(right)}</span>
+          <button class="btn btn-ghost" style="padding:4px 10px; font-size:12px;" onclick="removeCorrection('${esc(wrong)}')">刪除</button>
+        </div>`).join('');
+    }
+
+    function renderWords(filter = '') {
+      const { auto_added = [], manual_added = [] } = _dictData.custom_words || {};
+      const allWords = [
+        ...manual_added.map(w => ({ word: w, src: 'manual' })),
+        ...auto_added.map(w => ({ word: w, src: 'auto' })),
+      ].filter(({ word }) => !filter || word.includes(filter));
+
+      document.getElementById('words-count').textContent = `（自動 ${auto_added.length} + 手動 ${manual_added.length} 個）`;
+      if (allWords.length === 0) {
+        document.getElementById('words-list').innerHTML =
+          '<div style="color:var(--text3); font-size:13px; padding:12px 0;">尚無自訂詞彙。</div>';
+        return;
+      }
+      document.getElementById('words-list').innerHTML = `
+        <div style="display:flex; flex-wrap:wrap; gap:8px;">
+          ${allWords.map(({ word, src }) => `
+            <div style="display:inline-flex; align-items:center; gap:6px; background:var(--surface2); border:1px solid var(--border); border-radius:20px; padding:4px 12px; font-size:13px;">
+              <span style="width:6px; height:6px; border-radius:50%; background:${src==='auto'?'var(--green)':'var(--accent2)'}; display:inline-block;"></span>
+              ${esc(word)}
+              <span style="cursor:pointer; color:var(--text3); font-size:16px; line-height:1;" onclick="removeWord('${esc(word)}')">×</span>
+            </div>`).join('')}
+        </div>`;
+    }
+
+    function filterCorrections() {
+      renderCorrections(document.getElementById('correction-search').value.trim());
+    }
+
+    function filterWords() {
+      renderWords(document.getElementById('word-search').value.trim());
+    }
+
+    async function addCorrection() {
+      const wrong = document.getElementById('new-wrong').value.trim();
+      const right  = document.getElementById('new-right').value.trim();
+      if (!wrong || !right) { showToast('❌ 請填寫錯誤詞和修正詞'); return; }
+      await api('/dictionary/correction', { method: 'POST', body: { wrong, right } });
+      document.getElementById('new-wrong').value = '';
+      document.getElementById('new-right').value = '';
+      showToast(`✅ 已追加：「${wrong}」→「${right}」`);
+      loadDictionary();
+    }
+
+    async function addWord() {
+      const word = document.getElementById('new-word').value.trim();
+      if (!word) return;
+      await api('/dictionary/word', { method: 'POST', body: { word } });
+      document.getElementById('new-word').value = '';
+      showToast(`✅ 已追加詞彙：${word}`);
+      loadDictionary();
+    }
+
+    async function removeCorrection(wrong) {
+      await api('/dictionary/correction', { method: 'DELETE', body: { wrong } });
+      showToast('🗑️ 已刪除修正規則');
+      loadDictionary();
+    }
+
+    async function removeWord(word) {
+      await api('/dictionary/word', { method: 'DELETE', body: { word } });
+      showToast('🗑️ 已刪除詞彙');
+      loadDictionary();
     }
 
     window.onload = loadStats;
