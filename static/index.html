@@ -206,14 +206,40 @@
           <div id="llm-panel-groq" class="form-group llm-panel">
             <label>Groq 模型</label>
             <select id="cfg-groq-model">
-              <option value="llama-3.3-70b-versatile">Llama 3.3 70B (旗艦)</option>
-              <option value="llama-3.1-8b-instant">Llama 3.1 8B (極速)</option>
-              <option value="qwen-2.5-32b">Qwen 2.5 32B (中文強)</option>
+              <optgroup label="🆕 2026 最新">
+                <option value="meta-llama/llama-4-scout-17b-16e-instruct">Llama 4 Scout 17B (最新多模態)</option>
+                <option value="openai/gpt-oss-120b">GPT-OSS 120B (頂級推理)</option>
+                <option value="openai/gpt-oss-20b">GPT-OSS 20B (快速推理)</option>
+                <option value="qwen/qwen3-32b">Qwen3 32B (中文最強)</option>
+              </optgroup>
+              <optgroup label="⚡ 穩定快速">
+                <option value="llama-3.3-70b-versatile">Llama 3.3 70B (穩定旗艦)</option>
+                <option value="llama-3.1-8b-instant">Llama 3.1 8B (極速)</option>
+              </optgroup>
             </select>
           </div>
           <div id="llm-panel-openrouter" class="form-group llm-panel">
-            <label>OpenRouter 模型 ID</label>
-            <input type="text" id="cfg-openrouter-model" placeholder="qwen/qwen3.6-plus">
+            <label>OpenRouter 模型</label>
+            <select id="cfg-openrouter-model-select" onchange="document.getElementById('cfg-openrouter-model').value=this.value">
+              <optgroup label="🆕 Qwen 3.6（2026）">
+                <option value="qwen/qwen3.6-plus:free">Qwen 3.6 Plus (免費・1M context)</option>
+                <option value="qwen/qwen3.6-plus-preview:free">Qwen 3.6 Plus Preview (免費)</option>
+              </optgroup>
+              <optgroup label="🏆 Qwen3 免費旗艦">
+                <option value="qwen/qwen3-235b-a22b:free">Qwen3 235B (免費・最強)</option>
+                <option value="qwen/qwen3-coder-480b-a35b-instruct:free">Qwen3 Coder 480B (免費・最強編碼)</option>
+                <option value="qwen/qwen3-30b-a3b:free">Qwen3 30B MoE (免費・極速)</option>
+              </optgroup>
+              <optgroup label="🌐 其他免費">
+                <option value="google/gemma-4-31b-it:free">Gemma 4 31B (免費・Google)</option>
+                <option value="meta-llama/llama-4-scout:free">Llama 4 Scout (免費・Meta)</option>
+                <option value="meta-llama/llama-3.3-70b-instruct:free">Llama 3.3 70B (免費)</option>
+              </optgroup>
+              <optgroup label="✏️ 自訂">
+                <option value="">── 手動輸入 ──</option>
+              </optgroup>
+            </select>
+            <input type="text" id="cfg-openrouter-model" placeholder="qwen/qwen3.6-plus:free" style="margin-top:6px">
           </div>
           <div id="llm-panel-claude" class="form-group llm-panel">
             <label>Claude 模型</label>
@@ -324,7 +350,9 @@
       document.getElementById('cfg-openrouter-key').value = cfg.openrouter_api_key || '';
       document.getElementById('cfg-llm-engine').value = cfg.llm_engine || 'groq';
       document.getElementById('cfg-groq-model').value = cfg.groq_model || 'llama-3.3-70b-versatile';
-      document.getElementById('cfg-openrouter-model').value = cfg.openrouter_model || 'qwen/qwen3.6-plus';
+      const orModel = cfg.openrouter_model || 'qwen/qwen3.6-plus:free';
+      document.getElementById('cfg-openrouter-model').value = orModel;
+      document.getElementById('cfg-openrouter-model-select').value = orModel;
       document.getElementById('cfg-claude-model').value = cfg.claude_model || 'claude-haiku-4-5-20251001';
       document.getElementById('cfg-openai-model').value = cfg.openai_model || 'gpt-4o-mini';
       document.getElementById('cfg-local-llm-model').value = cfg.local_llm_model || '';
