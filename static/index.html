@@ -134,10 +134,52 @@
     .toast.show { transform: translateY(0); }
 
     /* ── Overview Cards ── */
-    .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin-bottom: 30px; }
-    .stat-card { background: var(--surface); border: 1px solid var(--border); padding: 24px; border-radius: var(--radius); }
-    .stat-val { font-size: 32px; font-weight: 800; margin: 8px 0; letter-spacing: -1px; }
-    .stat-label { font-size: 12px; color: var(--text2); font-weight: 600; text-transform: uppercase; }
+    .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
+    .stat-card {
+      background: var(--surface); border: 1px solid var(--border);
+      padding: 20px 22px; border-radius: var(--radius); position: relative; overflow: hidden;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .stat-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.2); }
+    .stat-card::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+      background: var(--card-accent, var(--accent));
+    }
+    .stat-card .stat-icon { font-size: 22px; margin-bottom: 10px; display: block; }
+    .stat-val { font-size: 30px; font-weight: 800; margin: 4px 0 2px; letter-spacing: -1px; }
+    .stat-label { font-size: 11px; color: var(--text2); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+    .stat-sub { font-size: 12px; color: var(--text3); margin-top: 4px; }
+
+    /* ── Activity Chart ── */
+    .activity-section { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; margin-bottom: 20px; }
+    .activity-section h3 { font-size: 14px; font-weight: 700; color: var(--text2); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 20px; }
+    .bar-chart { display: flex; align-items: flex-end; gap: 8px; height: 80px; }
+    .bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+    .bar-wrap { flex: 1; width: 100%; display: flex; align-items: flex-end; }
+    .bar { width: 100%; border-radius: 4px 4px 0 0; background: var(--accent); opacity: 0.6; transition: opacity 0.2s, height 0.5s; min-height: 3px; }
+    .bar:hover { opacity: 1; }
+    .bar.today { background: var(--green); opacity: 1; }
+    .bar-day { font-size: 10px; color: var(--text3); font-weight: 600; }
+
+    /* ── Today Hero ── */
+    .today-hero {
+      background: linear-gradient(135deg, var(--surface) 0%, var(--surface2) 100%);
+      border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 24px 28px; margin-bottom: 20px;
+      display: flex; align-items: center; justify-content: space-between; gap: 20px;
+      position: relative; overflow: hidden;
+    }
+    .today-hero::after {
+      content: '🎙'; position: absolute; right: 24px; top: 50%; transform: translateY(-50%);
+      font-size: 64px; opacity: 0.06; pointer-events: none;
+    }
+    .today-hero .today-label { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--green); margin-bottom: 6px; }
+    .today-hero .today-val { font-size: 42px; font-weight: 900; letter-spacing: -2px; line-height: 1; }
+    .today-hero .today-sub { font-size: 13px; color: var(--text2); margin-top: 6px; }
+    .today-meta { display: flex; gap: 24px; }
+    .today-meta-item { text-align: center; }
+    .today-meta-item .m-val { font-size: 20px; font-weight: 800; }
+    .today-meta-item .m-label { font-size: 11px; color: var(--text3); margin-top: 2px; }
   </style>
 </head>
 
@@ -162,19 +204,69 @@
   <main class="main-content">
     <!-- 總覽頁 -->
     <div id="page-dashboard" class="page active">
-      <h2 style="margin-bottom:24px;">數據總覽</h2>
-      <div class="stat-grid">
-        <div class="stat-card"><div class="stat-label">總口述時間</div><div class="stat-val" id="stat-audio-time">0m</div></div>
-        <div class="stat-card"><div class="stat-label">口述字數</div><div class="stat-val" style="color:var(--green)" id="stat-words">0</div></div>
-        <div class="stat-card"><div class="stat-label">節省時間</div><div class="stat-val" style="color:var(--accent2)" id="stat-time-saved">0m</div></div>
-        <div class="stat-card"><div class="stat-label">本月估算費用</div><div class="stat-val" id="stat-cost">$0.00</div><div id="stat-cost-detail" style="font-size:11px; color:var(--text2)">-</div></div>
-      </div>
-      <div class="card">
-        <h3>個人化進度</h3>
-        <p id="progress-pct" style="font-size:24px; font-weight:700; margin-bottom:10px;">0%</p>
-        <div style="width:100%; height:8px; background:var(--surface3); border-radius:4px; overflow:hidden;">
-          <div id="progress-bar" style="width:0%; height:100%; background:var(--accent); transition:0.5s;"></div>
+      <!-- 今日 Hero -->
+      <div class="today-hero">
+        <div>
+          <div class="today-label">📅 今日成果</div>
+          <div class="today-val" id="today-chars">0</div>
+          <div class="today-sub">字元輸出 · <span id="today-dictations">0</span> 次口述</div>
         </div>
+        <div class="today-meta">
+          <div class="today-meta-item">
+            <div class="m-val" id="today-minutes" style="color:var(--green)">0m</div>
+            <div class="m-label">錄音時長</div>
+          </div>
+          <div class="today-meta-item">
+            <div class="m-val" id="today-saved" style="color:var(--accent2)">0m</div>
+            <div class="m-label">節省時間</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 近 7 天活動圖 -->
+      <div class="activity-section">
+        <h3>近 7 日口述量</h3>
+        <div class="bar-chart" id="bar-chart"></div>
+      </div>
+
+      <!-- 累計統計 -->
+      <div class="stat-grid">
+        <div class="stat-card" style="--card-accent: var(--green)">
+          <span class="stat-icon">✍️</span>
+          <div class="stat-label">累計字元</div>
+          <div class="stat-val" style="color:var(--green)" id="stat-words">0</div>
+          <div class="stat-sub" id="stat-dictations-total">0 次口述</div>
+        </div>
+        <div class="stat-card" style="--card-accent: var(--accent2)">
+          <span class="stat-icon">⏱️</span>
+          <div class="stat-label">節省時間</div>
+          <div class="stat-val" style="color:var(--accent2)" id="stat-time-saved">0m</div>
+          <div class="stat-sub">vs 手動打字</div>
+        </div>
+        <div class="stat-card" style="--card-accent: #f39c12">
+          <span class="stat-icon">🎙️</span>
+          <div class="stat-label">錄音總時長</div>
+          <div class="stat-val" id="stat-audio-time">0m</div>
+          <div class="stat-sub" id="stat-audio-hours"></div>
+        </div>
+        <div class="stat-card" style="--card-accent: #e74c3c">
+          <span class="stat-icon">💰</span>
+          <div class="stat-label">本月費用</div>
+          <div class="stat-val" id="stat-cost">$0.00</div>
+          <div class="stat-sub" id="stat-cost-detail">計算中...</div>
+        </div>
+      </div>
+
+      <!-- 個人化進度 -->
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+          <h3 style="margin:0;">🧠 個人化學習進度</h3>
+          <span id="progress-pct" style="font-size:20px; font-weight:800; color:var(--accent2);">0%</span>
+        </div>
+        <div style="width:100%; height:6px; background:var(--surface3); border-radius:3px; overflow:hidden;">
+          <div id="progress-bar" style="width:0%; height:100%; background:linear-gradient(90deg, var(--accent), var(--green)); transition:0.8s ease;"></div>
+        </div>
+        <div id="progress-desc" style="font-size:12px; color:var(--text3); margin-top:8px;">詞庫學習中...</div>
       </div>
     </div>
 
@@ -405,22 +497,85 @@
     async function loadStats() {
       const data = await api('/stats');
       const s = data.stats;
-      document.getElementById('stat-audio-time').textContent = Math.round((s.total_audio_seconds || 0) / 60) + 'm';
+
+      // ── 累計數字 ──
+      const totalMins = Math.round((s.total_audio_seconds || 0) / 60);
+      document.getElementById('stat-audio-time').textContent = totalMins >= 60
+        ? (totalMins/60).toFixed(1) + 'h' : totalMins + 'm';
+      document.getElementById('stat-audio-hours').textContent =
+        totalMins >= 60 ? totalMins + ' 分鐘' : '';
       document.getElementById('stat-words').textContent = (s.total_characters || 0).toLocaleString();
-      document.getElementById('stat-time-saved').textContent = Math.round(s.total_seconds_saved / 60) + 'm';
-      
+      document.getElementById('stat-dictations-total').textContent = (s.total_dictations || 0).toLocaleString() + ' 次口述';
+      const savedMins = Math.round((s.total_seconds_saved || 0) / 60);
+      document.getElementById('stat-time-saved').textContent = savedMins >= 60
+        ? (savedMins/60).toFixed(1) + 'h' : savedMins + 'm';
+
+      // ── 今日數據 ──
+      const todayKey = new Date().toISOString().slice(0, 10);
+      const daily = s.daily || {};
+      const today = daily[todayKey] || {};
+      document.getElementById('today-chars').textContent = (today.chars || 0).toLocaleString();
+      document.getElementById('today-dictations').textContent = today.dictations || 0;
+      const todayMins = Math.round((today.audio_seconds || 0) / 60);
+      document.getElementById('today-minutes').textContent = todayMins + 'm';
+      const todaySavedMins = Math.round((today.seconds_saved || 0) / 60);
+      document.getElementById('today-saved').textContent = todaySavedMins + 'm';
+
+      // ── 近 7 日長條圖 ──
+      const days = Object.keys(daily).sort().slice(-7);
+      const maxChars = Math.max(...days.map(d => daily[d].chars || 0), 1);
+      const dayNames = ['日','一','二','三','四','五','六'];
+      const chartEl = document.getElementById('bar-chart');
+      chartEl.innerHTML = days.map(d => {
+        const pct = Math.round(((daily[d].chars || 0) / maxChars) * 100);
+        const dt = new Date(d + 'T00:00:00');
+        const label = d === todayKey ? '今' : dayNames[dt.getDay()];
+        const isToday = d === todayKey;
+        return `<div class="bar-col">
+          <div class="bar-wrap">
+            <div class="bar${isToday?' today':''}" style="height:${pct}%" title="${d}: ${(daily[d].chars||0).toLocaleString()} 字"></div>
+          </div>
+          <div class="bar-day">${label}</div>
+        </div>`;
+      }).join('');
+
+      // ── 個人化進度（含拆解說明）──
       const p = data.personalization;
       document.getElementById('progress-pct').textContent = p.total + '%';
       document.getElementById('progress-bar').style.width = p.total + '%';
+      document.getElementById('progress-desc').textContent =
+        `詞庫修正 ${p.dictionary_entries} 條 (+${p.dict_score}分) · ` +
+        `詞彙 ${p.vocabulary_words} 個 (+${p.vocab_score}分) · ` +
+        `口述 ${p.total_dictations} 次 (+${Math.min(40, Math.round(p.total_dictations * 0.04))}分)`;
 
+      // ── 本月費用（含模型明細）──
       try {
-        const usage = await api('/usage');
         const now = new Date();
         const monthKey = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
-        const m = usage[monthKey] || {};
-        const cost = ((m.openai_input_tokens||0)*0.000005) + ((m.openai_output_tokens||0)*0.000015) + ((m.anthropic_input_tokens||0)*0.00000025) + ((m.anthropic_output_tokens||0)*0.00000125);
-        document.getElementById('stat-cost').textContent = '$' + cost.toFixed(2);
-      } catch(e){}
+        const usage = (s.usage || {})[monthKey] || {};
+
+        // 費用計算：Claude Haiku 4.5 ($0.80/$4.00 per 1M), OpenAI GPT-4o ($5/$15), Whisper ($0.006/min)
+        const claudeIn  = (usage.claude_input_tokens  || 0);
+        const claudeOut = (usage.claude_output_tokens || 0);
+        const openaiIn  = (usage.openai_input_tokens  || 0);
+        const openaiOut = (usage.openai_output_tokens || 0);
+        const whisperSec = (usage.whisper_seconds || 0);
+
+        const claudeCost = claudeIn * 0.0000008 + claudeOut * 0.000004;
+        const openaiCost = openaiIn * 0.000005  + openaiOut * 0.000015;
+        const whisperCost = (whisperSec / 60) * 0.006;
+        const total = claudeCost + openaiCost + whisperCost;
+
+        document.getElementById('stat-cost').textContent = '$' + total.toFixed(3);
+
+        const details = [];
+        if (claudeCost > 0) details.push(`Claude ${usage.claude_calls||0}次 $${claudeCost.toFixed(3)}`);
+        if (openaiCost > 0) details.push(`OpenAI $${openaiCost.toFixed(3)}`);
+        if (whisperCost > 0) details.push(`Whisper ${Math.round(whisperSec/60)}m $${whisperCost.toFixed(3)}`);
+        document.getElementById('stat-cost-detail').textContent = details.join(' · ') || '本月尚無 API 費用';
+      } catch(e) {
+        document.getElementById('stat-cost-detail').textContent = '無法計算';
+      }
     }
 
     window.onload = loadStats;
