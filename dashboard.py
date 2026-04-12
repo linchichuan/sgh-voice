@@ -45,6 +45,26 @@ def api_stats():
     })
 
 
+def _resolve_ui_language(ui_lang):
+    """auto → 從 macOS 系統語言判斷，預設日文"""
+    if ui_lang and ui_lang != "auto":
+        return ui_lang
+    try:
+        import subprocess
+        result = subprocess.run(
+            ["defaults", "read", "-g", "AppleLanguages"],
+            capture_output=True, text=True, timeout=2
+        )
+        out = result.stdout.lower()
+        if "zh-hant" in out or "zh_tw" in out or "zh-tw" in out:
+            return "zh-TW"
+        if "en" in out and "ja" not in out:
+            return "en"
+    except Exception:
+        pass
+    return "ja"  # 預設日文（目標市場：日本醫療機構）
+
+
 @app.route("/api/config", methods=["GET"])
 def api_get_config():
     config = load_config()
@@ -55,6 +75,8 @@ def api_get_config():
         v = safe.get(key, "")
         if len(v) > 12:
             safe[key] = v[:6] + "..." + v[-4:]
+    # 解析 ui_language auto
+    safe["ui_language"] = _resolve_ui_language(safe.get("ui_language", "auto"))
     return jsonify(safe)
 
 

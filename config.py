@@ -238,6 +238,7 @@ DEFAULT_CONFIG = {
     "hotkey_mode": "push_to_talk",          # push_to_talk | toggle
     "hotkey": "right_cmd",                  # right_cmd, ctrl+shift+space, etc.
     "language": "auto",                     # auto, zh, ja, en
+    "ui_language": "auto",                  # Dashboard UI 語言：auto / ja / en / zh-TW
     "target_language": "",                  # 翻譯目標語言（空 = 不翻譯）
     "llm_engine": "groq",                   # 首選 LLM 引擎（groq/openrouter/claude/openai/ollama）
     "enable_claude_polish": True,           # Claude 後處理潤稿

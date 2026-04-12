@@ -187,17 +187,23 @@
   <aside class="sidebar">
     <div class="logo-area">
       <h1>🎙 SGH Voice</h1>
-      <p style="font-size:11px; color:var(--text3); margin-top:4px;">AI 語音輸入助手</p>
+      <p style="font-size:11px; color:var(--text3); margin-top:4px;" data-i18n="app.subtitle">AI音声入力アシスタント</p>
     </div>
     <nav class="nav">
-      <div class="nav-item active" onclick="showPage('dashboard')" data-page="dashboard">🏠 總覽</div>
-      <div class="nav-item" onclick="showPage('history')" data-page="history">📜 歷史紀錄</div>
-      <div class="nav-item" onclick="showPage('dictionary')" data-page="dictionary">📚 詞庫記憶</div>
-      <div class="nav-item" onclick="showPage('settings')" data-page="settings">⚙️ 設定</div>
+      <div class="nav-item active" onclick="showPage('dashboard')" data-page="dashboard" data-i18n="nav.overview">🏠 概要</div>
+      <div class="nav-item" onclick="showPage('history')" data-page="history" data-i18n="nav.history">📜 履歴</div>
+      <div class="nav-item" onclick="showPage('dictionary')" data-page="dictionary" data-i18n="nav.dictionary">📚 辞書</div>
+      <div class="nav-item" onclick="showPage('settings')" data-page="settings" data-i18n="nav.settings">⚙️ 設定</div>
     </nav>
     <div class="sidebar-footer">
       <div id="engine-status"><span class="status-dot online"></span><span id="engine-status-text">Local LLM</span></div>
-      <div style="margin-top:8px; opacity:0.6;">v1.9.7 · 本地運行</div>
+      <div style="margin-top:8px; opacity:0.6;">v1.9.7</div>
+      <!-- 語言切換 -->
+      <div style="margin-top:8px; display:flex; gap:4px;">
+        <button onclick="setLang('ja')" id="lang-ja" style="font-size:10px; padding:2px 6px; border-radius:4px; border:1px solid var(--border); background:transparent; color:var(--text2); cursor:pointer;">日</button>
+        <button onclick="setLang('en')" id="lang-en" style="font-size:10px; padding:2px 6px; border-radius:4px; border:1px solid var(--border); background:transparent; color:var(--text2); cursor:pointer;">EN</button>
+        <button onclick="setLang('zh-TW')" id="lang-zh" style="font-size:10px; padding:2px 6px; border-radius:4px; border:1px solid var(--border); background:transparent; color:var(--text2); cursor:pointer;">繁</button>
+      </div>
     </div>
   </aside>
 
@@ -392,8 +398,17 @@
           <textarea id="cfg-system-prompt" rows="5" placeholder="留空使用內建商務模式..."></textarea>
         </div>
 
+        <div class="form-section">
+          <h3 data-i18n="settings.ui_lang">🌐 表示言語</h3>
+          <select id="cfg-ui-language" onchange="setLang(this.value)">
+            <option value="ja">🇯🇵 日本語</option>
+            <option value="en">🇺🇸 English</option>
+            <option value="zh-TW">🇹🇼 繁體中文</option>
+          </select>
+        </div>
+
         <div style="padding-top:20px;">
-          <button class="btn btn-primary" onclick="saveSettings()">💾 儲存並套用設定</button>
+          <button class="btn btn-primary" onclick="saveSettings()" data-i18n="settings.save">💾 保存して適用</button>
         </div>
       </div>
     </div>
@@ -476,6 +491,164 @@
   <div class="toast" id="toast">✅ 設定已儲存</div>
 
   <script>
+    // ── i18n ──────────────────────────────────────────────
+    const I18N = {
+      "ja": {
+        "app.subtitle": "AI音声入力アシスタント",
+        "nav.overview": "🏠 概要", "nav.history": "📜 履歴",
+        "nav.dictionary": "📚 辞書", "nav.settings": "⚙️ 設定",
+        "dashboard.title": "ダッシュボード",
+        "today.label": "📅 本日の成果", "today.chars": "文字出力",
+        "today.dictations": "回の録音", "today.minutes": "録音時間", "today.saved": "節約時間",
+        "activity.title": "過去7日間の録音量",
+        "stat.chars": "累計文字数", "stat.dictations.sub": "回の録音",
+        "stat.saved": "節約時間", "stat.saved.sub": "手動入力との比較",
+        "stat.audio": "録音総時間", "stat.cost": "今月のコスト",
+        "progress.title": "🧠 個人化学習の進捗",
+        "settings.title": "設定",
+        "settings.api": "🔑 APIキーとモデル",
+        "settings.stt": "🎙 音声認識 (STT)",
+        "settings.llm": "🤖 AIポリッシュ機能",
+        "settings.ai_polish": "AIポリッシュと自動修正", "settings.ai_polish.desc": "用語と文法の修正",
+        "settings.filler": "フィラーワード除去", "settings.filler.desc": "「えーと」「あの」を自動フィルタ",
+        "settings.autopaste": "認識後自動ペースト", "settings.autopaste.desc": "カーソル位置に自動入力",
+        "settings.prompt.title": "📝 カスタムシステムプロンプト",
+        "settings.prompt.placeholder": "空白の場合はビルトインモードを使用...",
+        "settings.save": "💾 保存して適用",
+        "settings.ui_lang": "🌐 表示言語",
+        "dict.how.title": "🧠 辞書記憶の仕組み",
+        "dict.how.1.title": "① Whisper プロンプト注入",
+        "dict.how.1.desc": "カスタム語彙を認識時に Whisper へ注入し、専門用語・ブランド名・人名を優先認識します。",
+        "dict.how.2.title": "② 修正ルール（即時置換）",
+        "dict.how.2.desc": "認識後に文字列置換で誤認識を自動修正します。手動で追加できます。",
+        "dict.how.3.title": "③ LLM 自動学習",
+        "dict.how.3.desc": "履歴を編集すると差分を自動学習し、次回から同じ誤りを自動修正します。",
+        "dict.add.correction.title": "➕ 修正ルール追加",
+        "dict.add.correction.desc": "Whisperが誤認識した語を「聞こえた → 修正後」で登録します。",
+        "dict.wrong.label": "Whisperの誤認識（誤り）", "dict.wrong.placeholder": "例：cloud code",
+        "dict.right.label": "修正後（正しい）", "dict.right.placeholder": "例：Claude Code",
+        "dict.add.correction.btn": "+ ルール追加",
+        "dict.add.word.label": "➕ カスタム語彙追加（認識率向上）",
+        "dict.add.word.placeholder": "ブランド名・人名・専門用語...",
+        "dict.add.word.btn": "+ 語彙追加",
+        "dict.corrections.title": "🔄 修正ルール",
+        "dict.words.title": "📖 カスタム語彙",
+        "history.title": "📜 履歴",
+        "engine.status": "オンライン",
+      },
+      "en": {
+        "app.subtitle": "AI Voice Input Assistant",
+        "nav.overview": "🏠 Overview", "nav.history": "📜 History",
+        "nav.dictionary": "📚 Dictionary", "nav.settings": "⚙️ Settings",
+        "dashboard.title": "Dashboard",
+        "today.label": "📅 Today's Results", "today.chars": "Characters Output",
+        "today.dictations": "recordings", "today.minutes": "Recording Time", "today.saved": "Time Saved",
+        "activity.title": "7-Day Activity",
+        "stat.chars": "Total Characters", "stat.dictations.sub": "recordings",
+        "stat.saved": "Time Saved", "stat.saved.sub": "vs. manual typing",
+        "stat.audio": "Total Recording", "stat.cost": "This Month's Cost",
+        "progress.title": "🧠 Personalization Progress",
+        "settings.title": "Settings",
+        "settings.api": "🔑 API Keys & Models",
+        "settings.stt": "🎙 Speech Recognition (STT)",
+        "settings.llm": "🤖 AI Polish Features",
+        "settings.ai_polish": "AI Polish & Auto-Correct", "settings.ai_polish.desc": "Fix terminology & grammar",
+        "settings.filler": "Remove Filler Words", "settings.filler.desc": "Auto-filter um, uh, like",
+        "settings.autopaste": "Auto-paste After Recognition", "settings.autopaste.desc": "Insert text at cursor",
+        "settings.prompt.title": "📝 Custom System Prompt",
+        "settings.prompt.placeholder": "Leave blank to use built-in mode...",
+        "settings.save": "💾 Save & Apply",
+        "settings.ui_lang": "🌐 Display Language",
+        "dict.how.title": "🧠 How Dictionary Memory Works",
+        "dict.how.1.title": "① Whisper Prompt Injection",
+        "dict.how.1.desc": "Custom vocabulary is injected into Whisper at recognition time to prioritize technical terms, brand names, and proper nouns.",
+        "dict.how.2.title": "② Correction Rules (Instant Replace)",
+        "dict.how.2.desc": "After recognition, string replacement auto-corrects misrecognitions. You can add rules manually.",
+        "dict.how.3.title": "③ LLM Auto-Learning",
+        "dict.how.3.desc": "When you edit history entries, the system auto-learns corrections for future use.",
+        "dict.add.correction.title": "➕ Add Correction Rule",
+        "dict.add.correction.desc": "Register a wrong→right mapping for Whisper misrecognitions.",
+        "dict.wrong.label": "Whisper heard (wrong)", "dict.wrong.placeholder": "e.g. cloud code",
+        "dict.right.label": "Should be (correct)", "dict.right.placeholder": "e.g. Claude Code",
+        "dict.add.correction.btn": "+ Add Rule",
+        "dict.add.word.label": "➕ Add Custom Vocabulary",
+        "dict.add.word.placeholder": "Brand names, proper nouns, technical terms...",
+        "dict.add.word.btn": "+ Add Word",
+        "dict.corrections.title": "🔄 Correction Rules",
+        "dict.words.title": "📖 Custom Vocabulary",
+        "history.title": "📜 History",
+        "engine.status": "Online",
+      },
+      "zh-TW": {
+        "app.subtitle": "AI 語音輸入助手",
+        "nav.overview": "🏠 總覽", "nav.history": "📜 歷史紀錄",
+        "nav.dictionary": "📚 詞庫記憶", "nav.settings": "⚙️ 設定",
+        "dashboard.title": "數據總覽",
+        "today.label": "📅 今日成果", "today.chars": "字元輸出",
+        "today.dictations": "次口述", "today.minutes": "錄音時長", "today.saved": "節省時間",
+        "activity.title": "近 7 日口述量",
+        "stat.chars": "累計字元", "stat.dictations.sub": "次口述",
+        "stat.saved": "節省時間", "stat.saved.sub": "vs 手動打字",
+        "stat.audio": "錄音總時長", "stat.cost": "本月費用",
+        "progress.title": "🧠 個人化學習進度",
+        "settings.title": "系統設定",
+        "settings.api": "🔑 API 金鑰與模型",
+        "settings.stt": "🎙 語音辨識 (STT)",
+        "settings.llm": "🤖 AI 潤稿與功能",
+        "settings.ai_polish": "AI 潤稿與自動修正", "settings.ai_polish.desc": "修正術語與語法",
+        "settings.filler": "移除填充詞", "settings.filler.desc": "自動過濾「嗯」「啊」",
+        "settings.autopaste": "辨識後自動貼上", "settings.autopaste.desc": "將文字自動填入游標處",
+        "settings.prompt.title": "📝 自訂系統提示詞 (Prompt)",
+        "settings.prompt.placeholder": "留空使用內建模式...",
+        "settings.save": "💾 儲存並套用設定",
+        "settings.ui_lang": "🌐 介面語言",
+        "dict.how.title": "🧠 詞庫記憶如何運作？",
+        "dict.how.1.title": "① Whisper 提示詞",
+        "dict.how.1.desc": "自訂詞彙會在辨識時注入 Whisper，讓 AI 優先識別你的專業術語、品牌名和人名。",
+        "dict.how.2.title": "② 修正規則（即時替換）",
+        "dict.how.2.desc": "辨識完成後，系統用字串替換自動把錯誤辨識修正為正確字詞。可手動追加。",
+        "dict.how.3.title": "③ LLM 自動學習",
+        "dict.how.3.desc": "在歷史紀錄中編輯文字後，系統會自動比對差異，學習新的修正規則。",
+        "dict.add.correction.title": "➕ 新增修正規則",
+        "dict.add.correction.desc": "當 Whisper 把某個詞聽錯時，設定「聽到什麼 → 改成什麼」的對應規則。",
+        "dict.wrong.label": "Whisper 聽到（錯誤）", "dict.wrong.placeholder": "例：cloud code",
+        "dict.right.label": "應該修正為（正確）", "dict.right.placeholder": "例：Claude Code",
+        "dict.add.correction.btn": "+ 追加規則",
+        "dict.add.word.label": "➕ 追加自訂詞彙（提升辨識率）",
+        "dict.add.word.placeholder": "品牌名、人名、專業術語...",
+        "dict.add.word.btn": "+ 追加詞彙",
+        "dict.corrections.title": "🔄 修正規則",
+        "dict.words.title": "📖 自訂詞彙",
+        "history.title": "📜 歷史紀錄",
+        "engine.status": "オンライン",
+      }
+    };
+
+    let _lang = "ja";
+
+    function t(key) { return (I18N[_lang] || I18N["ja"])[key] || (I18N["ja"][key] || key); }
+
+    function applyI18n() {
+      document.querySelectorAll("[data-i18n]").forEach(el => {
+        const key = el.getAttribute("data-i18n");
+        const val = t(key);
+        if (val) el.textContent = val;
+      });
+      // 語言按鈕 active 狀態
+      ["ja","en","zh-TW"].forEach(l => {
+        const btn = document.getElementById("lang-" + (l === "zh-TW" ? "zh" : l));
+        if (btn) btn.style.background = (l === _lang) ? "var(--accent)" : "transparent";
+        if (btn) btn.style.color = (l === _lang) ? "white" : "var(--text2)";
+      });
+    }
+
+    async function setLang(lang) {
+      _lang = lang;
+      applyI18n();
+      // 存進 config
+      await api('/config', { method: 'POST', body: { ui_language: lang } });
+    }
+
     let currentConfig = {};
 
     function esc(str) {
@@ -528,6 +701,7 @@
       document.getElementById('cfg-stt-engine').value = cfg.stt_engine || 'mlx-whisper';
       document.getElementById('cfg-local-whisper-model').value = cfg.local_whisper_model || '';
       document.getElementById('cfg-system-prompt').value = cfg.claude_system_prompt || '';
+      document.getElementById('cfg-ui-language').value = cfg.ui_language || 'ja';
       document.getElementById('tog-hybrid').checked = cfg.enable_hybrid_mode ?? true;
       document.getElementById('tog-claude').checked = cfg.enable_claude_polish ?? true;
       document.getElementById('tog-filler').checked = cfg.enable_filler_removal ?? true;
@@ -748,7 +922,15 @@
       loadDictionary();
     }
 
-    window.onload = loadStats;
+    window.onload = async function() {
+      // 從 config 讀取 ui_language（server 已解析 auto → ja/en/zh-TW）
+      try {
+        const cfg = await api('/config');
+        _lang = cfg.ui_language || "ja";
+      } catch(e) { _lang = "ja"; }
+      applyI18n();
+      loadStats();
+    };
   </script>
 </body>
 </html>
