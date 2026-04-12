@@ -34,7 +34,8 @@ venv/
 .kiro/
 docs/
 
-# Local data
+# Local data（個人設定，不進 git）
+config.json
 dictionary.json
 *.log
 *.tmp

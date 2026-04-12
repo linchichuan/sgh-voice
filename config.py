@@ -9,24 +9,18 @@ from datetime import datetime, date
 
 # ─── 內部基礎詞庫（不在 Dashboard UI 顯示，但辨識時使用）────────
 BASE_CUSTOM_WORDS = [
-    "新義豊", "Shingihou", "KusuriJapan", "MedicalSupporter",
-    "SGH Phone", "林紀全", "薬機法", "PMD Act", "個人輸入",
-    "Ultravox", "Twilio", "n8n", "LINE Bot",
-    "福岡", "博多", "代表取締役",
-    "Haiku", "Sonnet", "OpenCC", "Gatekeeper", "PyInstaller",
-    "Groq", "FastAPI", "Hono", "Zeabur",
-    "InputMethodService", "OkHttp", "Coroutine",
+    # AI 模型（Whisper 常唸錯）
+    "Whisper", "Claude", "Haiku", "Sonnet", "Opus",
+    "ChatGPT", "Gemini", "Llama", "Qwen", "Groq",
+    # 技術通用詞
+    "API", "GitHub", "Docker", "WebSocket", "Markdown",
+    "Python", "Kotlin", "Swift", "TypeScript",
+    # 醫療通用詞
+    "Whisper", "HbA1c", "SpO2", "BMI", "CT", "MRI",
 ]
 
 BASE_CORRECTIONS = {
-    "新義豐": "新義豊",
-    "新义丰": "新義豊",
-    "醫療supporter": "Medical Supporter",
-    "medicalsupporter": "Medical Supporter",
-    "薬日本": "kusurijapan",
-    "林紀泉": "林紀全",
-    "林記全": "林紀全",
-    # Claude 常被 Whisper 辨識為 cloud/Cloud/CLOUD（發音相似）
+    # Claude 常被 Whisper 聽成 cloud（發音相似，通用修正）
     "cloud code": "Claude Code",
     "cloud AI": "Claude AI",
     "cloud haiku": "Claude Haiku",
@@ -34,7 +28,10 @@ BASE_CORRECTIONS = {
     "cloud opus": "Claude Opus",
     "cloud API": "Claude API",
     "cloud desktop": "Claude Desktop",
-    "cloud": "Claude",  # 獨立的 cloud → Claude（最後匹配，長詞優先）
+    "cloud": "Claude",  # 最後匹配，長詞優先
+    # 繁簡常見錯誤
+    "繁体中文": "繁體中文",
+    "简体中文": "簡體中文",
 }
 
 # 不分大小寫的修正規則（key 全部小寫，匹配時做 case-insensitive 替換）
@@ -268,14 +265,7 @@ DEFAULT_CONFIG = {
     "auto_paste": True,
     "show_notification": True,
     "typing_speed_cpm": 50,                 # 用戶打字速度（每分鐘字元數，中文約 30-60）
-    "custom_words": [
-        "繁體中文", "輸入法",
-        "Repo", "Repository", "GitHub", "branch", "Release", "DMG",
-        "API", "Android", "Kotlin", "Whisper",
-        "Docker", "Google Play", "IME", "WebSocket",
-        "Push-to-Talk", "Toggle", "PCM", "WAV",
-        "OpenCC", "PyInstaller",
-    ],
+    "custom_words": [],
     "filler_words": {
         "zh": ["嗯", "啊", "那個", "就是", "然後", "對", "欸"],
         "ja": ["えーと", "あの", "えー", "まあ", "なんか", "ちょっと"],

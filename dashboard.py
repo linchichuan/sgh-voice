@@ -325,7 +325,7 @@ def api_test_llm():
             client = openai_lib.OpenAI(base_url="https://openrouter.ai/api/v1", api_key=key, timeout=15.0)
             model = config.get("openrouter_model", "qwen/qwen3-30b-a3b:free")
             client.chat.completions.create(model=model, messages=[{"role": "user", "content": test_msg}], max_tokens=5,
-                                           extra_headers={"HTTP-Referer": "https://shingihou.com", "X-Title": "SGH Voice"})
+                                           extra_headers={"HTTP-Referer": "https://github.com/sgh-voice", "X-Title": "SGH Voice"})
 
         elif engine == "claude":
             key = config.get("anthropic_api_key")
