@@ -1,9 +1,10 @@
 """
 transcriber.py — 語音辨識管線
-Whisper API → 詞庫修正 → 機械式純文字精修 (v1.9.7)
+Whisper API → 詞庫修正 → 機械式純文字精修 (v1.9.8)
 """
 import re
 import time
+import sys
 import threading
 import numpy as np
 from datetime import datetime
@@ -30,13 +31,6 @@ def _get_sys_lang():
     return 'en'
 
 _LANG = _get_sys_lang()
-
-def _c(color, text):
-    """ANSI 色彩（tty only）"""
-    _MAP = {"gray":"\033[90m","cyan":"\033[96m","blue":"\033[94m",
-            "yellow":"\033[93m","green":"\033[92m","bold":"\033[1m","reset":"\033[0m"}
-    if not sys.stdout.isatty(): return text
-    return f"{_MAP.get(color,'')}{text}{_MAP['reset']}"
 
 def _t(zh, ja, en):
     if _LANG == 'ja': return ja
@@ -204,8 +198,8 @@ class Transcriber:
             res = re.sub(r'<think>[\s\S]*?</think>|<think>[\s\S]*$', '', resp.choices[0].message.content).strip()
             self._track_usage("groq", model, resp.usage.prompt_tokens, resp.usage.completion_tokens)
             if self._is_llm_hallucination(res, text): 
-                print(_c("yellow","  ⚠ [Groq] 幻覺偵測，已捨棄: ") + res[:30]); return None
-            print(_c("cyan", f"  ◈ Groq  ({time.time()-t0:.2f}s)"))
+                print(f" ⚠️ [Groq] 偵測到幻覺，已捨棄: {res[:20]}..."); return None
+            print(" " + _t(f"⚡ [Groq] 完成 ({time.time()-t0:.2f}s)", f"⚡ [Groq] 完了", f"⚡ [Groq] Done"))
             return res
         except Exception: return None
 
@@ -217,15 +211,15 @@ class Transcriber:
             model = self.config.get("openrouter_model", "qwen/qwen3.6-plus")
             system = self._EDIT_SYSTEM if mode == "edit" else self._get_system_prompt()
             t0 = time.time()
-            resp = client.chat.completions.create(model=model, messages=[{"role": "system", "content": system}, {"role": "user", "content": text}], temperature=0.0, max_tokens=2048, extra_headers={"HTTP-Referer": "https://github.com/sgh-voice", "X-Title": "SGH Voice"})
+            resp = client.chat.completions.create(model=model, messages=[{"role": "system", "content": system}, {"role": "user", "content": text}], temperature=0.0, max_tokens=2048, extra_headers={"HTTP-Referer": "https://shingihou.com", "X-Title": "SGH Voice"})
             res = re.sub(r'<think>[\s\S]*?</think>|<think>[\s\S]*$', '', resp.choices[0].message.content).strip()
             self._track_usage("openrouter", model, resp.usage.prompt_tokens, resp.usage.completion_tokens)
             if self._is_llm_hallucination(res, text):
-                print(_c("yellow", "  ⚠ [OpenRouter] 幻覺偵測，已捨棄")); return None
-            print(_c("cyan", f"  ◈ OpenRouter  ({time.time()-t0:.2f}s)"))
+                print(f" ⚠️ [OpenRouter] 偵測到幻覺，已捨棄"); return None
+            print(" " + _t(f"✅ [OpenRouter] 完成 ({time.time()-t0:.2f}s)", f"✅ [OpenRouter] 完了", f"✅ [OpenRouter] Done"))
             return res
         except Exception as e:
-            print(_c("yellow", f"  ⚠ OpenRouter 失敗: {e}")); return None
+            print(f" ⚠️ OpenRouter 失敗: {e}"); return None
 
     def _claude_process(self, text, mode, edit_context):
         api_key = self.config.get("anthropic_api_key")
@@ -239,8 +233,8 @@ class Transcriber:
             res = resp.content[0].text.strip()
             self._track_usage("anthropic", model, resp.usage.input_tokens, resp.usage.output_tokens)
             if self._is_llm_hallucination(res, text):
-                print(_c("yellow", f"  ⚠ [Claude] 幻覺偵測，已捨棄: ") + res[:30]); return None
-            print(_c("cyan", f"  ◈ Claude  ({time.time()-t0:.2f}s)"))
+                print(f" ⚠️ [Claude] 偵測到幻覺，已捨棄: {res[:20]}..."); return None
+            print(" " + _t(f"☁️ [Claude] 完成", f"☁️ [Claude] 完了", f"☁️ [Claude] Done"))
             return res
         except Exception: return None
 
@@ -256,8 +250,8 @@ class Transcriber:
             res = resp.choices[0].message.content.strip()
             self._track_usage("openai", model, resp.usage.prompt_tokens, resp.usage.completion_tokens)
             if self._is_llm_hallucination(res, text):
-                print(_c("yellow", "  ⚠ [OpenAI] 幻覺偵測，已捨棄")); return None
-            print(_c("cyan", f"  ◈ OpenAI  ({time.time()-t0:.2f}s)"))
+                print(f" ⚠️ [OpenAI] 偵測到對話幻覺，已捨棄"); return None
+            print(" " + _t(f"🤖 [OpenAI] 完成", f"🤖 [OpenAI] 完了", f"🤖 [OpenAI] Done"))
             return res
         except Exception: return None
 
@@ -285,7 +279,6 @@ class Transcriber:
             else: audio_path = audio_source; is_temp = False
             client = openai.OpenAI(base_url="https://api.groq.com/openai/v1", api_key=api_key, timeout=10.0)
             with open(audio_path, "rb") as f:
-                # 三語混合引導
                 prompt = "繁體中文 (Traditional Chinese), 日本語 (Japanese), English mixed conversation. Please keep the original language."
                 model = self.config.get("groq_whisper_model", "whisper-large-v3-turbo")
                 resp = client.audio.transcriptions.create(model=model, file=f, prompt=prompt, language=self.config.get("language", "auto") if self.config.get("language") != "auto" else None)
@@ -300,10 +293,7 @@ class Transcriber:
             model_path = LOCAL_MODEL_PATHS.get(self.config.get("local_whisper_model"), self.config.get("local_whisper_model", "mlx-community/whisper-turbo"))
             kwargs = {"path_or_hf_repo": model_path, "temperature": 0.0, "condition_on_previous_text": False}
             if "breeze" in str(model_path).lower(): kwargs["fp16"] = True
-            
-            # 三語混合引導
             kwargs["initial_prompt"] = "繁體中文, 日本語, English mixed conversation. Keep the original language."
-            
             with Transcriber._metal_lock: result = mlx_whisper.transcribe(audio_source, **kwargs)
             return result.get("text", "")
         except Exception: return None
@@ -320,7 +310,6 @@ class Transcriber:
             else: audio_path = audio_source; is_temp = False
             client = openai.OpenAI(api_key=api_key)
             with open(audio_path, "rb") as f: 
-                # 三語引導
                 prompt = "Traditional Chinese, Japanese, English mixed."
                 resp = client.audio.transcriptions.create(model="whisper-1", file=f, prompt=prompt)
             if is_temp: os.unlink(audio_path)

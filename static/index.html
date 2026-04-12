@@ -88,11 +88,11 @@
     .form-section { margin-bottom: 32px; border-bottom: 1px solid var(--border); padding-bottom: 24px; }
     .form-section:last-child { border-bottom: none; }
     .form-section h3 { font-size: 16px; font-weight: 700; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
-    
+
     .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 16px; }
     .form-group { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
     .form-group label { font-size: 13px; font-weight: 600; color: var(--text2); }
-    
+
     input, select, textarea {
       background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
       padding: 10px 14px; color: var(--text); font-size: 14px; outline: none; transition: 0.2s; width: 100%;
@@ -103,7 +103,7 @@
     .toggle-row:last-child { border-bottom: none; }
     .toggle-label { font-size: 14px; font-weight: 600; }
     .toggle-desc { font-size: 12px; color: var(--text2); margin-top: 2px; }
-    
+
     .switch { position: relative; display: inline-block; width: 44px; height: 24px; }
     .switch input { opacity: 0; width: 0; height: 0; }
     .slider {
@@ -198,7 +198,7 @@
     <div class="sidebar-footer">
       <div id="engine-status"><span class="status-dot online"></span><span id="engine-status-text">Local LLM</span></div>
       <div style="margin-top:8px; opacity:0.6;">v1.9.7</div>
-      <!-- 語言切換 -->
+      <!-- Language switcher -->
       <div style="margin-top:8px; display:flex; gap:4px;">
         <button onclick="setLang('ja')" id="lang-ja" style="font-size:10px; padding:2px 6px; border-radius:4px; border:1px solid var(--border); background:transparent; color:var(--text2); cursor:pointer;">日</button>
         <button onclick="setLang('en')" id="lang-en" style="font-size:10px; padding:2px 6px; border-radius:4px; border:1px solid var(--border); background:transparent; color:var(--text2); cursor:pointer;">EN</button>
@@ -208,80 +208,80 @@
   </aside>
 
   <main class="main-content">
-    <!-- 總覽頁 -->
+    <!-- Overview page -->
     <div id="page-dashboard" class="page active">
-      <!-- 今日 Hero -->
+      <!-- Today Hero -->
       <div class="today-hero">
         <div>
-          <div class="today-label">📅 今日成果</div>
+          <div class="today-label" data-i18n="today.label">📅 本日の成果</div>
           <div class="today-val" id="today-chars">0</div>
-          <div class="today-sub">字元輸出 · <span id="today-dictations">0</span> 次口述</div>
+          <div class="today-sub"><span id="today-chars-unit" data-i18n="today.chars">文字出力</span> · <span id="today-dictations">0</span> <span id="today-dictations-unit" data-i18n="today.dictations">回の録音</span></div>
         </div>
         <div class="today-meta">
           <div class="today-meta-item">
             <div class="m-val" id="today-minutes" style="color:var(--green)">0m</div>
-            <div class="m-label">錄音時長</div>
+            <div class="m-label" data-i18n="today.minutes">録音時間</div>
           </div>
           <div class="today-meta-item">
             <div class="m-val" id="today-saved" style="color:var(--accent2)">0m</div>
-            <div class="m-label">節省時間</div>
+            <div class="m-label" data-i18n="today.saved">節約時間</div>
           </div>
         </div>
       </div>
 
-      <!-- 近 7 天活動圖 -->
+      <!-- 7-day activity chart -->
       <div class="activity-section">
-        <h3>近 7 日口述量</h3>
+        <h3 data-i18n="activity.title">過去7日間の録音量</h3>
         <div class="bar-chart" id="bar-chart"></div>
       </div>
 
-      <!-- 累計統計 -->
+      <!-- Cumulative stats -->
       <div class="stat-grid">
         <div class="stat-card" style="--card-accent: var(--green)">
           <span class="stat-icon">✍️</span>
-          <div class="stat-label">累計字元</div>
+          <div class="stat-label" data-i18n="stat.chars">累計文字数</div>
           <div class="stat-val" style="color:var(--green)" id="stat-words">0</div>
-          <div class="stat-sub" id="stat-dictations-total">0 次口述</div>
+          <div class="stat-sub" id="stat-dictations-total">0</div>
         </div>
         <div class="stat-card" style="--card-accent: var(--accent2)">
           <span class="stat-icon">⏱️</span>
-          <div class="stat-label">節省時間</div>
+          <div class="stat-label" data-i18n="stat.saved">節約時間</div>
           <div class="stat-val" style="color:var(--accent2)" id="stat-time-saved">0m</div>
-          <div class="stat-sub">vs 手動打字</div>
+          <div class="stat-sub" data-i18n="stat.saved.sub">手動入力との比較</div>
         </div>
         <div class="stat-card" style="--card-accent: #f39c12">
           <span class="stat-icon">🎙️</span>
-          <div class="stat-label">錄音總時長</div>
+          <div class="stat-label" data-i18n="stat.audio">録音総時間</div>
           <div class="stat-val" id="stat-audio-time">0m</div>
           <div class="stat-sub" id="stat-audio-hours"></div>
         </div>
         <div class="stat-card" style="--card-accent: #e74c3c">
           <span class="stat-icon">💰</span>
-          <div class="stat-label">本月費用</div>
+          <div class="stat-label" data-i18n="stat.cost">今月のコスト</div>
           <div class="stat-val" id="stat-cost">$0.00</div>
-          <div class="stat-sub" id="stat-cost-detail">計算中...</div>
+          <div class="stat-sub" id="stat-cost-detail">...</div>
         </div>
       </div>
 
-      <!-- 個人化進度 -->
+      <!-- Personalization progress -->
       <div class="card">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-          <h3 style="margin:0;">🧠 個人化學習進度</h3>
+          <h3 style="margin:0;" data-i18n="progress.title">🧠 個人化学習の進捗</h3>
           <span id="progress-pct" style="font-size:20px; font-weight:800; color:var(--accent2);">0%</span>
         </div>
         <div style="width:100%; height:6px; background:var(--surface3); border-radius:3px; overflow:hidden;">
           <div id="progress-bar" style="width:0%; height:100%; background:linear-gradient(90deg, var(--accent), var(--green)); transition:0.8s ease;"></div>
         </div>
-        <div id="progress-desc" style="font-size:12px; color:var(--text3); margin-top:8px;">詞庫學習中...</div>
+        <div id="progress-desc" style="font-size:12px; color:var(--text3); margin-top:8px;">...</div>
       </div>
     </div>
 
-    <!-- 設定頁 -->
+    <!-- Settings page -->
     <div id="page-settings" class="page">
-      <h2 style="margin-bottom:24px;">系統設定</h2>
+      <h2 style="margin-bottom:24px;" data-i18n="settings.title">設定</h2>
       <div class="card">
         <div class="form-section">
-          <h3>🔑 API 金鑰與模型</h3>
+          <h3 data-i18n="settings.api">🔑 APIキーとモデル</h3>
           <div class="form-row">
             <div class="form-group"><label>OpenAI API Key</label><input type="password" id="cfg-openai-key" placeholder="sk-..."></div>
             <div class="form-group"><label>Anthropic API Key</label><input type="password" id="cfg-anthropic-key" placeholder="sk-ant-..."></div>
@@ -291,111 +291,125 @@
             <div class="form-group"><label>OpenRouter API Key</label><input type="password" id="cfg-openrouter-key" placeholder="sk-or-..."></div>
           </div>
           <div class="form-group">
-            <label>首選 LLM 引擎</label>
+            <label data-i18n="cfg.label.llm_engine">優先 LLM エンジン</label>
             <select id="cfg-llm-engine" onchange="updateLlmModelPanel()">
-              <option value="groq">☁️ Groq (極速穩定)</option>
-              <option value="openrouter">🌐 OpenRouter (200+ 模型)</option>
-              <option value="claude">☁️ Claude API</option>
-              <option value="openai">☁️ OpenAI API</option>
-              <option value="ollama">💻 Ollama 本地模型</option>
+              <option value="groq" data-i18n="cfg.engine.groq">☁️ Groq (高速・安定)</option>
+              <option value="openrouter" data-i18n="cfg.engine.openrouter">🌐 OpenRouter (200+ モデル)</option>
+              <option value="claude" data-i18n="cfg.engine.claude">☁️ Claude API</option>
+              <option value="openai" data-i18n="cfg.engine.openai">☁️ OpenAI API</option>
+              <option value="ollama" data-i18n="cfg.engine.ollama">💻 Ollama ローカルモデル</option>
             </select>
           </div>
-          <!-- 各引擎對應的模型選擇，由 updateLlmModelPanel() 控制顯示 -->
+          <!-- Engine model panels, controlled by updateLlmModelPanel() -->
           <div id="llm-panel-groq" class="form-group llm-panel">
-            <label>Groq 模型</label>
+            <label data-i18n="cfg.label.groq_model">Groq モデル</label>
             <select id="cfg-groq-model">
-              <optgroup label="🆕 2026 最新">
-                <option value="meta-llama/llama-4-scout-17b-16e-instruct">Llama 4 Scout 17B (最新多模態)</option>
-                <option value="openai/gpt-oss-120b">GPT-OSS 120B (頂級推理)</option>
-                <option value="openai/gpt-oss-20b">GPT-OSS 20B (快速推理)</option>
-                <option value="qwen/qwen3-32b">Qwen3 32B (中文最強)</option>
+              <optgroup data-i18n-label="groq.group.new2026" label="🆕 2026 最新">
+                <option value="meta-llama/llama-4-scout-17b-16e-instruct" data-i18n="groq.llama4scout">Llama 4 Scout 17B (最新マルチモーダル)</option>
+                <option value="openai/gpt-oss-120b" data-i18n="groq.gptoss120b">GPT-OSS 120B (最高推論)</option>
+                <option value="openai/gpt-oss-20b" data-i18n="groq.gptoss20b">GPT-OSS 20B (高速推論)</option>
+                <option value="qwen/qwen3-32b" data-i18n="groq.qwen332b">Qwen3 32B (中国語最強)</option>
               </optgroup>
-              <optgroup label="⚡ 穩定快速">
-                <option value="llama-3.3-70b-versatile">Llama 3.3 70B (穩定旗艦)</option>
-                <option value="llama-3.1-8b-instant">Llama 3.1 8B (極速)</option>
+              <optgroup data-i18n-label="groq.group.stable" label="⚡ 安定・高速">
+                <option value="llama-3.3-70b-versatile" data-i18n="groq.llama3370b">Llama 3.3 70B (安定旗艦)</option>
+                <option value="llama-3.1-8b-instant" data-i18n="groq.llama318b">Llama 3.1 8B (超高速)</option>
               </optgroup>
             </select>
           </div>
           <div id="llm-panel-openrouter" class="form-group llm-panel">
-            <label>OpenRouter 模型</label>
+            <label data-i18n="cfg.label.or_model">OpenRouter モデル</label>
             <select id="cfg-openrouter-model-select" onchange="document.getElementById('cfg-openrouter-model').value=this.value">
-              <optgroup label="🆕 Qwen 3.6（2026）">
-                <option value="qwen/qwen3.6-plus:free">Qwen 3.6 Plus (免費・1M context)</option>
-                <option value="qwen/qwen3.6-plus-preview:free">Qwen 3.6 Plus Preview (免費)</option>
+              <optgroup data-i18n-label="or.group.qwen36" label="🆕 Qwen 3.6（2026）">
+                <option value="qwen/qwen3.6-plus:free" data-i18n="or.qwen36plus">Qwen 3.6 Plus (無料・1Mコンテキスト)</option>
               </optgroup>
-              <optgroup label="🏆 Qwen3 免費旗艦">
-                <option value="qwen/qwen3-235b-a22b:free">Qwen3 235B (免費・最強)</option>
-                <option value="qwen/qwen3-coder-480b-a35b-instruct:free">Qwen3 Coder 480B (免費・最強編碼)</option>
-                <option value="qwen/qwen3-30b-a3b:free">Qwen3 30B MoE (免費・極速)</option>
+              <optgroup data-i18n-label="or.group.qwen3flagship" label="🏆 Qwen3 無料旗艦">
+                <option value="qwen/qwen3-235b-a22b:free" data-i18n="or.qwen3235b">Qwen3 235B (無料・最強)</option>
+                <option value="qwen/qwen3-coder-480b-a35b-instruct:free" data-i18n="or.qwen3coder">Qwen3 Coder 480B (無料・最強コード)</option>
+                <option value="qwen/qwen3-30b-a3b:free" data-i18n="or.qwen330b">Qwen3 30B MoE (無料・超高速)</option>
               </optgroup>
-              <optgroup label="🌐 其他免費">
-                <option value="google/gemma-4-31b-it:free">Gemma 4 31B (免費・Google)</option>
-                <option value="meta-llama/llama-4-scout:free">Llama 4 Scout (免費・Meta)</option>
-                <option value="meta-llama/llama-3.3-70b-instruct:free">Llama 3.3 70B (免費)</option>
+              <optgroup data-i18n-label="or.group.other" label="🌐 その他無料">
+                <option value="google/gemma-4-31b-it:free" data-i18n="or.gemma431b">Gemma 4 31B (無料・Google)</option>
+                <option value="meta-llama/llama-4-scout:free" data-i18n="or.llama4scout">Llama 4 Scout (無料・Meta)</option>
+                <option value="meta-llama/llama-3.3-70b-instruct:free" data-i18n="or.llama3370b">Llama 3.3 70B (無料)</option>
               </optgroup>
-              <optgroup label="✏️ 自訂">
-                <option value="">── 手動輸入 ──</option>
+              <optgroup data-i18n-label="or.group.custom" label="✏️ カスタム">
+                <option value="" data-i18n="or.custom">── 手動入力 ──</option>
               </optgroup>
             </select>
-            <input type="text" id="cfg-openrouter-model" placeholder="qwen/qwen3.6-plus:free" style="margin-top:6px">
+            <input type="text" id="cfg-openrouter-model" data-i18n-placeholder="or.input.placeholder" placeholder="qwen/qwen3.6-plus:free" style="margin-top:6px">
           </div>
           <div id="llm-panel-claude" class="form-group llm-panel">
-            <label>Claude 模型</label>
+            <label data-i18n="cfg.label.claude_model">Claude モデル</label>
             <select id="cfg-claude-model">
-              <option value="claude-haiku-4-5-20251001">Claude Haiku 4.5 (快速)</option>
-              <option value="claude-sonnet-4-6">Claude Sonnet 4.6 (旗艦)</option>
+              <option value="claude-haiku-4-5-20251001" data-i18n="claude.haiku">Claude Haiku 4.5 (高速)</option>
+              <option value="claude-sonnet-4-6" data-i18n="claude.sonnet">Claude Sonnet 4.6 (旗艦)</option>
             </select>
           </div>
           <div id="llm-panel-openai" class="form-group llm-panel">
-            <label>OpenAI 模型</label>
+            <label data-i18n="cfg.label.openai_model">OpenAI モデル</label>
             <select id="cfg-openai-model">
-              <option value="gpt-4o-mini">GPT-4o mini (快速)</option>
-              <option value="gpt-4o">GPT-4o (旗艦)</option>
+              <option value="gpt-4o-mini" data-i18n="openai.mini">GPT-4o mini (高速)</option>
+              <option value="gpt-4o" data-i18n="openai.4o">GPT-4o (旗艦)</option>
             </select>
           </div>
           <div id="llm-panel-ollama" class="form-group llm-panel">
-            <label>Ollama 本地模型</label>
+            <label data-i18n="cfg.label.ollama_model">Ollama ローカルモデル</label>
             <input type="text" id="cfg-local-llm-model" placeholder="qwen3:8b">
           </div>
         </div>
 
         <div class="form-section">
-          <h3>🎙 語音辨識 (STT)</h3>
+          <h3 data-i18n="settings.stt">🎙 音声認識 (STT)</h3>
           <div class="toggle-row">
-            <div><div class="toggle-label">啟用 Hybrid 混合模式</div><div class="toggle-desc">短句本地、長句雲端</div></div>
+            <div>
+              <div class="toggle-label" data-i18n="settings.hybrid">Hybrid混合モード有効</div>
+              <div class="toggle-desc" data-i18n="settings.hybrid.desc">短文はローカル、長文はクラウド</div>
+            </div>
             <label class="switch"><input type="checkbox" id="tog-hybrid"><span class="slider"></span></label>
           </div>
           <div class="form-row">
             <div class="form-group">
-              <label>STT 引擎</label>
+              <label data-i18n="cfg.label.stt_engine">STT エンジン</label>
               <select id="cfg-stt-engine">
-                <option value="mlx-whisper">mlx-whisper (本地)</option>
-                <option value="groq">Groq Whisper (雲端極速)</option>
+                <option value="mlx-whisper" data-i18n="stt.mlx">mlx-whisper (ローカル)</option>
+                <option value="groq" data-i18n="stt.groq">Groq Whisper (クラウド超高速)</option>
               </select>
             </div>
-            <div class="form-group"><label>本地 Whisper 模型</label><input type="text" id="cfg-local-whisper-model" value="breeze-asr-25-4bit"></div>
+            <div class="form-group">
+              <label data-i18n="cfg.label.local_whisper">ローカル Whisper モデル</label>
+              <input type="text" id="cfg-local-whisper-model" value="breeze-asr-25-4bit">
+            </div>
           </div>
         </div>
 
         <div class="form-section">
-          <h3>🤖 AI 潤稿與功能</h3>
+          <h3 data-i18n="settings.llm">🤖 AI ポリッシュ機能</h3>
           <div class="toggle-row">
-            <div><div class="toggle-label">AI 潤稿與自動修正</div><div class="toggle-desc">修正術語與語法</div></div>
+            <div>
+              <div class="toggle-label" data-i18n="settings.ai_polish">AI ポリッシュと自動修正</div>
+              <div class="toggle-desc" data-i18n="settings.ai_polish.desc">用語と文法の修正</div>
+            </div>
             <label class="switch"><input type="checkbox" id="tog-claude"><span class="slider"></span></label>
           </div>
           <div class="toggle-row">
-            <div><div class="toggle-label">移除填充詞</div><div class="toggle-desc">自動過濾「嗯」「啊」</div></div>
+            <div>
+              <div class="toggle-label" data-i18n="settings.filler">フィラーワード除去</div>
+              <div class="toggle-desc" data-i18n="settings.filler.desc">「えーと」「あの」を自動フィルタ</div>
+            </div>
             <label class="switch"><input type="checkbox" id="tog-filler"><span class="slider"></span></label>
           </div>
           <div class="toggle-row">
-            <div><div class="toggle-label">辨識後自動貼上</div><div class="toggle-desc">將文字自動填入游標處</div></div>
+            <div>
+              <div class="toggle-label" data-i18n="settings.autopaste">認識後自動ペースト</div>
+              <div class="toggle-desc" data-i18n="settings.autopaste.desc">カーソル位置に自動入力</div>
+            </div>
             <label class="switch"><input type="checkbox" id="tog-paste"><span class="slider"></span></label>
           </div>
         </div>
 
         <div class="form-section">
-          <h3>📝 自訂系統提示詞 (Prompt)</h3>
-          <textarea id="cfg-system-prompt" rows="5" placeholder="留空使用內建商務模式..."></textarea>
+          <h3 data-i18n="settings.prompt.title">📝 カスタムシステムプロンプト</h3>
+          <textarea id="cfg-system-prompt" rows="5" data-i18n-placeholder="settings.prompt.placeholder" placeholder="空白の場合はビルトインモードを使用..."></textarea>
         </div>
 
         <div class="form-section">
@@ -413,82 +427,93 @@
       </div>
     </div>
 
-    <!-- 歷史與詞庫 (簡化版示意，後續自動填充) -->
-    <div id="page-history" class="page"><div class="card"><h3>歷史紀錄</h3><div id="history-list">載入中...</div></div></div>
+    <!-- History page -->
+    <div id="page-history" class="page">
+      <div class="card">
+        <h3 data-i18n="history.title">📜 履歴</h3>
+        <div id="history-list" data-i18n="history.loading">読み込み中...</div>
+      </div>
+    </div>
+
+    <!-- Dictionary page -->
     <div id="page-dictionary" class="page">
 
-      <!-- 說明橫幅 -->
+      <!-- Explanation banner -->
       <div class="card" style="background: linear-gradient(135deg, var(--surface) 0%, var(--surface2) 100%); border-left: 4px solid var(--accent); margin-bottom: 20px;">
-        <h3 style="margin-bottom:12px;">🧠 詞庫記憶如何運作？</h3>
+        <h3 style="margin-bottom:12px;" data-i18n="dict.how.title">🧠 辞書記憶の仕組み</h3>
         <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; font-size:13px; color:var(--text2);">
           <div>
-            <div style="font-weight:700; color:var(--text); margin-bottom:4px;">① Whisper 提示詞</div>
-            自訂詞彙會在辨識時注入 Whisper，讓 AI <em>優先識別</em>你的專業術語、品牌名和人名，提升首次辨識準確率。
+            <div style="font-weight:700; color:var(--text); margin-bottom:4px;" data-i18n="dict.how.1.title">① Whisper プロンプト注入</div>
+            <span data-i18n="dict.how.1.desc">カスタム語彙を認識時に Whisper へ注入し、専門用語・ブランド名・人名を優先認識します。</span>
           </div>
           <div>
-            <div style="font-weight:700; color:var(--text); margin-bottom:4px;">② 修正規則（即時替換）</div>
-            辨識完成後，系統用<em>字串替換</em>自動把錯誤辨識（如「cloud code」）修正為正確字詞（「Claude Code」）。可手動追加。
+            <div style="font-weight:700; color:var(--text); margin-bottom:4px;" data-i18n="dict.how.2.title">② 修正ルール（即時置換）</div>
+            <span data-i18n="dict.how.2.desc">認識後に文字列置換で誤認識を自動修正します。手動で追加できます。</span>
           </div>
           <div>
-            <div style="font-weight:700; color:var(--text); margin-bottom:4px;">③ LLM 自動學習</div>
-            在歷史紀錄中編輯文字後，系統會<em>自動比對差異</em>，學習新的修正規則，下次遇到相同錯誤自動修正。
+            <div style="font-weight:700; color:var(--text); margin-bottom:4px;" data-i18n="dict.how.3.title">③ LLM 自動学習</div>
+            <span data-i18n="dict.how.3.desc">履歴を編集すると差分を自動学習し、次回から同じ誤りを自動修正します。</span>
           </div>
         </div>
       </div>
 
-      <!-- 手動新增修正規則 -->
+      <!-- Add correction rule -->
       <div class="card" style="margin-bottom:20px;">
-        <h3 style="margin-bottom:16px;">➕ 新增修正規則</h3>
-        <p style="font-size:13px; color:var(--text2); margin-bottom:16px;">當 Whisper 把某個詞聽錯時，在這裡設定「聽到什麼 → 改成什麼」的對應規則。</p>
+        <h3 style="margin-bottom:16px;" data-i18n="dict.add.correction.title">➕ 修正ルール追加</h3>
+        <p style="font-size:13px; color:var(--text2); margin-bottom:16px;" data-i18n="dict.add.correction.desc">Whisperが誤認識した語を「聞こえた → 修正後」で登録します。</p>
         <div style="display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap;">
           <div style="flex:1; min-width:140px;">
-            <div style="font-size:12px; font-weight:600; color:var(--text2); margin-bottom:6px;">Whisper 聽到（錯誤）</div>
-            <input type="text" id="new-wrong" placeholder="例：新义丰、あのー" style="width:100%">
+            <div style="font-size:12px; font-weight:600; color:var(--text2); margin-bottom:6px;" data-i18n="dict.wrong.label">Whisperの誤認識（誤り）</div>
+            <input type="text" id="new-wrong" data-i18n-placeholder="dict.wrong.placeholder" placeholder="例：cloud code" style="width:100%">
           </div>
           <div style="color:var(--text3); padding-bottom:12px; font-size:20px;">→</div>
           <div style="flex:1; min-width:140px;">
-            <div style="font-size:12px; font-weight:600; color:var(--text2); margin-bottom:6px;">應該修正為（正確）</div>
-            <input type="text" id="new-right" placeholder="例：Claude Code、えー" style="width:100%">
+            <div style="font-size:12px; font-weight:600; color:var(--text2); margin-bottom:6px;" data-i18n="dict.right.label">修正後（正しい）</div>
+            <input type="text" id="new-right" data-i18n-placeholder="dict.right.placeholder" placeholder="例：Claude Code" style="width:100%">
           </div>
-          <button class="btn btn-primary" onclick="addCorrection()" style="white-space:nowrap;">+ 追加規則</button>
+          <button class="btn btn-primary" onclick="addCorrection()" style="white-space:nowrap;" data-i18n="dict.add.correction.btn">+ ルール追加</button>
         </div>
         <div style="margin-top:12px; border-top:1px solid var(--border); padding-top:12px;">
-          <div style="font-size:12px; font-weight:600; color:var(--text2); margin-bottom:6px;">➕ 追加自訂詞彙（提升辨識率）</div>
+          <div style="font-size:12px; font-weight:600; color:var(--text2); margin-bottom:6px;" data-i18n="dict.add.word.label">➕ カスタム語彙追加（認識率向上）</div>
           <div style="display:flex; gap:12px;">
-            <input type="text" id="new-word" placeholder="品牌名、人名、專業術語..." style="flex:1">
-            <button class="btn btn-primary" onclick="addWord()">+ 追加詞彙</button>
+            <input type="text" id="new-word" data-i18n-placeholder="dict.add.word.placeholder" placeholder="ブランド名・人名・専門用語..." style="flex:1">
+            <button class="btn btn-primary" onclick="addWord()" data-i18n="dict.add.word.btn">+ 語彙追加</button>
           </div>
         </div>
       </div>
 
-      <!-- 修正規則列表 -->
+      <!-- Correction rules list -->
       <div class="card" style="margin-bottom:20px;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-          <h3 style="margin:0;">🔄 修正規則 <span id="corrections-count" style="font-size:13px; font-weight:400; color:var(--text2);"></span></h3>
-          <input type="text" id="correction-search" placeholder="搜尋..." oninput="filterCorrections()" style="width:180px; padding:6px 12px; font-size:13px;">
+          <h3 style="margin:0;"><span data-i18n="dict.corrections.title">🔄 修正ルール</span> <span id="corrections-count" style="font-size:13px; font-weight:400; color:var(--text2);"></span></h3>
+          <input type="text" id="correction-search" data-i18n-placeholder="dict.search.placeholder" placeholder="検索..." oninput="filterCorrections()" style="width:180px; padding:6px 12px; font-size:13px;">
         </div>
         <div style="font-size:12px; color:var(--text3); margin-bottom:12px;">
-          來源標籤：<span style="background:var(--accent); color:white; border-radius:4px; padding:1px 6px; font-size:11px;">自動學習</span> = 從歷史紀錄學習 &nbsp; <span style="background:var(--surface3); color:var(--text2); border-radius:4px; padding:1px 6px; font-size:11px;">手動添加</span> = 手動設定
+          <span data-i18n="dict.source.label">ソース：</span>
+          <span style="background:var(--accent); color:white; border-radius:4px; padding:1px 6px; font-size:11px;" data-i18n="dict.source.auto">自動学習</span>
+          &nbsp;
+          <span style="background:var(--surface3); color:var(--text2); border-radius:4px; padding:1px 6px; font-size:11px;" data-i18n="dict.source.manual">手動追加</span>
         </div>
         <div id="corrections-list" style="max-height:320px; overflow-y:auto;"></div>
       </div>
 
-      <!-- 自訂詞彙列表 -->
+      <!-- Custom words list -->
       <div class="card">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-          <h3 style="margin:0;">📖 自訂詞彙 <span id="words-count" style="font-size:13px; font-weight:400; color:var(--text2);"></span></h3>
-          <input type="text" id="word-search" placeholder="搜尋..." oninput="filterWords()" style="width:180px; padding:6px 12px; font-size:13px;">
+          <h3 style="margin:0;"><span data-i18n="dict.words.title">📖 カスタム語彙</span> <span id="words-count" style="font-size:13px; font-weight:400; color:var(--text2);"></span></h3>
+          <input type="text" id="word-search" data-i18n-placeholder="dict.search.placeholder" placeholder="検索..." oninput="filterWords()" style="width:180px; padding:6px 12px; font-size:13px;">
         </div>
         <div style="font-size:12px; color:var(--text3); margin-bottom:12px;">
-          這些詞彙會注入 Whisper 提示詞，讓語音辨識優先識別。<br>
-          <span style="color:var(--green);">●</span> AI 自動擷取（從口述內容中學習） &nbsp; <span style="color:var(--accent2);">●</span> 手動添加
+          <span data-i18n="dict.words.desc">これらの語彙は Whisper プロンプトに注入され、音声認識で優先認識されます。</span><br>
+          <span style="color:var(--green);">●</span> <span data-i18n="dict.words.auto">AI自動抽出</span> &nbsp;
+          <span style="color:var(--accent2);">●</span> <span data-i18n="dict.words.manual">手動追加</span>
         </div>
         <div id="words-list" style="max-height:320px; overflow-y:auto;"></div>
       </div>
     </div>
   </main>
 
-  <div class="toast" id="toast">✅ 設定已儲存</div>
+  <div class="toast" id="toast">✅</div>
 
   <script>
     // ── i18n ──────────────────────────────────────────────
@@ -497,7 +522,6 @@
         "app.subtitle": "AI音声入力アシスタント",
         "nav.overview": "🏠 概要", "nav.history": "📜 履歴",
         "nav.dictionary": "📚 辞書", "nav.settings": "⚙️ 設定",
-        "dashboard.title": "ダッシュボード",
         "today.label": "📅 本日の成果", "today.chars": "文字出力",
         "today.dictations": "回の録音", "today.minutes": "録音時間", "today.saved": "節約時間",
         "activity.title": "過去7日間の録音量",
@@ -508,14 +532,55 @@
         "settings.title": "設定",
         "settings.api": "🔑 APIキーとモデル",
         "settings.stt": "🎙 音声認識 (STT)",
-        "settings.llm": "🤖 AIポリッシュ機能",
-        "settings.ai_polish": "AIポリッシュと自動修正", "settings.ai_polish.desc": "用語と文法の修正",
+        "settings.llm": "🤖 AI ポリッシュ機能",
+        "settings.ai_polish": "AI ポリッシュと自動修正", "settings.ai_polish.desc": "用語と文法の修正",
         "settings.filler": "フィラーワード除去", "settings.filler.desc": "「えーと」「あの」を自動フィルタ",
         "settings.autopaste": "認識後自動ペースト", "settings.autopaste.desc": "カーソル位置に自動入力",
+        "settings.hybrid": "Hybrid混合モード有効", "settings.hybrid.desc": "短文はローカル、長文はクラウド",
         "settings.prompt.title": "📝 カスタムシステムプロンプト",
         "settings.prompt.placeholder": "空白の場合はビルトインモードを使用...",
         "settings.save": "💾 保存して適用",
         "settings.ui_lang": "🌐 表示言語",
+        "cfg.label.llm_engine": "優先 LLM エンジン",
+        "cfg.label.groq_model": "Groq モデル",
+        "cfg.label.or_model": "OpenRouter モデル",
+        "cfg.label.claude_model": "Claude モデル",
+        "cfg.label.openai_model": "OpenAI モデル",
+        "cfg.label.ollama_model": "Ollama ローカルモデル",
+        "cfg.label.stt_engine": "STT エンジン",
+        "cfg.label.local_whisper": "ローカル Whisper モデル",
+        "cfg.engine.groq": "☁️ Groq (高速・安定)",
+        "cfg.engine.openrouter": "🌐 OpenRouter (200+ モデル)",
+        "cfg.engine.claude": "☁️ Claude API",
+        "cfg.engine.openai": "☁️ OpenAI API",
+        "cfg.engine.ollama": "💻 Ollama ローカルモデル",
+        "groq.group.new2026": "🆕 2026 最新",
+        "groq.group.stable": "⚡ 安定・高速",
+        "groq.llama4scout": "Llama 4 Scout 17B (最新マルチモーダル)",
+        "groq.gptoss120b": "GPT-OSS 120B (最高推論)",
+        "groq.gptoss20b": "GPT-OSS 20B (高速推論)",
+        "groq.qwen332b": "Qwen3 32B (中国語最強)",
+        "groq.llama3370b": "Llama 3.3 70B (安定旗艦)",
+        "groq.llama318b": "Llama 3.1 8B (超高速)",
+        "or.group.qwen36": "🆕 Qwen 3.6（2026）",
+        "or.group.qwen3flagship": "🏆 Qwen3 無料旗艦",
+        "or.group.other": "🌐 その他無料",
+        "or.group.custom": "✏️ カスタム",
+        "or.qwen36plus": "Qwen 3.6 Plus (無料・1Mコンテキスト)",
+        "or.qwen3235b": "Qwen3 235B (無料・最強)",
+        "or.qwen3coder": "Qwen3 Coder 480B (無料・最強コード)",
+        "or.qwen330b": "Qwen3 30B MoE (無料・超高速)",
+        "or.gemma431b": "Gemma 4 31B (無料・Google)",
+        "or.llama4scout": "Llama 4 Scout (無料・Meta)",
+        "or.llama3370b": "Llama 3.3 70B (無料)",
+        "or.custom": "── 手動入力 ──",
+        "or.input.placeholder": "qwen/qwen3.6-plus:free",
+        "claude.haiku": "Claude Haiku 4.5 (高速)",
+        "claude.sonnet": "Claude Sonnet 4.6 (旗艦)",
+        "openai.mini": "GPT-4o mini (高速)",
+        "openai.4o": "GPT-4o (旗艦)",
+        "stt.mlx": "mlx-whisper (ローカル)",
+        "stt.groq": "Groq Whisper (クラウド超高速)",
         "dict.how.title": "🧠 辞書記憶の仕組み",
         "dict.how.1.title": "① Whisper プロンプト注入",
         "dict.how.1.desc": "カスタム語彙を認識時に Whisper へ注入し、専門用語・ブランド名・人名を優先認識します。",
@@ -533,15 +598,36 @@
         "dict.add.word.btn": "+ 語彙追加",
         "dict.corrections.title": "🔄 修正ルール",
         "dict.words.title": "📖 カスタム語彙",
-        "history.title": "📜 履歴",
-        "engine.status": "オンライン",
+        "dict.words.desc": "これらの語彙は Whisper プロンプトに注入され、音声認識で優先認識されます。",
+        "dict.words.auto": "AI自動抽出", "dict.words.manual": "手動追加",
+        "dict.source.label": "ソース：",
+        "dict.source.auto": "自動学習", "dict.source.manual": "手動追加",
+        "dict.search.placeholder": "検索...",
+        "history.title": "📜 履歴", "history.loading": "読み込み中...",
+        "js.mins": " 分", "js.today": "今",
+        "js.daynames": "日,月,火,水,木,金,土",
+        "js.chars.unit": "文字",
+        "js.no_cost": "今月のAPI費用なし",
+        "js.calc_error": "計算不能",
+        "js.count.corrections": "（{n} 件）",
+        "js.count.words": "（自動 {a} + 手動 {m} 個）",
+        "js.empty.corrections": "修正ルールがまだありません。上記で追加するか、履歴を編集して自動学習させてください。",
+        "js.delete": "削除",
+        "js.empty.words": "カスタム語彙がまだありません。",
+        "js.error.correction.empty": "❌ 誤りと正しい語を両方入力してください",
+        "js.toast.correction.added": "✅ 追加しました：「{w}」→「{r}」",
+        "js.toast.word.added": "✅ 語彙を追加しました：{w}",
+        "js.toast.correction.deleted": "🗑️ 修正ルールを削除しました",
+        "js.toast.word.deleted": "🗑️ 語彙を削除しました",
+        "js.toast.saved": "✅ 設定を保存しました",
+        "js.toast.save.error": "❌ 保存に失敗しました",
+        "js.progress.desc": "辞書修正 {d} 件 (+{ds}点) · 語彙 {v} 個 (+{vs}点) · 口述 {t} 回 (+{score}点)",
       },
       "en": {
         "app.subtitle": "AI Voice Input Assistant",
         "nav.overview": "🏠 Overview", "nav.history": "📜 History",
         "nav.dictionary": "📚 Dictionary", "nav.settings": "⚙️ Settings",
-        "dashboard.title": "Dashboard",
-        "today.label": "📅 Today's Results", "today.chars": "Characters Output",
+        "today.label": "📅 Today's Results", "today.chars": "Characters",
         "today.dictations": "recordings", "today.minutes": "Recording Time", "today.saved": "Time Saved",
         "activity.title": "7-Day Activity",
         "stat.chars": "Total Characters", "stat.dictations.sub": "recordings",
@@ -555,10 +641,51 @@
         "settings.ai_polish": "AI Polish & Auto-Correct", "settings.ai_polish.desc": "Fix terminology & grammar",
         "settings.filler": "Remove Filler Words", "settings.filler.desc": "Auto-filter um, uh, like",
         "settings.autopaste": "Auto-paste After Recognition", "settings.autopaste.desc": "Insert text at cursor",
+        "settings.hybrid": "Enable Hybrid Mode", "settings.hybrid.desc": "Short: local, Long: cloud",
         "settings.prompt.title": "📝 Custom System Prompt",
         "settings.prompt.placeholder": "Leave blank to use built-in mode...",
         "settings.save": "💾 Save & Apply",
         "settings.ui_lang": "🌐 Display Language",
+        "cfg.label.llm_engine": "Preferred LLM Engine",
+        "cfg.label.groq_model": "Groq Model",
+        "cfg.label.or_model": "OpenRouter Model",
+        "cfg.label.claude_model": "Claude Model",
+        "cfg.label.openai_model": "OpenAI Model",
+        "cfg.label.ollama_model": "Ollama Local Model",
+        "cfg.label.stt_engine": "STT Engine",
+        "cfg.label.local_whisper": "Local Whisper Model",
+        "cfg.engine.groq": "☁️ Groq (Fast & Stable)",
+        "cfg.engine.openrouter": "🌐 OpenRouter (200+ Models)",
+        "cfg.engine.claude": "☁️ Claude API",
+        "cfg.engine.openai": "☁️ OpenAI API",
+        "cfg.engine.ollama": "💻 Ollama Local Model",
+        "groq.group.new2026": "🆕 2026 Latest",
+        "groq.group.stable": "⚡ Stable & Fast",
+        "groq.llama4scout": "Llama 4 Scout 17B (Latest Multimodal)",
+        "groq.gptoss120b": "GPT-OSS 120B (Top Reasoning)",
+        "groq.gptoss20b": "GPT-OSS 20B (Fast Reasoning)",
+        "groq.qwen332b": "Qwen3 32B (Best for CJK)",
+        "groq.llama3370b": "Llama 3.3 70B (Stable Flagship)",
+        "groq.llama318b": "Llama 3.1 8B (Ultra-Fast)",
+        "or.group.qwen36": "🆕 Qwen 3.6 (2026)",
+        "or.group.qwen3flagship": "🏆 Qwen3 Free Flagship",
+        "or.group.other": "🌐 Other Free Models",
+        "or.group.custom": "✏️ Custom",
+        "or.qwen36plus": "Qwen 3.6 Plus (Free · 1M context)",
+        "or.qwen3235b": "Qwen3 235B (Free · Strongest)",
+        "or.qwen3coder": "Qwen3 Coder 480B (Free · Best Coding)",
+        "or.qwen330b": "Qwen3 30B MoE (Free · Ultra-Fast)",
+        "or.gemma431b": "Gemma 4 31B (Free · Google)",
+        "or.llama4scout": "Llama 4 Scout (Free · Meta)",
+        "or.llama3370b": "Llama 3.3 70B (Free)",
+        "or.custom": "── Manual Input ──",
+        "or.input.placeholder": "qwen/qwen3.6-plus:free",
+        "claude.haiku": "Claude Haiku 4.5 (Fast)",
+        "claude.sonnet": "Claude Sonnet 4.6 (Flagship)",
+        "openai.mini": "GPT-4o mini (Fast)",
+        "openai.4o": "GPT-4o (Flagship)",
+        "stt.mlx": "mlx-whisper (Local)",
+        "stt.groq": "Groq Whisper (Cloud Ultra-Fast)",
         "dict.how.title": "🧠 How Dictionary Memory Works",
         "dict.how.1.title": "① Whisper Prompt Injection",
         "dict.how.1.desc": "Custom vocabulary is injected into Whisper at recognition time to prioritize technical terms, brand names, and proper nouns.",
@@ -576,14 +703,35 @@
         "dict.add.word.btn": "+ Add Word",
         "dict.corrections.title": "🔄 Correction Rules",
         "dict.words.title": "📖 Custom Vocabulary",
-        "history.title": "📜 History",
-        "engine.status": "Online",
+        "dict.words.desc": "These words are injected into Whisper prompts for priority recognition.",
+        "dict.words.auto": "AI auto-extracted", "dict.words.manual": "Manually added",
+        "dict.source.label": "Source: ",
+        "dict.source.auto": "Auto-learned", "dict.source.manual": "Manual",
+        "dict.search.placeholder": "Search...",
+        "history.title": "📜 History", "history.loading": "Loading...",
+        "js.mins": " min", "js.today": "T",
+        "js.daynames": "Sun,Mon,Tue,Wed,Thu,Fri,Sat",
+        "js.chars.unit": "chars",
+        "js.no_cost": "No API cost this month",
+        "js.calc_error": "Cannot calculate",
+        "js.count.corrections": "({n} rules)",
+        "js.count.words": "({a} auto + {m} manual)",
+        "js.empty.corrections": "No correction rules yet. Add one above or edit history entries to auto-learn.",
+        "js.delete": "Delete",
+        "js.empty.words": "No custom vocabulary yet.",
+        "js.error.correction.empty": "❌ Please enter both wrong and correct terms",
+        "js.toast.correction.added": "✅ Added: \"{w}\" → \"{r}\"",
+        "js.toast.word.added": "✅ Word added: {w}",
+        "js.toast.correction.deleted": "🗑️ Correction rule deleted",
+        "js.toast.word.deleted": "🗑️ Word deleted",
+        "js.toast.saved": "✅ Settings saved",
+        "js.toast.save.error": "❌ Save failed",
+        "js.progress.desc": "Dict {d} rules (+{ds}pts) · Vocab {v} (+{vs}pts) · Dictations {t} (+{score}pts)",
       },
       "zh-TW": {
         "app.subtitle": "AI 語音輸入助手",
         "nav.overview": "🏠 總覽", "nav.history": "📜 歷史紀錄",
         "nav.dictionary": "📚 詞庫記憶", "nav.settings": "⚙️ 設定",
-        "dashboard.title": "數據總覽",
         "today.label": "📅 今日成果", "today.chars": "字元輸出",
         "today.dictations": "次口述", "today.minutes": "錄音時長", "today.saved": "節省時間",
         "activity.title": "近 7 日口述量",
@@ -598,10 +746,51 @@
         "settings.ai_polish": "AI 潤稿與自動修正", "settings.ai_polish.desc": "修正術語與語法",
         "settings.filler": "移除填充詞", "settings.filler.desc": "自動過濾「嗯」「啊」",
         "settings.autopaste": "辨識後自動貼上", "settings.autopaste.desc": "將文字自動填入游標處",
+        "settings.hybrid": "啟用 Hybrid 混合模式", "settings.hybrid.desc": "短句本地、長句雲端",
         "settings.prompt.title": "📝 自訂系統提示詞 (Prompt)",
         "settings.prompt.placeholder": "留空使用內建模式...",
         "settings.save": "💾 儲存並套用設定",
         "settings.ui_lang": "🌐 介面語言",
+        "cfg.label.llm_engine": "首選 LLM 引擎",
+        "cfg.label.groq_model": "Groq 模型",
+        "cfg.label.or_model": "OpenRouter 模型",
+        "cfg.label.claude_model": "Claude 模型",
+        "cfg.label.openai_model": "OpenAI 模型",
+        "cfg.label.ollama_model": "Ollama 本地模型",
+        "cfg.label.stt_engine": "STT 引擎",
+        "cfg.label.local_whisper": "本地 Whisper 模型",
+        "cfg.engine.groq": "☁️ Groq (極速穩定)",
+        "cfg.engine.openrouter": "🌐 OpenRouter (200+ 模型)",
+        "cfg.engine.claude": "☁️ Claude API",
+        "cfg.engine.openai": "☁️ OpenAI API",
+        "cfg.engine.ollama": "💻 Ollama 本地模型",
+        "groq.group.new2026": "🆕 2026 最新",
+        "groq.group.stable": "⚡ 穩定快速",
+        "groq.llama4scout": "Llama 4 Scout 17B (最新多模態)",
+        "groq.gptoss120b": "GPT-OSS 120B (頂級推理)",
+        "groq.gptoss20b": "GPT-OSS 20B (快速推理)",
+        "groq.qwen332b": "Qwen3 32B (中文最強)",
+        "groq.llama3370b": "Llama 3.3 70B (穩定旗艦)",
+        "groq.llama318b": "Llama 3.1 8B (極速)",
+        "or.group.qwen36": "🆕 Qwen 3.6（2026）",
+        "or.group.qwen3flagship": "🏆 Qwen3 免費旗艦",
+        "or.group.other": "🌐 其他免費",
+        "or.group.custom": "✏️ 自訂",
+        "or.qwen36plus": "Qwen 3.6 Plus (免費・1M context)",
+        "or.qwen3235b": "Qwen3 235B (免費・最強)",
+        "or.qwen3coder": "Qwen3 Coder 480B (免費・最強編碼)",
+        "or.qwen330b": "Qwen3 30B MoE (免費・極速)",
+        "or.gemma431b": "Gemma 4 31B (免費・Google)",
+        "or.llama4scout": "Llama 4 Scout (免費・Meta)",
+        "or.llama3370b": "Llama 3.3 70B (免費)",
+        "or.custom": "── 手動輸入 ──",
+        "or.input.placeholder": "qwen/qwen3.6-plus:free",
+        "claude.haiku": "Claude Haiku 4.5 (快速)",
+        "claude.sonnet": "Claude Sonnet 4.6 (旗艦)",
+        "openai.mini": "GPT-4o mini (快速)",
+        "openai.4o": "GPT-4o (旗艦)",
+        "stt.mlx": "mlx-whisper (本地)",
+        "stt.groq": "Groq Whisper (雲端極速)",
         "dict.how.title": "🧠 詞庫記憶如何運作？",
         "dict.how.1.title": "① Whisper 提示詞",
         "dict.how.1.desc": "自訂詞彙會在辨識時注入 Whisper，讓 AI 優先識別你的專業術語、品牌名和人名。",
@@ -619,8 +808,30 @@
         "dict.add.word.btn": "+ 追加詞彙",
         "dict.corrections.title": "🔄 修正規則",
         "dict.words.title": "📖 自訂詞彙",
-        "history.title": "📜 歷史紀錄",
-        "engine.status": "オンライン",
+        "dict.words.desc": "這些詞彙會注入 Whisper 提示詞，讓語音辨識優先識別。",
+        "dict.words.auto": "AI 自動擷取", "dict.words.manual": "手動添加",
+        "dict.source.label": "來源標籤：",
+        "dict.source.auto": "自動學習", "dict.source.manual": "手動添加",
+        "dict.search.placeholder": "搜尋...",
+        "history.title": "📜 歷史紀錄", "history.loading": "載入中...",
+        "js.mins": " 分鐘", "js.today": "今",
+        "js.daynames": "日,一,二,三,四,五,六",
+        "js.chars.unit": "字",
+        "js.no_cost": "本月尚無 API 費用",
+        "js.calc_error": "無法計算",
+        "js.count.corrections": "（{n} 條）",
+        "js.count.words": "（自動 {a} + 手動 {m} 個）",
+        "js.empty.corrections": "尚無修正規則。在上方輸入後點「追加規則」，或在歷史紀錄中編輯文字讓系統自動學習。",
+        "js.delete": "刪除",
+        "js.empty.words": "尚無自訂詞彙。",
+        "js.error.correction.empty": "❌ 請填寫錯誤詞和修正詞",
+        "js.toast.correction.added": "✅ 已追加：「{w}」→「{r}」",
+        "js.toast.word.added": "✅ 已追加詞彙：{w}",
+        "js.toast.correction.deleted": "🗑️ 已刪除修正規則",
+        "js.toast.word.deleted": "🗑️ 已刪除詞彙",
+        "js.toast.saved": "✅ 設定已儲存",
+        "js.toast.save.error": "❌ 儲存失敗",
+        "js.progress.desc": "詞庫修正 {d} 條 (+{ds}分) · 詞彙 {v} 個 (+{vs}分) · 口述 {t} 次 (+{score}分)",
       }
     };
 
@@ -629,23 +840,37 @@
     function t(key) { return (I18N[_lang] || I18N["ja"])[key] || (I18N["ja"][key] || key); }
 
     function applyI18n() {
+      // Text content
       document.querySelectorAll("[data-i18n]").forEach(el => {
         const key = el.getAttribute("data-i18n");
         const val = t(key);
         if (val) el.textContent = val;
       });
-      // 語言按鈕 active 狀態
+      // Placeholder attributes
+      document.querySelectorAll("[data-i18n-placeholder]").forEach(el => {
+        const key = el.getAttribute("data-i18n-placeholder");
+        const val = t(key);
+        if (val) el.placeholder = val;
+      });
+      // optgroup label attributes
+      document.querySelectorAll("[data-i18n-label]").forEach(el => {
+        const key = el.getAttribute("data-i18n-label");
+        const val = t(key);
+        if (val) el.label = val;
+      });
+      // Language button active state
       ["ja","en","zh-TW"].forEach(l => {
         const btn = document.getElementById("lang-" + (l === "zh-TW" ? "zh" : l));
-        if (btn) btn.style.background = (l === _lang) ? "var(--accent)" : "transparent";
-        if (btn) btn.style.color = (l === _lang) ? "white" : "var(--text2)";
+        if (btn) { btn.style.background = (l === _lang) ? "var(--accent)" : "transparent"; btn.style.color = (l === _lang) ? "white" : "var(--text2)"; }
       });
+      // Sync language dropdown in settings
+      const langSel = document.getElementById('cfg-ui-language');
+      if (langSel) langSel.value = _lang;
     }
 
     async function setLang(lang) {
       _lang = lang;
       applyI18n();
-      // 存進 config
       await api('/config', { method: 'POST', body: { ui_language: lang } });
     }
 
@@ -732,80 +957,84 @@
       };
       const res = await api('/config', { method: 'POST', body: cfg });
       if(res.ok || res.status === 'success' || !res.error) {
-        showToast('✅ 設定已儲存');
+        showToast(t('js.toast.saved'));
       } else {
-        showToast('❌ 儲存失敗');
+        showToast(t('js.toast.save.error'));
       }
     }
 
     function showToast(msg) {
-      const t = document.getElementById('toast');
-      t.textContent = msg;
-      t.classList.add('show');
-      setTimeout(() => t.classList.remove('show'), 3000);
+      const el = document.getElementById('toast');
+      el.textContent = msg;
+      el.classList.add('show');
+      setTimeout(() => el.classList.remove('show'), 3000);
     }
 
     async function loadStats() {
       const data = await api('/stats');
       const s = data.stats;
 
-      // ── 累計數字 ──
+      // ── Cumulative numbers ──
       const totalMins = Math.round((s.total_audio_seconds || 0) / 60);
       document.getElementById('stat-audio-time').textContent = totalMins >= 60
         ? (totalMins/60).toFixed(1) + 'h' : totalMins + 'm';
       document.getElementById('stat-audio-hours').textContent =
-        totalMins >= 60 ? totalMins + ' 分鐘' : '';
+        totalMins >= 60 ? totalMins + t('js.mins') : '';
       document.getElementById('stat-words').textContent = (s.total_characters || 0).toLocaleString();
-      document.getElementById('stat-dictations-total').textContent = (s.total_dictations || 0).toLocaleString() + ' 次口述';
+      document.getElementById('stat-dictations-total').textContent =
+        (s.total_dictations || 0).toLocaleString() + ' ' + t('stat.dictations.sub');
       const savedMins = Math.round((s.total_seconds_saved || 0) / 60);
       document.getElementById('stat-time-saved').textContent = savedMins >= 60
         ? (savedMins/60).toFixed(1) + 'h' : savedMins + 'm';
 
-      // ── 今日數據 ──
+      // ── Today data ──
       const todayKey = new Date().toISOString().slice(0, 10);
       const daily = s.daily || {};
       const today = daily[todayKey] || {};
       document.getElementById('today-chars').textContent = (today.chars || 0).toLocaleString();
       document.getElementById('today-dictations').textContent = today.dictations || 0;
+      // Update today-sub labels (spans with data-i18n already applied, but re-apply for safety)
       const todayMins = Math.round((today.audio_seconds || 0) / 60);
       document.getElementById('today-minutes').textContent = todayMins + 'm';
       const todaySavedMins = Math.round((today.seconds_saved || 0) / 60);
       document.getElementById('today-saved').textContent = todaySavedMins + 'm';
 
-      // ── 近 7 日長條圖 ──
+      // ── 7-day bar chart ──
       const days = Object.keys(daily).sort().slice(-7);
       const maxChars = Math.max(...days.map(d => daily[d].chars || 0), 1);
-      const dayNames = ['日','一','二','三','四','五','六'];
+      const dayNames = t('js.daynames').split(',');
+      const todayLabel = t('js.today');
       const chartEl = document.getElementById('bar-chart');
       chartEl.innerHTML = days.map(d => {
         const pct = Math.round(((daily[d].chars || 0) / maxChars) * 100);
         const dt = new Date(d + 'T00:00:00');
-        const label = d === todayKey ? '今' : dayNames[dt.getDay()];
+        const label = d === todayKey ? todayLabel : dayNames[dt.getDay()];
         const isToday = d === todayKey;
+        const charCount = (daily[d].chars || 0).toLocaleString();
         return `<div class="bar-col">
           <div class="bar-wrap">
-            <div class="bar${isToday?' today':''}" style="height:${pct}%" title="${d}: ${(daily[d].chars||0).toLocaleString()} 字"></div>
+            <div class="bar${isToday?' today':''}" style="height:${pct}%" title="${d}: ${charCount} ${t('js.chars.unit')}"></div>
           </div>
           <div class="bar-day">${label}</div>
         </div>`;
       }).join('');
 
-      // ── 個人化進度（含拆解說明）──
+      // ── Personalization progress ──
       const p = data.personalization;
       document.getElementById('progress-pct').textContent = p.total + '%';
       document.getElementById('progress-bar').style.width = p.total + '%';
-      document.getElementById('progress-desc').textContent =
-        `詞庫修正 ${p.dictionary_entries} 條 (+${p.dict_score}分) · ` +
-        `詞彙 ${p.vocabulary_words} 個 (+${p.vocab_score}分) · ` +
-        `口述 ${p.total_dictations} 次 (+${Math.min(40, Math.round(p.total_dictations * 0.04))}分)`;
+      const score = Math.min(40, Math.round(p.total_dictations * 0.04));
+      document.getElementById('progress-desc').textContent = t('js.progress.desc')
+        .replace('{d}', p.dictionary_entries).replace('{ds}', p.dict_score)
+        .replace('{v}', p.vocabulary_words).replace('{vs}', p.vocab_score)
+        .replace('{t}', p.total_dictations).replace('{score}', score);
 
-      // ── 本月費用（含模型明細）──
+      // ── Monthly cost (with model breakdown) ──
       try {
         const now = new Date();
         const monthKey = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
         const usage = (s.usage || {})[monthKey] || {};
 
-        // 費用計算：Claude Haiku 4.5 ($0.80/$4.00 per 1M), OpenAI GPT-4o ($5/$15), Whisper ($0.006/min)
         const claudeIn  = (usage.claude_input_tokens  || 0);
         const claudeOut = (usage.claude_output_tokens || 0);
         const openaiIn  = (usage.openai_input_tokens  || 0);
@@ -820,16 +1049,16 @@
         document.getElementById('stat-cost').textContent = '$' + total.toFixed(3);
 
         const details = [];
-        if (claudeCost > 0) details.push(`Claude ${usage.claude_calls||0}次 $${claudeCost.toFixed(3)}`);
+        if (claudeCost > 0) details.push(`Claude ${usage.claude_calls||0}x $${claudeCost.toFixed(3)}`);
         if (openaiCost > 0) details.push(`OpenAI $${openaiCost.toFixed(3)}`);
         if (whisperCost > 0) details.push(`Whisper ${Math.round(whisperSec/60)}m $${whisperCost.toFixed(3)}`);
-        document.getElementById('stat-cost-detail').textContent = details.join(' · ') || '本月尚無 API 費用';
+        document.getElementById('stat-cost-detail').textContent = details.join(' · ') || t('js.no_cost');
       } catch(e) {
-        document.getElementById('stat-cost-detail').textContent = '無法計算';
+        document.getElementById('stat-cost-detail').textContent = t('js.calc_error');
       }
     }
 
-    // ── 詞庫管理 ──────────────────────────────
+    // ── Dictionary management ──────────────────────────────
     let _dictData = { corrections: {}, custom_words: { auto_added: [], manual_added: [] } };
 
     async function loadDictionary() {
@@ -843,18 +1072,20 @@
       const entries = Object.entries(corrections).filter(([w, r]) =>
         !filter || w.includes(filter) || r.includes(filter)
       );
-      document.getElementById('corrections-count').textContent = `（${entries.length} 條）`;
+      const countTpl = t('js.count.corrections').replace('{n}', entries.length);
+      document.getElementById('corrections-count').textContent = countTpl;
       if (entries.length === 0) {
         document.getElementById('corrections-list').innerHTML =
-          '<div style="color:var(--text3); font-size:13px; padding:12px 0;">尚無修正規則。在上方輸入後點「追加規則」，或在歷史紀錄中編輯文字讓系統自動學習。</div>';
+          `<div style="color:var(--text3); font-size:13px; padding:12px 0;">${esc(t('js.empty.corrections'))}</div>`;
         return;
       }
+      const deleteLabel = t('js.delete');
       document.getElementById('corrections-list').innerHTML = entries.map(([wrong, right]) => `
         <div style="display:flex; align-items:center; gap:12px; padding:10px 0; border-bottom:1px solid var(--border);">
           <span style="flex:1; font-family:'JetBrains Mono', monospace; font-size:13px; color:#e74c3c;">${esc(wrong)}</span>
           <span style="color:var(--text3);">→</span>
           <span style="flex:1; font-family:'JetBrains Mono', monospace; font-size:13px; color:var(--green);">${esc(right)}</span>
-          <button class="btn btn-ghost" style="padding:4px 10px; font-size:12px;" onclick="removeCorrection('${esc(wrong)}')">刪除</button>
+          <button class="btn btn-ghost" style="padding:4px 10px; font-size:12px;" onclick="removeCorrection('${esc(wrong)}')">${deleteLabel}</button>
         </div>`).join('');
     }
 
@@ -865,10 +1096,11 @@
         ...auto_added.map(w => ({ word: w, src: 'auto' })),
       ].filter(({ word }) => !filter || word.includes(filter));
 
-      document.getElementById('words-count').textContent = `（自動 ${auto_added.length} + 手動 ${manual_added.length} 個）`;
+      const countTpl = t('js.count.words').replace('{a}', auto_added.length).replace('{m}', manual_added.length);
+      document.getElementById('words-count').textContent = countTpl;
       if (allWords.length === 0) {
         document.getElementById('words-list').innerHTML =
-          '<div style="color:var(--text3); font-size:13px; padding:12px 0;">尚無自訂詞彙。</div>';
+          `<div style="color:var(--text3); font-size:13px; padding:12px 0;">${esc(t('js.empty.words'))}</div>`;
         return;
       }
       document.getElementById('words-list').innerHTML = `
@@ -893,11 +1125,11 @@
     async function addCorrection() {
       const wrong = document.getElementById('new-wrong').value.trim();
       const right  = document.getElementById('new-right').value.trim();
-      if (!wrong || !right) { showToast('❌ 請填寫錯誤詞和修正詞'); return; }
+      if (!wrong || !right) { showToast(t('js.error.correction.empty')); return; }
       await api('/dictionary/correction', { method: 'POST', body: { wrong, right } });
       document.getElementById('new-wrong').value = '';
       document.getElementById('new-right').value = '';
-      showToast(`✅ 已追加：「${wrong}」→「${right}」`);
+      showToast(t('js.toast.correction.added').replace('{w}', wrong).replace('{r}', right));
       loadDictionary();
     }
 
@@ -906,24 +1138,23 @@
       if (!word) return;
       await api('/dictionary/word', { method: 'POST', body: { word } });
       document.getElementById('new-word').value = '';
-      showToast(`✅ 已追加詞彙：${word}`);
+      showToast(t('js.toast.word.added').replace('{w}', word));
       loadDictionary();
     }
 
     async function removeCorrection(wrong) {
       await api('/dictionary/correction', { method: 'DELETE', body: { wrong } });
-      showToast('🗑️ 已刪除修正規則');
+      showToast(t('js.toast.correction.deleted'));
       loadDictionary();
     }
 
     async function removeWord(word) {
       await api('/dictionary/word', { method: 'DELETE', body: { word } });
-      showToast('🗑️ 已刪除詞彙');
+      showToast(t('js.toast.word.deleted'));
       loadDictionary();
     }
 
     window.onload = async function() {
-      // 從 config 讀取 ui_language（server 已解析 auto → ja/en/zh-TW）
       try {
         const cfg = await api('/config');
         _lang = cfg.ui_language || "ja";
