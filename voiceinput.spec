@@ -3,7 +3,10 @@
 VoiceInput.app — PyInstaller 打包配置
 Apple Silicon (arm64) only
 """
+import platform
 from PyInstaller.utils.hooks import collect_all, collect_data_files, collect_dynamic_libs
+
+_target_arch = 'arm64' if platform.machine() == 'arm64' else 'x86_64'
 
 block_cipher = None
 
@@ -83,7 +86,7 @@ exe = EXE(
     strip=False,
     upx=False,
     console=False,  # rumps 需要 GUI 模式
-    target_arch='arm64',
+    target_arch=_target_arch,
 )
 
 coll = COLLECT(

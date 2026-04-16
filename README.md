@@ -1,4 +1,4 @@
-# 🎙 SGH Voice — 讓想法流動，不再卡在鍵盤上 (v1.9.7)
+# 🎙 SGH Voice — 讓想法流動，不再卡在鍵盤上 (v1.9.8)
 
 **[English](README.en.md) | [日本語](README.ja.md) | 繁體中文**
 
@@ -7,11 +7,11 @@
 [![macOS](https://img.shields.io/badge/macOS-Apple_Silicon-black?logo=apple)](https://github.com/linchichuan/sgh-voice/releases)
 [![iOS](https://img.shields.io/badge/iOS-17.0+-blue?logo=apple)](https://github.com/linchichuan/sgh-voice/releases)
 [![Android](https://img.shields.io/badge/Android-8.0+-green?logo=android)](https://github.com/linchichuan/sgh-voice/releases)
-[![Version](https://img.shields.io/badge/Version-1.9.7-green)]()
+[![Version](https://img.shields.io/badge/Version-1.9.8-green)]()
 
 ---
 
-## 🌟 v1.9.7 重大更新：三語混合，原汁原味
+## 🌟 v1.9.8 重大更新：三語混合，原汁原味
 
 這次更新我們優化了多語言環境下的表現，確保您說日文就是日文，說英文就是英文，絕不擅自翻譯。
 

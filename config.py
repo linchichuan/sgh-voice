@@ -4,8 +4,13 @@ config.py — 設定與資料持久化層
 """
 import json
 import os
+import platform
 import time
 from datetime import datetime, date
+
+# Apple Silicon 才支援 mlx-whisper / mlx-qwen3-asr（MLX = Metal GPU）
+# Intel Mac 自動退回純雲端（OpenAI Whisper API / Groq），否則本地 STT 會 ImportError
+_IS_APPLE_SILICON = platform.system() == "Darwin" and platform.machine() == "arm64"
 
 # ─── 內部基礎詞庫（不在 Dashboard UI 顯示，但辨識時使用）────────
 BASE_CUSTOM_WORDS = [
@@ -246,10 +251,10 @@ DEFAULT_CONFIG = {
     "enable_filler_removal": True,          # 移除填充詞
     "enable_auto_format": True,             # 自動格式化
     "enable_self_correction": True,         # 偵測口語修正
-    "enable_hybrid_mode": True,             # 混合模式開關 (Local + Cloud)，Apple Silicon 預設開啟
+    "enable_hybrid_mode": _IS_APPLE_SILICON, # 混合模式開關 (Local + Cloud)，僅 Apple Silicon 預設開啟
     "hybrid_audio_threshold": 15,           # 錄音小於 15 秒用 Local Whisper
     "hybrid_text_threshold": 30,            # 句子小於 30 字用 Local LLM (Qwen)
-    "stt_engine": "mlx-whisper",                           # mlx-whisper | qwen3-asr | cloud-only
+    "stt_engine": "mlx-whisper" if _IS_APPLE_SILICON else "cloud-only",  # mlx-whisper | qwen3-asr | cloud-only
     "local_whisper_model": "breeze-asr-25-4bit",           # 本地 Whisper 模型（Breeze-ASR-25 繁中最強）
     "local_llm_model": "qwen3.5:latest",    # Ollama 上的本地模型名稱 (使用 2026 最新 Qwen 3.5)
     "groq_model": "llama-3.3-70b-versatile",      # Groq LLM 模型 (目前的旗艦穩定版)

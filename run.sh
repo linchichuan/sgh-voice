@@ -54,15 +54,15 @@ echo -e "${G}✓${N} 依賴安裝完成"
 DATA_DIR="$HOME/.voice-input"
 CONFIG_FILE="$DATA_DIR/config.json"
 
-if [ ! -d "$DATA_DIR" ]; then
-    echo -e "${Y}📦 首次使用，匯入預設詞庫與設定...${N}"
-    mkdir -p "$DATA_DIR"
-    cp "$SCRIPT_DIR/config.json"     "$DATA_DIR/config.json"
-    cp "$SCRIPT_DIR/dictionary.json" "$DATA_DIR/dictionary.json"
-    echo '{"total_dictations":0,"total_words":0,"total_characters":0,"total_seconds_saved":0,"total_audio_seconds":0,"daily":{},"languages_detected":{},"corrections_applied":0,"first_use_date":"","streak_days":0,"last_use_date":""}' > "$DATA_DIR/stats.json"
-    echo "[]" > "$DATA_DIR/history.json"
-    echo -e "${G}✓${N} 已匯入 $(cat "$DATA_DIR/dictionary.json" | python3 -c "import sys,json; d=json.load(sys.stdin); print(len(d.get('corrections',{})))" 2>/dev/null || echo '60+') 條修正規則"
-    echo -e "${G}✓${N} 已匯入 $(cat "$DATA_DIR/dictionary.json" | python3 -c "import sys,json; d=json.load(sys.stdin); print(len(d.get('auto_added',[])))" 2>/dev/null || echo '60+') 個自訂詞彙"
+if [ ! -f "$CONFIG_FILE" ]; then
+    echo -e "${Y}📦 首次使用，建立預設設定...${N}"
+    # 用 launcher.py::init_user_data() 從 DEFAULT_CONFIG 建立（自動偵測 arch：Intel 走 cloud-only）
+    python3 -c "from launcher import init_user_data; init_user_data()"
+    echo -e "${G}✓${N} 已建立 ~/.voice-input/（config / dictionary / history / stats）"
+    ARCH=$(uname -m)
+    if [ "$ARCH" != "arm64" ]; then
+        echo -e "${Y}ℹ️  偵測到 ${ARCH}（非 Apple Silicon）— 已自動使用 cloud-only STT${N}"
+    fi
     echo ""
     echo -e "${Y}⚠️  請在 Dashboard 設定頁填入 API 金鑰${N}"
     echo ""

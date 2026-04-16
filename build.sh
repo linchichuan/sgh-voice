@@ -14,7 +14,12 @@ N='\033[0m'
 
 VERSION="1.9.8"
 APP_NAME="SGH Voice"
-DMG_NAME="${APP_NAME}-${VERSION}-apple-silicon"
+ARCH=$(uname -m)
+if [ "$ARCH" = "arm64" ]; then
+    DMG_NAME="${APP_NAME}-${VERSION}-apple-silicon"
+else
+    DMG_NAME="${APP_NAME}-${VERSION}-intel"
+fi
 
 echo ""
 echo -e "${C}🎙 Voice Input — Build DMG${N}"
