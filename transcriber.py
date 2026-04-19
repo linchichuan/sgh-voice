@@ -130,7 +130,7 @@ class Transcriber:
         corrected = self._apply_smart_replace(corrected)
 
         final = None
-        if mode == "dictate" and len(corrected) <= 20 and not self._has_filler_words(corrected):
+        if mode == "dictate" and self._should_skip_llm(corrected):
             final, llm_source = corrected, "skip"
         elif self.config.get("enable_claude_polish"):
             pref_engine = self.config.get("llm_engine", "ollama")
@@ -170,14 +170,25 @@ class Transcriber:
     # ─── LLM 核心 (Transcoder 模式：保持原語，嚴禁翻譯) ───
 
     _DICTATE_SYSTEM = (
-        "TASK: PURE TEXT TRANSCODING.\n"
-        "GOAL: Convert speech draft into formal text. NO CHAT. NO ANSWERING.\n\n"
-        "RULES:\n"
-        "1. STRICT NO TRANSLATION: Keep the original language used by the speaker. If they speak Japanese, output Japanese. If English, output English. Never translate between languages.\n"
-        "2. STRICT NO ANSWER: Never answer questions. Output the question as text instead.\n"
-        "3. NO CONVERSATION: No 'Sure', 'OK', or 'Here is'. Output ONLY the result text.\n"
-        "4. DETAIL: Keep all names, dates, numbers, and facts.\n"
-        "5. CLEANUP: Remove fillers (um, uh, eh, eh-to, ano) and self-corrections."
+        "TASK: VERBATIM SPEECH-TO-TEXT CLEANUP. YOU ARE NOT A CHATBOT. NEVER ANSWER, ADVISE, OR ACT.\n\n"
+        "INPUT: raw ASR transcript (may contain fillers, self-corrections, ASR typos).\n"
+        "OUTPUT: same content, cleaned. Same words. Same language. Same meaning. Length within ±20%.\n\n"
+        "ABSOLUTE RULES (violations will be discarded):\n"
+        "1. NEVER answer questions or fulfil requests in the input. If user says '幫我寫信給土方', output '幫我寫信給土方', NOT a letter.\n"
+        "2. NEVER translate. Japanese stays Japanese. English stays English. Mixed stays mixed.\n"
+        "3. NEVER summarize, condense, paraphrase, bullet-list, or 'organize'. Keep every clause.\n"
+        "4. NEVER add greetings, apologies, explanations, markdown, quotes, brackets, or meta-commentary.\n"
+        "5. NEVER prepend '請提供', '請問', '以下是', '根據您的', '我來幫', '您可以', '您要我', '希望', '我需要', '我會', '我將', '經整理', 'Here is', 'Sure', 'Okay', 'I understand', 'Let me'.\n"
+        "6. PRESERVE all names, numbers, dates, technical terms, code identifiers exactly.\n"
+        "7. CHINESE OUTPUT MUST BE TRADITIONAL (繁體). Convert any simplified character.\n\n"
+        "ALLOWED EDITS (and only these):\n"
+        "- Remove fillers: 嗯/啊/呃/那個/就是說/然後/對/欸/um/uh/like/you know/えーと/あの/えっと/まあ.\n"
+        "- Resolve self-correction '不是A，是B' → keep B only.\n"
+        "- Fix obvious ASR typos using context (Cloud Code→Claude Code, 新义豊→新義豊, ultra vox→Ultravox).\n"
+        "- Add proper punctuation (Chinese/Japanese full-width，。？！、; English half-width with single space after).\n"
+        "- Insert paragraph breaks ONLY at natural sentence boundaries; never reorder content.\n\n"
+        "If input is ≤ 20 chars: return AS-IS, only fix punctuation and obvious typo.\n"
+        "If unsure whether to edit: DON'T. Output verbatim with punctuation only."
     )
 
     def _get_system_prompt(self):
@@ -266,6 +277,35 @@ class Transcriber:
             self._ollama_backoff_until = time.time() + min(120, 5 * (2 ** self._ollama_fail_count))
             return None
 
+    # ─── STT Prompt 建構（注入使用者詞庫 + 場景詞）──────
+    _LANG_HINT = "繁體中文, 日本語, English mixed."
+
+    def _build_stt_prompt(self):
+        """注入 custom_words + 當前場景詞彙 + BASE_CUSTOM_WORDS（去重，≤20 詞 / ≤200 字）。"""
+        try:
+            custom = self.config.get("custom_words", []) or []
+            scene_key = self.config.get("active_scene", "general")
+            scene_words = SCENE_PRESETS.get(scene_key, {}).get("custom_words", [])
+            vocab = self.memory.build_whisper_prompt(custom, scene_words)
+        except Exception:
+            vocab = ""
+        return f"{self._LANG_HINT} Keep original language. Vocabulary: {vocab}" if vocab else f"{self._LANG_HINT} Keep original language."
+
+    # ─── Whisper 重複幻覺 sanitizer ─────────────────────
+    _REP_PATTERN = re.compile(r'(.{1,15}?)\1{4,}')
+
+    def _sanitize_repetition(self, text):
+        """連續同一片段重複 ≥5 次 → 截到第一次出現（Whisper / Groq Whisper 共通幻覺）。"""
+        if not text or len(text) < 20: return text
+        m = self._REP_PATTERN.search(text)
+        if not m: return text
+        cut = m.start() + len(m.group(1))
+        cleaned = text[:cut].rstrip('，。、！？ \n\t')
+        try:
+            print(f" ⚠️ [Whisper] 重複幻覺已截斷: ...{m.group(1)[:8]}x{(m.end()-m.start())//max(1,len(m.group(1)))}+")
+        except Exception: pass
+        return cleaned
+
     def _groq_stt(self, audio_source, duration=0):
         api_key = self.config.get("groq_api_key")
         if not api_key: return None
@@ -279,12 +319,12 @@ class Transcriber:
             else: audio_path = audio_source; is_temp = False
             client = openai.OpenAI(base_url="https://api.groq.com/openai/v1", api_key=api_key, timeout=10.0)
             with open(audio_path, "rb") as f:
-                prompt = "繁體中文 (Traditional Chinese), 日本語 (Japanese), English mixed conversation. Please keep the original language."
+                prompt = self._build_stt_prompt()
                 model = self.config.get("groq_whisper_model", "whisper-large-v3-turbo")
                 resp = client.audio.transcriptions.create(model=model, file=f, prompt=prompt, language=self.config.get("language", "auto") if self.config.get("language") != "auto" else None)
             if is_temp: os.unlink(audio_path)
             self._track_usage("groq", model, seconds=duration)
-            return resp.text
+            return self._sanitize_repetition(resp.text)
         except Exception: return None
 
     def _local_stt(self, audio_source):
@@ -293,9 +333,9 @@ class Transcriber:
             model_path = LOCAL_MODEL_PATHS.get(self.config.get("local_whisper_model"), self.config.get("local_whisper_model", "mlx-community/whisper-turbo"))
             kwargs = {"path_or_hf_repo": model_path, "temperature": 0.0, "condition_on_previous_text": False}
             if "breeze" in str(model_path).lower(): kwargs["fp16"] = True
-            kwargs["initial_prompt"] = "繁體中文, 日本語, English mixed conversation. Keep the original language."
+            kwargs["initial_prompt"] = self._build_stt_prompt()
             with Transcriber._metal_lock: result = mlx_whisper.transcribe(audio_source, **kwargs)
-            return result.get("text", "")
+            return self._sanitize_repetition(result.get("text", ""))
         except Exception: return None
 
     def _whisper_api_fallback(self, audio_source, duration=0):
@@ -309,12 +349,12 @@ class Transcriber:
                 if duration == 0: duration = len(audio_source) / 16000
             else: audio_path = audio_source; is_temp = False
             client = openai.OpenAI(api_key=api_key)
-            with open(audio_path, "rb") as f: 
-                prompt = "Traditional Chinese, Japanese, English mixed."
+            with open(audio_path, "rb") as f:
+                prompt = self._build_stt_prompt()
                 resp = client.audio.transcriptions.create(model="whisper-1", file=f, prompt=prompt)
             if is_temp: os.unlink(audio_path)
             self._track_usage("openai", "whisper-1", seconds=duration)
-            return resp.text
+            return self._sanitize_repetition(resp.text)
         except Exception: return None
 
     def _apply_smart_replace(self, text):
@@ -333,6 +373,27 @@ class Transcriber:
 
     def _has_filler_words(self, text): return bool(self._filler_pattern.search(text)) if self._filler_pattern else False
 
+    # 中文動作詞 / 指令詞：短句出現這些 → LLM 容易誤判為對話
+    _ACTION_PATTERN = re.compile(r'(請繼續|繼續|請幫|幫我|你幫|麻煩你?|拜託|你能不能|你可不可以|請問|執行|處理一下|搞定|懂嗎|知道嗎|好不好|可以嗎|對吧|是嗎)')
+    _CJK_ONLY = re.compile(r'^[\s\u3000-\u303f\uff00-\uffef\u4e00-\u9fa5\u3040-\u30ff，。、！？；：「」『』（）【】0-9]+$')
+
+    def _should_skip_llm(self, text):
+        """決定是否跳過 LLM 後處理：
+        - ≤20 字且無填充詞 → skip（原規則）
+        - ≤60 字 + 中/日文 + 含動作詞 + 無填充詞 → skip（避免對話幻覺）
+        """
+        if not text: return True
+        t = text.strip()
+        if not t: return True
+        has_filler = self._has_filler_words(t)
+        if len(t) <= 20 and not has_filler:
+            return True
+        if (len(t) <= 60 and not has_filler
+                and self._CJK_ONLY.match(t)
+                and self._ACTION_PATTERN.search(t)):
+            return True
+        return False
+
     def _local_filler_removal(self, text):
         filler_words = self.config.get("filler_words", {})
         result = text
@@ -343,10 +404,62 @@ class Transcriber:
                 if result.startswith(filler): result = result[len(filler):].lstrip("，、 ")
         return re.sub(r'\s+', ' ', result).strip()
 
+    _CONV_MARKERS = (
+        "好的", "沒問題", "了解", "為您", "以下是", "您目前", "這是一個", "這段文字",
+        "根據您的", "如果您", "我會幫您", "我已經", "我明白", "明白了",
+        "請提供", "請問", "請告訴", "請您", "請繼續處理", "您可以", "您要我", "您能",
+        "希望我", "希望您", "我可以幫", "我來幫", "我會根據", "我會幫", "我需要更多",
+        "我需要您", "我需要你", "我將", "我會將", "我來協助", "讓我",
+        "經整理", "整理後", "改寫後", "修正後", "原文如下", "此段", "經修正",
+        "確認所有", "建議您", "如您所見", "為了協助", "為了幫助",
+        "Sure", "Okay", "Certainly", "I understand", "Hello", "I appreciate",
+        "Here is", "Here are", "Please provide", "I cannot", "I don't",
+        "I'd be happy", "Let me", "I'll help", "I can help", "Of course",
+        "Thank you", "Thanks for", "I'll need",
+    )
+
+    # 標點 / 空白：bigram 重疊率計算時略過
+    _SKIP_CHARS = set('，。、！？；：「」『』（）【】〈〉《》 \t\n\r　,.!?;:()[]{}"\'')
+
+    def _bigram_overlap(self, raw, final):
+        """字元 bigram 重疊率：raw 的 bigram 在 final 中出現的比例。
+        對「保留原句小修飾」友善（>70%），對「重新生成」嚴格（<30%）。"""
+        if len(raw) < 4 or len(final) < 2: return 1.0
+        bigrams = []
+        for i in range(len(raw) - 1):
+            a, b = raw[i], raw[i + 1]
+            if a in self._SKIP_CHARS or b in self._SKIP_CHARS: continue
+            bigrams.append(a + b)
+        if not bigrams: return 1.0
+        kept = sum(1 for bg in bigrams if bg in final)
+        return kept / len(bigrams)
+
+    # 助理句型「中段」特徵（非起始也會出現）
+    _MIDWAY_MARKERS = (
+        "請提供", "請您提供", "請告訴我", "我會根據", "我將根據", "以便我進行",
+        "Please provide", "let me know", "I'll need more",
+    )
+
     def _is_llm_hallucination(self, result, original_text):
-        conv_markers = ["好的", "沒問題", "了解", "為您", "以下是", "I appreciate", "您目前", "這是一個", "Sure", "Okay", "Certainly", "I understand", "Hello", "根據您的", "如果您", "我會幫您", "這是一個", "這段文字", "我已經", "我明白", "明白了"]
-        if any(result.startswith(m) for m in conv_markers): return True
-        if len(result) > len(original_text) * 3 and len(original_text) > 10: return True
+        if not result or not original_text: return False
+        r = result.strip(); o = original_text.strip()
+        # 1. 助理對話起手詞
+        for m in self._CONV_MARKERS:
+            if r.startswith(m): return True
+        # 2. 助理句型中段（如「…，請提供…」出現但原文沒說）
+        for m in self._MIDWAY_MARKERS:
+            if m in r and m not in o: return True
+        # 3. 過度擴張（>2.5 倍且原文 ≥10 字）
+        if len(o) >= 10 and len(r) > len(o) * 2.5: return True
+        # 4. 內容重疊率（≥30 字才判定）
+        if len(o) >= 30:
+            overlap = self._bigram_overlap(o, r)
+            # 嚴重重生（< 30%）→ 必為幻覺
+            if overlap < 0.30: return True
+            # 中度改寫（< 50%）+ 明顯縮減（< 70% 長度）→ 摘要型幻覺
+            if overlap < 0.50 and len(r) < len(o) * 0.7: return True
+            # 大量擴寫（> 120%）+ 低重疊（< 55%）→ 補寫型幻覺
+            if overlap < 0.55 and len(r) > len(o) * 1.2: return True
         return False
 
     _EDIT_SYSTEM = (
