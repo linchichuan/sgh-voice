@@ -1,4 +1,4 @@
-# 🎙 SGH Voice — 讓想法流動，不再卡在鍵盤上 (v1.9.8)
+# 🎙 SGH Voice — 讓想法流動，不再卡在鍵盤上 (v1.9.9)
 
 **[English](README.en.md) | [日本語](README.ja.md) | 繁體中文**
 
@@ -7,21 +7,23 @@
 [![macOS](https://img.shields.io/badge/macOS-Apple_Silicon-black?logo=apple)](https://github.com/linchichuan/sgh-voice/releases)
 [![iOS](https://img.shields.io/badge/iOS-17.0+-blue?logo=apple)](https://github.com/linchichuan/sgh-voice/releases)
 [![Android](https://img.shields.io/badge/Android-8.0+-green?logo=android)](https://github.com/linchichuan/sgh-voice/releases)
-[![Version](https://img.shields.io/badge/Version-1.9.8-green)]()
+[![Version](https://img.shields.io/badge/Version-1.9.9-green)]()
 
 ---
 
-## 🌟 v1.9.8 重大更新：三語混合，原汁原味
+## 🌟 v1.9.9 重大更新：幻覺終結者（Anti-Hallucination Overhaul）
 
-這次更新我們優化了多語言環境下的表現，確保您說日文就是日文，說英文就是英文，絕不擅自翻譯。
+基於 762 筆真實歷史的差異分析，找出並修復了 LLM 後處理把指令當成對話回答的根本原因 — 模型選錯了。本次全面重構幻覺防護，幻覺率從 11.9% 降至 2.5%。
 
-| 重點功能 | 說明 |
+| 重點修復 | 說明 |
 |------|------|
-| **🌐 原生語言保持** | **(New)** 重新設計的 STT 與 LLM 引導，確保中/日/英混合輸入時能 100% 保持原始語言，嚴禁自動翻譯。 |
-| **🏆 Qwen 3.6 Plus** | **(New)** Dashboard 正式支援 2026 最新旗艦 Qwen 3.6，提供更精準的意圖理解。 |
-| **🎙️ Qwen3-ASR 推薦** | 針對 CJK 語境優化的本地 ASR 引擎，解決漢字同音異義字問題。 |
-| **🤐 絕對禁言模式** | 延續機械轉碼器設計，嚴禁 AI 回答問題或進行多餘對話。 |
-| **🛡️ 幻覺攔截升級** | 強化對話語式偵測，自動過濾所有嘗試聊天的廢話。 |
+| **🎯 預設 LLM 改為 Claude Haiku 4.5** | **(Critical)** Groq + `gpt-oss-120b`（OpenAI 開源 reasoning 模型）幻覺率達 11.9%，會主動「重寫」輸入。改回 Claude 後降至 2.5%，差距 4.7 倍。 |
+| **🔤 Whisper STT 注入個人詞庫** | **(New)** `_local_stt` / `_groq_stt` / `_whisper_api_fallback` 三函數現在會把使用者 `custom_words` + 場景詞彙 + 基礎詞庫一起餵給 Whisper，專有名詞首次正確率大幅提升。 |
+| **🛡️ 三層幻覺檢測** | 66 個對話起手詞 + 9 個中段助理句型 + bigram 重疊率（< 30% 嚴判 / < 50% 配合縮減判定 / < 55% 配合擴寫判定）。 |
+| **♻️ Whisper 重複幻覺 Sanitizer** | 偵測連續同一片段重複 ≥5 次（如「11.11.11...」、「財務所×16」），自動截斷到第一次出現。 |
+| **⚡ 短指令自動 Skip LLM** | ≤60 字 + 全中日文 + 含動作詞（請、幫我、你幫、繼續、處理一下…）→ 直接跳過 LLM，避免被當成對話回答。 |
+| **🎛️ System Prompt 完全重寫** | 移除舊版「條列呈現/長文整理」等誘導改寫的字眼，改成嚴格 transcoder 風格 + 雙語明確示範。 |
+| **💾 啟用音檔備份** | 預設備份到 `~/.voice-input/audio_backup/`，為將來 CER 趨勢測試累積素材。 |
 
 ---
 

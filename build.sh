@@ -12,7 +12,7 @@ R='\033[0;31m'
 C='\033[0;36m'
 N='\033[0m'
 
-VERSION="1.9.8"
+VERSION="1.9.9"
 APP_NAME="SGH Voice"
 ARCH=$(uname -m)
 if [ "$ARCH" = "arm64" ]; then
