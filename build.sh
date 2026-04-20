@@ -26,6 +26,18 @@ echo -e "${C}🎙 Voice Input — Build DMG${N}"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 
+# ── 自動同步版本字串到所有檔案（避免三處不同步）──
+echo -e "${Y}[0/5] 同步版本字串至 ${VERSION}...${N}"
+# voiceinput.spec — Info.plist 版本
+sed -i '' "s/'CFBundleVersion': '[^']*'/'CFBundleVersion': '${VERSION}'/" voiceinput.spec
+sed -i '' "s/'CFBundleShortVersionString': '[^']*'/'CFBundleShortVersionString': '${VERSION}'/" voiceinput.spec
+# static/index.html — Dashboard 左下角顯示
+sed -i '' "s|>v[0-9]\\.[0-9]\\.[0-9]<|>v${VERSION}<|" static/index.html
+# app.py — engine.version
+sed -i '' "s/self\\.version = \"[^\"]*\"/self.version = \"${VERSION}\"/" app.py
+echo -e "${G}✓${N} 已同步 voiceinput.spec / static/index.html / app.py"
+echo ""
+
 # ── 啟動 venv ──
 if [ -d "venv" ]; then
     source venv/bin/activate

@@ -107,8 +107,8 @@ app = BUNDLE(
     info_plist={
         'CFBundleName': 'SGH Voice',
         'CFBundleDisplayName': 'SGH Voice',
-        'CFBundleVersion': '1.9.8',
-        'CFBundleShortVersionString': '1.9.8',
+        'CFBundleVersion': '1.9.9',
+        'CFBundleShortVersionString': '1.9.9',
         'LSMinimumSystemVersion': '13.0',
         'LSUIElement': True,  # 選單列 App，不顯示 Dock 圖示
         'NSMicrophoneUsageDescription': 'SGH Voice 需要麥克風權限來錄製語音並轉為文字。',
