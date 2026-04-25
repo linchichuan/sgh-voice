@@ -97,11 +97,12 @@ class OllamaDetector:
             result = results.get(host, {})
             if result.get("status") == "ok":
                 base = f"http://{host}:{self._DEFAULT_PORT}/v1"
+                if self._status != OllamaStatus.CONNECTED:
+                    print(f" ✅ Ollama 偵測成功: {base}")
                 self._cached_url = base
                 self._status = OllamaStatus.CONNECTED
                 self._diagnosis = f"Ollama 連線正常 ({host}:{self._DEFAULT_PORT})"
                 self._models = result.get("models", [])
-                print(f" ✅ Ollama 偵測成功: {base}")
                 return self._status
 
         # 沒有成功，分析失敗原因
@@ -109,8 +110,9 @@ class OllamaDetector:
         any_refused = any(r.get("status") == "refused" for r in results.values())
         any_reachable = any(r.get("status") in ("cors", "error_response") for r in results.values())
 
+        new_status = self._status
         if any_cors:
-            self._status = OllamaStatus.CORS_BLOCKED
+            new_status = OllamaStatus.CORS_BLOCKED
             self._diagnosis = (
                 "偵測到 Ollama 正在運行，但連線被 CORS 政策擋住。\n"
                 "請設定環境變數後重啟 Ollama：\n"
@@ -119,7 +121,7 @@ class OllamaDetector:
             )
             self._cached_url = None
         elif any_refused:
-            self._status = OllamaStatus.REFUSED
+            new_status = OllamaStatus.REFUSED
             self._diagnosis = (
                 "Ollama 連接埠被拒絕。可能原因：\n"
                 "1. 防火牆封鎖了 11434 端口\n"
@@ -128,11 +130,11 @@ class OllamaDetector:
             )
             self._cached_url = None
         elif any_reachable:
-            self._status = OllamaStatus.REFUSED
+            new_status = OllamaStatus.REFUSED
             self._diagnosis = "Ollama 服務回應異常，請重啟 Ollama。"
             self._cached_url = None
         else:
-            self._status = OllamaStatus.NOT_RUNNING
+            new_status = OllamaStatus.NOT_RUNNING
             self._diagnosis = (
                 "未偵測到 Ollama 服務。\n"
                 "請安裝並啟動 Ollama：https://ollama.com\n"
@@ -140,7 +142,9 @@ class OllamaDetector:
             )
             self._cached_url = None
 
-        print(f" ⚠️ Ollama 偵測失敗: {self._status} — {self._diagnosis.split(chr(10))[0]}")
+        if new_status != self._status:
+            print(f" ⚠️ Ollama 偵測狀態改變: {new_status} — {self._diagnosis.split(chr(10))[0]}")
+        self._status = new_status
         return self._status
 
     def _probe_host(self, host: str, port: int, results: dict):

@@ -320,7 +320,7 @@ class VoiceEngine:
     """語音輸入核心引擎，被 CLI / MenuBar / Dashboard 共用"""
 
     def __init__(self):
-        self.version = "1.9.9"
+        self.version = "2.0.0"
         self.config = load_config()
         self.memory = Memory()
         self.transcriber = Transcriber(self.config, self.memory)
@@ -724,18 +724,32 @@ def start_clipboard_observer(engine):
 
     def _observer():
         nonlocal last_count
+        from datetime import datetime
         while True:
             time.sleep(1.5)
+            if not engine.config.get("enable_auto_learn", True):
+                continue
             # 檢查有無新語音紀錄
             if getattr(engine, "is_recording", False):
                 continue
             
-            # 使用者最近一次的語音輸出
-            recent = engine.memory.get_recent_context(1)
-            if not recent:
+            # 使用者最近一次的語音紀錄（含時間戳記）
+            if not engine.memory.history:
                 continue
-            last_dictated = recent[0]
-            if len(last_dictated) < 4:
+            
+            last_item = engine.memory.history[-1]
+            last_dictated = last_item.get("final_text", "")
+            last_ts_str = last_item.get("timestamp", "")
+            
+            if not last_dictated or len(last_dictated) < 4 or not last_ts_str:
+                continue
+
+            # 檢查時間視窗：最後一次口述必須在 300 秒（5 分鐘）內
+            try:
+                last_ts = datetime.fromisoformat(last_ts_str)
+                if (datetime.now() - last_ts).total_seconds() > 300:
+                    continue
+            except Exception:
                 continue
 
             current_count = pb.changeCount()
@@ -755,13 +769,22 @@ def start_clipboard_observer(engine):
                 # 若完全相同或差太多，不處理
                 if copied_text == last_dictated:
                     continue
+
+                # 若只是標點差異，不視為修正（例如只是加了逗號）
+                import re
+                punc_pattern = r'[^\w\s]'
+                c1 = re.sub(punc_pattern, '', last_dictated).strip()
+                c2 = re.sub(punc_pattern, '', copied_text).strip()
+                if c1 == c2:
+                    continue
                 
                 import difflib
                 ratio = difflib.SequenceMatcher(None, last_dictated, copied_text).ratio()
+                length_gap = abs(len(copied_text) - len(last_dictated)) / max(len(last_dictated), 1)
                 
-                # 若相似度介於 60% ~ 98%，視為人工修正版
-                if 0.60 < ratio < 0.98:
-                    learned = engine.memory.learn_correction(last_dictated, copied_text)
+                # 只接受高度相似且長度接近的內容，避免把別段文字誤學成詞庫
+                if 0.72 < ratio < 0.98 and length_gap <= 0.40:
+                    learned = engine.memory.learn_correction(last_dictated, copied_text, source="clipboard")
                     if learned:
                         updates = ", ".join([f"{item['wrong']}→{item['right']}" for item in learned])
                         print(f" 📚 由剪貼簿自動學習：{updates}")

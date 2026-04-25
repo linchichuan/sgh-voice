@@ -12,13 +12,14 @@ R='\033[0;31m'
 C='\033[0;36m'
 N='\033[0m'
 
-VERSION="1.9.9"
+VERSION="2.0.0"
 APP_NAME="SGH Voice"
+DMG_APP_NAME="SGH.Voice"
 ARCH=$(uname -m)
 if [ "$ARCH" = "arm64" ]; then
-    DMG_NAME="${APP_NAME}-${VERSION}-apple-silicon"
+    DMG_NAME="${DMG_APP_NAME}-${VERSION}-apple-silicon"
 else
-    DMG_NAME="${APP_NAME}-${VERSION}-intel"
+    DMG_NAME="${DMG_APP_NAME}-${VERSION}-intel"
 fi
 
 echo ""

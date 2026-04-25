@@ -1,4 +1,4 @@
-# 🎙 SGH Voice — 讓想法流動，不再卡在鍵盤上 (v1.9.9)
+# 🎙 SGH Voice — 讓想法流動，不再卡在鍵盤上 (v2.0.0)
 
 **[English](README.en.md) | [日本語](README.ja.md) | 繁體中文**
 
@@ -7,16 +7,18 @@
 [![macOS](https://img.shields.io/badge/macOS-Apple_Silicon-black?logo=apple)](https://github.com/linchichuan/sgh-voice/releases)
 [![iOS](https://img.shields.io/badge/iOS-17.0+-blue?logo=apple)](https://github.com/linchichuan/sgh-voice/releases)
 [![Android](https://img.shields.io/badge/Android-8.0+-green?logo=android)](https://github.com/linchichuan/sgh-voice/releases)
-[![Version](https://img.shields.io/badge/Version-1.9.9-green)]()
+[![Version](https://img.shields.io/badge/Version-2.0.0-green)]()
 
 ---
 
-## 🌟 v1.9.9 重大更新：幻覺終結者（Anti-Hallucination Overhaul）
+## 🌟 v2.0.0 重大更新：三平台版本同步與語音管線升級
 
-基於 762 筆真實歷史的差異分析，找出並修復了 LLM 後處理把指令當成對話回答的根本原因 — 模型選錯了。本次全面重構幻覺防護，幻覺率從 11.9% 降至 2.5%。
+本次把 macOS、iOS、Android、GitHub Release 與 Firebase 下載頁統一到 v2.0.0，並延續 v1.9.9 的反幻覺管線，補齊 RVC/TTS 相關工具與長音訊處理腳本。
 
 | 重點修復 | 說明 |
 |------|------|
+| **🚀 三平台版本統一** | macOS DMG、iOS project、Android APK/AAB、README、Firebase Landing Page 全部同步為 v2.0.0。 |
+| **🎧 RVC/TTS 工具鏈整合** | 新增 RVC 推論、批次 TTS、Spotify post-copy、長篇語音生成與提示文字正規化腳本。 |
 | **🎯 預設 LLM 改為 Claude Haiku 4.5** | **(Critical)** Groq + `gpt-oss-120b`（OpenAI 開源 reasoning 模型）幻覺率達 11.9%，會主動「重寫」輸入。改回 Claude 後降至 2.5%，差距 4.7 倍。 |
 | **🔤 Whisper STT 注入個人詞庫** | **(New)** `_local_stt` / `_groq_stt` / `_whisper_api_fallback` 三函數現在會把使用者 `custom_words` + 場景詞彙 + 基礎詞庫一起餵給 Whisper，專有名詞首次正確率大幅提升。 |
 | **🛡️ 三層幻覺檢測** | 66 個對話起手詞 + 9 個中段助理句型 + bigram 重疊率（< 30% 嚴判 / < 50% 配合縮減判定 / < 55% 配合擴寫判定）。 |

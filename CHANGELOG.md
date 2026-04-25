@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.0.0 (2026-04-25) — Cross-Platform Release Sync
+
+- **三平台版本同步**：macOS App/DMG、iOS project、Android Gradle、README、Firebase Landing Page 全部升級至 `2.0.0`。
+- **GitHub Release asset 命名統一**：DMG 產物改為 `SGH.Voice-2.0.0-apple-silicon.dmg`，與 Release 下載 URL 格式一致。
+- **RVC/TTS 工具鏈整合**：加入 RVC 推論工作區、批次 TTS、Spotify post-copy、長篇語音生成與提示文字正規化腳本。
+- **iOS Release build 修正**：SwiftUI `#Preview` 僅在 Debug 編譯，避免 production build 被 preview macro 擋住。
+- **延續反幻覺管線**：保留 Claude Haiku 4.5 預設、Whisper prompt 注入、重複幻覺 sanitizer、短指令 skip LLM 等 v1.9.9 安全策略。
+
 ## v1.9.9 (2026-04-19) — Anti-Hallucination Overhaul
 
 基於 762 筆真實歷史的差異分析（`whisper_raw` vs `final_text`），定位並修復了 LLM 後處理把指令當成對話回答的根本原因。

@@ -61,7 +61,7 @@ class Recorder:
 
     def _record_loop(self):
         sr = self.config.get("sample_rate", 16000)
-        max_dur = self.config.get("max_recording_duration", 360)
+        max_dur = self.config.get("max_recording_duration", 1800)
         silence_threshold = self.config.get("silence_threshold", 0.001)
         silence_duration = self.config.get("silence_duration", 2.0)
         hotkey_mode = self.config.get("hotkey_mode", "push_to_talk")

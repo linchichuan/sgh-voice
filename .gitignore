@@ -23,6 +23,21 @@ venv/
 .DS_Store
 *.dmg
 
+# RVC / TTS generated assets (keep source scripts, exclude bulky artifacts)
+rvc_work/assets/
+rvc_work/logs/
+rvc_work/**/*.pth
+rvc_work/**/*.index
+rvc_work/**/*.npy
+tts/output/
+tts/_tmp_chunks/
+tts/rvc_clean_*/
+tts/**/*.wav
+tts/**/*.mp3
+tts/**/*.aiff
+tts/**/*.pid
+tts/**/*.out
+
 # IDE
 .vscode/
 .idea/

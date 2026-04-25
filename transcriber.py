@@ -106,6 +106,8 @@ class Transcriber:
                 vp_score = self._voiceprint_mgr.verify(audio_source)
                 if vp_score < self.config.get("voiceprint_threshold", 0.97): return None
 
+        # ── STT 階段 ─────────────────────────────────────
+        t_stt0 = time.time()
         raw = None
         stt_engine = self.config.get("stt_engine", "mlx-whisper")
         if stt_engine == "groq":
@@ -119,16 +121,19 @@ class Transcriber:
         if not raw and self.config.get("groq_api_key"):
             raw = self._groq_stt(audio_source, duration=audio_duration)
             if raw: stt_source = "groq"
-        
+
         if not raw and self.config.get("openai_api_key"):
             raw = self._whisper_api_fallback(audio_source, duration=audio_duration)
             if raw: stt_source = "cloud"
-            
+
         if not raw or not raw.strip(): return None
+        t_stt = time.time() - t_stt0
 
         corrected = self.memory.apply_corrections(raw, SCENE_PRESETS.get(self.config.get("active_scene", "general"), {}).get("corrections"))
         corrected = self._apply_smart_replace(corrected)
 
+        # ── LLM 階段 ─────────────────────────────────────
+        t_llm0 = time.time()
         final = None
         if mode == "dictate" and self._should_skip_llm(corrected):
             final, llm_source = corrected, "skip"
@@ -156,15 +161,25 @@ class Transcriber:
         if final is None:
             final = self._local_filler_removal(corrected) if self.config.get("enable_filler_removal") else corrected
             llm_source = "regex"
+        t_llm = time.time() - t_llm0
 
         if self._opencc and final: final = self._opencc.convert(final)
 
         process_time = time.time() - t0
-        self.memory.add_to_history({
+        # 分階段 timing log（讓使用者看到瓶頸在 STT 還是 LLM）
+        try:
+            chars = len(final or "")
+            print(f" ⏱  STT={t_stt:.2f}s({stt_source}) | LLM={t_llm:.2f}s({llm_source}) | total={process_time:.2f}s | {chars}字")
+        except Exception: pass
+
+        # 歷史寫入丟到 daemon thread，不阻塞主流程
+        entry = {
             "timestamp": datetime.now().isoformat(), "whisper_raw": raw, "final_text": final,
-            "mode": mode, "process_time": round(process_time, 2), "stt_source": stt_source, "llm_source": llm_source,
-        })
-        if mode == "dictate": self._async_extract_keywords(final)
+            "mode": mode, "process_time": round(process_time, 2),
+            "stt_time": round(t_stt, 2), "llm_time": round(t_llm, 2),
+            "stt_source": stt_source, "llm_source": llm_source,
+        }
+        threading.Thread(target=self.memory.add_to_history, args=(entry,), daemon=True).start()
         return {"raw": raw, "final": final, "process_time": process_time}
 
     # ─── LLM 核心 (Transcoder 模式：保持原語，嚴禁翻譯) ───
@@ -197,32 +212,46 @@ class Transcriber:
         scene_extra = SCENE_PRESETS.get(self.config.get("active_scene", "general"), {}).get("system_prompt_extra", "")
         return f"{base}\n[Style Guide: {user_style}]\n{scene_extra}".strip()
 
+    def _dynamic_max_tokens(self, text):
+        """依輸入長度動態決定 max_tokens 上限：短句不分配 2048 budget，回應更快。
+        經驗值：output ≈ input × 1.4，再加 20% safety margin。"""
+        n = len(text or "")
+        if n <= 80: return 256
+        if n <= 200: return 512
+        if n <= 500: return 1024
+        return 2048
+
+    def _llm_timeout(self):
+        """雲端 LLM 呼叫的 timeout（秒）。預設 5 秒，超時 fallback 下一個引擎。"""
+        return float(self.config.get("llm_timeout_sec", 5.0))
+
     def _groq_llm_process(self, text, mode, edit_context):
         api_key = self.config.get("groq_api_key")
         if not api_key: return None
         try:
-            client = openai.OpenAI(base_url="https://api.groq.com/openai/v1", api_key=api_key, timeout=6.0)
+            client = openai.OpenAI(base_url="https://api.groq.com/openai/v1", api_key=api_key, timeout=self._llm_timeout())
             model = self.config.get("groq_model", "llama-3.3-70b-versatile")
             system = self._EDIT_SYSTEM if mode == "edit" else self._get_system_prompt()
             t0 = time.time()
-            resp = client.chat.completions.create(model=model, messages=[{"role": "system", "content": system}, {"role": "user", "content": text}], temperature=0.0, max_tokens=2048)
+            resp = client.chat.completions.create(model=model, messages=[{"role": "system", "content": system}, {"role": "user", "content": text}], temperature=0.0, max_tokens=self._dynamic_max_tokens(text))
             res = re.sub(r'<think>[\s\S]*?</think>|<think>[\s\S]*$', '', resp.choices[0].message.content).strip()
             self._track_usage("groq", model, resp.usage.prompt_tokens, resp.usage.completion_tokens)
-            if self._is_llm_hallucination(res, text): 
+            if self._is_llm_hallucination(res, text):
                 print(f" ⚠️ [Groq] 偵測到幻覺，已捨棄: {res[:20]}..."); return None
             print(" " + _t(f"⚡ [Groq] 完成 ({time.time()-t0:.2f}s)", f"⚡ [Groq] 完了", f"⚡ [Groq] Done"))
             return res
-        except Exception: return None
+        except Exception as e:
+            print(f" ⚠️ Groq 失敗/超時: {e}"); return None
 
     def _openrouter_process(self, text, mode, edit_context):
         api_key = self.config.get("openrouter_api_key")
         if not api_key: return None
         try:
-            client = openai.OpenAI(base_url="https://openrouter.ai/api/v1", api_key=api_key, timeout=10.0)
+            client = openai.OpenAI(base_url="https://openrouter.ai/api/v1", api_key=api_key, timeout=self._llm_timeout())
             model = self.config.get("openrouter_model", "qwen/qwen3.6-plus")
             system = self._EDIT_SYSTEM if mode == "edit" else self._get_system_prompt()
             t0 = time.time()
-            resp = client.chat.completions.create(model=model, messages=[{"role": "system", "content": system}, {"role": "user", "content": text}], temperature=0.0, max_tokens=2048, extra_headers={"HTTP-Referer": "https://shingihou.com", "X-Title": "SGH Voice"})
+            resp = client.chat.completions.create(model=model, messages=[{"role": "system", "content": system}, {"role": "user", "content": text}], temperature=0.0, max_tokens=self._dynamic_max_tokens(text), extra_headers={"HTTP-Referer": "https://shingihou.com", "X-Title": "SGH Voice"})
             res = re.sub(r'<think>[\s\S]*?</think>|<think>[\s\S]*$', '', resp.choices[0].message.content).strip()
             self._track_usage("openrouter", model, resp.usage.prompt_tokens, resp.usage.completion_tokens)
             if self._is_llm_hallucination(res, text):
@@ -230,34 +259,35 @@ class Transcriber:
             print(" " + _t(f"✅ [OpenRouter] 完成 ({time.time()-t0:.2f}s)", f"✅ [OpenRouter] 完了", f"✅ [OpenRouter] Done"))
             return res
         except Exception as e:
-            print(f" ⚠️ OpenRouter 失敗: {e}"); return None
+            print(f" ⚠️ OpenRouter 失敗/超時: {e}"); return None
 
     def _claude_process(self, text, mode, edit_context):
         api_key = self.config.get("anthropic_api_key")
         if not api_key: return None
         try:
-            client = anthropic.Anthropic(api_key=api_key, timeout=8.0)
+            client = anthropic.Anthropic(api_key=api_key, timeout=self._llm_timeout())
             model = self.config.get("claude_model", "claude-haiku-4-5-20251001")
             system = self._EDIT_SYSTEM if mode == "edit" else self._get_system_prompt()
             t0 = time.time()
-            resp = client.messages.create(model=model, system=system, messages=[{"role": "user", "content": text}], max_tokens=2048, temperature=0.0)
+            resp = client.messages.create(model=model, system=system, messages=[{"role": "user", "content": text}], max_tokens=self._dynamic_max_tokens(text), temperature=0.0)
             res = resp.content[0].text.strip()
             self._track_usage("anthropic", model, resp.usage.input_tokens, resp.usage.output_tokens)
             if self._is_llm_hallucination(res, text):
                 print(f" ⚠️ [Claude] 偵測到幻覺，已捨棄: {res[:20]}..."); return None
-            print(" " + _t(f"☁️ [Claude] 完成", f"☁️ [Claude] 完了", f"☁️ [Claude] Done"))
+            print(" " + _t(f"☁️ [Claude] 完成 ({time.time()-t0:.2f}s)", f"☁️ [Claude] 完了", f"☁️ [Claude] Done"))
             return res
-        except Exception: return None
+        except Exception as e:
+            print(f" ⚠️ Claude 失敗/超時: {e}"); return None
 
     def _openai_process(self, text, mode, edit_context):
         api_key = self.config.get("openai_api_key")
         if not api_key: return None
         try:
-            client = openai.OpenAI(api_key=api_key, timeout=8.0)
+            client = openai.OpenAI(api_key=api_key, timeout=self._llm_timeout())
             model = self.config.get("openai_model", "gpt-4o")
             system = self._EDIT_SYSTEM if mode == "edit" else self._get_system_prompt()
             t0 = time.time()
-            resp = client.chat.completions.create(model=model, messages=[{"role": "system", "content": system}, {"role": "user", "content": text}], temperature=0.0, max_tokens=2048)
+            resp = client.chat.completions.create(model=model, messages=[{"role": "system", "content": system}, {"role": "user", "content": text}], temperature=0.0, max_tokens=self._dynamic_max_tokens(text))
             res = resp.choices[0].message.content.strip()
             self._track_usage("openai", model, resp.usage.prompt_tokens, resp.usage.completion_tokens)
             if self._is_llm_hallucination(res, text):
@@ -310,19 +340,22 @@ class Transcriber:
         api_key = self.config.get("groq_api_key")
         if not api_key: return None
         try:
-            import tempfile, soundfile as sf
+            import io, soundfile as sf
             sr = self.config.get("sample_rate", 16000)
             if isinstance(audio_source, np.ndarray):
-                tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
-                sf.write(tmp.name, audio_source, sr); tmp.close(); audio_path = tmp.name; is_temp = True
+                buf = io.BytesIO()
+                sf.write(buf, audio_source, sr, format="WAV"); buf.seek(0); buf.name = "audio.wav"
+                file_obj = buf
                 if duration == 0: duration = len(audio_source) / sr
-            else: audio_path = audio_source; is_temp = False
+            else:
+                file_obj = open(audio_source, "rb")
             client = openai.OpenAI(base_url="https://api.groq.com/openai/v1", api_key=api_key, timeout=10.0)
-            with open(audio_path, "rb") as f:
+            try:
                 prompt = self._build_stt_prompt()
                 model = self.config.get("groq_whisper_model", "whisper-large-v3-turbo")
-                resp = client.audio.transcriptions.create(model=model, file=f, prompt=prompt, language=self.config.get("language", "auto") if self.config.get("language") != "auto" else None)
-            if is_temp: os.unlink(audio_path)
+                resp = client.audio.transcriptions.create(model=model, file=file_obj, prompt=prompt, language=self.config.get("language", "auto") if self.config.get("language") != "auto" else None)
+            finally:
+                if not isinstance(audio_source, np.ndarray): file_obj.close()
             self._track_usage("groq", model, seconds=duration)
             return self._sanitize_repetition(resp.text)
         except Exception: return None
@@ -342,17 +375,20 @@ class Transcriber:
         api_key = self.config.get("openai_api_key")
         if not api_key: return None
         try:
-            import tempfile, soundfile as sf
+            import io, soundfile as sf
             if isinstance(audio_source, np.ndarray):
-                tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
-                sf.write(tmp.name, audio_source, 16000); tmp.close(); audio_path = tmp.name; is_temp = True
+                buf = io.BytesIO()
+                sf.write(buf, audio_source, 16000, format="WAV"); buf.seek(0); buf.name = "audio.wav"
+                file_obj = buf
                 if duration == 0: duration = len(audio_source) / 16000
-            else: audio_path = audio_source; is_temp = False
+            else:
+                file_obj = open(audio_source, "rb")
             client = openai.OpenAI(api_key=api_key)
-            with open(audio_path, "rb") as f:
+            try:
                 prompt = self._build_stt_prompt()
-                resp = client.audio.transcriptions.create(model="whisper-1", file=f, prompt=prompt)
-            if is_temp: os.unlink(audio_path)
+                resp = client.audio.transcriptions.create(model="whisper-1", file=file_obj, prompt=prompt)
+            finally:
+                if not isinstance(audio_source, np.ndarray): file_obj.close()
             self._track_usage("openai", "whisper-1", seconds=duration)
             return self._sanitize_repetition(resp.text)
         except Exception: return None
@@ -470,30 +506,27 @@ class Transcriber:
     def _build_edit_prompt(self, cmd, original):
         return f"<original>{original}</original>\n<command>{cmd}</command>\nResult:"
 
-    def _async_extract_keywords(self, text):
-        def task():
-            words = re.findall(r'[A-Za-z][A-Za-z0-9\-]{2,}', text)
-            for kw in set(words): self.memory.add_auto_word(kw)
-        threading.Thread(target=task, daemon=True).start()
-
     def _track_usage(self, source, model, input_tokens=0, output_tokens=0, seconds=0):
-        try:
-            from config import load_stats, save_stats
-            from datetime import date
-            stats = load_stats(); month_key = date.today().strftime("%Y-%m")
-            if "usage" not in stats: stats["usage"] = {}
-            if month_key not in stats["usage"]:
-                stats["usage"][month_key] = {"openai_input_tokens":0, "openai_output_tokens":0, "openai_whisper_seconds":0, "anthropic_input_tokens":0, "anthropic_output_tokens":0, "groq_input_tokens":0, "groq_output_tokens":0, "groq_whisper_seconds":0, "openrouter_input_tokens":0, "openrouter_output_tokens":0}
-            m = stats["usage"][month_key]
-            fields = ["openai_input_tokens", "openai_output_tokens", "openai_whisper_seconds", "anthropic_input_tokens", "anthropic_output_tokens", "groq_input_tokens", "groq_output_tokens", "groq_whisper_seconds", "openrouter_input_tokens", "openrouter_output_tokens"]
-            for f in fields:
-                if f not in m: m[f] = 0
-            if source == "openai": m["openai_input_tokens"]+=input_tokens; m["openai_output_tokens"]+=output_tokens; m["openai_whisper_seconds"]+=seconds
-            elif source == "anthropic": m["anthropic_input_tokens"]+=input_tokens; m["anthropic_output_tokens"]+=output_tokens
-            elif source == "groq": m["groq_input_tokens"]+=input_tokens; m["groq_output_tokens"]+=output_tokens; m["groq_whisper_seconds"]+=seconds
-            elif source == "openrouter": m["openrouter_input_tokens"]+=input_tokens; m["openrouter_output_tokens"]+=output_tokens
-            save_stats(stats)
-        except Exception: pass
+        # 統計寫檔丟到 daemon thread + 走 update_stats_atomic（與 update_stats 共用同一把鎖，不再 race）
+        def _write():
+            try:
+                from config import update_stats_atomic
+                from datetime import date
+                month_key = date.today().strftime("%Y-%m")
+                def _mutate(stats):
+                    if "usage" not in stats: stats["usage"] = {}
+                    if month_key not in stats["usage"]:
+                        stats["usage"][month_key] = {"openai_input_tokens":0, "openai_output_tokens":0, "openai_whisper_seconds":0, "anthropic_input_tokens":0, "anthropic_output_tokens":0, "groq_input_tokens":0, "groq_output_tokens":0, "groq_whisper_seconds":0, "openrouter_input_tokens":0, "openrouter_output_tokens":0}
+                    m = stats["usage"][month_key]
+                    for f in ["openai_input_tokens", "openai_output_tokens", "openai_whisper_seconds", "anthropic_input_tokens", "anthropic_output_tokens", "groq_input_tokens", "groq_output_tokens", "groq_whisper_seconds", "openrouter_input_tokens", "openrouter_output_tokens"]:
+                        if f not in m: m[f] = 0
+                    if source == "openai": m["openai_input_tokens"]+=input_tokens; m["openai_output_tokens"]+=output_tokens; m["openai_whisper_seconds"]+=seconds
+                    elif source == "anthropic": m["anthropic_input_tokens"]+=input_tokens; m["anthropic_output_tokens"]+=output_tokens
+                    elif source == "groq": m["groq_input_tokens"]+=input_tokens; m["groq_output_tokens"]+=output_tokens; m["groq_whisper_seconds"]+=seconds
+                    elif source == "openrouter": m["openrouter_input_tokens"]+=input_tokens; m["openrouter_output_tokens"]+=output_tokens
+                update_stats_atomic(_mutate)
+            except Exception: pass
+        threading.Thread(target=_write, daemon=True).start()
 
     def get_service_status(self) -> dict:
         detector = self.ollama_detector

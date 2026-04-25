@@ -140,6 +140,8 @@ struct MainView: View {
     }
 }
 
+#if DEBUG
 #Preview {
     MainView()
 }
+#endif

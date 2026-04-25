@@ -137,7 +137,7 @@ def api_update_history(timestamp):
     # 自動學習：比對修改前後的差異
     learned = []
     if old_text != new_text:
-        learned = memory.learn_correction(old_text, new_text)
+        learned = memory.learn_correction(old_text, new_text, source="manual")
 
     return jsonify({"ok": True, "learned": learned})
 
@@ -189,10 +189,18 @@ def api_add_correction():
 
 @app.route("/api/dictionary/correction", methods=["DELETE"])
 def api_remove_correction():
-    wrong = request.json.get("wrong", "").strip()
+    # 不做 strip，避免 key 含合法前後空白時找不到
+    wrong = request.json.get("wrong", "")
     if wrong:
         memory.remove_correction(wrong)
     return jsonify({"ok": True})
+
+
+@app.route("/api/dictionary/cleanup", methods=["POST"])
+def api_cleanup_corrections():
+    """清理 dictionary 中不符合品質規則的修正規則（標點對應、含換行、跨語意 paraphrase 等）。"""
+    removed = memory.cleanup_bad_corrections()
+    return jsonify({"ok": True, "removed_count": len(removed), "removed": removed})
 
 
 @app.route("/api/rewrite", methods=["POST"])
@@ -596,50 +604,45 @@ def api_stop_recording():
 
 
 def _track_usage(response, source="anthropic"):
-    """追蹤 API 用量並寫入 stats.json"""
+    """追蹤 rewrite API 用量（atomic，與 update_stats 共用同一把鎖避免覆寫 daily/total）"""
     try:
+        from config import update_stats_atomic
+        from datetime import date, datetime
         input_tokens = getattr(response.usage, 'input_tokens', getattr(response.usage, 'prompt_tokens', 0))
         output_tokens = getattr(response.usage, 'output_tokens', getattr(response.usage, 'completion_tokens', 0))
         model = getattr(response, 'model', 'unknown')
-        
-        stats = load_stats()
-        if "usage" not in stats: stats["usage"] = {}
-        from datetime import date, datetime
         month_key = date.today().strftime("%Y-%m")
-        if month_key not in stats["usage"]:
-            stats["usage"][month_key] = {
-                "openai_input_tokens": 0, "openai_output_tokens": 0, "openai_whisper_seconds": 0,
-                "anthropic_input_tokens": 0, "anthropic_output_tokens": 0,
-                "groq_input_tokens": 0, "groq_output_tokens": 0, "groq_whisper_seconds": 0,
-                "openrouter_input_tokens": 0, "openrouter_output_tokens": 0,
-                "details": []
-            }
-        m = stats["usage"][month_key]
-        
-        # 補齊可能缺失的欄位
-        fields = [
-            "openai_input_tokens", "openai_output_tokens", "openai_whisper_seconds",
-            "anthropic_input_tokens", "anthropic_output_tokens",
-            "groq_input_tokens", "groq_output_tokens", "groq_whisper_seconds",
-            "openrouter_input_tokens", "openrouter_output_tokens"
-        ]
-        for f in fields:
-            if f not in m: m[f] = 0
-        if "details" not in m: m["details"] = []
-        
-        if source == "anthropic":
-            m["anthropic_input_tokens"] += input_tokens
-            m["anthropic_output_tokens"] += output_tokens
-        elif source == "openai":
-            m["openai_input_tokens"] += input_tokens
-            m["openai_output_tokens"] += output_tokens
-        
-        m["details"].append({
-            "t": datetime.now().isoformat(),
-            "s": source, "m": model, "i": input_tokens, "o": output_tokens, "sec": 0, "type": "rewrite"
-        })
-        if len(m["details"]) > 100: m["details"] = m["details"][-100:]
-        save_stats(stats)
+
+        def _mutate(stats):
+            if "usage" not in stats: stats["usage"] = {}
+            if month_key not in stats["usage"]:
+                stats["usage"][month_key] = {
+                    "openai_input_tokens": 0, "openai_output_tokens": 0, "openai_whisper_seconds": 0,
+                    "anthropic_input_tokens": 0, "anthropic_output_tokens": 0,
+                    "groq_input_tokens": 0, "groq_output_tokens": 0, "groq_whisper_seconds": 0,
+                    "openrouter_input_tokens": 0, "openrouter_output_tokens": 0,
+                    "details": []
+                }
+            m = stats["usage"][month_key]
+            for f in ["openai_input_tokens", "openai_output_tokens", "openai_whisper_seconds",
+                      "anthropic_input_tokens", "anthropic_output_tokens",
+                      "groq_input_tokens", "groq_output_tokens", "groq_whisper_seconds",
+                      "openrouter_input_tokens", "openrouter_output_tokens"]:
+                if f not in m: m[f] = 0
+            if "details" not in m: m["details"] = []
+            if source == "anthropic":
+                m["anthropic_input_tokens"] += input_tokens
+                m["anthropic_output_tokens"] += output_tokens
+            elif source == "openai":
+                m["openai_input_tokens"] += input_tokens
+                m["openai_output_tokens"] += output_tokens
+            m["details"].append({
+                "t": datetime.now().isoformat(),
+                "s": source, "m": model, "i": input_tokens, "o": output_tokens, "sec": 0, "type": "rewrite"
+            })
+            if len(m["details"]) > 100: m["details"] = m["details"][-100:]
+
+        update_stats_atomic(_mutate)
     except Exception:
         pass
 

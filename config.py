@@ -5,8 +5,12 @@ config.py — 設定與資料持久化層
 import json
 import os
 import platform
+import threading
 import time
 from datetime import datetime, date
+
+# 跨 thread 序列化 stats.json 的 read-modify-write，避免 update_stats 與 _track_usage race
+_STATS_LOCK = threading.RLock()
 
 # Apple Silicon 才支援 mlx-whisper / mlx-qwen3-asr（MLX = Metal GPU）
 # Intel Mac 自動退回純雲端（OpenAI Whisper API / Groq），否則本地 STT 會 ImportError
@@ -261,13 +265,14 @@ DEFAULT_CONFIG = {
     "openrouter_model": "qwen/qwen3.6-plus",               # OpenRouter 模型 (Qwen 3.6 最新旗艦)
     "groq_whisper_model": "whisper-large-v3-turbo",  # Groq STT 模型
     "local_llm_timeout_sec": 6.0,           # 本地 Ollama 超時秒數（避免 1.5 秒過短造成頻繁 fallback）
+    "llm_timeout_sec": 5.0,                 # 雲端 LLM 超時秒數（Claude/Groq/OpenAI/OpenRouter）超時即 fallback 下一個引擎
     "backup_audio_dir": "",                  # 音訊備份目錄（空字串=不備份）
     "enable_voiceprint": False,              # 聲紋驗證開關
     "voiceprint_threshold": 0.97,            # 聲紋相似度閾值（0.95~0.99）
     "sample_rate": 16000,
     "silence_threshold": 0.001,
     "silence_duration": 2.0,
-    "max_recording_duration": 360,          # 6 分鐘 (同 Typeless)
+    "max_recording_duration": 1800,         # 30 分鐘（長會議/長段口述用）
     "auto_paste": True,
     "show_notification": True,
     "typing_speed_cpm": 50,                 # 用戶打字速度（每分鐘字元數，中文約 30-60）
@@ -353,28 +358,59 @@ def save_history(history):
 
 def load_stats():
     _ensure_dir()
-    if os.path.exists(STATS_FILE):
-        with open(STATS_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return {
-        "total_dictations": 0,
-        "total_words": 0,
-        "total_characters": 0,
-        "total_seconds_saved": 0.0,
-        "total_audio_seconds": 0.0,
-        "daily": {},               # { "2026-02-20": { words, chars, dictations, seconds_saved } }
-        "languages_detected": {},  # { "zh": count, "ja": count, "en": count }
-        "corrections_applied": 0,
-        "first_use_date": "",
-        "streak_days": 0,
-        "last_use_date": "",
-    }
+    with _STATS_LOCK:
+        if os.path.exists(STATS_FILE):
+            with open(STATS_FILE, "r", encoding="utf-8") as f:
+                raw = f.read()
+            if not raw.strip():
+                raw = ""
+            else:
+                try:
+                    return json.loads(raw)
+                except json.JSONDecodeError:
+                    try:
+                        decoder = json.JSONDecoder()
+                        recovered, end = decoder.raw_decode(raw.lstrip())
+                        if isinstance(recovered, dict):
+                            trailing = raw.lstrip()[end:].strip()
+                            if trailing:
+                                save_stats(recovered)
+                            return recovered
+                    except json.JSONDecodeError:
+                        pass
+        return {
+            "total_dictations": 0,
+            "total_words": 0,
+            "total_characters": 0,
+            "total_seconds_saved": 0.0,
+            "total_audio_seconds": 0.0,
+            "daily": {},               # { "2026-02-20": { words, chars, dictations, seconds_saved } }
+            "languages_detected": {},  # { "zh": count, "ja": count, "en": count }
+            "corrections_applied": 0,
+            "first_use_date": "",
+            "streak_days": 0,
+            "last_use_date": "",
+        }
 
 
 def save_stats(stats):
     _ensure_dir()
-    with open(STATS_FILE, "w", encoding="utf-8") as f:
-        json.dump(stats, f, ensure_ascii=False, indent=2)
+    with _STATS_LOCK:
+        # 原子寫入：先寫 .tmp 再 rename，避免讀者看到半寫狀態
+        tmp = STATS_FILE + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(stats, f, ensure_ascii=False, indent=2)
+        os.replace(tmp, STATS_FILE)
+
+
+def update_stats_atomic(mutator):
+    """以 mutator(stats) 形式對 stats 做 read-modify-write，全程持鎖避免 race。
+    mutator 回傳值會被忽略；應直接修改傳入的 stats dict。"""
+    with _STATS_LOCK:
+        stats = load_stats()
+        mutator(stats)
+        save_stats(stats)
+        return stats
 
 
 # ─── Smart Replace ──────────────────────────────────────
@@ -403,56 +439,48 @@ def save_smart_replace(rules):
 
 
 def update_stats(text, audio_duration, config):
-    """Update stats after a successful dictation."""
-    stats = load_stats()
+    """Update stats after a successful dictation. Atomic — 全程持鎖避免與 _track_usage race。"""
     today = date.today().isoformat()
-
-    # Word/char count
     words = len(text.split())
     chars = len(text)
-
-    # 節省時間：打字所需時間 - 語音錄製時間
-    typing_speed_cpm = config.get("typing_speed_cpm", 50)  # 每分鐘字元數（中文約 30-60）
+    typing_speed_cpm = config.get("typing_speed_cpm", 50)
     typing_time = (chars / typing_speed_cpm) * 60 if typing_speed_cpm > 0 else 0
     time_saved = max(0, typing_time - audio_duration)
 
-    # Update totals
-    stats["total_dictations"] += 1
-    stats["total_words"] += words
-    stats["total_characters"] += chars
-    stats["total_seconds_saved"] += time_saved
-    stats["total_audio_seconds"] += audio_duration
+    def _mutate(stats):
+        stats["total_dictations"] = stats.get("total_dictations", 0) + 1
+        stats["total_words"] = stats.get("total_words", 0) + words
+        stats["total_characters"] = stats.get("total_characters", 0) + chars
+        stats["total_seconds_saved"] = stats.get("total_seconds_saved", 0) + time_saved
+        stats["total_audio_seconds"] = stats.get("total_audio_seconds", 0) + audio_duration
 
-    # Daily stats
-    if today not in stats["daily"]:
-        stats["daily"][today] = {"words": 0, "chars": 0, "dictations": 0, "seconds_saved": 0, "audio_seconds": 0}
-    day = stats["daily"][today]
-    day["words"] += words
-    day["chars"] += chars
-    day["dictations"] += 1
-    day["seconds_saved"] += time_saved
-    day["audio_seconds"] = day.get("audio_seconds", 0) + audio_duration
+        daily = stats.setdefault("daily", {})
+        if today not in daily:
+            daily[today] = {"words": 0, "chars": 0, "dictations": 0, "seconds_saved": 0, "audio_seconds": 0}
+        day = daily[today]
+        day["words"] += words
+        day["chars"] += chars
+        day["dictations"] += 1
+        day["seconds_saved"] = day.get("seconds_saved", 0) + time_saved
+        day["audio_seconds"] = day.get("audio_seconds", 0) + audio_duration
 
-    # First use
-    if not stats["first_use_date"]:
-        stats["first_use_date"] = today
+        if not stats.get("first_use_date"):
+            stats["first_use_date"] = today
 
-    # Streak
-    from datetime import timedelta
-    yesterday = (date.today() - timedelta(days=1)).isoformat()
-    if stats["last_use_date"] == today:
-        pass  # same day
-    elif stats["last_use_date"] == yesterday:
-        stats["streak_days"] += 1
-    else:
-        stats["streak_days"] = 1
-    stats["last_use_date"] = today
+        from datetime import timedelta
+        yesterday = (date.today() - timedelta(days=1)).isoformat()
+        if stats.get("last_use_date") == today:
+            pass
+        elif stats.get("last_use_date") == yesterday:
+            stats["streak_days"] = stats.get("streak_days", 0) + 1
+        else:
+            stats["streak_days"] = 1
+        stats["last_use_date"] = today
 
-    # Keep only last 90 days of daily stats
-    sorted_days = sorted(stats["daily"].keys())
-    if len(sorted_days) > 90:
-        for old_day in sorted_days[:-90]:
-            del stats["daily"][old_day]
+        # Keep only last 90 days of daily stats
+        sorted_days = sorted(daily.keys())
+        if len(sorted_days) > 90:
+            for old_day in sorted_days[:-90]:
+                del daily[old_day]
 
-    save_stats(stats)
-    return stats
+    return update_stats_atomic(_mutate)

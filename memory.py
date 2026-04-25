@@ -71,37 +71,126 @@ class Memory:
 
     # ─── Auto Learn ──────────────────────────────────────
 
-    def learn_correction(self, original, corrected):
-        """從手動修正中自動學習"""
+    # ── 自動學習守門員（避免污染詞庫）─────────────────
+    _PUNCT_RE = re.compile(r"[\s　-〿＀-￯，。、！？；：「」『』（）【】〈〉《》,.!?;:()\[\]{}\"'\\\\\n\r\t　]+")
+    _KANA_RE = re.compile(r"[぀-ゟ゠-ヿ]")  # 平假名 + 片假名
+    _KANJI_RE = re.compile(r"[一-鿿㐀-䶿]")
+    _LATIN_RE = re.compile(r"[A-Za-z]")
+    _LEARN_MAX_LEN = 20   # 單一規則最大字元數（防長段落整段對應）
+    _LEARN_MIN_SIM = 0.45  # 相似度下限（防完全跨語意）
+
+    def _is_pure_kana(self, s):
+        """是否為純假名（不含漢字、不含拉丁字母）。"""
+        return bool(self._KANA_RE.search(s)) and not self._KANJI_RE.search(s) and not self._LATIN_RE.search(s)
+
+    def _is_transliteration(self, wrong, right):
+        """跨字符系統的音譯：要求兩邊都是「純」單一字符系統（避免混合字元的 paraphrase）。
+        合法：純假名↔純漢字、純假名↔純拉丁、純漢字↔純拉丁、純漢字↔純漢字（簡繁，需有共同字元）。
+        例：クスリジャパン→KusuriJapan、ハイク→Haiku、医薬品→醫藥品。"""
+        only_kana_w = bool(self._KANA_RE.search(wrong)) and not self._KANJI_RE.search(wrong) and not self._LATIN_RE.search(wrong)
+        only_kana_r = bool(self._KANA_RE.search(right)) and not self._KANJI_RE.search(right) and not self._LATIN_RE.search(right)
+        only_kanji_w = bool(self._KANJI_RE.search(wrong)) and not self._LATIN_RE.search(wrong) and not self._KANA_RE.search(wrong)
+        only_kanji_r = bool(self._KANJI_RE.search(right)) and not self._LATIN_RE.search(right) and not self._KANA_RE.search(right)
+        only_latin_w = bool(self._LATIN_RE.search(wrong)) and not self._KANJI_RE.search(wrong) and not self._KANA_RE.search(wrong)
+        only_latin_r = bool(self._LATIN_RE.search(right)) and not self._KANJI_RE.search(right) and not self._KANA_RE.search(right)
+
+        # 1) 純假名 ↔ 純拉丁（クスリジャパン→KusuriJapan）：假名邊 ≥3 字
+        if (only_kana_w and only_latin_r and len(wrong) >= 3) or (only_latin_w and only_kana_r and len(right) >= 3):
+            return True
+        # 2) 純假名 ↔ 純漢字（しんぎほう→新義豊）：假名邊 ≥3 字
+        if (only_kana_w and only_kanji_r and len(wrong) >= 3) or (only_kanji_w and only_kana_r and len(right) >= 3):
+            return True
+        # 3) 純漢字 ↔ 純拉丁（hakataeki minami→博多駅南）
+        if (only_kanji_w and only_latin_r) or (only_latin_w and only_kanji_r):
+            return True
+        # 4) 純漢字 ↔ 純漢字（簡繁/異體字）：要求字元集合有交集
+        if only_kanji_w and only_kanji_r:
+            return len(set(wrong) & set(right)) >= 1
+        return False
+
+    def _is_meaningful_correction(self, wrong, right, source):
+        """嚴格守門：避免把標點調整、長段落改寫、跨語意 paraphrase 學成 correction。
+        對「跨字符系統音譯」（假名↔英文/漢字）放寬相似度檢查。"""
+        if not wrong or not right or wrong == right:
+            return False
+        # 1. 含換行 / Tab → 拒絕（多行對應幾乎都是 paraphrase）
+        if any(c in wrong + right for c in "\n\r\t"):
+            return False
+        # 2. 任一邊超過長度上限 → 拒絕（「ちは、Sawna.Darumas → なっております」這類）
+        if len(wrong) > self._LEARN_MAX_LEN or len(right) > self._LEARN_MAX_LEN:
+            return False
+        # 3. 去掉所有標點/空白後相同 → 純標點調整，不學（防「？ → ，」）
+        w_core = self._PUNCT_RE.sub("", wrong)
+        r_core = self._PUNCT_RE.sub("", right)
+        if w_core == r_core:
+            return False
+        if not w_core or not r_core:
+            return False
+        # 4. 跨字符系統音譯（假名↔英文/漢字、簡繁）→ 跳過相似度與長度比檢查
+        if self._is_transliteration(w_core, r_core):
+            return True
+        # 5. 長度比 > 2.5 倍 → 拒絕
+        shorter = min(len(w_core), len(r_core))
+        longer = max(len(w_core), len(r_core))
+        if longer / shorter > 2.5:
+            return False
+        # 6. 單字元 ↔ 多字元（非 ASCII）→ 通常是誤判，拒絕
+        if (len(w_core) == 1 and len(r_core) >= 2 and not w_core.isascii()) or \
+           (len(r_core) == 1 and len(w_core) >= 2 and not r_core.isascii()):
+            return False
+        # 7. 相似度過低 → 拒絕（ASCII 互換 0.42，其餘 0.45；防 compared drug→import）
+        similarity = difflib.SequenceMatcher(None, w_core.lower(), r_core.lower()).ratio()
+        both_ascii = w_core.isascii() and r_core.isascii()
+        threshold = 0.42 if both_ascii else self._LEARN_MIN_SIM
+        if similarity < threshold:
+            return False
+        return True
+
+    def learn_correction(self, original, corrected, source="manual"):
+        """從手動修正中自動學習。所有來源都套用嚴格守門，避免污染詞庫。"""
         if original.strip() == corrected.strip():
             return []
 
         learned = []
         # 將字串切分為：英文單字、空白、以及獨立的非英文/非空白字元（例如中日韓漢字）
-        import re
         def tokenize(text):
             return re.findall(r'[a-zA-Z0-9_\'-]+|\s+|[^\sa-zA-Z0-9_\'-]', text)
-        
+
         orig_words = tokenize(original)
         corr_words = tokenize(corrected)
         matcher = difflib.SequenceMatcher(None, orig_words, corr_words)
 
         for op, i1, i2, j1, j2 in matcher.get_opcodes():
-            if op == "replace":
-                wrong = "".join(orig_words[i1:i2]).strip()
-                right = "".join(corr_words[j1:j2]).strip()
-                if wrong and right and wrong != right:
-                    self.dictionary.setdefault("corrections", {})[wrong] = right
-                    freq = self.dictionary.setdefault("frequency", {})
-                    freq[wrong] = freq.get(wrong, 0) + 1
-                    # 記錄正確詞到自動詞庫
-                    auto = self.dictionary.setdefault("auto_added", [])
-                    if right not in auto:
-                        auto.append(right)
-                    learned.append({"wrong": wrong, "right": right})
+            if op != "replace":
+                continue
+            wrong = "".join(orig_words[i1:i2]).strip()
+            right = "".join(corr_words[j1:j2]).strip()
+            if not self._is_meaningful_correction(wrong, right, source):
+                continue
+            self.dictionary.setdefault("corrections", {})[wrong] = right
+            freq = self.dictionary.setdefault("frequency", {})
+            freq[wrong] = freq.get(wrong, 0) + 1
+            learned.append({"wrong": wrong, "right": right})
 
-        save_dictionary(self.dictionary)
+        if learned:
+            save_dictionary(self.dictionary)
         return learned
+
+    def cleanup_bad_corrections(self):
+        """清理現有 corrections 中不符合守門規則的條目。回傳被刪除的條目列表。"""
+        corr = self.dictionary.get("corrections", {})
+        # 與 BASE_CORRECTIONS 重複的條目視為合法（基底有就不刪）
+        base_keys = set(BASE_CORRECTIONS.keys())
+        removed = []
+        for w, r in list(corr.items()):
+            if w in base_keys:
+                continue
+            if not self._is_meaningful_correction(w, r, source="cleanup"):
+                removed.append({"wrong": w, "right": r})
+                del corr[w]
+        if removed:
+            save_dictionary(self.dictionary)
+        return removed
 
     def add_custom_word(self, word):
         """手動新增詞彙到詞庫"""
@@ -179,27 +268,50 @@ class Memory:
     # ─── Personalization Progress ────────────────────────
 
     def get_personalization_score(self):
-        """計算個人化進度（模仿 Typeless）"""
+        """計算個人化進度。改良版：總分難更上限，加入最近 7 天活躍度（持續使用會有成就感）。
+        分項：詞庫 25 + 詞彙 20 + 累計使用 25 + 本週活躍 30 = 100"""
+        from datetime import date, timedelta
         corrections_count = len(self.dictionary.get("corrections", {}))
         words_count = len(self.dictionary.get("auto_added", [])) + len(self.dictionary.get("manual_added", []))
         history_count = len(self.history)
 
-        # 各項權重評分（滿分 100，調高門檻讓 100% 變難）
-        # 需要 100 個 correction 才能滿 30 分
-        dict_score = min(30.0, corrections_count * 0.3)
-        # 需要 150 個 vocabulary 才能滿 30 分
-        vocab_score = min(30.0, words_count * 0.2)
-        # 需要 1000 次錄音才能滿 40 分
-        usage_score = min(40.0, history_count * 0.04)
+        # 7 天活躍度統計
+        today = date.today()
+        days_iso = [(today - timedelta(days=i)).isoformat() for i in range(7)]
+        days_set = set(days_iso)
+        with self._history_lock:
+            week_entries = [h for h in self.history if (h.get("timestamp", "") or "")[:10] in days_set]
+        week_count = len(week_entries)
+        week_chars = sum(len(h.get("final_text", "") or "") for h in week_entries)
+        active_days = len({(h.get("timestamp", "") or "")[:10] for h in week_entries})
+
+        # 分項評分（滿分難達到，但有持續使用能持續累積）
+        # 詞庫：250 條滿分（每條 0.1 分，目前 115 條 = 11.5 分）
+        dict_score = min(25.0, corrections_count * 0.1)
+        # 詞彙：400 個滿分（每個 0.05 分）
+        vocab_score = min(20.0, words_count * 0.05)
+        # 累計使用：5000 次滿分（每次 0.005 分；之前 1000 次就滿，太容易）
+        usage_score = min(25.0, history_count * 0.005)
+        # 本週活躍：30 分上限。每活躍日 4 分（28 分）+ 字數量加成 (本週 ≥10000 字 +2 分)
+        active_score = active_days * 4.0 + (2.0 if week_chars >= 10000 else 0.0)
+        active_score = min(30.0, active_score)
 
         return {
-            "total": min(100, int(dict_score + vocab_score + usage_score)),
+            "total": min(100, int(dict_score + vocab_score + usage_score + active_score)),
             "dictionary_entries": corrections_count,
             "vocabulary_words": words_count,
             "total_dictations": history_count,
             "dict_score": int(dict_score),
+            "dict_max": 25,
             "vocab_score": int(vocab_score),
+            "vocab_max": 20,
             "usage_score": int(usage_score),
+            "usage_max": 25,
+            "active_score": int(active_score),
+            "active_max": 30,
+            "week_dictations": week_count,
+            "week_chars": week_chars,
+            "week_active_days": active_days,
         }
 
     # ─── History ─────────────────────────────────────────

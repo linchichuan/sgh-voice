@@ -106,8 +106,10 @@ struct SettingsView: View {
     }
 }
 
+#if DEBUG
 #Preview {
     NavigationView {
         SettingsView()
     }
 }
+#endif

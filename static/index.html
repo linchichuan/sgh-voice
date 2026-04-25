@@ -153,9 +153,9 @@
     /* ── Activity Chart ── */
     .activity-section { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; margin-bottom: 20px; }
     .activity-section h3 { font-size: 14px; font-weight: 700; color: var(--text2); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 20px; }
-    .bar-chart { display: flex; align-items: flex-end; gap: 8px; height: 80px; }
-    .bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; }
-    .bar-wrap { flex: 1; width: 100%; display: flex; align-items: flex-end; }
+    .bar-chart { display: flex; align-items: flex-end; gap: 8px; height: 100px; }
+    .bar-col { flex: 1; height: 100%; display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 0; }
+    .bar-wrap { flex: 1; width: 100%; display: flex; align-items: flex-end; min-height: 0; }
     .bar { width: 100%; border-radius: 4px 4px 0 0; background: var(--accent); opacity: 0.6; transition: opacity 0.2s, height 0.5s; min-height: 3px; }
     .bar:hover { opacity: 1; }
     .bar.today { background: var(--green); opacity: 1; }
@@ -197,7 +197,7 @@
     </nav>
     <div class="sidebar-footer">
       <div id="engine-status"><span class="status-dot online"></span><span id="engine-status-text">Local LLM</span></div>
-      <div style="margin-top:8px; opacity:0.6;">v1.9.9</div>
+      <div style="margin-top:8px; opacity:0.6;">v2.0.0</div>
       <!-- Language switcher -->
       <div style="margin-top:8px; display:flex; gap:4px;">
         <button onclick="setLang('ja')" id="lang-ja" style="font-size:10px; padding:2px 6px; border-radius:4px; border:1px solid var(--border); background:transparent; color:var(--text2); cursor:pointer;">日</button>
@@ -269,10 +269,11 @@
           <h3 style="margin:0;" data-i18n="progress.title">🧠 個人化学習の進捗</h3>
           <span id="progress-pct" style="font-size:20px; font-weight:800; color:var(--accent2);">0%</span>
         </div>
-        <div style="width:100%; height:6px; background:var(--surface3); border-radius:3px; overflow:hidden;">
+        <div style="width:100%; height:6px; background:var(--surface3); border-radius:3px; overflow:hidden; margin-bottom:14px;">
           <div id="progress-bar" style="width:0%; height:100%; background:linear-gradient(90deg, var(--accent), var(--green)); transition:0.8s ease;"></div>
         </div>
-        <div id="progress-desc" style="font-size:12px; color:var(--text3); margin-top:8px;">...</div>
+        <div id="progress-breakdown" style="display:grid; grid-template-columns:repeat(2,1fr); gap:10px 20px; margin-bottom:12px;"></div>
+        <div id="progress-week" style="font-size:12px; color:var(--text3); padding-top:10px; border-top:1px solid var(--border);"></div>
       </div>
     </div>
 
@@ -486,7 +487,10 @@
       <div class="card" style="margin-bottom:20px;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
           <h3 style="margin:0;"><span data-i18n="dict.corrections.title">🔄 修正ルール</span> <span id="corrections-count" style="font-size:13px; font-weight:400; color:var(--text2);"></span></h3>
-          <input type="text" id="correction-search" data-i18n-placeholder="dict.search.placeholder" placeholder="検索..." oninput="filterCorrections()" style="width:180px; padding:6px 12px; font-size:13px;">
+          <div style="display:flex; gap:8px; align-items:center;">
+            <button class="btn btn-ghost" style="padding:6px 12px; font-size:12px;" onclick="cleanupBadCorrections()" title="清理含換行、純標點對應、跨語意 paraphrase 等壞規則">🧹 清理壞規則</button>
+            <input type="text" id="correction-search" data-i18n-placeholder="dict.search.placeholder" placeholder="検索..." oninput="filterCorrections()" style="width:180px; padding:6px 12px; font-size:13px;">
+          </div>
         </div>
         <div style="font-size:12px; color:var(--text3); margin-bottom:12px;">
           <span data-i18n="dict.source.label">ソース：</span>
@@ -899,6 +903,52 @@
       if(pageId === 'settings') loadSettings();
       if(pageId === 'dashboard') loadStats();
       if(pageId === 'dictionary') loadDictionary();
+      if(pageId === 'history') loadHistory();
+    }
+
+    async function loadHistory() {
+      const list = document.getElementById('history-list');
+      try {
+        const items = await api('/history?n=200');
+        if(!items || items.length === 0) {
+          list.innerHTML = '<div style="color:var(--text3); padding:20px;">（沒有歷史紀錄）</div>';
+          return;
+        }
+        list.innerHTML = items.map(h => {
+          const ts = (h.timestamp || '').replace('T',' ').slice(0, 19);
+          const stt = h.stt_source || '?';
+          const llm = h.llm_source || '?';
+          const final = h.final_text || '';
+          const raw = h.whisper_raw || '';
+          const showRaw = raw && raw !== final;
+          const sttColor = {groq:'#f97316', local:'#10b981', cloud:'#3b82f6'}[stt] || 'var(--text3)';
+          const llmColor = {claude:'#8b5cf6', groq:'#f97316', openai:'#10a37f', skip:'#6b7280', regex:'#94a3b8', local:'#10b981'}[llm] || 'var(--text3)';
+          return `
+            <div style="border-bottom:1px solid var(--border); padding:12px 0;">
+              <div style="display:flex; gap:8px; align-items:center; font-size:11px; color:var(--text3); margin-bottom:6px;">
+                <span style="font-family:'JetBrains Mono', monospace;">${esc(ts)}</span>
+                <span style="background:${sttColor}; color:#fff; padding:1px 6px; border-radius:3px;">STT:${esc(stt)}</span>
+                <span style="background:${llmColor}; color:#fff; padding:1px 6px; border-radius:3px;">LLM:${esc(llm)}</span>
+                ${h.process_time ? `<span>${h.process_time}s</span>` : ''}
+                <span style="margin-left:auto; display:flex; gap:6px;">
+                  <button class="btn btn-ghost" style="padding:2px 8px; font-size:11px;" onclick="navigator.clipboard.writeText(${JSON.stringify(final)})">複製</button>
+                  <button class="btn btn-ghost" style="padding:2px 8px; font-size:11px; color:#dc2626;" onclick="deleteHistory('${esc(h.timestamp)}')">刪除</button>
+                </span>
+              </div>
+              <div style="font-size:14px; line-height:1.6; color:var(--text); white-space:pre-wrap; word-break:break-word;">${esc(final)}</div>
+              ${showRaw ? `<details style="margin-top:6px;"><summary style="font-size:11px; color:var(--text3); cursor:pointer;">原始 Whisper 輸出</summary><div style="font-size:12px; color:var(--text3); margin-top:4px; white-space:pre-wrap;">${esc(raw)}</div></details>` : ''}
+            </div>
+          `;
+        }).join('');
+      } catch(e) {
+        list.innerHTML = `<div style="color:#dc2626; padding:20px;">載入失敗：${esc(e.message)}</div>`;
+      }
+    }
+
+    async function deleteHistory(timestamp) {
+      if(!confirm('刪除這筆歷史紀錄？')) return;
+      await api('/history/' + encodeURIComponent(timestamp), {method:'DELETE'});
+      loadHistory();
     }
 
     function updateLlmModelPanel() {
@@ -971,8 +1021,14 @@
     }
 
     async function loadStats() {
-      const data = await api('/stats');
-      const s = data.stats;
+      let data;
+      try {
+        data = await api('/stats');
+      } catch(e) {
+        console.error('loadStats fetch failed:', e);
+        return;
+      }
+      const s = data.stats || {};
 
       // ── Cumulative numbers ──
       const totalMins = Math.round((s.total_audio_seconds || 0) / 60);
@@ -999,18 +1055,26 @@
       const todaySavedMins = Math.round((today.seconds_saved || 0) / 60);
       document.getElementById('today-saved').textContent = todaySavedMins + 'm';
 
-      // ── 7-day bar chart ──
-      const days = Object.keys(daily).sort().slice(-7);
-      const maxChars = Math.max(...days.map(d => daily[d].chars || 0), 1);
+      // ── 7-day bar chart（最近 7 個日曆日，沒口述的天補 0）──
+      const days = [];
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        days.push(d.toISOString().slice(0, 10));
+      }
+      const maxChars = Math.max(...days.map(d => (daily[d] || {}).chars || 0), 1);
       const dayNames = t('js.daynames').split(',');
       const todayLabel = t('js.today');
       const chartEl = document.getElementById('bar-chart');
       chartEl.innerHTML = days.map(d => {
-        const pct = Math.round(((daily[d].chars || 0) / maxChars) * 100);
+        const dayData = daily[d] || {};
+        const chars = dayData.chars || 0;
+        // 至少 2% 高度，讓 0 值的日子也看得到 bar 底
+        const pct = chars > 0 ? Math.max(2, Math.round((chars / maxChars) * 100)) : 0;
         const dt = new Date(d + 'T00:00:00');
         const label = d === todayKey ? todayLabel : dayNames[dt.getDay()];
         const isToday = d === todayKey;
-        const charCount = (daily[d].chars || 0).toLocaleString();
+        const charCount = chars.toLocaleString();
         return `<div class="bar-col">
           <div class="bar-wrap">
             <div class="bar${isToday?' today':''}" style="height:${pct}%" title="${d}: ${charCount} ${t('js.chars.unit')}"></div>
@@ -1019,15 +1083,37 @@
         </div>`;
       }).join('');
 
-      // ── Personalization progress ──
+      // ── Personalization progress（分項 + 本週活躍）──
       const p = data.personalization;
       document.getElementById('progress-pct').textContent = p.total + '%';
       document.getElementById('progress-bar').style.width = p.total + '%';
-      const score = Math.min(40, Math.round(p.total_dictations * 0.04));
-      document.getElementById('progress-desc').textContent = t('js.progress.desc')
-        .replace('{d}', p.dictionary_entries).replace('{ds}', p.dict_score)
-        .replace('{v}', p.vocabulary_words).replace('{vs}', p.vocab_score)
-        .replace('{t}', p.total_dictations).replace('{score}', score);
+
+      const items = [
+        { label: '📚 詞庫成熟度', cur: p.dictionary_entries, score: p.dict_score, max: p.dict_max, unit: '條' },
+        { label: '🔤 詞彙累積',   cur: p.vocabulary_words,   score: p.vocab_score, max: p.vocab_max, unit: '個' },
+        { label: '🎙️ 累計使用',   cur: p.total_dictations,    score: p.usage_score, max: p.usage_max, unit: '次' },
+        { label: '🔥 本週活躍',   cur: (p.week_active_days || 0) + '/7', score: p.active_score, max: p.active_max, unit: '天' },
+      ];
+      document.getElementById('progress-breakdown').innerHTML = items.map(it => {
+        const pct = Math.round((it.score / it.max) * 100);
+        const isFull = it.score >= it.max;
+        const valStr = typeof it.cur === 'number' ? it.cur.toLocaleString() + ' ' + it.unit : it.cur + ' ' + it.unit;
+        return `
+          <div>
+            <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px;">
+              <span style="color:var(--text2);">${it.label} <span style="color:var(--text3);">${valStr}</span></span>
+              <span style="font-weight:600; color:${isFull?'var(--green)':'var(--text2)'};">${it.score}/${it.max}${isFull?' ✓':''}</span>
+            </div>
+            <div style="width:100%; height:4px; background:var(--surface3); border-radius:2px; overflow:hidden;">
+              <div style="width:${pct}%; height:100%; background:${isFull?'var(--green)':'var(--accent)'}; transition:0.5s;"></div>
+            </div>
+          </div>`;
+      }).join('');
+      const wkN = (p.week_dictations || 0).toLocaleString();
+      const wkC = (p.week_chars || 0).toLocaleString();
+      const wkAvg = p.week_dictations ? Math.round(p.week_chars / p.week_dictations) : 0;
+      document.getElementById('progress-week').textContent =
+        `📊 最近 7 天：口述 ${wkN} 次 · 字數 ${wkC} · 平均 ${wkAvg} 字/次`;
 
       // ── Monthly cost (with model breakdown) ──
       try {
@@ -1080,12 +1166,14 @@
         return;
       }
       const deleteLabel = t('js.delete');
+      // 用 base64 編碼 key（避免 wrong 含換行/引號等特殊字元時 onclick 屬性 syntax error）
+      const b64 = s => btoa(unescape(encodeURIComponent(s)));
       document.getElementById('corrections-list').innerHTML = entries.map(([wrong, right]) => `
         <div style="display:flex; align-items:center; gap:12px; padding:10px 0; border-bottom:1px solid var(--border);">
-          <span style="flex:1; font-family:'JetBrains Mono', monospace; font-size:13px; color:#e74c3c;">${esc(wrong)}</span>
+          <span style="flex:1; font-family:'JetBrains Mono', monospace; font-size:13px; color:#e74c3c; white-space:pre-wrap;">${esc(wrong)}</span>
           <span style="color:var(--text3);">→</span>
-          <span style="flex:1; font-family:'JetBrains Mono', monospace; font-size:13px; color:var(--green);">${esc(right)}</span>
-          <button class="btn btn-ghost" style="padding:4px 10px; font-size:12px;" onclick="removeCorrection('${esc(wrong)}')">${deleteLabel}</button>
+          <span style="flex:1; font-family:'JetBrains Mono', monospace; font-size:13px; color:var(--green); white-space:pre-wrap;">${esc(right)}</span>
+          <button class="btn btn-ghost" style="padding:4px 10px; font-size:12px;" onclick="removeCorrectionB64('${b64(wrong)}')">${deleteLabel}</button>
         </div>`).join('');
     }
 
@@ -1145,6 +1233,19 @@
     async function removeCorrection(wrong) {
       await api('/dictionary/correction', { method: 'DELETE', body: { wrong } });
       showToast(t('js.toast.correction.deleted'));
+      loadDictionary();
+    }
+
+    // base64 解碼後刪除（修復含換行/引號 key 無法刪除的 bug）
+    async function removeCorrectionB64(b64) {
+      const wrong = decodeURIComponent(escape(atob(b64)));
+      await removeCorrection(wrong);
+    }
+
+    async function cleanupBadCorrections() {
+      if (!confirm('將清理所有不符合品質規則的修正規則（標點對應、長段落、跨語意 paraphrase 等）。確定？')) return;
+      const res = await api('/dictionary/cleanup', { method: 'POST' });
+      showToast(`🗑️ 已清理 ${res.removed_count} 條壞規則`);
       loadDictionary();
     }
 
