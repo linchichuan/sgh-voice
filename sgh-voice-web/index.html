@@ -3,16 +3,24 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SGH Voice — 讓想法流動，不再卡在鍵盤上 v2.0.0</title>
-    <meta name="description" content="說話即成專業文章。不管是中、日、英混合，還是專門的醫療、開發術語，SGH Voice 都能聽懂你的意思，自動整理成流暢文字。">
-    <meta property="og:title" content="SGH Voice — 讓想法流動，不再卡在鍵盤上 v2.0.0">
-    <meta property="og:description" content="說話即成專業文章。AI 自動校正、排版、移除冗贅詞。內建 2026 最新旗艦 AI 模型支援。">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#2563eb">
+    <title>SGH Voice — 話すだけで、プロ品質のテキストに。 v2.0.0</title>
+    <meta name="description" content="SGH Voice は、あなたの意図を汲み取る AI 音声入力アシスタント。中国語・日本語・英語を自動認識し、口語を洗練された書き言葉へ整えます。データは 100% あなたの手元に。">
+    <meta property="og:title" content="SGH Voice — 話すだけで、プロ品質のテキストに。 v2.0.0">
+    <meta property="og:description" content="SGH Voice は、あなたの意図を汲み取る AI 音声入力アシスタント。中・日・英対応、データは 100% あなたの手元に。">
     <meta property="og:url" content="https://voice.shingihou.com">
+    <meta property="og:locale" content="ja_JP">
+    <meta property="og:locale:alternate" content="zh_TW">
+    <meta property="og:locale:alternate" content="en_US">
+    <link rel="alternate" hreflang="ja" href="https://voice.shingihou.com/?lang=ja">
+    <link rel="alternate" hreflang="zh-Hant" href="https://voice.shingihou.com/?lang=zh">
+    <link rel="alternate" hreflang="en" href="https://voice.shingihou.com/?lang=en">
+    <link rel="alternate" hreflang="x-default" href="https://voice.shingihou.com/">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
-        href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Noto+Sans+JP:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&family=Noto+Sans:wght@400;500;600;700&display=swap"
+        href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Noto+Sans+JP:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@400;500;600;700&family=Noto+Sans:wght@400;500;600;700&display=swap"
         rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
@@ -54,8 +62,6 @@
                         <button onclick="setLanguage('ja')" class="lang-option active" data-lang="ja">🇯🇵 日本語</button>
                         <button onclick="setLanguage('zh')" class="lang-option" data-lang="zh">🇹🇼 繁體中文</button>
                         <button onclick="setLanguage('en')" class="lang-option" data-lang="en">🇺🇸 English</button>
-                        <button onclick="setLanguage('vi')" class="lang-option" data-lang="vi">🇻🇳 Tiếng Việt</button>
-                        <button onclick="setLanguage('th')" class="lang-option" data-lang="th">🇹🇭 ภาษาไทย</button>
                     </div>
                 </div>
                 <a href="#download" class="nav-cta" data-i18n="nav.cta">無料で始める</a>
@@ -74,13 +80,12 @@
             <div class="hero-orb hero-orb-3"></div>
         </div>
         <div class="container hero-content">
-            <div class="hero-badge" data-i18n="hero.badge">macOS & iOS & Android 対応</div>
+            <div class="hero-badge" data-i18n="hero.badge">思考を言葉に · v2.0.0</div>
             <h1 class="hero-title">
                 <span data-i18n="hero.title1">話すだけで、</span><br>
-                <span class="gradient-text" data-i18n="hero.title2">プロ品質のテキストに。</span>
+                <span class="gradient-text" data-i18n="hero.title2">プロの文章に。</span>
             </h1>
-            <p class="hero-subtitle" data-i18n="hero.subtitle">AI
-                が音声をリアルタイムで文字起こし・校正・フォーマット。中国語・日本語・英語の3言語を自動検出し、話したままの自然な文章を即座に出力します。</p>
+            <p class="hero-subtitle" data-i18n="hero.subtitle">SGH Voice は、あなたの意図を汲み取る専属速記者のような存在です。単なる文字起こしではなく、無駄な言葉を削ぎ落とし、誤字を直し、完璧に整えます。中・日・英対応、データは 100% あなたの手元に。</p>
             <div class="hero-actions">
                 <a href="#download" class="btn btn-primary">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
@@ -105,7 +110,7 @@
                 <div class="stat-divider"></div>
                 <div class="stat">
                     <span class="stat-value">0.3<small>s</small></span>
-                    <span class="stat-label" data-i18n="hero.stat2">極速響應</span>
+                    <span class="stat-label" data-i18n="hero.stat2">高速応答</span>
                 </div>
                 <div class="stat-divider"></div>
                 <div class="stat">
@@ -229,8 +234,8 @@
                             <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
                         </svg>
                     </div>
-                    <h3 data-i18n="features.f9.title">旗艦級 2026 AI 整合 (v1.5.1)</h3>
-                    <p data-i18n="features.f9.desc">支援 Llama 3.3 與 Qwen 3.5 系列模型。透過 Groq 極速推論引擎，實現低於 1 秒的智慧潤稿體驗。</p>
+                    <h3 data-i18n="features.f9.title">止まらない、マルチクラウド (v1.5.1)</h3>
+                    <p data-i18n="features.f9.desc">Groq と OpenRouter を統合。一つのサービスが混雑していても、最適なモデルへ自動で切り替え、あなたのインスピレーションを逃しません。</p>
                 </div>
             </div>
         </div>
@@ -319,7 +324,7 @@
                 <div class="pricing-card pricing-card-featured">
                     <div class="pricing-badge" data-i18n="pricing.pro.badge">おすすめ</div>
                     <div class="pricing-name" data-i18n="pricing.pro.name">Pro プラン</div>
-                    <div class="pricing-price">¥980<small>/月</small></div>
+                    <div class="pricing-price">¥980<small data-i18n="pricing.pro.unit">/月</small></div>
                     <div class="pricing-period" data-i18n="pricing.pro.period">API 料金込み・使い放題</div>
                     <ul class="pricing-features">
                         <li data-i18n="pricing.pro.f1">Free プランの全機能</li>
@@ -344,7 +349,7 @@
                 </div>
                 <form class="subscribe-form" id="subscribeForm" onsubmit="handleSubscribe(event)">
                     <div class="input-group">
-                        <input type="email" id="emailInput" placeholder="mail@example.com" required>
+                        <input type="email" id="emailInput" placeholder="mail@example.com" data-i18n-placeholder="subscribe.placeholder" required>
                         <button type="submit" class="btn btn-primary" data-i18n="subscribe.cta">登録する</button>
                     </div>
                     <p class="subscribe-note" data-i18n="subscribe.note">スパムは送りません。いつでも解除可能です。</p>
@@ -385,7 +390,7 @@
                             <polyline points="7 10 12 15 17 10" />
                             <line x1="12" y1="15" x2="12" y2="3" />
                         </svg>
-                        Apple Silicon (v2.0.0)
+                        <span data-i18n="download.macCta">Apple Silicon (v2.0.0)</span>
                     </a>
                     <a href="https://github.com/linchichuan/sgh-voice/releases/tag/v2.0.0"
                         class="btn btn-outline download-btn" style="margin-top: 8px;">
@@ -395,7 +400,7 @@
                             <polyline points="7 10 12 15 17 10" />
                             <line x1="12" y1="15" x2="12" y2="3" />
                         </svg>
-                        Intel Mac
+                        <span data-i18n="download.macIntel">Intel Mac</span>
                     </a>
                 </div>
                 <div class="download-card">
@@ -430,38 +435,38 @@
     <section class="beta" id="beta">
         <div class="container">
             <div class="section-header">
-                <span class="section-label" data-i18n="beta.label">Android 測試招募</span>
-                <h2 class="section-title" data-i18n="beta.title">Android 封測計畫 (NPP)</h2>
-                <p class="section-subtitle">我們正在招募 20 位以上的外部測試者。加入封測，搶先體驗 Android 智慧語音輸入！</p>
+                <span class="section-label" data-i18n="beta.label">Android テスト募集</span>
+                <h2 class="section-title" data-i18n="beta.title">Android 先行テストプログラム (NPP)</h2>
+                <p class="section-subtitle" data-i18n="beta.subtitle">Android 版のリリースに向けて 20 名以上のテスターを募集中。いち早く未来の入力体験を。</p>
             </div>
             <div class="contact-card">
                 <form class="contact-form" id="nppForm">
                     <div class="form-row">
                         <div class="form-group">
-                            <label for="nppName">姓名 / 暱稱</label>
+                            <label for="nppName" data-i18n="beta.form.name">お名前 / ニックネーム</label>
                             <input type="text" id="nppName" required>
                         </div>
                         <div class="form-group">
-                            <label for="nppEmail">Gmail (Google Play 必要)</label>
+                            <label for="nppEmail" data-i18n="beta.form.email">Gmail (Google Play で必須)</label>
                             <input type="email" id="nppEmail" required>
                         </div>
                     </div>
                     <div class="form-group">
-                        <label for="nppDevice">您的 Android 手機型號</label>
-                        <input type="text" id="nppDevice" placeholder="例如：Pixel 8, S24..." required>
+                        <label for="nppDevice" data-i18n="beta.form.device">Android 端末モデル</label>
+                        <input type="text" id="nppDevice" placeholder="例: Pixel 8、Galaxy S24…" data-i18n-placeholder="beta.form.devicePlaceholder" required>
                     </div>
-                    <button type="submit" class="btn btn-primary contact-submit-btn">
+                    <button type="submit" class="btn btn-primary contact-submit-btn" id="nppSubmitBtn">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
                             <line x1="22" y1="2" x2="11" y2="13" />
                             <polygon points="22 2 15 22 11 13 2 9 22 2" />
                         </svg>
-                        <span>申請加入 Android 封測</span>
+                        <span data-i18n="beta.form.submit">Android 先行テストに申し込む</span>
                     </button>
                     <div class="contact-success" id="nppSuccess" style="display:none;">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
                             <polyline points="20 6 9 17 4 12" />
                         </svg>
-                        <span>感謝參與！我們會將您的帳號加入測試名單，並通知您下一步。</span>
+                        <span data-i18n="beta.form.success">ご応募ありがとうございます！テストアカウントに追加し、次のステップをご案内します。</span>
                     </div>
                 </form>
             </div>
@@ -474,24 +479,28 @@
         if (nppForm) {
             nppForm.addEventListener('submit', async (e) => {
                 e.preventDefault();
+                const t = (key, fallback) => (window.SGH_I18N && window.SGH_I18N[key]) || fallback;
                 const { db, collection, addDoc, serverTimestamp } = window._firestore;
-                const btn = nppForm.querySelector('button');
+                const btn = document.getElementById('nppSubmitBtn');
+                const btnLabel = btn.querySelector('span');
+                const originalLabel = btnLabel.textContent;
                 btn.disabled = true;
-                btn.innerHTML = '正在傳送...';
+                btnLabel.textContent = t('beta.form.submitting', '送信中…');
                 try {
                     await addDoc(collection(db, "npp_testers"), {
                         name: document.getElementById('nppName').value,
                         email: document.getElementById('nppEmail').value,
                         device: document.getElementById('nppDevice').value,
+                        lang: window.SGH_LANG || document.documentElement.lang || 'ja',
                         timestamp: serverTimestamp()
                     });
                     nppForm.style.display = 'none';
                     document.getElementById('nppSuccess').style.display = 'flex';
                 } catch (error) {
                     console.error("Error adding document: ", error);
-                    alert("傳送失敗，請稍後再試。");
+                    alert(t('beta.form.error', '送信に失敗しました。もう一度お試しください。'));
                     btn.disabled = false;
-                    btn.innerHTML = '重試傳送';
+                    btnLabel.textContent = t('beta.form.retry', '再送信');
                 }
             });
         }

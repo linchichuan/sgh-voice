@@ -981,6 +981,49 @@ body {
         display: flex;
     }
 
+    /* Mobile menu — slides down from navbar */
+    .nav-links.mobile-open {
+        display: flex;
+        flex-direction: column;
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: var(--color-surface);
+        border-top: 1px solid var(--color-border);
+        border-bottom: 1px solid var(--color-border);
+        padding: 16px 24px;
+        gap: 4px;
+        box-shadow: var(--shadow-lg);
+        animation: slideDown 0.18s ease-out;
+    }
+
+    .nav-links.mobile-open a {
+        padding: 12px 8px;
+        border-bottom: 1px solid var(--color-border);
+        font-size: 1rem;
+    }
+
+    .nav-links.mobile-open a:last-child {
+        border-bottom: none;
+    }
+
+    @keyframes slideDown {
+        from { opacity: 0; transform: translateY(-8px); }
+        to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Hamburger → X animation when active */
+    .mobile-toggle.active span:nth-child(1) {
+        transform: translateY(7px) rotate(45deg);
+    }
+    .mobile-toggle.active span:nth-child(2) {
+        opacity: 0;
+    }
+    .mobile-toggle.active span:nth-child(3) {
+        transform: translateY(-7px) rotate(-45deg);
+    }
+
     .features-grid {
         grid-template-columns: 1fr;
     }

@@ -72,46 +72,14 @@ document.getElementById("subscribeForm").addEventListener("submit", function (e)
             console.error("Subscribe error:", err);
             submitBtn.disabled = false;
             submitBtn.style.opacity = "1";
-            alert("エラーが発生しました。もう一度お試しください。");
+            const msg = (window.SGH_I18N && window.SGH_I18N["subscribe.error"])
+                || "エラーが発生しました。もう一度お試しください。";
+            alert(msg);
         }
     });
 });
 
-// --- Beta Request form → Firestore ---
-document.getElementById("betaForm").addEventListener("submit", function (e) {
-    e.preventDefault();
-    const name = document.getElementById("betaName").value.trim();
-    const email = document.getElementById("betaEmail").value.trim();
-    const message = document.getElementById("betaMessage").value.trim();
-    if (!name || !email || !message) return;
-
-    const submitBtn = this.querySelector('button[type="submit"]');
-    submitBtn.disabled = true;
-    submitBtn.style.opacity = "0.6";
-
-    document.getElementById("betaError").style.display = "none";
-
-    waitForFirestore(async ({ db, collection, addDoc, serverTimestamp }) => {
-        try {
-            await addDoc(collection(db, "sgh-voice-beta-requests"), {
-                name: name,
-                email: email,
-                message: message,
-                createdAt: serverTimestamp(),
-                lang: document.documentElement.lang || "ja",
-                status: "new"
-            });
-            // Hide form, show success
-            this.querySelectorAll(".form-row, .form-group, .contact-submit-btn").forEach(el => el.style.display = "none");
-            document.getElementById("betaSuccess").style.display = "flex";
-        } catch (err) {
-            console.error("Beta Request error:", err);
-            submitBtn.disabled = false;
-            submitBtn.style.opacity = "1";
-            document.getElementById("betaError").style.display = "block";
-        }
-    });
-});
+// (NPP form handler is defined inline in index.html)
 
 // --- Intersection Observer for scroll animations ---
 const observerOptions = { threshold: 0.1, rootMargin: "0px 0px -40px 0px" };
