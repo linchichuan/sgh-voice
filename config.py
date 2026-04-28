@@ -261,6 +261,11 @@ DEFAULT_CONFIG = {
     "continuous_silence_duration": 1.5,     # 連續模式：偵測到此秒數靜音即切片送 ASR
     "continuous_min_segment_duration": 0.6, # 連續模式：低於此秒數的片段直接丟棄（防止單音/咳嗽觸發）
     "continuous_max_segment_duration": 30.0,# 連續模式：超過此秒數強制切片（避免 Whisper 吃太重）
+    "enable_audio_gate": True,              # 音訊品質前置守門（太靜/削峰/純噪音直接 skip Whisper）
+    "audio_gate_rms_min": 0.003,            # RMS 下限（低於此=靜音/背景音）
+    "audio_gate_clipping_max": 0.05,        # 削峰樣本比例上限（>5% 視為失真）
+    "audio_gate_crest_min": 1.8,            # crest factor 下限（<1.8 疑似純噪音平頂）
+    "audio_gate_crest_max": 60.0,           # crest factor 上限（>60 疑似單一爆音）
     "enable_auto_format": True,             # 自動格式化
     "enable_self_correction": True,         # 偵測口語修正
     "enable_hybrid_mode": _IS_APPLE_SILICON, # 混合模式開關 (Local + Cloud)，僅 Apple Silicon 預設開啟

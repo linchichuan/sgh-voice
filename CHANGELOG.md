@@ -6,6 +6,7 @@
 - **Dictionary 從歷史學習**：新增 `scripts/dictionary_promote_from_history.py` 與 `POST /api/dictionary/promote_from_history`，支援 dry-run / apply 兩段式流程與多重守門。
 - **全域 Quick-Rewrite 熱鍵**：選取任意 App 文字後按 `right_option+r`，走 LLM fallback 鏈改寫並自動貼回。
 - **連續錄音模式 + VAD 自動分段**：新增連續錄音 hotkey、voice/silence 邊界偵測、片段長度保護與尾端靜音裁切。
+- **發布前穩定化**：修正連續模式切片呼叫 `transcribe()`；新增音訊品質前置守門、個人語氣 profile 生成 API/UI，以及場景/App 分層詞庫管理。
 - **錄音檔搬離隱藏目錄**：`backup_audio_dir` 預設改為 `/Volumes/Satechi_SSD/voice-input/audio_backup`，SSD 未掛載時自動略過備份。
 
 ## v2.0.0 (2026-04-25) — Cross-Platform Release Sync

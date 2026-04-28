@@ -156,10 +156,69 @@ def api_clear_history():
 
 @app.route("/api/dictionary")
 def api_dictionary():
+    """支援 ?layer=global|scene:medical|app:com.apple.mail 切換檢視。
+    預設回傳 global + 所有層級摘要。"""
+    layer = request.args.get("layer", "global")
+    if layer.startswith("scene:"):
+        scene_key = layer.split(":", 1)[1]
+        return jsonify({
+            "layer": layer,
+            "corrections": memory.get_scene_corrections(scene_key),
+            "custom_words": memory.get_dictionary_words(),
+            "style_profile": memory.get_style_profile(),
+        })
+    if layer.startswith("app:"):
+        app_id = layer.split(":", 1)[1]
+        return jsonify({
+            "layer": layer,
+            "corrections": memory.get_app_corrections(app_id),
+            "custom_words": memory.get_dictionary_words(),
+            "style_profile": memory.get_style_profile(),
+        })
+    # default: global
     return jsonify({
+        "layer": "global",
         "corrections": memory.get_all_corrections(),
         "custom_words": memory.get_dictionary_words(),
+        "style_profile": memory.get_style_profile(),
+        "scene_keys": list(memory.get_scene_corrections().keys()),
+        "app_ids": list(memory.get_app_corrections().keys()),
     })
+
+
+@app.route("/api/dictionary/scene_correction", methods=["POST", "DELETE"])
+def api_scene_correction():
+    """手動管理場景級 corrections。⚠️ 不開放給自動學習路徑。"""
+    body = request.get_json(force=True, silent=True) or {}
+    scene = body.get("scene", "").strip()
+    wrong = body.get("wrong", "").strip()
+    if not scene or not wrong:
+        return jsonify({"ok": False, "error": "scene 與 wrong 必填"}), 400
+    if request.method == "DELETE":
+        ok = memory.remove_scene_correction(scene, wrong)
+        return jsonify({"ok": ok})
+    right = body.get("right", "").strip()
+    if not right:
+        return jsonify({"ok": False, "error": "right 必填"}), 400
+    ok = memory.add_scene_correction(scene, wrong, right)
+    return jsonify({"ok": ok, "rejected_by_filter": not ok})
+
+
+@app.route("/api/dictionary/app_correction", methods=["POST", "DELETE"])
+def api_app_correction():
+    body = request.get_json(force=True, silent=True) or {}
+    app_id = body.get("app_id", "").strip()
+    wrong = body.get("wrong", "").strip()
+    if not app_id or not wrong:
+        return jsonify({"ok": False, "error": "app_id 與 wrong 必填"}), 400
+    if request.method == "DELETE":
+        ok = memory.remove_app_correction(app_id, wrong)
+        return jsonify({"ok": ok})
+    right = body.get("right", "").strip()
+    if not right:
+        return jsonify({"ok": False, "error": "right 必填"}), 400
+    ok = memory.add_app_correction(app_id, wrong, right)
+    return jsonify({"ok": ok, "rejected_by_filter": not ok})
 
 
 @app.route("/api/dictionary/word", methods=["POST"])
@@ -201,6 +260,55 @@ def api_cleanup_corrections():
     """清理 dictionary 中不符合品質規則的修正規則（標點對應、含換行、跨語意 paraphrase 等）。"""
     removed = memory.cleanup_bad_corrections()
     return jsonify({"ok": True, "removed_count": len(removed), "removed": removed})
+
+
+@app.route("/api/style_profile/regenerate", methods=["POST"])
+def api_regenerate_style_profile():
+    """從最近 N 筆 history.final_text 重新生成使用者語氣 profile，寫入 dictionary.style_profile。
+    ⚠️ 不影響 dictionary corrections — 只更新 style_profile 文字欄位。
+    body: {n?: int=100, apply?: bool=true}（預設直接套用因為純文字、不會污染管線）"""
+    body = request.get_json(force=True, silent=True) or {}
+    n = int(body.get("n", 100))
+    do_apply = body.get("apply", True)
+
+    samples = []
+    for h in reversed(memory.history):
+        text = (h.get("final_text") or "").strip()
+        if len(text) < 15:
+            continue
+        samples.append(text)
+        if len(samples) >= n:
+            break
+    if len(samples) < 10:
+        return jsonify({"ok": False, "error": f"樣本不足（{len(samples)} 筆，需 ≥10）"}), 400
+
+    # 重用腳本邏輯：呼叫 LLM 分析
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "_style_profile",
+        os.path.join(os.path.dirname(__file__), "scripts", "update_style_profile.py")
+    )
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+
+    cfg = load_config()
+    sample_text = "\n".join(f"- {s}" for s in samples)
+    profile, engine = mod._call_llm(cfg, mod._PROFILE_PROMPT, sample_text)
+    if not profile:
+        return jsonify({"ok": False, "error": "LLM 全部失敗（檢查 API key）"}), 500
+
+    profile = profile.strip().strip('"').strip("'")
+    old_profile = memory.get_style_profile()
+    if do_apply:
+        memory.update_style_profile(profile)
+    return jsonify({
+        "ok": True,
+        "applied": bool(do_apply),
+        "engine": engine,
+        "samples": len(samples),
+        "old_profile": old_profile,
+        "new_profile": profile,
+    })
 
 
 @app.route("/api/dictionary/promote_from_history", methods=["POST"])

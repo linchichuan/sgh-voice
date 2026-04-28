@@ -420,6 +420,13 @@
             </div>
             <input type="number" id="cfg-fewshot-count" min="0" max="10" step="1" style="width:60px;text-align:center">
           </div>
+          <div class="toggle-row" style="align-items:flex-start;">
+            <div style="flex:1;">
+              <div class="toggle-label">🎨 個人語氣 Profile（自動生成）</div>
+              <div class="toggle-desc" id="style-profile-text" style="margin-top:6px; padding:8px 10px; background:var(--bg2); border-radius:6px; font-size:12px; line-height:1.55; max-height:90px; overflow-y:auto; white-space:pre-wrap;">尚未生成 — 點右側「重新生成」用最近 100 筆 history 用 LLM 分析你的文體特徵</div>
+            </div>
+            <button class="btn btn-ghost" style="padding:6px 12px; font-size:12px; margin-left:12px; flex-shrink:0;" onclick="regenerateStyleProfile()" title="呼叫 LLM 分析最近 100 筆 final_text 並更新個人語氣 profile（不會動到 corrections）">🔄 重新生成</button>
+          </div>
         </div>
 
         <div class="form-section">
@@ -1051,6 +1058,12 @@
       document.getElementById('tog-paste').checked = cfg.auto_paste ?? true;
       document.getElementById('tog-fewshot').checked = cfg.enable_fewshot ?? true;
       document.getElementById('cfg-fewshot-count').value = cfg.fewshot_count ?? 3;
+      // 載入個人語氣 profile（從 dictionary.json）
+      try {
+        const dict = await api('/dictionary');
+        const sp = (dict && dict.style_profile) || '';
+        if (sp) document.getElementById('style-profile-text').textContent = sp;
+      } catch(_) {}
       updateLlmModelPanel();
     }
 
@@ -1324,6 +1337,27 @@
       const res = await api('/dictionary/cleanup', { method: 'POST' });
       showToast(`🗑️ 已清理 ${res.removed_count} 條壞規則`);
       loadDictionary();
+    }
+
+    async function regenerateStyleProfile() {
+      if (!confirm('將呼叫 LLM 分析最近 100 筆轉寫，產出新的「個人語氣 Profile」並覆蓋原內容。\n（純文字描述，不會動到字典 corrections）\n繼續？')) return;
+      const btn = event && event.target;
+      if (btn) { btn.disabled = true; btn.textContent = '⏳ 分析中...'; }
+      try {
+        const res = await api('/style_profile/regenerate', {
+          method: 'POST', body: { n: 100, apply: true }
+        });
+        if (!res.ok) {
+          showToast('❌ ' + (res.error || '失敗'));
+          return;
+        }
+        document.getElementById('style-profile-text').textContent = res.new_profile;
+        showToast(`✅ Profile 已更新（${res.engine}, ${res.samples} 筆樣本）`);
+      } catch (e) {
+        showToast('❌ ' + e.message);
+      } finally {
+        if (btn) { btn.disabled = false; btn.textContent = '🔄 重新生成'; }
+      }
     }
 
     async function promoteFromHistory() {

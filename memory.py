@@ -50,13 +50,24 @@ class Memory:
 
     # ─── Apply Corrections ───────────────────────────────
 
-    def apply_corrections(self, text, scene_corrections=None):
-        """套用修正：基礎修正 + 場景修正 + 使用者自訂修正（使用者規則 > 場景規則 > 基底規則）
-        支援不分大小寫匹配（CASE_INSENSITIVE_CORRECTIONS），解決 Whisper 大小寫不穩定問題。
+    def apply_corrections(self, text, scene_corrections=None, scene_key=None, app_id=None):
+        """套用修正，多層合併（後者覆蓋前者）：
+            BASE_CORRECTIONS  ← 程式碼基底
+            corrections_by_scene[scene_key]  ← 使用者場景層
+            scene_corrections  ← SCENE_PRESETS 內建（呼叫者傳入）
+            corrections_by_app[app_id]  ← 使用者 App 層
+            corrections (global)  ← 使用者全域層（最高優先）
+
+        ⚠️ 自動學習路徑只能寫入 global `corrections`，per-scene / per-app 規則一律手動透過 UI/API。
+        詳見 feedback memory: 詞庫嚴格控管。
         """
         merged = {**BASE_CORRECTIONS}
+        if scene_key:
+            merged.update(self.dictionary.get("corrections_by_scene", {}).get(scene_key, {}))
         if scene_corrections:
             merged.update(scene_corrections)
+        if app_id:
+            merged.update(self.dictionary.get("corrections_by_app", {}).get(app_id, {}))
         merged.update(self.dictionary.get("corrections", {}))
         result = text
         # 長詞優先，避免短詞先匹配破壞長詞
@@ -68,6 +79,52 @@ class Memory:
             else:
                 result = result.replace(wrong, right)
         return result
+
+    # ─── 多層詞庫管理（手動 only，永不自動寫入）─────────────
+    def add_scene_correction(self, scene_key, wrong, right):
+        """手動新增場景級修正規則。⚠️ 不過守門員以外的自動寫入路徑都禁止呼叫這個。"""
+        if not scene_key or not wrong or not right or wrong == right:
+            return False
+        if not self._is_meaningful_correction(wrong, right, source="manual-scene"):
+            return False
+        bucket = self.dictionary.setdefault("corrections_by_scene", {}).setdefault(scene_key, {})
+        bucket[wrong] = right
+        save_dictionary(self.dictionary)
+        return True
+
+    def remove_scene_correction(self, scene_key, wrong):
+        bucket = self.dictionary.get("corrections_by_scene", {}).get(scene_key, {})
+        if wrong in bucket:
+            del bucket[wrong]
+            save_dictionary(self.dictionary)
+            return True
+        return False
+
+    def add_app_correction(self, app_id, wrong, right):
+        if not app_id or not wrong or not right or wrong == right:
+            return False
+        if not self._is_meaningful_correction(wrong, right, source="manual-app"):
+            return False
+        bucket = self.dictionary.setdefault("corrections_by_app", {}).setdefault(app_id, {})
+        bucket[wrong] = right
+        save_dictionary(self.dictionary)
+        return True
+
+    def remove_app_correction(self, app_id, wrong):
+        bucket = self.dictionary.get("corrections_by_app", {}).get(app_id, {})
+        if wrong in bucket:
+            del bucket[wrong]
+            save_dictionary(self.dictionary)
+            return True
+        return False
+
+    def get_scene_corrections(self, scene_key=None):
+        d = self.dictionary.get("corrections_by_scene", {})
+        return d.get(scene_key, {}) if scene_key else d
+
+    def get_app_corrections(self, app_id=None):
+        d = self.dictionary.get("corrections_by_app", {})
+        return d.get(app_id, {}) if app_id else d
 
     # ─── Auto Learn ──────────────────────────────────────
 

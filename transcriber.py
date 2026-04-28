@@ -98,8 +98,10 @@ class Transcriber:
         stt_source, llm_source = "none", "none"
 
         if isinstance(audio_source, np.ndarray):
-            rms = np.sqrt(np.mean(audio_source ** 2))
-            if rms < 0.003: return None
+            ok, reason = self._audio_quality_check(audio_source)
+            if not ok:
+                print(f" 🚫 [audio gate] 跳過：{reason}")
+                return None
 
         if isinstance(audio_source, np.ndarray) and self.config.get("enable_voiceprint", False):
             if self._voiceprint_mgr.is_enrolled:
@@ -129,7 +131,30 @@ class Transcriber:
         if not raw or not raw.strip(): return None
         t_stt = time.time() - t_stt0
 
-        corrected = self.memory.apply_corrections(raw, SCENE_PRESETS.get(self.config.get("active_scene", "general"), {}).get("corrections"))
+        # 句尾 meta-command 偵測：「...以上翻成英文」「改正式」等 → 切換 mode
+        if mode == "dictate":
+            stripped, override_style = self._detect_voice_command(raw)
+            if override_style:
+                raw = stripped
+                mode = "edit"
+                edit_context = override_style
+                print(f" 🎙→✏️ [voice command] 偵測到句尾指令，切換為 rewrite 模式：{override_style}")
+
+        scene_key = self.config.get("active_scene", "general")
+        app_id = None
+        try:
+            from AppKit import NSWorkspace
+            curr_app = NSWorkspace.sharedWorkspace().frontmostApplication()
+            if curr_app:
+                app_id = curr_app.bundleIdentifier()
+        except Exception:
+            pass
+        corrected = self.memory.apply_corrections(
+            raw,
+            scene_corrections=SCENE_PRESETS.get(scene_key, {}).get("corrections"),
+            scene_key=scene_key,
+            app_id=app_id,
+        )
         corrected = self._apply_smart_replace(corrected)
 
         # ── LLM 階段 ─────────────────────────────────────
@@ -212,6 +237,41 @@ class Transcriber:
         scene_extra = SCENE_PRESETS.get(self.config.get("active_scene", "general"), {}).get("system_prompt_extra", "")
         return f"{base}\n[Style Guide: {user_style}]\n{scene_extra}".strip()
 
+    def _audio_quality_check(self, audio_array):
+        """音訊品質前置守門。回傳 (ok: bool, reason: str)。
+        防呆三項：太靜（純背景）、削峰嚴重（爆音/失真）、能量分布不像語音（純噪音）。
+        所有閾值可由 config 覆寫，預設值對 16kHz mono 麥克風校準。"""
+        if audio_array is None or len(audio_array) == 0:
+            return False, "empty"
+        if not self.config.get("enable_audio_gate", True):
+            return True, ""
+
+        # 1) RMS 太低 → 純靜音/背景音（沿用原本 0.003 但可調）
+        rms_min = float(self.config.get("audio_gate_rms_min", 0.003))
+        rms = float(np.sqrt(np.mean(audio_array.astype(np.float32) ** 2)))
+        if rms < rms_min:
+            return False, f"rms={rms:.4f} < {rms_min}"
+
+        # 2) Clipping 比例過高 → 削峰失真，Whisper 會幻覺
+        clip_max = float(self.config.get("audio_gate_clipping_max", 0.05))
+        peak_thresh = 0.98
+        clip_ratio = float(np.mean(np.abs(audio_array) > peak_thresh))
+        if clip_ratio > clip_max:
+            return False, f"clipping={clip_ratio:.2%} > {clip_max:.2%}"
+
+        # 3) Crest factor（峰值/RMS）過低 → 平頂雜訊；過高 → 單一爆音
+        peak = float(np.max(np.abs(audio_array)))
+        if peak > 1e-6:
+            crest = peak / max(rms, 1e-9)
+            crest_min = float(self.config.get("audio_gate_crest_min", 1.8))
+            crest_max = float(self.config.get("audio_gate_crest_max", 60.0))
+            if crest < crest_min:
+                return False, f"crest={crest:.1f} < {crest_min}（疑似純噪音）"
+            if crest > crest_max:
+                return False, f"crest={crest:.1f} > {crest_max}（疑似單一爆音）"
+
+        return True, ""
+
     def _few_shot_pairs(self, mode=None):
         """產生個人化 few-shot user/assistant 訊息對。
         edit 模式（rewrite API）不注入；enable_fewshot 為 False 時不注入。"""
@@ -245,6 +305,13 @@ class Transcriber:
         """雲端 LLM 呼叫的 timeout（秒）。預設 5 秒，超時 fallback 下一個引擎。"""
         return float(self.config.get("llm_timeout_sec", 5.0))
 
+    def _wrap_edit_text(self, text, edit_context):
+        """edit 模式時把風格指令包進 user 訊息。edit_context 既支援 style key 也支援自訂指令。"""
+        if not edit_context:
+            return text
+        directive = self._STYLE_DIRECTIVES.get(edit_context, edit_context)
+        return f"{directive}\n\n{text}"
+
     def _groq_llm_process(self, text, mode, edit_context):
         api_key = self.config.get("groq_api_key")
         if not api_key: return None
@@ -252,8 +319,9 @@ class Transcriber:
             client = openai.OpenAI(base_url="https://api.groq.com/openai/v1", api_key=api_key, timeout=self._llm_timeout())
             model = self.config.get("groq_model", "llama-3.3-70b-versatile")
             system = self._EDIT_SYSTEM if mode == "edit" else self._get_system_prompt()
+            user_text = self._wrap_edit_text(text, edit_context) if mode == "edit" else text
             t0 = time.time()
-            messages = [{"role": "system", "content": system}, *self._few_shot_pairs(mode), {"role": "user", "content": text}]
+            messages = [{"role": "system", "content": system}, *self._few_shot_pairs(mode), {"role": "user", "content": user_text}]
             resp = client.chat.completions.create(model=model, messages=messages, temperature=0.0, max_tokens=self._dynamic_max_tokens(text))
             res = re.sub(r'<think>[\s\S]*?</think>|<think>[\s\S]*$', '', resp.choices[0].message.content).strip()
             self._track_usage("groq", model, resp.usage.prompt_tokens, resp.usage.completion_tokens)
@@ -272,7 +340,7 @@ class Transcriber:
             model = self.config.get("openrouter_model", "qwen/qwen3.6-plus")
             system = self._EDIT_SYSTEM if mode == "edit" else self._get_system_prompt()
             t0 = time.time()
-            messages = [{"role": "system", "content": system}, *self._few_shot_pairs(mode), {"role": "user", "content": text}]
+            messages = [{"role": "system", "content": system}, *self._few_shot_pairs(mode), {"role": "user", "content": self._wrap_edit_text(text, edit_context) if mode == "edit" else text}]
             resp = client.chat.completions.create(model=model, messages=messages, temperature=0.0, max_tokens=self._dynamic_max_tokens(text), extra_headers={"HTTP-Referer": "https://shingihou.com", "X-Title": "SGH Voice"})
             res = re.sub(r'<think>[\s\S]*?</think>|<think>[\s\S]*$', '', resp.choices[0].message.content).strip()
             self._track_usage("openrouter", model, resp.usage.prompt_tokens, resp.usage.completion_tokens)
@@ -310,7 +378,7 @@ class Transcriber:
             model = self.config.get("openai_model", "gpt-4o")
             system = self._EDIT_SYSTEM if mode == "edit" else self._get_system_prompt()
             t0 = time.time()
-            messages = [{"role": "system", "content": system}, *self._few_shot_pairs(mode), {"role": "user", "content": text}]
+            messages = [{"role": "system", "content": system}, *self._few_shot_pairs(mode), {"role": "user", "content": self._wrap_edit_text(text, edit_context) if mode == "edit" else text}]
             resp = client.chat.completions.create(model=model, messages=messages, temperature=0.0, max_tokens=self._dynamic_max_tokens(text))
             res = resp.choices[0].message.content.strip()
             self._track_usage("openai", model, resp.usage.prompt_tokens, resp.usage.completion_tokens)
@@ -527,6 +595,46 @@ class Transcriber:
         "TASK: PURE TEXT EDITING.\n"
         "RULES: 1. Modify ONLY per command. 2. Preserve original formatting. 3. NO CHAT. NO EXPLANATION."
     )
+
+    # 風格指令對照表（與 app.py:VoiceEngine._REWRITE_STYLE_PROMPTS 同義；用於語音控制詞偵測後的 LLM 包裝）
+    _STYLE_DIRECTIVES = {
+        "concise":     "請將以下文字精簡改寫，去除冗詞贅字，保持原意。只輸出改寫結果，不要任何前後綴。",
+        "formal":      "請將以下文字改寫為正式書面語氣。只輸出改寫結果。",
+        "casual":      "請將以下文字改寫為輕鬆口語風格。只輸出改寫結果。",
+        "email":       "請將以下內容改寫為一封得體的 Email 草稿。只輸出 Email 內容。",
+        "technical":   "請將以下內容改寫為技術文件風格，用詞精確。只輸出改寫結果。",
+        "translate_en":"請將以下文字翻譯為英文。只輸出翻譯結果。",
+        "translate_ja":"請將以下文字翻譯為日文。只輸出翻譯結果。",
+        "translate_zh":"請將以下文字翻譯為繁體中文。只輸出翻譯結果。",
+    }
+
+    # 句尾語音控制詞 patterns。每個 pattern 寬鬆匹配（涵蓋常見口語表達），
+    # 命中後切除尾段、改 mode='edit' + edit_context=<style>。
+    _VOICE_COMMAND_PATTERNS = [
+        # 翻譯類
+        (re.compile(r"[，。、,.\s]*(以上|前面這段|這段)?[\s,]*(請[幫請])?[，。、,.\s]*(翻譯|翻成|改成|寫成|轉成)[\s]*(英文|英語)[\s。，！]*$"), "translate_en"),
+        (re.compile(r"[，。、,.\s]*(以上|前面這段|這段)?[\s,]*(翻譯|翻成|改成|寫成)[\s]*(日文|日語|日本語)[\s。，！]*$"), "translate_ja"),
+        (re.compile(r"[，。、,.\s]*(以上|前面這段|這段)?[\s,]*(翻譯|翻成|改成)[\s]*(繁中|繁體中文|中文)[\s。，！]*$"), "translate_zh"),
+        # 風格改寫類
+        (re.compile(r"[，。、,.\s]*(以上|前面這段|這段)?[\s,]*(改|改成|改為|寫成)[\s]*(正式|書面|商務)[\s。，！]*$"), "formal"),
+        (re.compile(r"[，。、,.\s]*(以上|前面這段|這段)?[\s,]*(改|改成|改為|寫成)[\s]*(口語|輕鬆|休閒)[\s。，！]*$"), "casual"),
+        (re.compile(r"[，。、,.\s]*(以上|前面這段|這段)?[\s,]*(精簡一下|改精簡|精簡|精簡點)[\s。，！]*$"), "concise"),
+        (re.compile(r"[，。、,.\s]*(以上|前面這段|這段)?[\s,]*(寫成|改成)[\s]*(email|Email|郵件|電子郵件)[\s。，！]*$"), "email"),
+        (re.compile(r"[，。、,.\s]*(以上|前面這段|這段)?[\s,]*(寫成|改成)[\s]*(技術文件|技術風格)[\s。，！]*$"), "technical"),
+    ]
+
+    def _detect_voice_command(self, text):
+        """偵測句尾 meta-command。命中時回傳 (前段文字, style_key)；否則 (text, None)。
+        ⚠️ 安全策略：要求前段文字 ≥ 8 字，避免「翻成英文」這 4 字當主內容時誤觸。"""
+        if not self.config.get("enable_voice_commands", True):
+            return text, None
+        for pattern, style in self._VOICE_COMMAND_PATTERNS:
+            m = pattern.search(text)
+            if m:
+                stripped = text[: m.start()].rstrip(" ，。、,.！？!?")
+                if len(stripped) >= 8:
+                    return stripped, style
+        return text, None
 
     def _build_edit_prompt(self, cmd, original):
         return f"<original>{original}</original>\n<command>{cmd}</command>\nResult:"

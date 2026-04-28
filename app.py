@@ -528,7 +528,7 @@ class VoiceEngine:
             try:
                 if duration < 0.4:
                     return
-                result = self.transcriber.process(audio_array, audio_duration=duration)
+                result = self.transcriber.transcribe(audio_array, audio_duration=duration)
                 if not result:
                     return
                 final = (result.get("final") or "").strip()
