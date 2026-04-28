@@ -6,7 +6,7 @@ import os
 import sys
 import json
 from flask import Flask, request, jsonify, send_from_directory, Response
-from config import load_config, save_config, load_stats, update_stats, load_smart_replace, save_smart_replace, DEFAULT_APP_STYLES
+from config import load_config, save_config, load_stats, update_stats, load_smart_replace, save_smart_replace, DEFAULT_APP_STYLES, BASE_CORRECTIONS as BASE_CORRECTIONS_REF
 from memory import Memory
 import anthropic
 
@@ -201,6 +201,104 @@ def api_cleanup_corrections():
     """清理 dictionary 中不符合品質規則的修正規則（標點對應、含換行、跨語意 paraphrase 等）。"""
     removed = memory.cleanup_bad_corrections()
     return jsonify({"ok": True, "removed_count": len(removed), "removed": removed})
+
+
+@app.route("/api/dictionary/promote_from_history", methods=["POST"])
+def api_promote_from_history():
+    """從歷史 raw→final 高頻差異中升級 dictionary 規則。
+    body: {min_freq?: int=5, source?: "auto"|"edited"|"both"=both, apply?: bool=false}
+    回傳：{promoted: [{wrong, right, freq}], skipped: {...}}（apply=False 為預覽）"""
+    from collections import Counter
+    import difflib, re
+    body = request.get_json(force=True, silent=True) or {}
+    min_freq = int(body.get("min_freq", 5))
+    source = body.get("source", "both")
+    do_apply = bool(body.get("apply", False))
+
+    try:
+        from opencc import OpenCC
+        opencc_inst = OpenCC("s2twp")
+    except Exception:
+        opencc_inst = None
+
+    def _tokenize(t):
+        return re.findall(r"[a-zA-Z0-9_'-]+|\s+|[^\sa-zA-Z0-9_'-]", t or "")
+
+    def _is_substring_relation(a, b):
+        return bool(a) and bool(b) and a != b and (a in b or b in a)
+
+    def _opencc_handled(w, r):
+        if not opencc_inst:
+            return False
+        try:
+            return opencc_inst.convert(w) == r
+        except Exception:
+            return False
+
+    counter = Counter()
+    for h in memory.history:
+        if source == "edited" and not h.get("edited"):
+            continue
+        if source == "auto" and h.get("edited"):
+            continue
+        raw = (h.get("whisper_raw") or "").strip()
+        fin = (h.get("final_text") or "").strip()
+        if not raw or not fin or raw == fin:
+            continue
+        a, b = _tokenize(raw), _tokenize(fin)
+        for op, i1, i2, j1, j2 in difflib.SequenceMatcher(None, a, b).get_opcodes():
+            if op != "replace":
+                continue
+            w = "".join(a[i1:i2]).strip()
+            r = "".join(b[j1:j2]).strip()
+            if w and r and w != r:
+                counter[(w, r)] += 1
+
+    base_keys = {k.lower() for k in BASE_CORRECTIONS_REF.keys()}
+    existing = set(memory.dictionary.get("corrections", {}).keys())
+    promoted, sk_substr, sk_opencc, sk_filter, sk_base = [], [], [], [], []
+    for (w, r), f in counter.most_common():
+        if f < min_freq:
+            break
+        if w.lower() in base_keys or w in existing:
+            sk_base.append({"wrong": w, "right": r, "freq": f}); continue
+        if _is_substring_relation(w, r):
+            sk_substr.append({"wrong": w, "right": r, "freq": f}); continue
+        if _opencc_handled(w, r):
+            sk_opencc.append({"wrong": w, "right": r, "freq": f}); continue
+        if not memory._is_meaningful_correction(w, r, source="auto-promote"):
+            sk_filter.append({"wrong": w, "right": r, "freq": f}); continue
+        promoted.append({"wrong": w, "right": r, "freq": f})
+
+    if do_apply and promoted:
+        corr = memory.dictionary.setdefault("corrections", {})
+        freq_d = memory.dictionary.setdefault("frequency", {})
+        for p in promoted:
+            corr[p["wrong"]] = p["right"]
+            freq_d[p["wrong"]] = freq_d.get(p["wrong"], 0) + p["freq"]
+        from config import save_dictionary
+        save_dictionary(memory.dictionary)
+
+    return jsonify({
+        "ok": True,
+        "applied": do_apply,
+        "min_freq": min_freq,
+        "source": source,
+        "edited_count": sum(1 for h in memory.history if h.get("edited")),
+        "promoted": promoted,
+        "skipped": {
+            "existing": sk_base[:30],
+            "substring_relation": sk_substr[:30],
+            "opencc_handled": sk_opencc[:30],
+            "filter_rejected": sk_filter[:30],
+        },
+        "skipped_counts": {
+            "existing": len(sk_base),
+            "substring_relation": len(sk_substr),
+            "opencc_handled": len(sk_opencc),
+            "filter_rejected": len(sk_filter),
+        },
+    })
 
 
 @app.route("/api/rewrite", methods=["POST"])

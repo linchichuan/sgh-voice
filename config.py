@@ -255,6 +255,12 @@ DEFAULT_CONFIG = {
     "enable_filler_removal": True,          # 移除填充詞
     "enable_fewshot": True,                 # 個人化 few-shot：把最近的 raw→final 範例餵給 LLM
     "fewshot_count": 3,                     # 注入的範例數（0=關閉，建議 2~5；越多越貼但 token 成本越高）
+    "rewrite_hotkey": "right_option+r",     # Quick-Rewrite 全域熱鍵（空字串=關閉）；選取文字後按下，LLM 改寫並貼回
+    "default_rewrite_style": "concise",     # Quick-Rewrite 預設風格（concise/formal/casual/email/technical/translate_en/translate_ja/translate_zh）
+    "continuous_hotkey": "",                # 連續錄音 toggle 熱鍵（空字串=關閉）；按一次開麥克風長監聽，再按一次關
+    "continuous_silence_duration": 1.5,     # 連續模式：偵測到此秒數靜音即切片送 ASR
+    "continuous_min_segment_duration": 0.6, # 連續模式：低於此秒數的片段直接丟棄（防止單音/咳嗽觸發）
+    "continuous_max_segment_duration": 30.0,# 連續模式：超過此秒數強制切片（避免 Whisper 吃太重）
     "enable_auto_format": True,             # 自動格式化
     "enable_self_correction": True,         # 偵測口語修正
     "enable_hybrid_mode": _IS_APPLE_SILICON, # 混合模式開關 (Local + Cloud)，僅 Apple Silicon 預設開啟

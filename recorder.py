@@ -118,6 +118,100 @@ class Recorder:
             print(f"Save error: {e}")
             return None
 
+    # ─── Continuous Mode (C) ─────────────────────────────
+    def start_continuous(self, on_segment, on_voice_change=None):
+        """連續錄音模式：麥克風長開，偵測 voice/silence 邊界，每完成一段呼叫
+        on_segment(audio_array: np.ndarray, duration_sec: float)。
+        on_voice_change(is_voice: bool) 用於 UI 狀態（可選）。"""
+        if self.is_recording:
+            return False
+        if sd is None:
+            raise RuntimeError("請安裝 sounddevice: pip install sounddevice soundfile")
+        self.is_recording = True
+        self._stop_event.clear()
+        self._start_time = time.time()
+        self._thread = threading.Thread(
+            target=self._continuous_loop,
+            args=(on_segment, on_voice_change),
+            daemon=True,
+        )
+        self._thread.start()
+        return True
+
+    def _continuous_loop(self, on_segment, on_voice_change):
+        sr = self.config.get("sample_rate", 16000)
+        silence_threshold = self.config.get("silence_threshold", 0.001)
+        silence_duration = float(self.config.get("continuous_silence_duration", 1.5))
+        min_seg_dur = float(self.config.get("continuous_min_segment_duration", 0.6))
+        max_seg_dur = float(self.config.get("continuous_max_segment_duration", 30.0))
+        chunk = int(sr * 0.1)
+        silence_chunks = max(1, int(silence_duration / 0.1))
+        min_seg_chunks = max(1, int(min_seg_dur / 0.1))
+        max_seg_chunks = max(silence_chunks + 1, int(max_seg_dur / 0.1))
+
+        seg_buffer = []
+        consecutive_silence = 0
+        in_voice = False
+
+        def _flush_segment():
+            """送出當前 buffer，回呼 on_segment（背景執行）。"""
+            nonlocal seg_buffer
+            if len(seg_buffer) < min_seg_chunks + silence_chunks:
+                seg_buffer = []
+                return
+            audio_array = np.concatenate(seg_buffer, axis=0).flatten()
+            # 削掉尾端大部分靜音，留 200ms 緩衝供 ASR 吃
+            tail_keep = int(sr * 0.2)
+            tail_cut = max(0, silence_chunks * chunk - tail_keep)
+            if tail_cut > 0:
+                audio_array = audio_array[:-tail_cut] if tail_cut < len(audio_array) else audio_array
+            seg_buffer = []
+            duration = len(audio_array) / sr
+            threading.Thread(
+                target=on_segment, args=(audio_array, duration), daemon=True
+            ).start()
+
+        try:
+            with sd.InputStream(samplerate=sr, channels=1, dtype="float32") as stream:
+                while not self._stop_event.is_set():
+                    data, _ = stream.read(chunk)
+                    rms = float(np.sqrt(np.mean(data ** 2)))
+                    is_voice = rms > silence_threshold
+
+                    if is_voice:
+                        if not in_voice:
+                            in_voice = True
+                            if on_voice_change:
+                                try: on_voice_change(True)
+                                except Exception: pass
+                        seg_buffer.append(data.copy())
+                        consecutive_silence = 0
+                        # 強制切片：太長就先送出避免 Whisper 太重
+                        if len(seg_buffer) >= max_seg_chunks:
+                            _flush_segment()
+                            in_voice = False
+                            if on_voice_change:
+                                try: on_voice_change(False)
+                                except Exception: pass
+                    else:
+                        if in_voice:
+                            seg_buffer.append(data.copy())
+                            consecutive_silence += 1
+                            if consecutive_silence >= silence_chunks:
+                                _flush_segment()
+                                in_voice = False
+                                consecutive_silence = 0
+                                if on_voice_change:
+                                    try: on_voice_change(False)
+                                    except Exception: pass
+                # 結束時還有 buffer 就最後送一次
+                if in_voice and seg_buffer:
+                    _flush_segment()
+        except Exception as e:
+            print(f"Continuous recording error: {e}")
+        finally:
+            self.is_recording = False
+
     @staticmethod
     def list_devices():
         if sd is None:

@@ -449,6 +449,187 @@ class VoiceEngine:
 
         return result
 
+    # ─── Quick-Rewrite (B) ─────────────────────────────────
+    _REWRITE_STYLE_PROMPTS = {
+        "concise":     "請將以下文字精簡改寫，去除冗詞贅字，保持原意。只輸出改寫結果，不要任何前後綴。",
+        "formal":      "請將以下文字改寫為正式書面語氣。只輸出改寫結果。",
+        "casual":      "請將以下文字改寫為輕鬆口語風格。只輸出改寫結果。",
+        "email":       "請將以下內容改寫為一封得體的 Email 草稿，包含適當問候與結尾。只輸出 Email 內容。",
+        "technical":   "請將以下內容改寫為技術文件風格，用詞精確、結構清晰。只輸出改寫結果。",
+        "translate_en":"請將以下文字翻譯為英文。只輸出翻譯結果。",
+        "translate_ja":"請將以下文字翻譯為日文。只輸出翻譯結果。",
+        "translate_zh":"請將以下文字翻譯為繁體中文。只輸出翻譯結果。",
+    }
+
+    def _simulate_cmd_c(self):
+        """模擬 Cmd+C 複製選取的文字。回傳 True 表示送出。"""
+        try:
+            import ApplicationServices
+            if not ApplicationServices.AXIsProcessTrusted():
+                log("warn", "Cmd+C 需要輔助使用權限")
+                return False
+        except Exception:
+            pass
+        try:
+            from Quartz import (
+                CGEventCreateKeyboardEvent, CGEventPost, kCGSessionEventTap,
+                CGEventSetFlags, kCGEventFlagMaskCommand,
+            )
+            C_KEYCODE = 8
+            ev_down = CGEventCreateKeyboardEvent(None, C_KEYCODE, True)
+            CGEventSetFlags(ev_down, kCGEventFlagMaskCommand)
+            ev_up = CGEventCreateKeyboardEvent(None, C_KEYCODE, False)
+            CGEventSetFlags(ev_up, kCGEventFlagMaskCommand)
+            CGEventPost(kCGSessionEventTap, ev_down)
+            time.sleep(0.02)
+            CGEventPost(kCGSessionEventTap, ev_up)
+            return True
+        except Exception as e:
+            log("warn", f"Cmd+C simulate error: {e}")
+            return False
+
+    def _rewrite_text(self, text, style):
+        """共用改寫核心，沿用主 LLM fallback 鏈，但用獨立 system prompt（_EDIT_SYSTEM）。"""
+        prompt = self._REWRITE_STYLE_PROMPTS.get(style, self._REWRITE_STYLE_PROMPTS["concise"])
+        wrapped = f"{prompt}\n\n{text}"
+        # 走 transcriber 的 LLM fallback 鏈（mode='edit' 會跳 few-shot 並用 _EDIT_SYSTEM）
+        for fn_name in ("_groq_llm_process", "_openrouter_process", "_claude_process", "_openai_process"):
+            try:
+                fn = getattr(self.transcriber, fn_name, None)
+                if not fn:
+                    continue
+                res = fn(wrapped, mode="edit", edit_context="")
+                if res:
+                    return res.strip()
+            except Exception as e:
+                log("warn", f"rewrite {fn_name} error: {e}")
+        return None
+
+    # ─── Continuous Mode (C) ──────────────────────────────
+    def toggle_continuous_mode(self):
+        """連續錄音模式切換：開 → 麥克風持續監聽，自動切片轉寫；再按 → 關。"""
+        if getattr(self, "_continuous_active", False):
+            self.stop_continuous_mode()
+        else:
+            self.start_continuous_mode()
+
+    def start_continuous_mode(self):
+        if self.is_recording:
+            log("warn", "已在錄音中，無法啟動連續模式")
+            return
+        self._continuous_active = True
+        self.is_recording = True
+        try: self.overlay.show("recording")
+        except Exception: pass
+        self._safe_status_change("recording")
+        log("rec", "連續模式啟動 — 持續監聽中…")
+
+        def _on_segment(audio_array, duration):
+            try:
+                if duration < 0.4:
+                    return
+                result = self.transcriber.process(audio_array, audio_duration=duration)
+                if not result:
+                    return
+                final = (result.get("final") or "").strip()
+                if not final:
+                    return
+                from datetime import datetime
+                self.memory.add_to_history({
+                    "timestamp": datetime.now().isoformat(timespec="seconds"),
+                    "whisper_raw": result.get("raw", ""),
+                    "final_text": final,
+                    "duration": round(duration, 2),
+                    "mode": "continuous",
+                })
+                if self.config.get("auto_paste", True):
+                    try: paste_text(final)
+                    except Exception as e: log("warn", f"continuous paste: {e}")
+                log("ok", f"[continuous] {final[:60]}")
+            except Exception as e:
+                log("error", f"continuous segment: {e}")
+
+        def _on_voice(is_voice):
+            try:
+                self.overlay.show("recording" if is_voice else "idle")
+            except Exception:
+                pass
+
+        self.recorder.start_continuous(on_segment=_on_segment, on_voice_change=_on_voice)
+
+    def stop_continuous_mode(self):
+        if not getattr(self, "_continuous_active", False):
+            return
+        self.recorder._stop_event.set()
+        self._continuous_active = False
+        self.is_recording = False
+        try: self.overlay.show("idle")
+        except Exception: pass
+        self._safe_status_change("idle")
+        log("ok", "連續模式關閉")
+
+    def rewrite_selection(self, style=None):
+        """全域快捷鍵入口：複製選取文字 → LLM 改寫 → 貼回。"""
+        if getattr(self, "_rewrite_in_progress", False):
+            return
+        self._rewrite_in_progress = True
+        try:
+            style = style or self.config.get("default_rewrite_style", "concise")
+            try:
+                import pyperclip
+            except Exception:
+                log("warn", "pyperclip 未安裝，無法 quick-rewrite")
+                return
+
+            old_clip = None
+            try:
+                old_clip = pyperclip.paste()
+            except Exception:
+                pass
+
+            # 等使用者鬆開修飾鍵，再送 Cmd+C
+            time.sleep(0.25)
+            if not self._simulate_cmd_c():
+                return
+            # 等剪貼簿更新
+            time.sleep(0.2)
+            try:
+                selected = pyperclip.paste() or ""
+            except Exception:
+                selected = ""
+
+            if not selected.strip():
+                log("warn", "未偵測到選取文字，已取消改寫")
+                return
+            if old_clip is not None and selected == old_clip:
+                # Cmd+C 沒拿到新東西（可能沒選取）
+                log("warn", "選取內容與剪貼簿相同，已取消")
+                return
+
+            try:
+                self.overlay.show("processing")
+            except Exception:
+                pass
+
+            log("info", f"Quick-Rewrite [{style}] 處理中：{selected[:40]}...")
+            rewritten = self._rewrite_text(selected, style)
+            if not rewritten or rewritten.strip() == selected.strip():
+                log("warn", "改寫結果為空或無變化")
+                try: self.overlay.show("idle")
+                except Exception: pass
+                return
+
+            paste_text(rewritten)
+            log("ok", f"Quick-Rewrite 完成 ({len(rewritten)} 字)")
+            try:
+                self.overlay.show("done")
+                time.sleep(0.4)
+                self.overlay.show("idle")
+            except Exception:
+                pass
+        finally:
+            self._rewrite_in_progress = False
+
 
 # ─── Hotkey Listener ─────────────────────────────────────
 
@@ -600,6 +781,152 @@ def setup_hotkey(engine):
     NSEvent.addLocalMonitorForEventsMatchingMask_handler_(
         KEY_EVENT_MASK, handle_local_event
     )
+
+
+def setup_continuous_hotkey(engine):
+    """連續模式 toggle 熱鍵（按一次開、按一次關）。預設 right_option+l（long-form）。"""
+    try:
+        from AppKit import NSEvent, NSKeyDown, NSKeyUp, NSFlagsChanged
+    except ImportError:
+        return
+
+    config = engine.config
+    hotkey_str = config.get("continuous_hotkey", "")
+    if not hotkey_str:
+        return
+
+    KEY_MAP = {
+        'right_cmd': 54, 'cmd': 55, 'command': 55, 'cmd_l': 55, 'right_command': 54,
+        'right_alt': 61, 'right_option': 61, 'alt': 58, 'option': 58, 'alt_l': 58,
+        'ctrl': 59, 'control': 59, 'shift': 56, 'right_shift': 60, 'space': 49,
+        'f1': 122, 'f2': 120, 'f3': 99, 'f4': 118, 'f5': 96, 'f6': 97, 'f7': 98, 'f8': 100,
+        'a': 0, 'b': 11, 'c': 8, 'd': 2, 'e': 14, 'f': 3, 'g': 5, 'h': 4, 'i': 34, 'j': 38,
+        'k': 40, 'l': 37, 'm': 46, 'n': 45, 'o': 31, 'p': 35, 'q': 12, 'r': 15, 's': 1,
+        't': 17, 'u': 32, 'v': 9, 'w': 13, 'x': 7, 'y': 16, 'z': 6,
+    }
+    target_keys = set()
+    for p in hotkey_str.lower().replace("+", " ").split():
+        if p in KEY_MAP:
+            target_keys.add(KEY_MAP[p])
+    if not target_keys:
+        log("warn", f"Unknown continuous_hotkey: {hotkey_str}")
+        return
+
+    currently_pressed = set()
+    KEY_EVENT_MASK = (1 << 10) | (1 << 11) | (1 << 12)
+
+    def _on_event(event):
+        nonlocal currently_pressed
+        try:
+            etype = event.type(); vk = event.keyCode()
+        except Exception:
+            return
+        if etype == NSKeyDown:   currently_pressed.add(vk)
+        elif etype == NSKeyUp:   currently_pressed.discard(vk)
+        elif etype == NSFlagsChanged:
+            flags = event.modifierFlags()
+            if vk in target_keys:
+                pressed = False
+                if vk in (54, 55):   pressed = (flags & 0x100000) > 0
+                elif vk in (58, 61): pressed = (flags & 0x80000) > 0
+                elif vk in (59, 62): pressed = (flags & 0x40000) > 0
+                elif vk in (56, 60): pressed = (flags & 0x20000) > 0
+                if pressed: currently_pressed.add(vk)
+                else: currently_pressed.discard(vk)
+
+        is_active = target_keys.issubset(currently_pressed)
+        if is_active and not getattr(_on_event, "last_active", False):
+            threading.Thread(target=engine.toggle_continuous_mode, daemon=True).start()
+        _on_event.last_active = is_active
+
+    def _global(ev):
+        try: _on_event(ev)
+        except Exception as e: log("warn", f"continuous global: {e}")
+    def _local(ev):
+        try: _on_event(ev)
+        except Exception as e: log("warn", f"continuous local: {e}")
+        return ev
+
+    NSEvent.addGlobalMonitorForEventsMatchingMask_handler_(KEY_EVENT_MASK, _global)
+    NSEvent.addLocalMonitorForEventsMatchingMask_handler_(KEY_EVENT_MASK, _local)
+    log("ok", f"Continuous-mode hotkey: {hotkey_str}")
+
+
+def setup_rewrite_hotkey(engine):
+    """Quick-Rewrite 全域熱鍵：選取文字 → 觸發 → LLM 改寫 → 貼回。
+    與錄音熱鍵共用 NSEvent 機制但獨立監聽，預設 right_option+r。"""
+    try:
+        from AppKit import NSEvent, NSKeyDown, NSKeyUp, NSFlagsChanged
+    except ImportError:
+        return
+
+    config = engine.config
+    hotkey_str = config.get("rewrite_hotkey", "")
+    if not hotkey_str:
+        return  # 空字串=關閉功能
+
+    KEY_MAP = {
+        'right_cmd': 54, 'cmd': 55, 'command': 55, 'cmd_l': 55, 'right_command': 54,
+        'right_alt': 61, 'right_option': 61, 'alt': 58, 'option': 58, 'alt_l': 58,
+        'ctrl': 59, 'control': 59, 'shift': 56, 'right_shift': 60, 'space': 49,
+        'f1': 122, 'f2': 120, 'f3': 99, 'f4': 118, 'f5': 96, 'f6': 97, 'f7': 98, 'f8': 100,
+        'a': 0, 'b': 11, 'c': 8, 'd': 2, 'e': 14, 'f': 3, 'g': 5, 'h': 4, 'i': 34, 'j': 38,
+        'k': 40, 'l': 37, 'm': 46, 'n': 45, 'o': 31, 'p': 35, 'q': 12, 'r': 15, 's': 1,
+        't': 17, 'u': 32, 'v': 9, 'w': 13, 'x': 7, 'y': 16, 'z': 6,
+    }
+    target_keys = set()
+    for p in hotkey_str.lower().replace("+", " ").split():
+        if p in KEY_MAP:
+            target_keys.add(KEY_MAP[p])
+    if not target_keys:
+        log("warn", f"Unknown rewrite_hotkey: {hotkey_str}")
+        return
+
+    currently_pressed = set()
+    KEY_EVENT_MASK = (1 << 10) | (1 << 11) | (1 << 12)
+
+    def _on_event(event):
+        nonlocal currently_pressed
+        try:
+            etype = event.type()
+            vk = event.keyCode()
+        except Exception:
+            return
+        if etype == NSKeyDown:
+            currently_pressed.add(vk)
+        elif etype == NSKeyUp:
+            currently_pressed.discard(vk)
+        elif etype == NSFlagsChanged:
+            flags = event.modifierFlags()
+            if vk in target_keys:
+                pressed = False
+                if vk in (54, 55):   pressed = (flags & 0x100000) > 0  # Cmd
+                elif vk in (58, 61): pressed = (flags & 0x80000) > 0   # Alt/Option
+                elif vk in (59, 62): pressed = (flags & 0x40000) > 0   # Ctrl
+                elif vk in (56, 60): pressed = (flags & 0x20000) > 0   # Shift
+                if pressed:
+                    currently_pressed.add(vk)
+                else:
+                    currently_pressed.discard(vk)
+
+        is_active = target_keys.issubset(currently_pressed)
+        if is_active and not getattr(_on_event, "last_active", False):
+            # Rising edge → 觸發改寫（背景執行避免阻塞 event loop）
+            threading.Thread(target=engine.rewrite_selection, daemon=True).start()
+        _on_event.last_active = is_active
+
+    def _global(ev):
+        try: _on_event(ev)
+        except Exception as e: log("warn", f"rewrite global handler: {e}")
+
+    def _local(ev):
+        try: _on_event(ev)
+        except Exception as e: log("warn", f"rewrite local handler: {e}")
+        return ev
+
+    NSEvent.addGlobalMonitorForEventsMatchingMask_handler_(KEY_EVENT_MASK, _global)
+    NSEvent.addLocalMonitorForEventsMatchingMask_handler_(KEY_EVENT_MASK, _local)
+    log("ok", f"Quick-Rewrite hotkey: {hotkey_str}")
 
 
 def _setup_hotkey_pynput(engine):
@@ -850,7 +1177,13 @@ def run_menubar():
 
             # Start hotkey listener
             setup_hotkey(engine)
-            
+
+            # Start Quick-Rewrite hotkey listener (B)
+            setup_rewrite_hotkey(engine)
+
+            # Start Continuous-mode hotkey listener (C)
+            setup_continuous_hotkey(engine)
+
             # Start Clipboard AI Learning observer
             start_clipboard_observer(engine)
 

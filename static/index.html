@@ -428,6 +428,54 @@
         </div>
 
         <div class="form-section">
+          <h3>✏️ Quick-Rewrite（全域改寫熱鍵）</h3>
+          <div style="font-size:12px; color:var(--text3); margin-bottom:12px;">
+            選取任意 App 內的文字 → 按下熱鍵 → LLM 改寫並貼回原處。空白=關閉。
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+            <div>
+              <label style="font-size:12px; color:var(--text2); display:block; margin-bottom:4px;">熱鍵組合</label>
+              <input type="text" id="cfg-rewrite-hotkey" placeholder="right_option+r" style="width:100%; padding:6px 10px; font-size:13px;">
+              <div style="font-size:11px; color:var(--text3); margin-top:4px;">範例：<code>right_option+r</code>、<code>ctrl+shift+r</code>、<code>f5</code></div>
+            </div>
+            <div>
+              <label style="font-size:12px; color:var(--text2); display:block; margin-bottom:4px;">預設風格</label>
+              <select id="cfg-rewrite-style" style="width:100%; padding:6px 10px; font-size:13px;">
+                <option value="concise">精簡（預設）</option>
+                <option value="formal">正式書面</option>
+                <option value="casual">輕鬆口語</option>
+                <option value="email">Email 草稿</option>
+                <option value="technical">技術文件</option>
+                <option value="translate_en">翻譯 → 英文</option>
+                <option value="translate_ja">翻譯 → 日文</option>
+                <option value="translate_zh">翻譯 → 繁中</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <h3>🎙 連續錄音模式（實驗性）</h3>
+          <div style="font-size:12px; color:var(--text3); margin-bottom:12px;">
+            麥克風長開，自動依靜音切句、邊講邊出文字。適合會議記錄/腦力激盪。空白熱鍵=關閉。
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px;">
+            <div>
+              <label style="font-size:12px; color:var(--text2); display:block; margin-bottom:4px;">Toggle 熱鍵</label>
+              <input type="text" id="cfg-continuous-hotkey" placeholder="例如 right_option+l" style="width:100%; padding:6px 10px; font-size:13px;">
+            </div>
+            <div>
+              <label style="font-size:12px; color:var(--text2); display:block; margin-bottom:4px;">切句靜音時間 (秒)</label>
+              <input type="number" id="cfg-continuous-silence" min="0.5" max="5" step="0.1" style="width:100%; padding:6px 10px; font-size:13px;">
+            </div>
+            <div>
+              <label style="font-size:12px; color:var(--text2); display:block; margin-bottom:4px;">最短片段 (秒)</label>
+              <input type="number" id="cfg-continuous-min" min="0.2" max="3" step="0.1" style="width:100%; padding:6px 10px; font-size:13px;">
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section">
           <h3 data-i18n="settings.ui_lang">🌐 表示言語</h3>
           <select id="cfg-ui-language" onchange="setLang(this.value)">
             <option value="ja">🇯🇵 日本語</option>
@@ -502,6 +550,7 @@
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
           <h3 style="margin:0;"><span data-i18n="dict.corrections.title">🔄 修正ルール</span> <span id="corrections-count" style="font-size:13px; font-weight:400; color:var(--text2);"></span></h3>
           <div style="display:flex; gap:8px; align-items:center;">
+            <button class="btn btn-ghost" style="padding:6px 12px; font-size:12px;" onclick="promoteFromHistory()" title="從歷史記錄中找出高頻錯誤模式，自動升級為修正規則">🎯 從歷史學習</button>
             <button class="btn btn-ghost" style="padding:6px 12px; font-size:12px;" onclick="cleanupBadCorrections()" title="清理含換行、純標點對應、跨語意 paraphrase 等壞規則">🧹 清理壞規則</button>
             <input type="text" id="correction-search" data-i18n-placeholder="dict.search.placeholder" placeholder="検索..." oninput="filterCorrections()" style="width:180px; padding:6px 12px; font-size:13px;">
           </div>
@@ -990,6 +1039,11 @@
       document.getElementById('cfg-stt-engine').value = cfg.stt_engine || 'mlx-whisper';
       document.getElementById('cfg-local-whisper-model').value = cfg.local_whisper_model || '';
       document.getElementById('cfg-system-prompt').value = cfg.claude_system_prompt || '';
+      document.getElementById('cfg-rewrite-hotkey').value = cfg.rewrite_hotkey ?? 'right_option+r';
+      document.getElementById('cfg-rewrite-style').value = cfg.default_rewrite_style || 'concise';
+      document.getElementById('cfg-continuous-hotkey').value = cfg.continuous_hotkey ?? '';
+      document.getElementById('cfg-continuous-silence').value = cfg.continuous_silence_duration ?? 1.5;
+      document.getElementById('cfg-continuous-min').value = cfg.continuous_min_segment_duration ?? 0.6;
       document.getElementById('cfg-ui-language').value = cfg.ui_language || 'ja';
       document.getElementById('tog-hybrid').checked = cfg.enable_hybrid_mode ?? true;
       document.getElementById('tog-claude').checked = cfg.enable_claude_polish ?? true;
@@ -1022,6 +1076,11 @@
         auto_paste: document.getElementById('tog-paste').checked,
         enable_fewshot: document.getElementById('tog-fewshot').checked,
         fewshot_count: parseInt(document.getElementById('cfg-fewshot-count').value, 10) || 0,
+        rewrite_hotkey: document.getElementById('cfg-rewrite-hotkey').value.trim(),
+        default_rewrite_style: document.getElementById('cfg-rewrite-style').value,
+        continuous_hotkey: document.getElementById('cfg-continuous-hotkey').value.trim(),
+        continuous_silence_duration: parseFloat(document.getElementById('cfg-continuous-silence').value) || 1.5,
+        continuous_min_segment_duration: parseFloat(document.getElementById('cfg-continuous-min').value) || 0.6,
       };
       const res = await api('/config', { method: 'POST', body: cfg });
       if(res.ok || res.status === 'success' || !res.error) {
@@ -1264,6 +1323,45 @@
       if (!confirm('將清理所有不符合品質規則的修正規則（標點對應、長段落、跨語意 paraphrase 等）。確定？')) return;
       const res = await api('/dictionary/cleanup', { method: 'POST' });
       showToast(`🗑️ 已清理 ${res.removed_count} 條壞規則`);
+      loadDictionary();
+    }
+
+    async function promoteFromHistory() {
+      // Step 1: dry-run
+      const preview = await api('/dictionary/promote_from_history', {
+        method: 'POST',
+        body: { min_freq: 5, source: 'both', apply: false }
+      });
+      const promoted = preview.promoted || [];
+      const sk = preview.skipped_counts || {};
+      const lines = [
+        `預覽結果（min_freq=5）：`,
+        `  ✅ 可升級：${promoted.length} 條`,
+        `  ⏭️ 已存在：${sk.existing||0}`,
+        `  ♻️ OpenCC 已修：${sk.opencc_handled||0}`,
+        `  🌀 子字串幻覺：${sk.substring_relation||0}`,
+        `  🚫 守門員拒絕：${sk.filter_rejected||0}`,
+        ``,
+      ];
+      if (promoted.length === 0) {
+        lines.push(`目前沒有可升級的規則。`);
+        lines.push(`提示：在歷史頁手動編輯不滿意的結果，累積後再來跑。`);
+        alert(lines.join('\n'));
+        return;
+      }
+      lines.push(`待升級 top ${Math.min(20, promoted.length)}:`);
+      for (const p of promoted.slice(0, 20)) {
+        lines.push(`  [${p.freq}×] ${p.wrong} → ${p.right}`);
+      }
+      lines.push(``, `要套用嗎？`);
+      if (!confirm(lines.join('\n'))) return;
+
+      // Step 2: apply
+      const res = await api('/dictionary/promote_from_history', {
+        method: 'POST',
+        body: { min_freq: 5, source: 'both', apply: true }
+      });
+      showToast(`🎯 已升級 ${(res.promoted||[]).length} 條規則`);
       loadDictionary();
     }
 
