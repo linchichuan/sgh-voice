@@ -339,6 +339,49 @@ class Memory:
             recent = self.history[-n:] if self.history else []
         return [h.get("final_text", "") for h in recent]
 
+    def get_few_shot_examples(self, n=3, min_chars=12, max_chars=240):
+        """取得個人化 few-shot 範例：whisper_raw → final_text。
+        優先使用者手動編輯過的（edited=True），不足時 fallback 到 LLM 自動處理過的隱性正例對。
+        範例會被當成 user/assistant 訊息對注入 LLM 的 messages 陣列。"""
+        with self._history_lock:
+            items = list(reversed(self.history))  # 新→舊
+
+        examples = []
+        seen_raw = set()
+
+        def _try_add(h):
+            raw = (h.get("whisper_raw") or "").strip()
+            fin = (h.get("final_text") or "").strip()
+            if not raw or not fin or raw == fin:
+                return False
+            if len(raw) < min_chars or len(raw) > max_chars:
+                return False
+            if len(fin) > max_chars:
+                return False
+            if raw in seen_raw:
+                return False
+            seen_raw.add(raw)
+            examples.append((raw, fin))
+            return True
+
+        # Pass 1: 使用者明確編輯過的（最高品質）
+        for h in items:
+            if not h.get("edited"):
+                continue
+            _try_add(h)
+            if len(examples) >= n:
+                return examples
+
+        # Pass 2: LLM 自動處理過、使用者未編輯（隱性正例）
+        for h in items:
+            if h.get("edited"):
+                continue
+            _try_add(h)
+            if len(examples) >= n:
+                return examples
+
+        return examples
+
     def get_history(self, n=100, search=None):
         """取得歷史紀錄（支援搜尋）"""
         with self._history_lock:

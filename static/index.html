@@ -406,6 +406,20 @@
             </div>
             <label class="switch"><input type="checkbox" id="tog-paste"><span class="slider"></span></label>
           </div>
+          <div class="toggle-row">
+            <div>
+              <div class="toggle-label" data-i18n="settings.fewshot">個人化 Few-shot</div>
+              <div class="toggle-desc" data-i18n="settings.fewshot.desc">最近の認識履歴を LLM に例示して文体を学習させる</div>
+            </div>
+            <label class="switch"><input type="checkbox" id="tog-fewshot"><span class="slider"></span></label>
+          </div>
+          <div class="toggle-row">
+            <div>
+              <div class="toggle-label" data-i18n="settings.fewshot.count">Few-shot 例示数</div>
+              <div class="toggle-desc" data-i18n="settings.fewshot.count.desc">0=オフ / 推奨 2〜5（多いほど忠実、token コスト増）</div>
+            </div>
+            <input type="number" id="cfg-fewshot-count" min="0" max="10" step="1" style="width:60px;text-align:center">
+          </div>
         </div>
 
         <div class="form-section">
@@ -981,6 +995,8 @@
       document.getElementById('tog-claude').checked = cfg.enable_claude_polish ?? true;
       document.getElementById('tog-filler').checked = cfg.enable_filler_removal ?? true;
       document.getElementById('tog-paste').checked = cfg.auto_paste ?? true;
+      document.getElementById('tog-fewshot').checked = cfg.enable_fewshot ?? true;
+      document.getElementById('cfg-fewshot-count').value = cfg.fewshot_count ?? 3;
       updateLlmModelPanel();
     }
 
@@ -1004,6 +1020,8 @@
         enable_claude_polish: document.getElementById('tog-claude').checked,
         enable_filler_removal: document.getElementById('tog-filler').checked,
         auto_paste: document.getElementById('tog-paste').checked,
+        enable_fewshot: document.getElementById('tog-fewshot').checked,
+        fewshot_count: parseInt(document.getElementById('cfg-fewshot-count').value, 10) || 0,
       };
       const res = await api('/config', { method: 'POST', body: cfg });
       if(res.ok || res.status === 'success' || !res.error) {

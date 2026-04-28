@@ -253,6 +253,8 @@ DEFAULT_CONFIG = {
     "enable_claude_polish": True,           # Claude 後處理潤稿
     "enable_auto_learn": True,              # 自動學習修正
     "enable_filler_removal": True,          # 移除填充詞
+    "enable_fewshot": True,                 # 個人化 few-shot：把最近的 raw→final 範例餵給 LLM
+    "fewshot_count": 3,                     # 注入的範例數（0=關閉，建議 2~5；越多越貼但 token 成本越高）
     "enable_auto_format": True,             # 自動格式化
     "enable_self_correction": True,         # 偵測口語修正
     "enable_hybrid_mode": _IS_APPLE_SILICON, # 混合模式開關 (Local + Cloud)，僅 Apple Silicon 預設開啟

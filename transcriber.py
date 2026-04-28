@@ -212,6 +212,26 @@ class Transcriber:
         scene_extra = SCENE_PRESETS.get(self.config.get("active_scene", "general"), {}).get("system_prompt_extra", "")
         return f"{base}\n[Style Guide: {user_style}]\n{scene_extra}".strip()
 
+    def _few_shot_pairs(self, mode=None):
+        """產生個人化 few-shot user/assistant 訊息對。
+        edit 模式（rewrite API）不注入；enable_fewshot 為 False 時不注入。"""
+        if mode == "edit":
+            return []
+        if not self.config.get("enable_fewshot", True):
+            return []
+        n = int(self.config.get("fewshot_count", 3))
+        if n <= 0:
+            return []
+        try:
+            examples = self.memory.get_few_shot_examples(n=n)
+        except Exception:
+            return []
+        pairs = []
+        for raw, fin in examples:
+            pairs.append({"role": "user", "content": raw})
+            pairs.append({"role": "assistant", "content": fin})
+        return pairs
+
     def _dynamic_max_tokens(self, text):
         """依輸入長度動態決定 max_tokens 上限：短句不分配 2048 budget，回應更快。
         經驗值：output ≈ input × 1.4，再加 20% safety margin。"""
@@ -233,7 +253,8 @@ class Transcriber:
             model = self.config.get("groq_model", "llama-3.3-70b-versatile")
             system = self._EDIT_SYSTEM if mode == "edit" else self._get_system_prompt()
             t0 = time.time()
-            resp = client.chat.completions.create(model=model, messages=[{"role": "system", "content": system}, {"role": "user", "content": text}], temperature=0.0, max_tokens=self._dynamic_max_tokens(text))
+            messages = [{"role": "system", "content": system}, *self._few_shot_pairs(mode), {"role": "user", "content": text}]
+            resp = client.chat.completions.create(model=model, messages=messages, temperature=0.0, max_tokens=self._dynamic_max_tokens(text))
             res = re.sub(r'<think>[\s\S]*?</think>|<think>[\s\S]*$', '', resp.choices[0].message.content).strip()
             self._track_usage("groq", model, resp.usage.prompt_tokens, resp.usage.completion_tokens)
             if self._is_llm_hallucination(res, text):
@@ -251,7 +272,8 @@ class Transcriber:
             model = self.config.get("openrouter_model", "qwen/qwen3.6-plus")
             system = self._EDIT_SYSTEM if mode == "edit" else self._get_system_prompt()
             t0 = time.time()
-            resp = client.chat.completions.create(model=model, messages=[{"role": "system", "content": system}, {"role": "user", "content": text}], temperature=0.0, max_tokens=self._dynamic_max_tokens(text), extra_headers={"HTTP-Referer": "https://shingihou.com", "X-Title": "SGH Voice"})
+            messages = [{"role": "system", "content": system}, *self._few_shot_pairs(mode), {"role": "user", "content": text}]
+            resp = client.chat.completions.create(model=model, messages=messages, temperature=0.0, max_tokens=self._dynamic_max_tokens(text), extra_headers={"HTTP-Referer": "https://shingihou.com", "X-Title": "SGH Voice"})
             res = re.sub(r'<think>[\s\S]*?</think>|<think>[\s\S]*$', '', resp.choices[0].message.content).strip()
             self._track_usage("openrouter", model, resp.usage.prompt_tokens, resp.usage.completion_tokens)
             if self._is_llm_hallucination(res, text):
@@ -269,7 +291,8 @@ class Transcriber:
             model = self.config.get("claude_model", "claude-haiku-4-5-20251001")
             system = self._EDIT_SYSTEM if mode == "edit" else self._get_system_prompt()
             t0 = time.time()
-            resp = client.messages.create(model=model, system=system, messages=[{"role": "user", "content": text}], max_tokens=self._dynamic_max_tokens(text), temperature=0.0)
+            messages = [*self._few_shot_pairs(mode), {"role": "user", "content": text}]
+            resp = client.messages.create(model=model, system=system, messages=messages, max_tokens=self._dynamic_max_tokens(text), temperature=0.0)
             res = resp.content[0].text.strip()
             self._track_usage("anthropic", model, resp.usage.input_tokens, resp.usage.output_tokens)
             if self._is_llm_hallucination(res, text):
@@ -287,7 +310,8 @@ class Transcriber:
             model = self.config.get("openai_model", "gpt-4o")
             system = self._EDIT_SYSTEM if mode == "edit" else self._get_system_prompt()
             t0 = time.time()
-            resp = client.chat.completions.create(model=model, messages=[{"role": "system", "content": system}, {"role": "user", "content": text}], temperature=0.0, max_tokens=self._dynamic_max_tokens(text))
+            messages = [{"role": "system", "content": system}, *self._few_shot_pairs(mode), {"role": "user", "content": text}]
+            resp = client.chat.completions.create(model=model, messages=messages, temperature=0.0, max_tokens=self._dynamic_max_tokens(text))
             res = resp.choices[0].message.content.strip()
             self._track_usage("openai", model, resp.usage.prompt_tokens, resp.usage.completion_tokens)
             if self._is_llm_hallucination(res, text):
@@ -300,7 +324,8 @@ class Transcriber:
         if time.time() < self._ollama_backoff_until: return None
         if self.ollama_detector.status != OllamaStatus.CONNECTED: return None
         try:
-            resp = self.local_llm.chat.completions.create(model=self.config.get("local_llm_model", "qwen3.5:latest"), messages=[{"role": "system", "content": self._get_system_prompt()}, {"role": "user", "content": text}], temperature=0.0, max_tokens=1024)
+            messages = [{"role": "system", "content": self._get_system_prompt()}, *self._few_shot_pairs(), {"role": "user", "content": text}]
+            resp = self.local_llm.chat.completions.create(model=self.config.get("local_llm_model", "qwen3.5:latest"), messages=messages, temperature=0.0, max_tokens=1024)
             return resp.choices[0].message.content.strip()
         except Exception:
             self._ollama_fail_count += 1
