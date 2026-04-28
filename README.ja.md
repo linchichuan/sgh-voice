@@ -1,4 +1,4 @@
-# 🎙 SGH Voice — AI 音声入力ツール (v2.0.0)
+# 🎙 SGH Voice — AI 音声入力ツール (v2.1.0)
 
 **[English](README.en.md)** | **日本語** | **[繁體中文](README.md)**
 
@@ -7,24 +7,19 @@
 [![macOS](https://img.shields.io/badge/macOS-Apple_Silicon-black?logo=apple)](https://github.com/linchichuan/sgh-voice/releases)
 [![iOS](https://img.shields.io/badge/iOS-17.0+-blue?logo=apple)](https://github.com/linchichuan/sgh-voice/releases)
 [![Android](https://img.shields.io/badge/Android-8.0+-green?logo=android)](https://github.com/linchichuan/sgh-voice/releases)
-[![Version](https://img.shields.io/badge/Version-2.0.0-green)]()
+[![Version](https://img.shields.io/badge/Version-2.1.0-green)]()
 
 ---
 
-## 🌟 v2.0.0 の新機能
+## 🌟 v2.1.0 の新機能
 
 | 機能 | 詳細 |
 |------|------|
-| **🚀 クロスプラットフォーム版の統一** | macOS DMG、iOS project、Android APK/AAB、README、Firebase Landing Page を v2.0.0 に同期。 |
-| **🎧 RVC/TTS ツールチェーン** | RVC 推論、バッチ TTS、Spotify post-copy、長文音声生成、プロンプト正規化スクリプトを追加。 |
-| **🛡️ 幻覚防止パイプライン** | Claude Haiku 4.5 を安全な既定 LLM に変更し、Whisper prompt 注入、重複除去、短文コマンドの LLM skip を追加。 |
-| **🌐 OpenRouter 統合** | 200以上のモデル対応（無料モデルあり）。デフォルト：Nemotron Nano（実測 ~1.6s）。クラウドバックアップでサービスの安定性を確保。 |
-| **🔌 ワンクリック接続テスト** | Dashboard 設定ページに「LLM接続テスト」ボタンを追加。レイテンシとモデル状態を即時表示。 |
-| **📊 エンジンステータス表示** | 概要ページに現在のSTTエンジン、LLMエンジン＋モデル、使用シーンをリアルタイム表示。 |
-| **🔒 セキュリティ強化** | config.json の権限を 600 に強制、API 設定のホワイトリスト検証で不正アクセスを防止。 |
-| **🧠 ビジネス秘書 Prompt** | LLM 後処理を刷新：論理校正・構造化整形・敬語変換・人間味のある表現。1つのプロンプトで全5エンジンに対応。 |
-| **⚡ 5エンジン LLM ルーティング** | Ollama（ローカル）/ Groq / Claude / OpenAI / OpenRouter、完全フォールバックチェーン。 |
-| **🌍 OS 言語適応** | macOS の言語設定（日/中/英）を自動検出し、UIを最適化。 |
+| **🧠 パーソナライズ Few-shot 後処理** | 最新 3 件の `whisper_raw → final_text` 例を LLM messages に注入し、5 つのエンジンが句読点・語調・用語の癖を学習します。 |
+| **🎯 履歴から辞書候補を学習** | CLI と Dashboard endpoint を追加し、履歴の高頻度修正から辞書候補を dry-run / apply で安全に反映できます。 |
+| **✏️ グローバル Quick-Rewrite ホットキー** | 任意の App で文字を選択して `right_option+r` を押すと、LLM が書き換えて自動で貼り戻します。 |
+| **🎙 連続録音モード** | VAD 自動分割で voice/silence 境界を検出し、末尾無音の切り詰めと最短/最長セグメント保護を行います。 |
+| **💾 音声バックアップ先を外部 SSD へ移動** | 既定の保存先を `/Volumes/Satechi_SSD/voice-input/audio_backup` に変更し、SSD 未マウント時は自動でスキップします。 |
 
 ---
 
@@ -84,7 +79,7 @@
 
 ### インストール手順
 
-1. [Releases](https://github.com/linchichuan/sgh-voice/releases) から `SGH.Voice-2.0.0-apple-silicon.dmg` をダウンロード
+1. [Releases](https://github.com/linchichuan/sgh-voice/releases) から `SGH.Voice-2.1.0-apple-silicon.dmg` をダウンロード
 2. DMG を開き、**Voice Input** を Applications フォルダへドラッグ
 3. 初回起動：右クリック → **開く**（macOS Gatekeeper を一度許可）
 4. メニューバーに 🎙 アイコンが表示されたら **Open Dashboard** をクリック

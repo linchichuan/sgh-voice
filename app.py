@@ -320,7 +320,7 @@ class VoiceEngine:
     """語音輸入核心引擎，被 CLI / MenuBar / Dashboard 共用"""
 
     def __init__(self):
-        self.version = "2.0.0"
+        self.version = "2.1.0"
         self.config = load_config()
         self.memory = Memory()
         self.transcriber = Transcriber(self.config, self.memory)

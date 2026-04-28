@@ -7,7 +7,7 @@ const translations = {
        ============================================================ */
     ja: {
         // Document <head>
-        "meta.title": "SGH Voice — 話すだけで、プロ品質のテキストに。 v2.0.0",
+        "meta.title": "SGH Voice — 話すだけで、プロ品質のテキストに。 v2.1.0",
         "meta.description": "SGH Voice は、あなたの意図を汲み取る AI 音声入力アシスタント。中国語・日本語・英語を自動認識し、口語を洗練された書き言葉へ整えます。データは 100% あなたの手元に。",
 
         // Nav
@@ -20,7 +20,7 @@ const translations = {
         "nav.cta": "無料で始める",
 
         // Hero
-        "hero.badge": "思考を言葉に · v2.0.0",
+        "hero.badge": "思考を言葉に · v2.1.0",
         "hero.title1": "話すだけで、",
         "hero.title2": "プロの文章に。",
         "hero.subtitle": "SGH Voice は、あなたの意図を汲み取る専属速記者のような存在です。単なる文字起こしではなく、無駄な言葉を削ぎ落とし、誤字を直し、完璧に整えます。中・日・英対応、データは 100% あなたの手元に。",
@@ -98,7 +98,7 @@ const translations = {
         "download.label": "ダウンロード",
         "download.title": "今すぐ始めましょう",
         "download.macDesc": "Apple Silicon & Intel 対応",
-        "download.macCta": "Apple Silicon (v2.0.0)",
+        "download.macCta": "Apple Silicon (v2.1.0)",
         "download.macIntel": "Intel Mac",
         "download.iosDesc": "iPhone / iPad (iOS 16+)",
         "download.iosCta": "リリースページ",
@@ -132,7 +132,7 @@ const translations = {
        繁體中文(台灣)
        ============================================================ */
     zh: {
-        "meta.title": "SGH Voice — 隨口一說，即是專業文章。v2.0.0",
+        "meta.title": "SGH Voice — 隨口一說，即是專業文章。v2.1.0",
         "meta.description": "SGH Voice 是懂你的 AI 語音輸入助理。中、日、英自動辨識，將口語整理為流暢的書面文字。資料 100% 由你掌握。",
 
         "nav.features": "主要功能",
@@ -143,7 +143,7 @@ const translations = {
         "nav.privacy": "隱私權",
         "nav.cta": "免費開始",
 
-        "hero.badge": "讓想法流動 · v2.0.0",
+        "hero.badge": "讓想法流動 · v2.1.0",
         "hero.title1": "隨口一說，",
         "hero.title2": "即是專業文章。",
         "hero.subtitle": "SGH Voice 就像一位懂你的速記員。它不只是轉錄，更會自動過濾廢話、修正錯字、精確排版。支援中日英混合，資料 100% 掌握在你自己手中。",
@@ -216,7 +216,7 @@ const translations = {
         "download.label": "立即下載",
         "download.title": "現在就開始",
         "download.macDesc": "支援 Apple Silicon 與 Intel",
-        "download.macCta": "Apple Silicon (v2.0.0)",
+        "download.macCta": "Apple Silicon (v2.1.0)",
         "download.macIntel": "Intel Mac",
         "download.iosDesc": "iPhone / iPad (iOS 16+)",
         "download.iosCta": "前往發行頁",
@@ -248,7 +248,7 @@ const translations = {
        English
        ============================================================ */
     en: {
-        "meta.title": "SGH Voice — Just speak. Get professional text. v2.0.0",
+        "meta.title": "SGH Voice — Just speak. Get professional text. v2.1.0",
         "meta.description": "SGH Voice is an AI voice-input assistant that understands you. Auto-detects Chinese, Japanese, and English, and turns spontaneous speech into polished prose. 100% private — your data stays with you.",
 
         "nav.features": "Features",
@@ -259,7 +259,7 @@ const translations = {
         "nav.privacy": "Privacy",
         "nav.cta": "Get Started Free",
 
-        "hero.badge": "Flow your ideas · v2.0.0",
+        "hero.badge": "Flow your ideas · v2.1.0",
         "hero.title1": "Just speak —",
         "hero.title2": "get professional text.",
         "hero.subtitle": "SGH Voice is like an intuitive stenographer. Beyond mere transcription, it filters fillers, corrects typos, and formats perfectly. Trilingual (CN / JA / EN), private by design — 100% local data.",
@@ -332,7 +332,7 @@ const translations = {
         "download.label": "Download",
         "download.title": "Get started now",
         "download.macDesc": "Apple Silicon & Intel",
-        "download.macCta": "Apple Silicon (v2.0.0)",
+        "download.macCta": "Apple Silicon (v2.1.0)",
         "download.macIntel": "Intel Mac",
         "download.iosDesc": "iPhone / iPad (iOS 16+)",
         "download.iosCta": "Release page",

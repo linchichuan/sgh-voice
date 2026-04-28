@@ -1,4 +1,4 @@
-# 🎙 SGH Voice — 讓想法流動，不再卡在鍵盤上 (v2.0.0)
+# 🎙 SGH Voice — 讓想法流動，不再卡在鍵盤上 (v2.1.0)
 
 **[English](README.en.md) | [日本語](README.ja.md) | 繁體中文**
 
@@ -7,25 +7,21 @@
 [![macOS](https://img.shields.io/badge/macOS-Apple_Silicon-black?logo=apple)](https://github.com/linchichuan/sgh-voice/releases)
 [![iOS](https://img.shields.io/badge/iOS-17.0+-blue?logo=apple)](https://github.com/linchichuan/sgh-voice/releases)
 [![Android](https://img.shields.io/badge/Android-8.0+-green?logo=android)](https://github.com/linchichuan/sgh-voice/releases)
-[![Version](https://img.shields.io/badge/Version-2.0.0-green)]()
+[![Version](https://img.shields.io/badge/Version-2.1.0-green)]()
 
 ---
 
-## 🌟 v2.0.0 重大更新：三平台版本同步與語音管線升級
+## 🌟 v2.1.0 重大更新：個人化與生產力升級
 
-本次把 macOS、iOS、Android、GitHub Release 與 Firebase 下載頁統一到 v2.0.0，並延續 v1.9.9 的反幻覺管線，補齊 RVC/TTS 相關工具與長音訊處理腳本。
+本次新增個人化 few-shot 後處理、全域 Quick-Rewrite 熱鍵、連續錄音模式與 VAD 自動分段，讓語音輸入更貼近個人寫作習慣，也更適合長時間工作流。
 
 | 重點修復 | 說明 |
 |------|------|
-| **🚀 三平台版本統一** | macOS DMG、iOS project、Android APK/AAB、README、Firebase Landing Page 全部同步為 v2.0.0。 |
-| **🎧 RVC/TTS 工具鏈整合** | 新增 RVC 推論、批次 TTS、Spotify post-copy、長篇語音生成與提示文字正規化腳本。 |
-| **🎯 預設 LLM 改為 Claude Haiku 4.5** | **(Critical)** Groq + `gpt-oss-120b`（OpenAI 開源 reasoning 模型）幻覺率達 11.9%，會主動「重寫」輸入。改回 Claude 後降至 2.5%，差距 4.7 倍。 |
-| **🔤 Whisper STT 注入個人詞庫** | **(New)** `_local_stt` / `_groq_stt` / `_whisper_api_fallback` 三函數現在會把使用者 `custom_words` + 場景詞彙 + 基礎詞庫一起餵給 Whisper，專有名詞首次正確率大幅提升。 |
-| **🛡️ 三層幻覺檢測** | 66 個對話起手詞 + 9 個中段助理句型 + bigram 重疊率（< 30% 嚴判 / < 50% 配合縮減判定 / < 55% 配合擴寫判定）。 |
-| **♻️ Whisper 重複幻覺 Sanitizer** | 偵測連續同一片段重複 ≥5 次（如「11.11.11...」、「財務所×16」），自動截斷到第一次出現。 |
-| **⚡ 短指令自動 Skip LLM** | ≤60 字 + 全中日文 + 含動作詞（請、幫我、你幫、繼續、處理一下…）→ 直接跳過 LLM，避免被當成對話回答。 |
-| **🎛️ System Prompt 完全重寫** | 移除舊版「條列呈現/長文整理」等誘導改寫的字眼，改成嚴格 transcoder 風格 + 雙語明確示範。 |
-| **💾 啟用音檔備份** | 預設備份到 `~/.voice-input/audio_backup/`，為將來 CER 趨勢測試累積素材。 |
+| **🧠 個人化 Few-shot 後處理** | 最近 3 筆 `whisper_raw → final_text` 歷史會自動注入 LLM messages，讓 5 個引擎沿用使用者標點、語氣與用詞習慣。 |
+| **🎯 Dictionary 從歷史學習** | 新增 CLI 與 Dashboard endpoint，可從歷史修正中提取高頻詞典候選，支援 dry-run / apply 兩段式流程。 |
+| **✏️ 全域 Quick-Rewrite 熱鍵** | 選取任意 App 文字後按 `right_option+r`，LLM 會改寫並自動貼回，支援 concise/formal/casual/email/technical/translate 等風格。 |
+| **🎙 連續錄音模式** | 新增 VAD 自動分段，支援 voice/silence 邊界偵測、最短/最長片段保護與尾端靜音裁切。 |
+| **💾 錄音檔外移** | 音檔備份預設移至 `/Volumes/Satechi_SSD/voice-input/audio_backup`，SSD 未掛載時自動略過備份。 |
 
 ---
 

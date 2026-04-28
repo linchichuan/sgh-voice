@@ -1,4 +1,4 @@
-# 🎙 SGH Voice — AI Voice Input Tool (v2.0.0)
+# 🎙 SGH Voice — AI Voice Input Tool (v2.1.0)
 
 **English** | **[日本語](README.ja.md)** | **[繁體中文](README.md)**
 
@@ -7,24 +7,19 @@
 [![macOS](https://img.shields.io/badge/macOS-Apple_Silicon-black?logo=apple)](https://github.com/linchichuan/sgh-voice/releases)
 [![iOS](https://img.shields.io/badge/iOS-17.0+-blue?logo=apple)](https://github.com/linchichuan/sgh-voice/releases)
 [![Android](https://img.shields.io/badge/Android-8.0+-green?logo=android)](https://github.com/linchichuan/sgh-voice/releases)
-[![Version](https://img.shields.io/badge/Version-2.0.0-green)]()
+[![Version](https://img.shields.io/badge/Version-2.1.0-green)]()
 
 ---
 
-## 🌟 What's New in v2.0.0
+## 🌟 What's New in v2.1.0
 
 | Feature | Details |
 |---------|---------|
-| **🚀 Unified Cross-Platform Release** | macOS DMG, iOS project, Android APK/AAB, README, and Firebase landing page are synchronized to v2.0.0. |
-| **🎧 RVC/TTS Toolchain** | Added RVC inference, batch TTS, Spotify post-copy, long-form voice generation, and prompt normalization scripts. |
-| **🛡️ Anti-Hallucination Pipeline** | Claude Haiku 4.5 is the safer default LLM, with Whisper prompt injection, overlap checks, repetition sanitizing, and short-command LLM skip logic. |
-| **🌐 OpenRouter Integration** | 200+ models including free ones. Default: Nemotron Nano (~1.6s). Cloud backup ensures service never goes down. |
-| **🔌 One-Click Connection Test** | New "Test LLM Connection" button in Dashboard settings — instantly shows latency and model status. |
-| **📊 Engine Status Dashboard** | Overview page now shows current STT engine, LLM engine + model, and active scene at a glance. |
-| **🔒 Security Hardening** | config.json enforced 600 permissions, API field whitelist validation, prevents unauthorized access. |
-| **🧠 Business Secretary Prompt** | Redesigned LLM post-processing: logic correction, structured formatting, Japanese keigo conversion, humanized wording. One prompt powers all 5 engines. |
-| **⚡ 5-Engine LLM Routing** | Ollama (local) / Groq / Claude / OpenAI / OpenRouter with full fallback chain coverage. |
-| **🌍 OS Language Adaptation** | Auto-detects your macOS language (JA/ZH/EN) for the friendliest UI experience. |
+| **🧠 Personalized Few-Shot Post-Processing** | The latest 3 `whisper_raw → final_text` examples are injected into LLM messages so all 5 engines follow your punctuation, wording, and style. |
+| **🎯 Dictionary Learning from History** | New CLI and Dashboard endpoint promote high-frequency corrections from history with dry-run / apply safeguards. |
+| **✏️ Global Quick-Rewrite Hotkey** | Select text in any app, press `right_option+r`, and SGH Voice rewrites it with LLM fallback before pasting it back. |
+| **🎙 Continuous Voice Mode** | VAD auto-segmentation detects voice/silence boundaries, clips trailing silence, and protects minimum/maximum segment length. |
+| **💾 External Audio Backup** | Audio backups now default to `/Volumes/Satechi_SSD/voice-input/audio_backup`; backup is skipped automatically when the SSD is not mounted. |
 
 ---
 
@@ -84,7 +79,7 @@ This tool offers maximum flexibility — run entirely locally for free, or use p
 
 ### Installation
 
-1. Download `SGH.Voice-2.0.0-apple-silicon.dmg` from [Releases](https://github.com/linchichuan/sgh-voice/releases)
+1. Download `SGH.Voice-2.1.0-apple-silicon.dmg` from [Releases](https://github.com/linchichuan/sgh-voice/releases)
 2. Drag **Voice Input** to Applications
 3. First launch: Right-click → **Open** (allow macOS Gatekeeper once)
 4. Menu bar shows 🎙 icon → click **Open Dashboard**

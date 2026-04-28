@@ -12,7 +12,7 @@ R='\033[0;31m'
 C='\033[0;36m'
 N='\033[0m'
 
-VERSION="2.0.0"
+VERSION="2.1.0"
 APP_NAME="SGH Voice"
 DMG_APP_NAME="SGH.Voice"
 ARCH=$(uname -m)
