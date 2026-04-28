@@ -266,6 +266,8 @@ DEFAULT_CONFIG = {
     "audio_gate_clipping_max": 0.05,        # 削峰樣本比例上限（>5% 視為失真）
     "audio_gate_crest_min": 1.8,            # crest factor 下限（<1.8 疑似純噪音平頂）
     "audio_gate_crest_max": 60.0,           # crest factor 上限（>60 疑似單一爆音）
+    "enable_voice_commands": True,          # 句尾 meta-command（「以上翻成英文」「改正式」等）
+    "enable_transcript_overlay": True,      # 完成後浮動視窗顯示節錄文字 ~2.5s（連續模式必備）
     "enable_auto_format": True,             # 自動格式化
     "enable_self_correction": True,         # 偵測口語修正
     "enable_hybrid_mode": _IS_APPLE_SILICON, # 混合模式開關 (Local + Cloud)，僅 Apple Silicon 預設開啟

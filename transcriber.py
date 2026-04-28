@@ -359,7 +359,7 @@ class Transcriber:
             model = self.config.get("claude_model", "claude-haiku-4-5-20251001")
             system = self._EDIT_SYSTEM if mode == "edit" else self._get_system_prompt()
             t0 = time.time()
-            messages = [*self._few_shot_pairs(mode), {"role": "user", "content": text}]
+            messages = [*self._few_shot_pairs(mode), {"role": "user", "content": self._wrap_edit_text(text, edit_context) if mode == "edit" else text}]
             resp = client.messages.create(model=model, system=system, messages=messages, max_tokens=self._dynamic_max_tokens(text), temperature=0.0)
             res = resp.content[0].text.strip()
             self._track_usage("anthropic", model, resp.usage.input_tokens, resp.usage.output_tokens)

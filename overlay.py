@@ -37,7 +37,11 @@ if HAS_APPKIT:
         @objc.python_method
         def _apply(self):
             """實際在主執行緒上更新 UI"""
-            self._overlay._do_update(self._pending_status)
+            payload = self._pending_status
+            if isinstance(payload, tuple) and len(payload) >= 2 and payload[0] == "__transcript__":
+                self._overlay._do_show_transcript(payload[1], payload[2] if len(payload) > 2 else 2.5)
+            else:
+                self._overlay._do_update(payload)
 
         def applyUpdate_(self, _sender):
             self._apply()
@@ -200,3 +204,68 @@ class StatusOverlay:
         if self._timer:
             self._timer.invalidate()
             self._timer = None
+
+    # ─── 即時轉寫顯示（C 連續模式 / 一般模式皆可用）────────
+    def show_transcript(self, text, duration=2.5):
+        """顯示最近一段轉寫結果，N 秒後自動淡出。Thread-safe。"""
+        if not HAS_APPKIT or not self._window or not text:
+            return
+        if threading.current_thread() is threading.main_thread():
+            self._do_show_transcript(text, duration)
+        else:
+            # 透過 _updater 排程到主執行緒
+            payload = ("__transcript__", text, duration)
+            self._updater._pending_status = payload
+            self._updater.performSelectorOnMainThread_withObject_waitUntilDone_(
+                "applyUpdate:", None, True
+            )
+
+    def _do_show_transcript(self, text, duration):
+        """主執行緒：拓寬視窗 + 顯示節錄文字 + 自動淡出。"""
+        snippet = text.strip().replace("\n", " ")
+        if len(snippet) > 70:
+            snippet = snippet[:68] + "…"
+
+        screen = AppKit.NSScreen.mainScreen()
+        if not screen:
+            return
+        screen_frame = screen.frame()
+        # 動態寬度：依文字長度估算（中文 ~16px / 字, 英文 ~9px）
+        char_w = 16 if any(ord(c) > 0x4e00 for c in snippet) else 11
+        w = max(280, min(560, len(snippet) * char_w + 60))
+        h = 56
+        x = (screen_frame.size.width - w) / 2
+        y = screen_frame.size.height * 0.10
+        self._window.setFrame_display_animate_(Foundation.NSMakeRect(x, y, w, h), True, False)
+
+        # 重新置中 label
+        self._label.setFrame_(Foundation.NSMakeRect(8, 16, w - 16, 24))
+        self._label.setStringValue_(snippet)
+        self._label.setTextColor_(
+            AppKit.NSColor.colorWithCalibratedRed_green_blue_alpha_(0.85, 0.95, 1.0, 1.0)
+        )
+        self._label.setFont_(AppKit.NSFont.systemFontOfSize_weight_(13, AppKit.NSFontWeightRegular))
+        self._stop_animation()
+        self._window.orderFront_(None)
+
+        Foundation.NSTimer.scheduledTimerWithTimeInterval_repeats_block_(
+            duration, False, lambda t: self._fade_out()
+        )
+
+    def _fade_out(self):
+        if not self._window:
+            return
+        try:
+            self._window.orderOut_(None)
+            # 還原原本尺寸（180x40）以免下次 status 顯示時太寬
+            screen = AppKit.NSScreen.mainScreen()
+            if screen:
+                sf = screen.frame()
+                w, h = 180, 40
+                x = (sf.size.width - w) / 2
+                y = sf.size.height * 0.10
+                self._window.setFrame_display_(Foundation.NSMakeRect(x, y, w, h), False)
+                self._label.setFrame_(Foundation.NSMakeRect(0, 10, w, 20))
+                self._label.setFont_(AppKit.NSFont.systemFontOfSize_weight_(15, AppKit.NSFontWeightMedium))
+        except Exception:
+            pass

@@ -239,10 +239,18 @@ def api_remove_word():
 
 @app.route("/api/dictionary/correction", methods=["POST"])
 def api_add_correction():
+    """新增 correction 規則。所有 UI 路徑都過守門員，防止亂加標點/單字偽規則。"""
     wrong = request.json.get("wrong", "").strip()
     right = request.json.get("right", "").strip()
-    if wrong and right:
-        memory.add_correction(wrong, right)
+    if not wrong or not right:
+        return jsonify({"ok": False, "error": "wrong 和 right 必填"}), 400
+    ok = memory.add_correction(wrong, right)
+    if not ok:
+        return jsonify({
+            "ok": False,
+            "rejected": True,
+            "error": "被守門員拒絕：可能是純標點對應、單字↔多字、長度差異過大或跨語意 paraphrase。",
+        }), 400
     return jsonify({"ok": True})
 
 

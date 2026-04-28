@@ -410,7 +410,12 @@ class VoiceEngine:
                         paste_text(final)
                     except Exception as e:
                         log("warn", f"Paste: {e}")
-                self.overlay.show("done")
+                # #2 即時轉寫 overlay：顯示節錄 ~2.5s
+                if self.config.get("enable_transcript_overlay", True):
+                    try: self.overlay.show_transcript(final, duration=2.5)
+                    except Exception: self.overlay.show("done")
+                else:
+                    self.overlay.show("done")
             else:
                 log("warn", "無有效音訊，已略過")
                 log_sep()
@@ -545,6 +550,8 @@ class VoiceEngine:
                 if self.config.get("auto_paste", True):
                     try: paste_text(final)
                     except Exception as e: log("warn", f"continuous paste: {e}")
+                try: self.overlay.show_transcript(final, duration=2.5)
+                except Exception: pass
                 log("ok", f"[continuous] {final[:60]}")
             except Exception as e:
                 log("error", f"continuous segment: {e}")

@@ -281,10 +281,17 @@ class Memory:
             save_dictionary(self.dictionary)
         return removed
 
-    def add_correction(self, wrong, right):
-        """手動新增修正規則"""
+    def add_correction(self, wrong, right, force=False):
+        """新增 corrections 規則。預設過守門員防止偽規則（標點對應、跨語意 paraphrase 等）。
+        force=True 才允許繞過守門員（僅供 CLI/測試使用，UI 路徑禁止傳 force）。
+        回傳：True=已寫入，False=被守門員拒絕（rejected）。"""
+        if not wrong or not right or wrong == right:
+            return False
+        if not force and not self._is_meaningful_correction(wrong, right, source="manual"):
+            return False
         self.dictionary.setdefault("corrections", {})[wrong] = right
         save_dictionary(self.dictionary)
+        return True
 
     def get_style_profile(self):
         """獲取用戶個人風格特徵描述（用於注入 Prompt）"""
