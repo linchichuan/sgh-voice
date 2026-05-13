@@ -10,11 +10,13 @@
       "static/index.html",
       "transcriber.py"
     ],
-    "touched_files": [],
+    "touched_files": [
+      "app.py"
+    ],
     "updated_at": "2026-05-13T03:33:27Z"
   },
-  "updated_at": "2026-05-13T03:33:27Z",
-  "has_code_change": false,
+  "updated_at": "2026-05-13T12:44:29Z",
+  "has_code_change": true,
   "has_doc_change": false,
   "code_review": {
     "executed": false,
@@ -29,10 +31,16 @@
     "passed": false
   },
   "aggregate_gate": {
-    "executed": false
+    "executed": false,
+    "gate": null,
+    "reason": null
   },
   "iteration_history": {
     "current_round": 0,
     "findings_by_round": []
-  }
+  },
+  "changed_files_since_review": [
+    "/Users/lin/voice-input/app.py"
+  ],
+  "review_phase": "pending_review"
 }

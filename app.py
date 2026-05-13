@@ -328,6 +328,8 @@ class VoiceEngine:
         self.overlay = StatusOverlay()
         self.is_recording = False
         self._on_status_change = None  # callback(status_str)
+        self._watchdog_timer = None
+        self._record_start_ts = None
 
     def start_background_tasks(self):
         """主程式啟動後再跑背景任務，避免搶佔啟動時的系統資源"""
@@ -346,10 +348,49 @@ class VoiceEngine:
         if self.is_recording:
             return
         self.is_recording = True
+        self._record_start_ts = time.time()
         self.overlay.show("recording")
         self._safe_status_change("recording")
         self.recorder.start()
         log("rec", "錄音中…")
+        self._arm_watchdog()
+
+    def _arm_watchdog(self):
+        """錄音保險：超過 max 秒仍在錄音 → 強制停止（防 hotkey 卡住）。"""
+        self._cancel_watchdog()
+        try:
+            max_sec = float(self.config.get("pushtotalk_max_seconds", 180))
+        except Exception:
+            max_sec = 180.0
+        if max_sec <= 0:
+            return
+
+        def _fire():
+            if not self.is_recording:
+                return
+            elapsed = time.time() - (self._record_start_ts or time.time())
+            log("warn", f"⏱ 錄音已 {elapsed:.0f}s 超過上限 {max_sec:.0f}s，自動停止（防止 hotkey 卡住）")
+            try:
+                self.stop_and_process()
+            except Exception as e:
+                log("error", f"watchdog stop_and_process error: {e}")
+                # 保底：即使 stop_and_process 失敗也要重設狀態
+                self.is_recording = False
+                try: self.overlay.show("idle")
+                except Exception: pass
+                self._safe_status_change("idle")
+
+        t = threading.Timer(max_sec, _fire)
+        t.daemon = True
+        t.start()
+        self._watchdog_timer = t
+
+    def _cancel_watchdog(self):
+        t = self._watchdog_timer
+        if t is not None:
+            try: t.cancel()
+            except Exception: pass
+            self._watchdog_timer = None
 
     def _safe_status_change(self, status):
         """Thread-safe 狀態更新（rumps NSStatusItem 必須在 main thread 更新）"""
@@ -370,6 +411,9 @@ class VoiceEngine:
         """停止錄音並處理（全面異常防護，避免 .app 閃退）"""
         if not self.is_recording:
             return None
+
+        self._cancel_watchdog()
+        self._record_start_ts = None
 
         result = None
         try:
@@ -706,16 +750,39 @@ def setup_hotkey(engine):
         elif etype == NSFlagsChanged:
             flags = event.modifierFlags()
             if vk in target_keys:
-                is_pressed = False
-                if vk == 54 or vk == 55:  # Cmd
-                    is_pressed = (flags & 0x100000) > 0
-                elif vk == 58 or vk == 61:  # Alt
-                    is_pressed = (flags & 0x80000) > 0
-                elif vk == 59 or vk == 62:  # Ctrl
-                    is_pressed = (flags & 0x40000) > 0
-                elif vk == 56 or vk == 60:  # Shift
-                    is_pressed = (flags & 0x20000) > 0
-                
+                # 用 device-dependent bits 區分左右修飾鍵，避免另一邊也按住時誤判
+                # 參考 IOKit/hidsystem/IOLLEvent.h (NX_DEVICE*KEYMASK)
+                # 例：right_cmd 釋放時，若 left_cmd 仍按住，generic Cmd bit 仍會是 1，
+                #     必須用 RCMD bit 才能正確判斷 right_cmd 的真實狀態
+                MASK_BY_VK = {
+                    55: 0x8,     # Left Cmd
+                    54: 0x10,    # Right Cmd
+                    58: 0x20,    # Left Alt
+                    61: 0x40,    # Right Alt
+                    59: 0x1,     # Left Ctrl
+                    62: 0x2000,  # Right Ctrl
+                    56: 0x2,     # Left Shift
+                    60: 0x4,     # Right Shift
+                }
+                # generic fallback：若 device-dependent bit 不可用（罕見：軟體鍵盤 / KVM）
+                GENERIC_BY_VK = {
+                    54: 0x100000, 55: 0x100000,  # Cmd
+                    58: 0x80000,  61: 0x80000,   # Alt
+                    59: 0x40000,  62: 0x40000,   # Ctrl
+                    56: 0x20000,  60: 0x20000,   # Shift
+                }
+                bit = MASK_BY_VK.get(vk, 0)
+                generic_bit = GENERIC_BY_VK.get(vk, 0)
+                if bit and (flags & bit):
+                    is_pressed = True
+                elif bit and not (flags & generic_bit):
+                    # device bit 沒亮、generic 也沒亮 → 確定釋放
+                    is_pressed = False
+                else:
+                    # device bit 沒亮但 generic 還亮：可能是另一邊還按著，
+                    # 此鍵已經釋放；但保險起見不誤判，視為釋放
+                    is_pressed = False
+
                 if is_pressed:
                     currently_pressed.add(vk)
                 else:
