@@ -181,7 +181,30 @@
     .today-meta-item .m-val { font-size: 20px; font-weight: 800; }
     .today-meta-item .m-label { font-size: 11px; color: var(--text3); margin-top: 2px; }
   </style>
+
+<script>
+window.copyToClipboard = function(text) {
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(text).catch(err => { fallbackCopy(text); });
+  } else {
+    fallbackCopy(text);
+  }
+  function fallbackCopy(t) {
+    var textArea = document.createElement("textarea");
+    textArea.value = t;
+    textArea.style.position = "fixed";
+    textArea.style.left = "-999999px";
+    textArea.style.top = "-999999px";
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    try { document.execCommand("copy"); } catch (e) { console.error(e); }
+    textArea.remove();
+  }
+};
+</script>
 </head>
+
 
 <body>
   <aside class="sidebar">
@@ -1001,7 +1024,7 @@
                 <span style="background:${llmColor}; color:#fff; padding:1px 6px; border-radius:3px;">LLM:${esc(llm)}</span>
                 ${h.process_time ? `<span>${h.process_time}s</span>` : ''}
                 <span style="margin-left:auto; display:flex; gap:6px;">
-                  <button class="btn btn-ghost" style="padding:2px 8px; font-size:11px;" onclick="navigator.clipboard.writeText(${JSON.stringify(final)})">複製</button>
+                  <button class="btn btn-ghost" style="padding:2px 8px; font-size:11px;" onclick="window.copyToClipboard(this.dataset.text)" data-text="${esc(final).replace(/&/g, '&amp;').replace(/"/g, '&quot;')}">複製</button>
                   <button class="btn btn-ghost" style="padding:2px 8px; font-size:11px; color:#dc2626;" onclick="deleteHistory('${esc(h.timestamp)}')">刪除</button>
                 </span>
               </div>

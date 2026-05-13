@@ -1,0 +1,38 @@
+{
+  "schema_version": 2,
+  "session_id": "7ed6b28a-3a8a-46f0-bbc2-c632a49a93c6",
+  "session_commit_scope": {
+    "session_id": "7ed6b28a-3a8a-46f0-bbc2-c632a49a93c6",
+    "baseline_dirty_files": [
+      ".claude_review_state.json",
+      "memory.py",
+      "overlay.py",
+      "static/index.html",
+      "transcriber.py"
+    ],
+    "touched_files": [],
+    "updated_at": "2026-05-13T03:33:27Z"
+  },
+  "updated_at": "2026-05-13T03:33:27Z",
+  "has_code_change": false,
+  "has_doc_change": false,
+  "code_review": {
+    "executed": false,
+    "passed": false
+  },
+  "doc_review": {
+    "executed": false,
+    "passed": false
+  },
+  "precommit": {
+    "executed": false,
+    "passed": false
+  },
+  "aggregate_gate": {
+    "executed": false
+  },
+  "iteration_history": {
+    "current_round": 0,
+    "findings_by_round": []
+  }
+}

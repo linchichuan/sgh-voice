@@ -31,7 +31,7 @@ if HAS_APPKIT:
             """從任何執行緒呼叫，排程到主執行緒執行"""
             self._pending_status = status
             self.performSelectorOnMainThread_withObject_waitUntilDone_(
-                "applyUpdate:", None, True
+                "applyUpdate:", None, False
             )
 
         @objc.python_method

@@ -18,10 +18,13 @@ class Memory:
         self.history = load_history()
         self._history_lock = threading.Lock()
         self._history_write_count = 0
+        # 自動清理不合規的詞庫規則（避免壞規則堆積）
+        self.cleanup_bad_corrections()
 
     def reload(self):
         self.dictionary = load_dictionary()
         self.history = load_history()
+        self.cleanup_bad_corrections()
 
     # ─── Whisper Prompt ──────────────────────────────────
 
@@ -234,20 +237,21 @@ class Memory:
         return learned
 
     def cleanup_bad_corrections(self):
-        """清理現有 corrections 中不符合守門規則的條目。回傳被刪除的條目列表。"""
+        """清理現有 corrections 中不符合守門規則的條目（自動執行）。"""
         corr = self.dictionary.get("corrections", {})
         # 與 BASE_CORRECTIONS 重複的條目視為合法（基底有就不刪）
         base_keys = set(BASE_CORRECTIONS.keys())
-        removed = []
+        removed_count = 0
         for w, r in list(corr.items()):
             if w in base_keys:
                 continue
             if not self._is_meaningful_correction(w, r, source="cleanup"):
-                removed.append({"wrong": w, "right": r})
                 del corr[w]
-        if removed:
+                removed_count += 1
+        if removed_count > 0:
             save_dictionary(self.dictionary)
-        return removed
+            print(f" 🧹 已自動清理 {removed_count} 筆不合規的詞庫規則")
+        return []
 
     def add_custom_word(self, word):
         """手動新增詞彙到詞庫"""

@@ -231,11 +231,240 @@ class Transcriber:
         "If unsure whether to edit: DON'T. Output verbatim with punctuation only."
     )
 
-    def _get_system_prompt(self):
+    def _get_system_prompt(self, app_info=None):
+        """建構最終 Prompt，合併：基礎指令 + App 風格 + 個人風格 + 場景指令"""
         base = self.config.get("claude_system_prompt") or self._DICTATE_SYSTEM
+        
+        # 1. App 感知風格
+        app_prompt = ""
+        if app_info and app_info.get("prompt"):
+            app_prompt = f"\n[App Context: {app_info.get('app_name')}]\nTarget Style: {app_info.get('prompt')}"
+        
+        # 2. 個人風格特徵
         user_style = self.memory.get_style_profile()
-        scene_extra = SCENE_PRESETS.get(self.config.get("active_scene", "general"), {}).get("system_prompt_extra", "")
-        return f"{base}\n[Style Guide: {user_style}]\n{scene_extra}".strip()
+        personal_prompt = f"\n[User Personal Style]: {user_style}" if user_style else ""
+        
+        # 3. 場景附加指令
+        scene_key = self.config.get("active_scene", "general")
+        scene_extra = SCENE_PRESETS.get(scene_key, {}).get("system_prompt_extra", "")
+        scene_prompt = f"\n[Scene Context: {scene_key}]\n{scene_extra}" if scene_extra else ""
+
+        return f"{base}{app_prompt}{personal_prompt}{scene_prompt}".strip()
+
+    def transcribe(self, audio_source, audio_duration=0, mode="dictate", edit_context=""):
+        t0 = time.time()
+        is_hybrid = self.config.get("enable_hybrid_mode", True)
+        stt_source, llm_source = "none", "none"
+
+        # ── 自動偵測前景 App (App Awareness) ───────────────
+        app_info = detect_app_style(self.config)
+        app_id = app_info.get("bundle_id")
+
+        if isinstance(audio_source, np.ndarray):
+            ok, reason = self._audio_quality_check(audio_source)
+            if not ok:
+                print(f" 🚫 [audio gate] 跳過：{reason}")
+                return None
+
+        if isinstance(audio_source, np.ndarray) and self.config.get("enable_voiceprint", False):
+            if self._voiceprint_mgr.is_enrolled:
+                vp_score = self._voiceprint_mgr.verify(audio_source)
+                if vp_score < self.config.get("voiceprint_threshold", 0.97): return None
+
+        # ── STT 階段 ─────────────────────────────────────
+        t_stt0 = time.time()
+        raw = None
+        stt_engine = self.config.get("stt_engine", "mlx-whisper")
+        
+        # 進化 5: 資源管理 - 長音訊 (>30s) 優先走 Groq 以節省本地資源
+        if audio_duration > 30 and self.config.get("groq_api_key"):
+            raw = self._groq_stt(audio_source, duration=audio_duration)
+            if raw: stt_source = "groq"
+
+        if not raw:
+            if stt_engine == "groq":
+                raw = self._groq_stt(audio_source, duration=audio_duration)
+                if raw: stt_source = "groq"
+            elif stt_engine != "cloud-only" and is_hybrid:
+                if isinstance(audio_source, np.ndarray) or audio_duration <= self.config.get("hybrid_audio_threshold", 15):
+                    raw = self._local_stt(audio_source)
+                    if raw: stt_source = "local"
+
+        if not raw and self.config.get("groq_api_key"):
+            raw = self._groq_stt(audio_source, duration=audio_duration)
+            if raw: stt_source = "groq"
+
+        if not raw and self.config.get("openai_api_key"):
+            raw = self._whisper_api_fallback(audio_source, duration=audio_duration)
+            if raw: stt_source = "cloud"
+
+        if not raw or not raw.strip(): return None
+        t_stt = time.time() - t_stt0
+
+        # 句尾 meta-command 偵測
+        if mode == "dictate":
+            stripped, override_style = self._detect_voice_command(raw)
+            if override_style:
+                raw = stripped
+                mode = "edit"
+                edit_context = override_style
+                print(f" 🎙→✏️ [voice command] 偵測到指令，切換為 {override_style}")
+
+        scene_key = self.config.get("active_scene", "general")
+        # 進化 3: 詞庫傳播 - 套用 App-Specific Corrections
+        corrected = self.memory.apply_corrections(
+            raw,
+            scene_corrections=SCENE_PRESETS.get(scene_key, {}).get("corrections"),
+            scene_key=scene_key,
+            app_id=app_id,
+        )
+        corrected = self._apply_smart_replace(corrected)
+
+        # ── LLM 階段 ─────────────────────────────────────
+        t_llm0 = time.time()
+        final = None
+        
+        # 進化 1: App Awareness Prompt
+        system_prompt = self._get_system_prompt(app_info)
+
+        if mode == "dictate" and self._should_skip_llm(corrected):
+            final, llm_source = corrected, "skip"
+        elif self.config.get("enable_claude_polish"):
+            pref_engine = self.config.get("llm_engine", "ollama")
+            
+            def try_groq(): return self._groq_llm_process(corrected, mode, edit_context, system_prompt=system_prompt), "groq"
+            def try_or(): return self._openrouter_process(corrected, mode, edit_context, system_prompt=system_prompt), "openrouter"
+            def try_claude(): return self._claude_process(corrected, mode, edit_context, system_prompt=system_prompt), "claude"
+            def try_openai(): return self._openai_process(corrected, mode, edit_context, system_prompt=system_prompt), "openai"
+            def try_ollama():
+                if is_hybrid and mode == "dictate": return self._local_llm_process(corrected, system_prompt=system_prompt), "local"
+                return None, None
+
+
+            routes_map = {
+                "groq": [try_groq, try_or, try_claude, try_openai, try_ollama],
+                "openrouter": [try_or, try_groq, try_claude, try_openai, try_ollama],
+                "claude": [try_claude, try_groq, try_or, try_openai, try_ollama],
+                "openai": [try_openai, try_groq, try_or, try_claude, try_ollama],
+                "ollama": [try_ollama, try_groq, try_or, try_claude, try_openai],
+            }
+            for route in routes_map.get(pref_engine, routes_map["ollama"]):
+                res, source = route()
+                if res: final, llm_source = res, source; break
+
+        if final is None:
+            final = self._local_filler_removal(corrected) if self.config.get("enable_filler_removal") else corrected
+            llm_source = "regex"
+        t_llm = time.time() - t_llm0
+
+        if self._opencc and final: final = self._opencc.convert(final)
+
+        process_time = time.time() - t0
+        try:
+            chars = len(final or "")
+            app_name = app_info.get("app_name", "Unknown")
+            print(f" ⏱  App={app_name} | STT={t_stt:.2f}s({stt_source}) | LLM={t_llm:.2f}s({llm_source}) | total={process_time:.2f}s | {chars}字")
+        except Exception: pass
+
+        # 歷史寫入
+        entry = {
+            "timestamp": datetime.now().isoformat(), "whisper_raw": raw, "final_text": final,
+            "mode": mode, "process_time": round(process_time, 2),
+            "stt_time": round(t_stt, 2), "llm_time": round(t_llm, 2),
+            "stt_source": stt_source, "llm_source": llm_source,
+            "app_name": app_info.get("app_name"), "bundle_id": app_id
+        }
+        threading.Thread(target=self.memory.add_to_history, args=(entry,), daemon=True).start()
+        return {"raw": raw, "final": final, "process_time": process_time}
+
+    def _groq_llm_process(self, text, mode, edit_context, system_prompt=None):
+        api_key = self.config.get("groq_api_key")
+        if not api_key: return None
+        try:
+            client = openai.OpenAI(base_url="https://api.groq.com/openai/v1", api_key=api_key, timeout=self._llm_timeout())
+            model = self.config.get("groq_model", "llama-3.3-70b-versatile")
+            system = self._EDIT_SYSTEM if mode == "edit" else (system_prompt or self._get_system_prompt())
+            user_text = self._wrap_edit_text(text, edit_context) if mode == "edit" else text
+            t0 = time.time()
+            messages = [{"role": "system", "content": system}, *self._few_shot_pairs(mode), {"role": "user", "content": user_text}]
+            resp = client.chat.completions.create(model=model, messages=messages, temperature=0.0, max_tokens=self._dynamic_max_tokens(text))
+            res = re.sub(r'<think>[\s\S]*?</think>|<think>[\s\S]*$', '', resp.choices[0].message.content).strip()
+            self._track_usage("groq", model, resp.usage.prompt_tokens, resp.usage.completion_tokens)
+            if self._is_llm_hallucination(res, text):
+                print(f" ⚠️ [Groq] 偵測到幻覺，已捨棄: {res[:20]}..."); return None
+            print(" " + _t(f"⚡ [Groq] 完成 ({time.time()-t0:.2f}s)", f"⚡ [Groq] 完了", f"⚡ [Groq] Done"))
+            return res
+        except Exception as e:
+            print(f" ⚠️ Groq 失敗/超時: {e}"); return None
+
+    def _openrouter_process(self, text, mode, edit_context, system_prompt=None):
+        api_key = self.config.get("openrouter_api_key")
+        if not api_key: return None
+        try:
+            client = openai.OpenAI(base_url="https://openrouter.ai/api/v1", api_key=api_key, timeout=self._llm_timeout())
+            model = self.config.get("openrouter_model", "qwen/qwen3.6-plus")
+            system = self._EDIT_SYSTEM if mode == "edit" else (system_prompt or self._get_system_prompt())
+            t0 = time.time()
+            messages = [{"role": "system", "content": system}, *self._few_shot_pairs(mode), {"role": "user", "content": self._wrap_edit_text(text, edit_context) if mode == "edit" else text}]
+            resp = client.chat.completions.create(model=model, messages=messages, temperature=0.0, max_tokens=self._dynamic_max_tokens(text), extra_headers={"HTTP-Referer": "https://shingihou.com", "X-Title": "SGH Voice"})
+            res = re.sub(r'<think>[\s\S]*?</think>|<think>[\s\S]*$', '', resp.choices[0].message.content).strip()
+            self._track_usage("openrouter", model, resp.usage.prompt_tokens, resp.usage.completion_tokens)
+            if self._is_llm_hallucination(res, text):
+                print(f" ⚠️ [OpenRouter] 偵測到幻覺，已捨棄"); return None
+            print(" " + _t(f"✅ [OpenRouter] 完成 ({time.time()-t0:.2f}s)", f"✅ [OpenRouter] 完了", f"✅ [OpenRouter] Done"))
+            return res
+        except Exception as e:
+            print(f" ⚠️ OpenRouter 失敗/超時: {e}"); return None
+
+    def _claude_process(self, text, mode, edit_context, system_prompt=None):
+        api_key = self.config.get("anthropic_api_key")
+        if not api_key: return None
+        try:
+            client = anthropic.Anthropic(api_key=api_key, timeout=self._llm_timeout())
+            model = self.config.get("claude_model", "claude-haiku-4-5-20251001")
+            system = self._EDIT_SYSTEM if mode == "edit" else (system_prompt or self._get_system_prompt())
+            t0 = time.time()
+            messages = [*self._few_shot_pairs(mode), {"role": "user", "content": self._wrap_edit_text(text, edit_context) if mode == "edit" else text}]
+            resp = client.messages.create(model=model, system=system, messages=messages, max_tokens=self._dynamic_max_tokens(text), temperature=0.0)
+            res = resp.content[0].text.strip()
+            self._track_usage("anthropic", model, resp.usage.input_tokens, resp.usage.output_tokens)
+            if self._is_llm_hallucination(res, text):
+                print(f" ⚠️ [Claude] 偵測到幻覺，已捨棄: {res[:20]}..."); return None
+            print(" " + _t(f"☁️ [Claude] 完成 ({time.time()-t0:.2f}s)", f"☁️ [Claude] 完了", f"☁️ [Claude] Done"))
+            return res
+        except Exception as e:
+            print(f" ⚠️ Claude 失敗/超時: {e}"); return None
+
+    def _openai_process(self, text, mode, edit_context, system_prompt=None):
+        api_key = self.config.get("openai_api_key")
+        if not api_key: return None
+        try:
+            client = openai.OpenAI(api_key=api_key, timeout=self._llm_timeout())
+            model = self.config.get("openai_model", "gpt-4o")
+            system = self._EDIT_SYSTEM if mode == "edit" else (system_prompt or self._get_system_prompt())
+            t0 = time.time()
+            messages = [{"role": "system", "content": system}, *self._few_shot_pairs(mode), {"role": "user", "content": self._wrap_edit_text(text, edit_context) if mode == "edit" else text}]
+            resp = client.chat.completions.create(model=model, messages=messages, temperature=0.0, max_tokens=self._dynamic_max_tokens(text))
+            res = resp.choices[0].message.content.strip()
+            self._track_usage("openai", model, resp.usage.prompt_tokens, resp.usage.completion_tokens)
+            if self._is_llm_hallucination(res, text):
+                print(f" ⚠️ [OpenAI] 偵測到對話幻覺，已捨棄"); return None
+            print(" " + _t(f"🤖 [OpenAI] 完成", f"🤖 [OpenAI] 完了", f"🤖 [OpenAI] Done"))
+            return res
+        except Exception: return None
+
+    def _local_llm_process(self, text, system_prompt=None):
+        if time.time() < self._ollama_backoff_until: return None
+        if self.ollama_detector.status != OllamaStatus.CONNECTED: return None
+        try:
+            system = system_prompt or self._get_system_prompt()
+            messages = [{"role": "system", "content": system}, *self._few_shot_pairs(), {"role": "user", "content": text}]
+            resp = self.local_llm.chat.completions.create(model=self.config.get("local_llm_model", "qwen3.5:latest"), messages=messages, temperature=0.0, max_tokens=1024)
+            return resp.choices[0].message.content.strip()
+        except Exception:
+            self._ollama_fail_count += 1
+            self._ollama_backoff_until = time.time() + min(120, 5 * (2 ** self._ollama_fail_count))
+            return None
 
     def _audio_quality_check(self, audio_array):
         """音訊品質前置守門。回傳 (ok: bool, reason: str)。
@@ -311,94 +540,6 @@ class Transcriber:
             return text
         directive = self._STYLE_DIRECTIVES.get(edit_context, edit_context)
         return f"{directive}\n\n{text}"
-
-    def _groq_llm_process(self, text, mode, edit_context):
-        api_key = self.config.get("groq_api_key")
-        if not api_key: return None
-        try:
-            client = openai.OpenAI(base_url="https://api.groq.com/openai/v1", api_key=api_key, timeout=self._llm_timeout())
-            model = self.config.get("groq_model", "llama-3.3-70b-versatile")
-            system = self._EDIT_SYSTEM if mode == "edit" else self._get_system_prompt()
-            user_text = self._wrap_edit_text(text, edit_context) if mode == "edit" else text
-            t0 = time.time()
-            messages = [{"role": "system", "content": system}, *self._few_shot_pairs(mode), {"role": "user", "content": user_text}]
-            resp = client.chat.completions.create(model=model, messages=messages, temperature=0.0, max_tokens=self._dynamic_max_tokens(text))
-            res = re.sub(r'<think>[\s\S]*?</think>|<think>[\s\S]*$', '', resp.choices[0].message.content).strip()
-            self._track_usage("groq", model, resp.usage.prompt_tokens, resp.usage.completion_tokens)
-            if self._is_llm_hallucination(res, text):
-                print(f" ⚠️ [Groq] 偵測到幻覺，已捨棄: {res[:20]}..."); return None
-            print(" " + _t(f"⚡ [Groq] 完成 ({time.time()-t0:.2f}s)", f"⚡ [Groq] 完了", f"⚡ [Groq] Done"))
-            return res
-        except Exception as e:
-            print(f" ⚠️ Groq 失敗/超時: {e}"); return None
-
-    def _openrouter_process(self, text, mode, edit_context):
-        api_key = self.config.get("openrouter_api_key")
-        if not api_key: return None
-        try:
-            client = openai.OpenAI(base_url="https://openrouter.ai/api/v1", api_key=api_key, timeout=self._llm_timeout())
-            model = self.config.get("openrouter_model", "qwen/qwen3.6-plus")
-            system = self._EDIT_SYSTEM if mode == "edit" else self._get_system_prompt()
-            t0 = time.time()
-            messages = [{"role": "system", "content": system}, *self._few_shot_pairs(mode), {"role": "user", "content": self._wrap_edit_text(text, edit_context) if mode == "edit" else text}]
-            resp = client.chat.completions.create(model=model, messages=messages, temperature=0.0, max_tokens=self._dynamic_max_tokens(text), extra_headers={"HTTP-Referer": "https://shingihou.com", "X-Title": "SGH Voice"})
-            res = re.sub(r'<think>[\s\S]*?</think>|<think>[\s\S]*$', '', resp.choices[0].message.content).strip()
-            self._track_usage("openrouter", model, resp.usage.prompt_tokens, resp.usage.completion_tokens)
-            if self._is_llm_hallucination(res, text):
-                print(f" ⚠️ [OpenRouter] 偵測到幻覺，已捨棄"); return None
-            print(" " + _t(f"✅ [OpenRouter] 完成 ({time.time()-t0:.2f}s)", f"✅ [OpenRouter] 完了", f"✅ [OpenRouter] Done"))
-            return res
-        except Exception as e:
-            print(f" ⚠️ OpenRouter 失敗/超時: {e}"); return None
-
-    def _claude_process(self, text, mode, edit_context):
-        api_key = self.config.get("anthropic_api_key")
-        if not api_key: return None
-        try:
-            client = anthropic.Anthropic(api_key=api_key, timeout=self._llm_timeout())
-            model = self.config.get("claude_model", "claude-haiku-4-5-20251001")
-            system = self._EDIT_SYSTEM if mode == "edit" else self._get_system_prompt()
-            t0 = time.time()
-            messages = [*self._few_shot_pairs(mode), {"role": "user", "content": self._wrap_edit_text(text, edit_context) if mode == "edit" else text}]
-            resp = client.messages.create(model=model, system=system, messages=messages, max_tokens=self._dynamic_max_tokens(text), temperature=0.0)
-            res = resp.content[0].text.strip()
-            self._track_usage("anthropic", model, resp.usage.input_tokens, resp.usage.output_tokens)
-            if self._is_llm_hallucination(res, text):
-                print(f" ⚠️ [Claude] 偵測到幻覺，已捨棄: {res[:20]}..."); return None
-            print(" " + _t(f"☁️ [Claude] 完成 ({time.time()-t0:.2f}s)", f"☁️ [Claude] 完了", f"☁️ [Claude] Done"))
-            return res
-        except Exception as e:
-            print(f" ⚠️ Claude 失敗/超時: {e}"); return None
-
-    def _openai_process(self, text, mode, edit_context):
-        api_key = self.config.get("openai_api_key")
-        if not api_key: return None
-        try:
-            client = openai.OpenAI(api_key=api_key, timeout=self._llm_timeout())
-            model = self.config.get("openai_model", "gpt-4o")
-            system = self._EDIT_SYSTEM if mode == "edit" else self._get_system_prompt()
-            t0 = time.time()
-            messages = [{"role": "system", "content": system}, *self._few_shot_pairs(mode), {"role": "user", "content": self._wrap_edit_text(text, edit_context) if mode == "edit" else text}]
-            resp = client.chat.completions.create(model=model, messages=messages, temperature=0.0, max_tokens=self._dynamic_max_tokens(text))
-            res = resp.choices[0].message.content.strip()
-            self._track_usage("openai", model, resp.usage.prompt_tokens, resp.usage.completion_tokens)
-            if self._is_llm_hallucination(res, text):
-                print(f" ⚠️ [OpenAI] 偵測到對話幻覺，已捨棄"); return None
-            print(" " + _t(f"🤖 [OpenAI] 完成", f"🤖 [OpenAI] 完了", f"🤖 [OpenAI] Done"))
-            return res
-        except Exception: return None
-
-    def _local_llm_process(self, text):
-        if time.time() < self._ollama_backoff_until: return None
-        if self.ollama_detector.status != OllamaStatus.CONNECTED: return None
-        try:
-            messages = [{"role": "system", "content": self._get_system_prompt()}, *self._few_shot_pairs(), {"role": "user", "content": text}]
-            resp = self.local_llm.chat.completions.create(model=self.config.get("local_llm_model", "qwen3.5:latest"), messages=messages, temperature=0.0, max_tokens=1024)
-            return resp.choices[0].message.content.strip()
-        except Exception:
-            self._ollama_fail_count += 1
-            self._ollama_backoff_until = time.time() + min(120, 5 * (2 ** self._ollama_fail_count))
-            return None
 
     # ─── STT Prompt 建構（注入使用者詞庫 + 場景詞）──────
     _LANG_HINT = "繁體中文, 日本語, English mixed."
