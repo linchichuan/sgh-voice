@@ -358,15 +358,30 @@ def load_history():
     _ensure_dir()
     if os.path.exists(HISTORY_FILE):
         with open(HISTORY_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
+            raw = f.read()
+        if not raw.strip():
+            return []
+        try:
+            history = json.loads(raw)
+            return history if isinstance(history, list) else []
+        except json.JSONDecodeError:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            backup = f"{HISTORY_FILE}.bad.{timestamp}"
+            try:
+                os.replace(HISTORY_FILE, backup)
+            except OSError:
+                pass
+            return []
     return []
 
 
 def save_history(history):
     _ensure_dir()
     history = history[-2000:]  # 保留最近 2000 筆
-    with open(HISTORY_FILE, "w", encoding="utf-8") as f:
+    tmp = HISTORY_FILE + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
         json.dump(history, f, ensure_ascii=False, indent=2)
+    os.replace(tmp, HISTORY_FILE)
 
 
 # ─── Stats ───────────────────────────────────────────────

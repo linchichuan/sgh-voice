@@ -52,6 +52,7 @@ def get_i18n(key, fallback=""):
             'menu_dashboard': '📊 Open Dashboard',
             'menu_record': '🎤 Start Recording',
             'menu_stop': '⏹ Stop Recording',
+            'menu_processing': '⏳ Processing...',
             'menu_quit': 'Quit',
             'notif_learn_title': 'SGH Voice Auto-Learn',
             'notif_learn_body': '📚 Added to dictionary: ',
@@ -68,6 +69,7 @@ def get_i18n(key, fallback=""):
             'menu_dashboard': '📊 ダッシュボード設定',
             'menu_record': '🎤 録音開始',
             'menu_stop': '⏹ 録音停止',
+            'menu_processing': '⏳ 処理中...',
             'menu_quit': '終了',
             'notif_learn_title': 'SGH Voice 自動学習',
             'notif_learn_body': '📚 辞書に追加されました: ',
@@ -84,6 +86,7 @@ def get_i18n(key, fallback=""):
             'menu_dashboard': '📊 開啟 Dashboard',
             'menu_record': '🎤 開始錄音',
             'menu_stop': '⏹ 停止錄音',
+            'menu_processing': '⏳ 辨識處理中...',
             'menu_quit': '退出',
             'notif_learn_title': 'SGH Voice 自動學習',
             'notif_learn_body': '📚 已新增至詞庫：',
@@ -327,6 +330,8 @@ class VoiceEngine:
         self.recorder = Recorder(self.config)
         self.overlay = StatusOverlay()
         self.is_recording = False
+        self.is_processing = False
+        self._state_lock = threading.RLock()
         self._on_status_change = None  # callback(status_str)
         self._watchdog_timer = None
         self._record_start_ts = None
@@ -345,15 +350,29 @@ class VoiceEngine:
         log("ok", "設定已即時重新載入")
 
     def start_recording(self):
-        if self.is_recording:
-            return
-        self.is_recording = True
-        self._record_start_ts = time.time()
-        self.overlay.show("recording")
-        self._safe_status_change("recording")
-        self.recorder.start()
-        log("rec", "錄音中…")
-        self._arm_watchdog()
+        with self._state_lock:
+            if self.is_recording:
+                return False
+            if self.is_processing:
+                log("warn", "上一段語音仍在處理中，略過新的錄音觸發")
+                self._safe_status_change("processing")
+                return False
+            self.is_recording = True
+            self._record_start_ts = time.time()
+
+        try:
+            self.overlay.show("recording")
+            self._safe_status_change("recording")
+            self.recorder.start()
+            log("rec", "錄音中…")
+            self._arm_watchdog()
+            return True
+        except Exception:
+            with self._state_lock:
+                self.is_recording = False
+                self._record_start_ts = None
+            self._safe_status_change("idle")
+            raise
 
     def _arm_watchdog(self):
         """錄音保險：超過 max 秒仍在錄音 → 強制停止（防 hotkey 卡住）。"""
@@ -366,7 +385,9 @@ class VoiceEngine:
             return
 
         def _fire():
-            if not self.is_recording:
+            with self._state_lock:
+                is_recording = self.is_recording
+            if not is_recording:
                 return
             elapsed = time.time() - (self._record_start_ts or time.time())
             log("warn", f"⏱ 錄音已 {elapsed:.0f}s 超過上限 {max_sec:.0f}s，自動停止（防止 hotkey 卡住）")
@@ -375,7 +396,9 @@ class VoiceEngine:
             except Exception as e:
                 log("error", f"watchdog stop_and_process error: {e}")
                 # 保底：即使 stop_and_process 失敗也要重設狀態
-                self.is_recording = False
+                with self._state_lock:
+                    self.is_recording = False
+                    self.is_processing = False
                 try: self.overlay.show("idle")
                 except Exception: pass
                 self._safe_status_change("idle")
@@ -393,24 +416,21 @@ class VoiceEngine:
             self._watchdog_timer = None
 
     def _safe_status_change(self, status):
-        """Thread-safe 狀態更新（rumps NSStatusItem 必須在 main thread 更新）"""
+        """送出狀態變更；menubar callback 會自行排程到主執行緒更新 UI。"""
         if not self._on_status_change:
             return
         try:
-            # 檢查是否在 main thread
-            if threading.current_thread() is threading.main_thread():
-                self._on_status_change(status)
-            else:
-                # 排程到 main thread（透過 rumps 的 timer 機制）
-                import rumps
-                rumps.Timer(lambda t: (self._on_status_change(status), t.stop()), 0.01).start()
+            self._on_status_change(status)
         except Exception as e:
             print(f"Status change error (non-fatal): {e}")
 
     def stop_and_process(self, mode="dictate", edit_context=""):
         """停止錄音並處理（全面異常防護，避免 .app 閃退）"""
-        if not self.is_recording:
-            return None
+        with self._state_lock:
+            if not self.is_recording:
+                return None
+            self.is_recording = False
+            self.is_processing = True
 
         self._cancel_watchdog()
         self._record_start_ts = None
@@ -419,10 +439,10 @@ class VoiceEngine:
         try:
             # 獲取記憶體中的音訊數據與檔案路徑
             audio_array, filepath, duration = self.recorder.stop()
-            self.is_recording = False
 
             self.overlay.show("processing")
             self._safe_status_change("processing")
+            log("info", f"錄音 {duration:.1f}s，開始辨識處理…")
 
             if audio_array is None and not filepath:
                 self.overlay.show("idle")
@@ -488,13 +508,16 @@ class VoiceEngine:
             log("error", f"stop_and_process 未預期錯誤: {e}")
             import traceback
             traceback.print_exc()
-            self.is_recording = False
             try:
                 self.overlay.show("idle")
             except Exception:
                 pass
-
-        self._safe_status_change("idle")
+        finally:
+            with self._state_lock:
+                self.is_recording = False
+                self.is_processing = False
+            self._record_start_ts = None
+            self._safe_status_change("idle")
 
         return result
 
@@ -1238,16 +1261,22 @@ def run_menubar():
     class App(rumps.App):
         def __init__(self):
             super().__init__("🎙", quit_button=None)
+            self.record_item = rumps.MenuItem(get_i18n("menu_record"), callback=self.toggle_rec)
+            self._status_lock = threading.Lock()
+            self._pending_status = "idle"
+            self._current_status = None
             self.menu = [
                 rumps.MenuItem(get_i18n("menu_dashboard"), callback=self.open_dash),
                 None,
-                rumps.MenuItem(get_i18n("menu_record"), callback=self.toggle_rec),
+                self.record_item,
                 None,
                 rumps.MenuItem(get_i18n("menu_quit"), callback=rumps.quit_application),
             ]
 
             # Status callback
-            engine._on_status_change = self._status
+            engine._on_status_change = self.queue_status
+            self._status_timer = rumps.Timer(self.flush_status, 0.1)
+            self._status_timer.start()
 
             # Start hotkey listener
             setup_hotkey(engine)
@@ -1280,24 +1309,37 @@ def run_menubar():
             # 延遲 1.5 秒啟動背景任務，避開 macOS 啟動時的 IMK 通訊高峰
             rumps.Timer(lambda t: (engine.start_background_tasks(), t.stop()), 1.5).start()
 
+        def queue_status(self, s):
+            with self._status_lock:
+                self._pending_status = s
+
+        def flush_status(self, _):
+            with self._status_lock:
+                status = self._pending_status
+            if status != self._current_status:
+                self._status(status)
+
         def _status(self, s):
+            self._current_status = s
             if s == "recording":
                 self.title = "🔴"
+                self.record_item.title = get_i18n("menu_stop")
             elif s == "processing":
                 self.title = "⏳"
+                self.record_item.title = get_i18n("menu_processing")
             else:
                 self.title = "🎙"
+                self.record_item.title = get_i18n("menu_record")
 
         def toggle_rec(self, sender):
             if engine.is_recording:
                 threading.Thread(target=self._process, daemon=True).start()
             else:
                 engine.start_recording()
-                sender.title = "⏹ 停止錄音"
 
         def _process(self):
             engine.stop_and_process()
-            self.menu["🎤 開始錄音"].title = "🎤 開始錄音"
+            self.queue_status("idle")
 
         def open_dash(self, sender):
             port = config.get("dashboard_port", 7865)
