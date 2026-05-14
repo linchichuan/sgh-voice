@@ -59,6 +59,20 @@ def _call_llm(config, prompt, content):
         except Exception as e:
             print(f"⚠️  Groq 失敗: {e}")
 
+    if config.get("openrouter_api_key"):
+        try:
+            import openai
+            client = openai.OpenAI(base_url="https://openrouter.ai/api/v1",
+                                    api_key=config["openrouter_api_key"], timeout=30)
+            resp = client.chat.completions.create(
+                model=config.get("openrouter_model", "qwen/qwen3-30b-a3b:free"),
+                messages=[{"role": "user", "content": full}],
+                temperature=0.2, max_tokens=400,
+            )
+            return resp.choices[0].message.content.strip(), "openrouter"
+        except Exception as e:
+            print(f"⚠️  OpenRouter 失敗: {e}")
+
     if config.get("anthropic_api_key"):
         try:
             import anthropic
