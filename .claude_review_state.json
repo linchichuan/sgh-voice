@@ -9,16 +9,18 @@
       "config.py"
     ],
     "touched_files": [
+      "app.py",
       "config.py",
       "scripts/dictionary_promote_from_history.py",
       "scripts/install-launchd.sh",
       "scripts/launchd/com.shingihou.promote-corrections.plist",
       "scripts/update_style_profile.py",
-      "static/index.html"
+      "static/index.html",
+      "transcriber.py"
     ],
     "updated_at": "2026-05-14T01:52:25Z"
   },
-  "updated_at": "2026-05-14T02:33:20Z",
+  "updated_at": "2026-05-14T11:40:29Z",
   "has_code_change": true,
   "has_doc_change": false,
   "code_review": {
@@ -46,7 +48,8 @@
     "/Users/lin/voice-input/app.py",
     "/Users/lin/voice-input/config.py",
     "/Users/lin/voice-input/scripts/dictionary_promote_from_history.py",
-    "/Users/lin/voice-input/scripts/update_style_profile.py"
+    "/Users/lin/voice-input/scripts/update_style_profile.py",
+    "/Users/lin/voice-input/transcriber.py"
   ],
   "review_phase": "pending_review"
 }

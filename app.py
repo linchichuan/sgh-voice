@@ -331,6 +331,7 @@ class VoiceEngine:
         self.overlay = StatusOverlay()
         self.is_recording = False
         self.is_processing = False
+        self._processing_start_ts = None
         self._state_lock = threading.RLock()
         self._on_status_change = None  # callback(status_str)
         self._watchdog_timer = None
@@ -354,9 +355,17 @@ class VoiceEngine:
             if self.is_recording:
                 return False
             if self.is_processing:
-                log("warn", "上一段語音仍在處理中，略過新的錄音觸發")
-                self._safe_status_change("processing")
-                return False
+                # 緊急逃生：processing 超過 max_processing_sec（預設 120s）視為卡死，強制清狀態
+                stuck_for = time.time() - (self._processing_start_ts or time.time())
+                max_proc = float(self.config.get("max_processing_sec", 120.0))
+                if self._processing_start_ts and stuck_for > max_proc:
+                    log("warn", f"⚠️ 處理已卡 {stuck_for:.0f}s（>{max_proc:.0f}s），強制重置狀態以恢復可用性")
+                    self.is_processing = False
+                    self._processing_start_ts = None
+                else:
+                    log("warn", f"上一段語音處理中（已 {stuck_for:.0f}s），略過新的錄音觸發")
+                    self._safe_status_change("processing")
+                    return False
             self.is_recording = True
             self._record_start_ts = time.time()
 
@@ -431,6 +440,7 @@ class VoiceEngine:
                 return None
             self.is_recording = False
             self.is_processing = True
+            self._processing_start_ts = time.time()
 
         self._cancel_watchdog()
         self._record_start_ts = None
@@ -516,6 +526,7 @@ class VoiceEngine:
             with self._state_lock:
                 self.is_recording = False
                 self.is_processing = False
+                self._processing_start_ts = None
             self._record_start_ts = None
             self._safe_status_change("idle")
 

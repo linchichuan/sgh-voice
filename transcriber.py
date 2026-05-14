@@ -92,121 +92,6 @@ class Transcriber:
 
         threading.Thread(target=lambda: (_warmup_ollama(), _warmup_whisper()), daemon=True).start()
 
-    def transcribe(self, audio_source, audio_duration=0, mode="dictate", edit_context=""):
-        t0 = time.time()
-        is_hybrid = self.config.get("enable_hybrid_mode", True)
-        stt_source, llm_source = "none", "none"
-
-        if isinstance(audio_source, np.ndarray):
-            ok, reason = self._audio_quality_check(audio_source)
-            if not ok:
-                print(f" 🚫 [audio gate] 跳過：{reason}")
-                return None
-
-        if isinstance(audio_source, np.ndarray) and self.config.get("enable_voiceprint", False):
-            if self._voiceprint_mgr.is_enrolled:
-                vp_score = self._voiceprint_mgr.verify(audio_source)
-                if vp_score < self.config.get("voiceprint_threshold", 0.97): return None
-
-        # ── STT 階段 ─────────────────────────────────────
-        t_stt0 = time.time()
-        raw = None
-        stt_engine = self.config.get("stt_engine", "mlx-whisper")
-        if stt_engine == "groq":
-            raw = self._groq_stt(audio_source, duration=audio_duration)
-            if raw: stt_source = "groq"
-        elif stt_engine != "cloud-only" and is_hybrid:
-            if isinstance(audio_source, np.ndarray) or audio_duration <= self.config.get("hybrid_audio_threshold", 15):
-                raw = self._local_stt(audio_source)
-                if raw: stt_source = "local"
-
-        if not raw and self.config.get("groq_api_key"):
-            raw = self._groq_stt(audio_source, duration=audio_duration)
-            if raw: stt_source = "groq"
-
-        if not raw and self.config.get("openai_api_key"):
-            raw = self._whisper_api_fallback(audio_source, duration=audio_duration)
-            if raw: stt_source = "cloud"
-
-        if not raw or not raw.strip(): return None
-        t_stt = time.time() - t_stt0
-
-        # 句尾 meta-command 偵測：「...以上翻成英文」「改正式」等 → 切換 mode
-        if mode == "dictate":
-            stripped, override_style = self._detect_voice_command(raw)
-            if override_style:
-                raw = stripped
-                mode = "edit"
-                edit_context = override_style
-                print(f" 🎙→✏️ [voice command] 偵測到句尾指令，切換為 rewrite 模式：{override_style}")
-
-        scene_key = self.config.get("active_scene", "general")
-        app_id = None
-        try:
-            from AppKit import NSWorkspace
-            curr_app = NSWorkspace.sharedWorkspace().frontmostApplication()
-            if curr_app:
-                app_id = curr_app.bundleIdentifier()
-        except Exception:
-            pass
-        corrected = self.memory.apply_corrections(
-            raw,
-            scene_corrections=SCENE_PRESETS.get(scene_key, {}).get("corrections"),
-            scene_key=scene_key,
-            app_id=app_id,
-        )
-        corrected = self._apply_smart_replace(corrected)
-
-        # ── LLM 階段 ─────────────────────────────────────
-        t_llm0 = time.time()
-        final = None
-        if mode == "dictate" and self._should_skip_llm(corrected):
-            final, llm_source = corrected, "skip"
-        elif self.config.get("enable_claude_polish"):
-            pref_engine = self.config.get("llm_engine", "ollama")
-            def try_groq(): return self._groq_llm_process(corrected, mode, edit_context), "groq"
-            def try_or(): return self._openrouter_process(corrected, mode, edit_context), "openrouter"
-            def try_claude(): return self._claude_process(corrected, mode, edit_context), "claude"
-            def try_openai(): return self._openai_process(corrected, mode, edit_context), "openai"
-            def try_ollama():
-                if is_hybrid and mode == "dictate": return self._local_llm_process(corrected), "local"
-                return None, None
-
-            routes_map = {
-                "groq": [try_groq, try_or, try_claude, try_openai, try_ollama],
-                "openrouter": [try_or, try_groq, try_claude, try_openai, try_ollama],
-                "claude": [try_claude, try_groq, try_or, try_openai, try_ollama],
-                "openai": [try_openai, try_groq, try_or, try_claude, try_ollama],
-                "ollama": [try_ollama, try_groq, try_or, try_claude, try_openai],
-            }
-            for route in routes_map.get(pref_engine, routes_map["ollama"]):
-                res, source = route()
-                if res: final, llm_source = res, source; break
-
-        if final is None:
-            final = self._local_filler_removal(corrected) if self.config.get("enable_filler_removal") else corrected
-            llm_source = "regex"
-        t_llm = time.time() - t_llm0
-
-        if self._opencc and final: final = self._opencc.convert(final)
-
-        process_time = time.time() - t0
-        # 分階段 timing log（讓使用者看到瓶頸在 STT 還是 LLM）
-        try:
-            chars = len(final or "")
-            print(f" ⏱  STT={t_stt:.2f}s({stt_source}) | LLM={t_llm:.2f}s({llm_source}) | total={process_time:.2f}s | {chars}字")
-        except Exception: pass
-
-        # 歷史寫入丟到 daemon thread，不阻塞主流程
-        entry = {
-            "timestamp": datetime.now().isoformat(), "whisper_raw": raw, "final_text": final,
-            "mode": mode, "process_time": round(process_time, 2),
-            "stt_time": round(t_stt, 2), "llm_time": round(t_llm, 2),
-            "stt_source": stt_source, "llm_source": llm_source,
-        }
-        threading.Thread(target=self.memory.add_to_history, args=(entry,), daemon=True).start()
-        return {"raw": raw, "final": final, "process_time": process_time}
-
     # ─── LLM 核心 (Transcoder 模式：保持原語，嚴禁翻譯) ───
 
     _DICTATE_SYSTEM = (
@@ -570,6 +455,14 @@ class Transcriber:
         except Exception: pass
         return cleaned
 
+    def _stt_timeout(self, duration):
+        """STT 動態 timeout：短音檔快 fail、長音檔給夠時間。
+        公式：max(base, duration * factor)，配置可覆寫。"""
+        base = float(self.config.get("stt_timeout_base_sec", 15.0))
+        factor = float(self.config.get("stt_timeout_factor", 0.5))
+        cap = float(self.config.get("stt_timeout_max_sec", 90.0))
+        return min(cap, max(base, (duration or 0) * factor))
+
     def _groq_stt(self, audio_source, duration=0):
         api_key = self.config.get("groq_api_key")
         if not api_key: return None
@@ -583,7 +476,8 @@ class Transcriber:
                 if duration == 0: duration = len(audio_source) / sr
             else:
                 file_obj = open(audio_source, "rb")
-            client = openai.OpenAI(base_url="https://api.groq.com/openai/v1", api_key=api_key, timeout=10.0)
+            timeout_s = self._stt_timeout(duration)
+            client = openai.OpenAI(base_url="https://api.groq.com/openai/v1", api_key=api_key, timeout=timeout_s)
             try:
                 prompt = self._build_stt_prompt()
                 model = self.config.get("groq_whisper_model", "whisper-large-v3-turbo")
@@ -592,7 +486,9 @@ class Transcriber:
                 if not isinstance(audio_source, np.ndarray): file_obj.close()
             self._track_usage("groq", model, seconds=duration)
             return self._sanitize_repetition(resp.text)
-        except Exception: return None
+        except Exception as e:
+            print(f" ⚠️  Groq STT 失敗（duration={duration:.1f}s, timeout={self._stt_timeout(duration):.0f}s）: {type(e).__name__}: {e}")
+            return None
 
     def _local_stt(self, audio_source):
         try:
@@ -617,7 +513,8 @@ class Transcriber:
                 if duration == 0: duration = len(audio_source) / 16000
             else:
                 file_obj = open(audio_source, "rb")
-            client = openai.OpenAI(api_key=api_key)
+            timeout_s = self._stt_timeout(duration)
+            client = openai.OpenAI(api_key=api_key, timeout=timeout_s)
             try:
                 prompt = self._build_stt_prompt()
                 resp = client.audio.transcriptions.create(model="whisper-1", file=file_obj, prompt=prompt)
@@ -625,7 +522,9 @@ class Transcriber:
                 if not isinstance(audio_source, np.ndarray): file_obj.close()
             self._track_usage("openai", "whisper-1", seconds=duration)
             return self._sanitize_repetition(resp.text)
-        except Exception: return None
+        except Exception as e:
+            print(f" ⚠️  OpenAI Whisper API 失敗（duration={duration:.1f}s, timeout={self._stt_timeout(duration):.0f}s）: {type(e).__name__}: {e}")
+            return None
 
     def _apply_smart_replace(self, text):
         rules = load_smart_replace()
