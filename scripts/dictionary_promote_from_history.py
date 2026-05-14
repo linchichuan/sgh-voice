@@ -63,6 +63,28 @@ def _tokenize(text):
     return re.findall(r"[a-zA-Z0-9_'-]+|\s+|[^\sa-zA-Z0-9_'-]", text or "")
 
 
+# ASCII 技術詞/品牌名 pattern：駝峰、含數字、連字、或含大寫字母的 ASCII token
+# 例：Supabase, Ultravox, Zeabur, n8n, GPT-4o, Node.js, Claude Code
+_TECH_TERM_RE = re.compile(r"^[A-Za-z][A-Za-z0-9.\-]*[A-Za-z0-9]$")
+
+def _is_tech_term(s):
+    """判斷 right 是否為 ASCII 技術詞 / 品牌名（值得降低 freq 門檻 + 同步進 custom_words）。
+    條件：純 ASCII，長度 3+，且 (含大寫字母 OR 含數字 OR 含連字/點)。
+    純小寫單字（如 'and'）不算 — 避免噪音。"""
+    if not s or len(s) < 3 or not s.isascii():
+        return False
+    if " " in s:
+        # 允許多字組合，但每段都要像技術詞（如 "LINE Bot", "Claude Code"）
+        parts = s.split()
+        return all(_is_tech_term(p) for p in parts)
+    if not _TECH_TERM_RE.match(s):
+        return False
+    has_upper = any(c.isupper() for c in s)
+    has_digit = any(c.isdigit() for c in s)
+    has_sep = any(c in ".-" for c in s)
+    return has_upper or has_digit or has_sep
+
+
 def extract_diff_pairs(raw, fin):
     """回傳 [(wrong, right), ...] 從一筆 raw→fin 的差異。"""
     pairs = []
@@ -82,7 +104,9 @@ def extract_diff_pairs(raw, fin):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--apply", action="store_true", help="實際寫入 dictionary.json（預設僅 dry-run）")
-    parser.add_argument("--min-freq", type=int, default=5, help="最低頻次（預設 5）")
+    parser.add_argument("--min-freq", type=int, default=5, help="最低頻次（一般詞，預設 5）")
+    parser.add_argument("--tech-min-freq", type=int, default=2,
+                        help="ASCII 技術詞/品牌名最低頻次（預設 2，因為這類錯誤通常少量出現但必須抓）")
     parser.add_argument("--source", choices=["auto", "edited", "both"], default="both",
                         help="auto=LLM 隱性正例、edited=使用者編輯過、both=兩者皆採用（預設）")
     parser.add_argument("--top", type=int, default=50, help="最多列印 N 條（預設 50）")
@@ -124,15 +148,24 @@ def main():
     base_keys = {k.lower() for k in BASE_CORRECTIONS.keys()}
     existing = set(mem.dictionary.get("corrections", {}).keys())
 
-    promoted = []     # (wrong, right, freq) 通過所有守門
-    skipped_base = [] # 已存在於 BASE 或 dictionary
+    promoted = []        # (wrong, right, freq, is_tech) 通過所有守門
+    skipped_base = []    # 已存在於 BASE 或 dictionary
     skipped_substr = []  # 子字串關係（LLM 加減字幻覺）
     skipped_opencc = []  # OpenCC 已自動處理
     skipped_filter = []  # 既有守門員拒絕
+    skipped_lowfreq = [] # 頻次未達門檻（依 tech / 一般 分層）
+
+    # 既有 custom_words（用於去重，避免重複加入）
+    existing_words_lower = {w.lower() for w in mem.dictionary.get("custom_words", [])}
 
     for (wrong, right), freq in counter.most_common():
-        if freq < args.min_freq:
-            break  # most_common 已排序
+        is_tech = _is_tech_term(right)
+        threshold = args.tech_min_freq if is_tech else args.min_freq
+        if freq < threshold:
+            # 注意：most_common 是按 freq 排序，但 tech / 非 tech 的門檻不同，
+            # 不能一律 break。低於一般門檻但屬技術詞可能仍要收。
+            skipped_lowfreq.append((wrong, right, freq, is_tech))
+            continue
         if wrong.lower() in base_keys or wrong in existing:
             skipped_base.append((wrong, right, freq))
             continue
@@ -145,19 +178,24 @@ def main():
         if not mem._is_meaningful_correction(wrong, right, source="auto-promote"):
             skipped_filter.append((wrong, right, freq))
             continue
-        promoted.append((wrong, right, freq))
+        promoted.append((wrong, right, freq, is_tech))
 
+    n_tech = sum(1 for *_, is_tech in promoted if is_tech)
     print()
-    print(f"✅ 通過守門員可升級：{len(promoted)} 條（min_freq={args.min_freq}）")
+    print(f"✅ 通過守門員可升級：{len(promoted)} 條"
+          f"（一般 min_freq={args.min_freq} / 技術詞 min_freq={args.tech_min_freq}，"
+          f"其中技術詞 {n_tech} 條會同步進 custom_words）")
     print(f"⏭️  跳過（已存在）：{len(skipped_base)} 條")
     print(f"♻️  跳過（OpenCC 已修）：{len(skipped_opencc)} 條")
     print(f"🌀 跳過（子字串關係）：{len(skipped_substr)} 條")
     print(f"🚫 跳過（守門員拒絕）：{len(skipped_filter)} 條")
+    print(f"📉 跳過（頻次不足）：{len(skipped_lowfreq)} 條")
 
     if promoted:
         print("\n=== 待升級規則（freq desc）===")
-        for w, r, f in promoted[: args.top]:
-            print(f"  [{f:3d}×] {w!r:30s} → {r!r}")
+        for w, r, f, is_tech in promoted[: args.top]:
+            tag = "🔧" if is_tech else "  "
+            print(f"  {tag} [{f:3d}×] {w!r:30s} → {r!r}")
 
     if skipped_filter:
         print(f"\n=== 守門員拒絕的 top {min(20, len(skipped_filter))} 範例（供檢視）===")
@@ -179,11 +217,20 @@ def main():
     # 寫入
     corr = mem.dictionary.setdefault("corrections", {})
     freq_dict = mem.dictionary.setdefault("frequency", {})
-    for w, r, f in promoted:
+    words = mem.dictionary.setdefault("custom_words", [])
+    n_words_added = 0
+    for w, r, f, is_tech in promoted:
         corr[w] = r
         freq_dict[w] = freq_dict.get(w, 0) + f
+        # 技術詞同步寫進 custom_words → 下次 Whisper prompt 直接認得（治本）
+        if is_tech and r.lower() not in existing_words_lower:
+            words.append(r)
+            existing_words_lower.add(r.lower())
+            n_words_added += 1
     save_dictionary(mem.dictionary)
-    print(f"\n✅ 已寫入 {len(promoted)} 條到 dictionary.json")
+    print(f"\n✅ 已寫入 {len(promoted)} 條 corrections 到 dictionary.json")
+    if n_words_added > 0:
+        print(f"   + {n_words_added} 個技術詞同步加入 custom_words（下次 Whisper prompt 將認得）")
     return 0
 
 

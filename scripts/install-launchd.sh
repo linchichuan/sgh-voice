@@ -12,6 +12,7 @@ PLISTS=(
   "com.shingihou.dict-update"
   "com.shingihou.pipeline-health"
   "com.shingihou.maintenance-loop"
+  "com.shingihou.promote-corrections"
 )
 
 if [ "$1" = "--uninstall" ]; then

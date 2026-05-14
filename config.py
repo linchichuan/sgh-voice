@@ -18,14 +18,28 @@ _IS_APPLE_SILICON = platform.system() == "Darwin" and platform.machine() == "arm
 
 # ─── 內部基礎詞庫（不在 Dashboard UI 顯示，但辨識時使用）────────
 BASE_CUSTOM_WORDS = [
-    # AI 模型（Whisper 常唸錯）
-    "Whisper", "Claude", "Haiku", "Sonnet", "Opus",
-    "ChatGPT", "Gemini", "Llama", "Qwen", "Groq",
-    # 技術通用詞
+    # ⚠️ 順序即優先級！build_whisper_prompt 只取前 20 詞/200 字元注入 Whisper。
+    # 前段放 Whisper 最容易聽錯/不認得的冷門技術名、品牌名、公司名。
+    # 後段放 Whisper 通常認得的常見詞（API / GitHub / Docker / 中日大字）作為 fallback。
+
+    # 第一優先：公司・產品（高頻、Whisper 完全不認得）
+    "Shingihou", "新義豊", "KusuriJapan", "Medical Supporter", "SGH Phone",
+    # 第二優先：冷門平台與 SDK（高頻技術詞）
+    "Supabase", "Zeabur", "Ultravox", "Twilio", "SendGrid", "n8n",
+    # 第三優先：AI 模型 / 工具（部分 Whisper 不穩）
+    "Claude", "Anthropic", "OpenRouter", "Groq", "Ollama",
+    "Breeze-ASR-25", "OpenCC", "MLX",
+
+    # ── 以下通常不會進入 Whisper prompt（前 20 已滿），但保留供 corrections 後處理參照 ──
+    "Whisper", "Haiku", "Sonnet", "Opus",
+    "ChatGPT", "Gemini", "Llama", "Qwen", "OpenAI", "Hugging Face",
+    "Firebase", "Firestore", "Vercel", "Cloudflare", "Railway", "Sentry",
+    "PostgreSQL", "LINE Bot", "WhatsApp", "Make", "Zapier",
     "API", "GitHub", "Docker", "WebSocket", "Markdown",
-    "Python", "Kotlin", "Swift", "TypeScript",
-    # 醫療通用詞
-    "Whisper", "HbA1c", "SpO2", "BMI", "CT", "MRI",
+    "Python", "Kotlin", "Swift", "TypeScript", "JavaScript",
+    "Node.js", "pnpm", "npm",
+    "林紀全", "PMDA", "MHLW", "JETRO", "薬機法", "APPI", "PIPL",
+    "HbA1c", "SpO2", "BMI", "CT", "MRI",
 ]
 
 BASE_CORRECTIONS = {
