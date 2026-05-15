@@ -1,26 +1,17 @@
 {
   "schema_version": 2,
-  "session_id": "79fac06e-edd7-49f0-b037-2647f00832e3",
+  "session_id": "c2c703e2-61b7-4a57-93e0-834a48dccb7b",
   "session_commit_scope": {
-    "session_id": "79fac06e-edd7-49f0-b037-2647f00832e3",
+    "session_id": "c2c703e2-61b7-4a57-93e0-834a48dccb7b",
     "baseline_dirty_files": [
-      ".claude_review_state.json",
-      "app.py",
-      "config.py"
+      ".claude_review_state.json"
     ],
     "touched_files": [
-      "app.py",
-      "config.py",
-      "scripts/dictionary_promote_from_history.py",
-      "scripts/install-launchd.sh",
-      "scripts/launchd/com.shingihou.promote-corrections.plist",
-      "scripts/update_style_profile.py",
-      "static/index.html",
-      "transcriber.py"
+      "app.py"
     ],
-    "updated_at": "2026-05-14T01:52:25Z"
+    "updated_at": "2026-05-15T14:16:08Z"
   },
-  "updated_at": "2026-05-14T11:40:29Z",
+  "updated_at": "2026-05-15T15:11:32Z",
   "has_code_change": true,
   "has_doc_change": false,
   "code_review": {

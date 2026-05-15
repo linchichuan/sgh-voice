@@ -890,6 +890,45 @@ def setup_hotkey(engine):
         KEY_EVENT_MASK, handle_local_event
     )
 
+    # Key-state reconciler：直接查詢硬體鍵盤狀態，補救漏掉的 keyUp / flagsChanged
+    # 解決 push-to-talk 模式下切換 App / Cmd+Tab 時 release 事件被吞掉，
+    # 造成麥克風指示燈不熄、要等到 watchdog 才救的問題。
+    try:
+        from Quartz import CGEventSourceKeyState, kCGEventSourceStateHIDSystemState
+    except Exception:
+        CGEventSourceKeyState = None
+
+    def _key_state_reconciler():
+        if CGEventSourceKeyState is None:
+            return
+        while True:
+            try:
+                time.sleep(0.2)
+                if not getattr(_process_event, 'last_active', False):
+                    continue  # 不在「按住」邏輯中，不需 reconcile
+                # 直接問 HID：目標鍵真的還按著嗎？
+                all_down = all(
+                    bool(CGEventSourceKeyState(kCGEventSourceStateHIDSystemState, vk))
+                    for vk in target_keys
+                )
+                if all_down:
+                    continue
+                # 有目標鍵其實已經放開但事件被吞 → 同步狀態並觸發 falling edge
+                for vk in list(target_keys):
+                    if not bool(CGEventSourceKeyState(kCGEventSourceStateHIDSystemState, vk)):
+                        currently_pressed.discard(vk)
+                _process_event.last_active = False
+                if mode == "push_to_talk" and engine.is_recording:
+                    log("warn", "🛟 偵測到目標鍵已釋放但事件遺失，強制停止錄音")
+                    threading.Thread(target=engine.stop_and_process, daemon=True).start()
+                elif mode == "toggle":
+                    # toggle 模式 last_active 只在按下瞬間為 True，這裡基本不會走到，留作保險
+                    pass
+            except Exception as e:
+                print(f"key-state reconciler error: {e}")
+
+    threading.Thread(target=_key_state_reconciler, daemon=True).start()
+
 
 def setup_continuous_hotkey(engine):
     """連續模式 toggle 熱鍵（按一次開、按一次關）。預設 right_option+l（long-form）。"""
