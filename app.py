@@ -336,6 +336,9 @@ class VoiceEngine:
         self._on_status_change = None  # callback(status_str)
         self._watchdog_timer = None
         self._record_start_ts = None
+        # 多段轉寫並行時序列化 paste，避免剪貼簿/Cmd+V 互踩
+        self._paste_lock = threading.Lock()
+        self._inflight_transcriptions = 0
 
     def start_background_tasks(self):
         """主程式啟動後再跑背景任務，避免搶佔啟動時的系統資源"""
@@ -354,18 +357,8 @@ class VoiceEngine:
         with self._state_lock:
             if self.is_recording:
                 return False
-            if self.is_processing:
-                # 緊急逃生：processing 超過 max_processing_sec（預設 120s）視為卡死，強制清狀態
-                stuck_for = time.time() - (self._processing_start_ts or time.time())
-                max_proc = float(self.config.get("max_processing_sec", 120.0))
-                if self._processing_start_ts and stuck_for > max_proc:
-                    log("warn", f"⚠️ 處理已卡 {stuck_for:.0f}s（>{max_proc:.0f}s），強制重置狀態以恢復可用性")
-                    self.is_processing = False
-                    self._processing_start_ts = None
-                else:
-                    log("warn", f"上一段語音處理中（已 {stuck_for:.0f}s），略過新的錄音觸發")
-                    self._safe_status_change("processing")
-                    return False
+            # is_processing 只代表「背景有轉寫在跑」，不應該阻擋新錄音。
+            # paste 由 self._paste_lock 序列化，不會互踩。
             self.is_recording = True
             self._record_start_ts = time.time()
 
@@ -433,37 +426,64 @@ class VoiceEngine:
         except Exception as e:
             print(f"Status change error (non-fatal): {e}")
 
-    def stop_and_process(self, mode="dictate", edit_context=""):
-        """停止錄音並處理（全面異常防護，避免 .app 閃退）"""
+    def stop_and_process(self, mode="dictate", edit_context="", sync=False):
+        """停止錄音 → 立刻釋放 engine（可開新錄音）→ 轉寫/貼上在背景跑。
+        sync=True 時改為同步等待轉寫結果（CLI/REPL 用）。"""
         with self._state_lock:
             if not self.is_recording:
                 return None
             self.is_recording = False
-            self.is_processing = True
-            self._processing_start_ts = time.time()
 
         self._cancel_watchdog()
         self._record_start_ts = None
 
-        result = None
         try:
-            # 獲取記憶體中的音訊數據與檔案路徑
             audio_array, filepath, duration = self.recorder.stop()
+        except Exception as e:
+            log("error", f"recorder.stop 錯誤: {e}")
+            self._safe_status_change("idle")
+            return None
 
-            self.overlay.show("processing")
-            self._safe_status_change("processing")
-            log("info", f"錄音 {duration:.1f}s，開始辨識處理…")
-
-            if audio_array is None and not filepath:
+        if (audio_array is None or (hasattr(audio_array, '__len__') and len(audio_array) == 0)) and not filepath:
+            with self._state_lock:
+                pending = self._inflight_transcriptions
+            if pending == 0:
                 self.overlay.show("idle")
                 self._safe_status_change("idle")
-                return None
+            return None
 
-            # 如果設定了翻譯目標語言，自動切換模式
-            if self.config.get("target_language") and mode == "dictate":
-                mode = "translate"
+        if self.config.get("target_language") and mode == "dictate":
+            mode = "translate"
 
-            # 傳入音訊數據 (audio_array) 而非檔案路徑，以極大化速度
+        if sync:
+            return self._transcribe_and_paste(audio_array, filepath, duration, mode, edit_context)
+
+        threading.Thread(
+            target=self._transcribe_and_paste,
+            args=(audio_array, filepath, duration, mode, edit_context),
+            daemon=True,
+        ).start()
+        return None
+
+    def _transcribe_and_paste(self, audio_array, filepath, duration, mode, edit_context):
+        """背景跑：Whisper → 後處理 → 自動貼上。paste 用 lock 序列化。"""
+        with self._state_lock:
+            self._inflight_transcriptions += 1
+            self.is_processing = True
+            if self._processing_start_ts is None:
+                self._processing_start_ts = time.time()
+
+        # 只在沒人在錄音時把 overlay 切到 processing，避免蓋掉新一段錄音的狀態
+        with self._state_lock:
+            show_processing = not self.is_recording
+        if show_processing:
+            try: self.overlay.show("processing")
+            except Exception: pass
+            self._safe_status_change("processing")
+        log("info", f"錄音 {duration:.1f}s，開始辨識處理…")
+
+        result = None
+        try:
             audio_input = audio_array if audio_array is not None else filepath
             result = self.transcriber.transcribe(audio_input, duration, mode, edit_context)
 
@@ -473,29 +493,38 @@ class VoiceEngine:
                 log("done", f"{_c('bold', final[:80])}{'…' if len(final)>80 else ''}")
                 log("info", f"錄音 {duration:.1f}s  |  處理 {proc:.1f}s  |  {len(final)} 字元")
                 log_sep()
-                # 更新統計
                 try:
                     update_stats(final, duration, self.config)
                 except Exception as e:
                     log("warn", f"Stats update: {e}")
-                # 自動貼上
-                if self.config.get("auto_paste"):
-                    try:
-                        paste_text(final)
-                    except Exception as e:
-                        log("warn", f"Paste: {e}")
-                # #2 即時轉寫 overlay：顯示節錄 ~2.5s
-                if self.config.get("enable_transcript_overlay", True):
-                    try: self.overlay.show_transcript(final, duration=2.5)
-                    except Exception: self.overlay.show("done")
-                else:
-                    self.overlay.show("done")
+
+                if self.config.get("auto_paste") and final:
+                    with self._paste_lock:
+                        try:
+                            paste_text(final)
+                        except Exception as e:
+                            log("warn", f"Paste: {e}")
+
+                with self._state_lock:
+                    other_inflight = self._inflight_transcriptions > 1 or self.is_recording
+                if not other_inflight:
+                    if self.config.get("enable_transcript_overlay", True):
+                        try: self.overlay.show_transcript(final, duration=2.5)
+                        except Exception:
+                            try: self.overlay.show("done")
+                            except Exception: pass
+                    else:
+                        try: self.overlay.show("done")
+                        except Exception: pass
             else:
                 log("warn", "無有效音訊，已略過")
                 log_sep()
-                self.overlay.show("idle")
+                with self._state_lock:
+                    other_inflight = self._inflight_transcriptions > 1 or self.is_recording
+                if not other_inflight:
+                    try: self.overlay.show("idle")
+                    except Exception: pass
 
-            # 非同步處理存檔/備份，不阻塞主流程
             if filepath:
                 def _backup():
                     try:
@@ -513,23 +542,21 @@ class VoiceEngine:
                     except Exception:
                         pass
                 threading.Thread(target=_backup, daemon=True).start()
-
         except Exception as e:
-            log("error", f"stop_and_process 未預期錯誤: {e}")
+            log("error", f"transcribe 未預期錯誤: {e}")
             import traceback
             traceback.print_exc()
-            try:
-                self.overlay.show("idle")
-            except Exception:
-                pass
         finally:
             with self._state_lock:
-                self.is_recording = False
-                self.is_processing = False
-                self._processing_start_ts = None
-            self._record_start_ts = None
-            self._safe_status_change("idle")
-
+                self._inflight_transcriptions = max(0, self._inflight_transcriptions - 1)
+                if self._inflight_transcriptions == 0:
+                    self.is_processing = False
+                    self._processing_start_ts = None
+                    going_idle = not self.is_recording
+                else:
+                    going_idle = False
+            if going_idle:
+                self._safe_status_change("idle")
         return result
 
     # ─── Quick-Rewrite (B) ─────────────────────────────────
@@ -1157,7 +1184,7 @@ def run_cli():
         print("🔴 錄音中... 按 Enter 停止")
         engine.start_recording()
         input()
-        result = engine.stop_and_process(mode=mode, edit_context=edit_ctx)
+        result = engine.stop_and_process(mode=mode, edit_context=edit_ctx, sync=True)
 
         if not result:
             print("⚠️  未偵測到音訊\n")
