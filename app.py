@@ -334,6 +334,7 @@ class VoiceEngine:
         self._processing_start_ts = None
         self._state_lock = threading.RLock()
         self._on_status_change = None  # callback(status_str)
+        self._on_hotkey_reset = None   # callback() — 讓 hotkey closure 清掉 stale press state
         self._watchdog_timer = None
         self._record_start_ts = None
         # 多段轉寫並行時序列化 paste，避免剪貼簿/Cmd+V 互踩
@@ -353,7 +354,9 @@ class VoiceEngine:
         self.recorder.config = self.config
         log("ok", "設定已即時重新載入")
 
-    def start_recording(self):
+    def start_recording(self, from_hotkey=False):
+        """from_hotkey=True 才會 arm push-to-talk watchdog；CLI/Dashboard/menu bar
+        從外部主動呼叫時請保持 False，否則會被 60s watchdog 截掉。"""
         with self._state_lock:
             if self.is_recording:
                 return False
@@ -367,7 +370,7 @@ class VoiceEngine:
             self._safe_status_change("recording")
             self.recorder.start()
             log("rec", "錄音中…")
-            self._arm_watchdog()
+            self._arm_watchdog(from_hotkey=from_hotkey)
             return True
         except Exception:
             with self._state_lock:
@@ -376,34 +379,60 @@ class VoiceEngine:
             self._safe_status_change("idle")
             raise
 
-    def _arm_watchdog(self):
-        """錄音保險：超過 max 秒仍在錄音 → 強制停止（防 hotkey 卡住）。"""
+    def _arm_watchdog(self, from_hotkey=False):
+        """錄音保險：超過 max 秒仍在錄音 → 強制停止。
+        - hotkey 觸發：pushtotalk_max_seconds（預設 60s），兜底「keyUp 被吞」
+        - 非 hotkey：max_recording_duration（預設 30 分鐘），兜底「使用者忘了按 stop」
+        """
         self._cancel_watchdog()
-        try:
-            max_sec = float(self.config.get("pushtotalk_max_seconds", 180))
-        except Exception:
-            max_sec = 180.0
+        if from_hotkey and self.config.get("hotkey_mode", "push_to_talk") == "push_to_talk":
+            try:
+                max_sec = float(self.config.get("pushtotalk_max_seconds", 60))
+            except Exception:
+                max_sec = 60.0
+        else:
+            try:
+                max_sec = float(self.config.get("max_recording_duration", 1800))
+            except Exception:
+                max_sec = 1800.0
         if max_sec <= 0:
             return
 
+        armed_for_ts = self._record_start_ts
+
         def _fire():
             with self._state_lock:
+                current_ts = self._record_start_ts
                 is_recording = self.is_recording
-            if not is_recording:
+            # 同一段錄音才處理；如果是新的（使用者在 timer 等候期間 stop 再 start），略過
+            if not is_recording or current_ts != armed_for_ts:
                 return
-            elapsed = time.time() - (self._record_start_ts or time.time())
-            log("warn", f"⏱ 錄音已 {elapsed:.0f}s 超過上限 {max_sec:.0f}s，自動停止（防止 hotkey 卡住）")
+            elapsed = time.time() - (current_ts or time.time())
+            log("warn", f"⏱ 錄音已 {elapsed:.0f}s 超過上限 {max_sec:.0f}s，自動停止")
             try:
                 self.stop_and_process()
             except Exception as e:
                 log("error", f"watchdog stop_and_process error: {e}")
-                # 保底：即使 stop_and_process 失敗也要重設狀態
                 with self._state_lock:
                     self.is_recording = False
                     self.is_processing = False
                 try: self.overlay.show("idle")
                 except Exception: pass
                 self._safe_status_change("idle")
+            # 通知 hotkey closure 清掉 stale press state——但只有在「真的沒有新錄音
+            # 接著開始」的時候才清，避免 stop_and_process 跑完到這裡的空檔，
+            # 使用者剛好重按 hotkey 起了一段新錄音，反而把新錄音的 press state 弄壞。
+            if not from_hotkey:
+                return  # 非 hotkey path 沒有 hotkey closure 要重置
+            with self._state_lock:
+                new_recording_running = self.is_recording
+            if new_recording_running:
+                return  # 有新錄音了，別動 hotkey state
+            cb = self._on_hotkey_reset
+            if cb:
+                try: cb()
+                except Exception as e:
+                    log("warn", f"hotkey reset callback error: {e}")
 
         t = threading.Timer(max_sec, _fire)
         t.daemon = True
@@ -803,6 +832,16 @@ def setup_hotkey(engine):
         except Exception:
             return  # Not a valid NSEvent, skip
 
+        # Skip auto-repeat keydowns：使用者長按非 modifier hotkey（space/letter）時
+        # 系統會狂送 NSKeyDown(isARepeat=True)。若 watchdog 剛 fire 清掉狀態，
+        # 下一個 autorepeat 會被當成新的 rising edge 而立刻再開錄音，繞過 watchdog。
+        if etype == NSKeyDown:
+            try:
+                if event.isARepeat():
+                    return
+            except Exception:
+                pass
+
         # Update state
         if etype == NSKeyDown:
             currently_pressed.add(vk)
@@ -858,33 +897,33 @@ def setup_hotkey(engine):
                  if not getattr(_process_event, 'last_active', False):  # Rising Edge
                      if mode == "push_to_talk":
                          if not engine.is_recording:
-                             engine.start_recording()
+                             engine.start_recording(from_hotkey=True)
                      elif mode == "toggle":
                          if engine.is_recording:
                              threading.Thread(target=engine.stop_and_process, daemon=True).start()
                          else:
-                             engine.start_recording()
+                             engine.start_recording(from_hotkey=True)
             else:
                  if getattr(_process_event, 'last_active', False):  # Falling Edge
                      if mode == "push_to_talk":
                          if engine.is_recording:
                              threading.Thread(target=engine.stop_and_process, daemon=True).start()
-            
+
             _process_event.last_active = is_active
-            
+
         else:
             # Combo Mode
             is_active = target_keys.issubset(currently_pressed)
-            
+
             if is_active and not getattr(_process_event, 'last_active', False):
                 if mode == "push_to_talk":
                     if not engine.is_recording:
-                         engine.start_recording()
+                         engine.start_recording(from_hotkey=True)
                 elif mode == "toggle":
                     if engine.is_recording:
                         threading.Thread(target=engine.stop_and_process, daemon=True).start()
                     else:
-                        engine.start_recording()
+                        engine.start_recording(from_hotkey=True)
             
             elif not is_active and getattr(_process_event, 'last_active', False):
                  if mode == "push_to_talk" and engine.is_recording:
@@ -917,44 +956,20 @@ def setup_hotkey(engine):
         KEY_EVENT_MASK, handle_local_event
     )
 
-    # Key-state reconciler：直接查詢硬體鍵盤狀態，補救漏掉的 keyUp / flagsChanged
-    # 解決 push-to-talk 模式下切換 App / Cmd+Tab 時 release 事件被吞掉，
-    # 造成麥克風指示燈不熄、要等到 watchdog 才救的問題。
-    try:
-        from Quartz import CGEventSourceKeyState, kCGEventSourceStateHIDSystemState
-    except Exception:
-        CGEventSourceKeyState = None
+    # 提供 reset hook：watchdog fire（代表 keyUp 被吞）時清掉 stale press state，
+    # 否則 closure 還以為使用者持續按著，下一次按會被吃掉。
+    def _reset_hotkey_state():
+        currently_pressed.clear()
+        _process_event.last_active = False
+    engine._on_hotkey_reset = _reset_hotkey_state
 
-    def _key_state_reconciler():
-        if CGEventSourceKeyState is None:
-            return
-        while True:
-            try:
-                time.sleep(0.2)
-                if not getattr(_process_event, 'last_active', False):
-                    continue  # 不在「按住」邏輯中，不需 reconcile
-                # 直接問 HID：目標鍵真的還按著嗎？
-                all_down = all(
-                    bool(CGEventSourceKeyState(kCGEventSourceStateHIDSystemState, vk))
-                    for vk in target_keys
-                )
-                if all_down:
-                    continue
-                # 有目標鍵其實已經放開但事件被吞 → 同步狀態並觸發 falling edge
-                for vk in list(target_keys):
-                    if not bool(CGEventSourceKeyState(kCGEventSourceStateHIDSystemState, vk)):
-                        currently_pressed.discard(vk)
-                _process_event.last_active = False
-                if mode == "push_to_talk" and engine.is_recording:
-                    log("warn", "🛟 偵測到目標鍵已釋放但事件遺失，強制停止錄音")
-                    threading.Thread(target=engine.stop_and_process, daemon=True).start()
-                elif mode == "toggle":
-                    # toggle 模式 last_active 只在按下瞬間為 True，這裡基本不會走到，留作保險
-                    pass
-            except Exception as e:
-                print(f"key-state reconciler error: {e}")
-
-    threading.Thread(target=_key_state_reconciler, daemon=True).start()
+    # NOTE: 曾經在這裡放過 _key_state_reconciler（polling thread + CGEventSourceKeyState /
+    # NSEvent.modifierFlags），目的是補救漏掉的 keyUp / flagsChanged。實測 false positive
+    # 太嚴重：背景 thread 拿到的 modifierFlags 不是 live state、CGEventSourceKeyState 對
+    # modifier key 也不穩，會在使用者仍按著的時候誤判成已放開，把錄音切成 0.2~0.8s。
+    # 已移除。漏事件的兜底改靠 _arm_watchdog（pushtotalk_max_seconds），預設 60s（從 180s
+    # 收緊；trade-off：keyUp 真的被吞掉時最壞情境的隱私曝光時間從 3 分鐘壓到 1 分鐘，
+    # 但對需要 >60s push-to-talk 的人請改 config 或用 toggle / continuous 模式）。
 
 
 def setup_continuous_hotkey(engine):
@@ -1125,12 +1140,12 @@ def _setup_hotkey_pynput(engine):
         if key == target:
             if mode == "push_to_talk":
                 if not engine.is_recording:
-                    engine.start_recording()
+                    engine.start_recording(from_hotkey=True)
             else:
                 if engine.is_recording:
                     threading.Thread(target=engine.stop_and_process, daemon=True).start()
                 else:
-                    engine.start_recording()
+                    engine.start_recording(from_hotkey=True)
 
     def on_release(key):
         if key == target and mode == "push_to_talk" and engine.is_recording:

@@ -11,12 +11,13 @@
     ],
     "updated_at": "2026-05-15T14:16:08Z"
   },
-  "updated_at": "2026-05-15T15:30:32Z",
+  "updated_at": "2026-05-16T00:02:30Z",
   "has_code_change": true,
   "has_doc_change": false,
   "code_review": {
-    "executed": false,
-    "passed": false
+    "executed": true,
+    "passed": false,
+    "last_run": "2026-05-15T23:48:14Z"
   },
   "doc_review": {
     "executed": false,
@@ -33,7 +34,8 @@
   },
   "iteration_history": {
     "current_round": 0,
-    "findings_by_round": []
+    "findings_by_round": [],
+    "total_rounds_session": 1
   },
   "changed_files_since_review": [
     "/Users/lin/voice-input/app.py",
