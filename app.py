@@ -19,6 +19,34 @@ import subprocess
 import threading
 import tempfile
 import locale
+import signal
+import atexit
+
+
+_active_engines = []
+
+
+def _register_engine_for_cleanup(engine):
+    if engine not in _active_engines:
+        _active_engines.append(engine)
+
+
+def _graceful_shutdown(signum=None, frame=None):
+    """Ctrl+C / SIGTERM 時把錄音串流乾淨收掉，避免 PortAudio 留下半開的麥克風。"""
+    for engine in _active_engines:
+        try:
+            rec = getattr(engine, "recorder", None)
+            if rec and getattr(rec, "is_recording", False):
+                rec._stop_event.set()
+                rec.is_recording = False
+                thr = getattr(rec, "_thread", None)
+                if thr and thr.is_alive():
+                    thr.join(timeout=2)
+        except Exception:
+            pass
+    if signum is not None:
+        # 收到訊號時再用預設行為退出，讓 shell exit code 正確
+        sys.exit(0)
 
 # ─── 系統語言偵測 ─────────────────────────────────────────
 def get_sys_lang():
@@ -1161,6 +1189,7 @@ def _setup_hotkey_pynput(engine):
 
 def run_cli():
     engine = VoiceEngine()
+    _register_engine_for_cleanup(engine)
     config = engine.config
 
     if not config.get("openai_api_key"):
@@ -1328,6 +1357,7 @@ def run_menubar():
         return
 
     engine = VoiceEngine()
+    _register_engine_for_cleanup(engine)
     config = engine.config
 
     # 啟動時檢查輔助使用權限（自動貼上必需）
@@ -1502,6 +1532,11 @@ def _start_dashboard(config):
 # ─── Entry Point ─────────────────────────────────────────
 
 def main():
+    # 確保 Ctrl+C / kill 時麥克風串流被乾淨關閉，避免 PortAudio 留下 leaked semaphore
+    signal.signal(signal.SIGINT, _graceful_shutdown)
+    signal.signal(signal.SIGTERM, _graceful_shutdown)
+    atexit.register(_graceful_shutdown)
+
     parser = argparse.ArgumentParser(description="🎙 Voice Input — AI 語音輸入工具")
     parser.add_argument("--cli", action="store_true", help="CLI 模式")
     parser.add_argument("--dashboard", action="store_true", help="只開 Dashboard")

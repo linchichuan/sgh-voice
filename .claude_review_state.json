@@ -6,11 +6,13 @@
     "baseline_dirty_files": [
       ".claude_review_state.json"
     ],
-    "touched_files": [],
+    "touched_files": [
+      "app.py"
+    ],
     "updated_at": "2026-05-16T22:41:19Z"
   },
-  "updated_at": "2026-05-16T22:41:19Z",
-  "has_code_change": false,
+  "updated_at": "2026-05-16T23:00:53Z",
+  "has_code_change": true,
   "has_doc_change": false,
   "code_review": {
     "executed": false,
@@ -25,7 +27,9 @@
     "passed": false
   },
   "aggregate_gate": {
-    "executed": false
+    "executed": false,
+    "gate": null,
+    "reason": null
   },
   "iteration_history": {
     "current_round": 0,
