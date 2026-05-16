@@ -380,21 +380,22 @@ class VoiceEngine:
             raise
 
     def _arm_watchdog(self, from_hotkey=False):
-        """錄音保險：超過 max 秒仍在錄音 → 強制停止。
-        - hotkey 觸發：pushtotalk_max_seconds（預設 60s），兜底「keyUp 被吞」
-        - 非 hotkey：max_recording_duration（預設 30 分鐘），兜底「使用者忘了按 stop」
-        """
+        """錄音保險：超過 max 秒仍在錄音 → 強制停止。所有 path 共用同一上限：
+        max_recording_duration（預設 30 分鐘）。push-to-talk 講三五分鐘是合理使用情境，
+        不該因為「以防 hotkey 卡住」就被特別截短。`pushtotalk_max_seconds` 仍可被
+        config override 拿來縮短，但預設沿用 max_recording_duration。"""
         self._cancel_watchdog()
-        if from_hotkey and self.config.get("hotkey_mode", "push_to_talk") == "push_to_talk":
-            try:
-                max_sec = float(self.config.get("pushtotalk_max_seconds", 60))
-            except Exception:
-                max_sec = 60.0
-        else:
-            try:
-                max_sec = float(self.config.get("max_recording_duration", 1800))
-            except Exception:
-                max_sec = 1800.0
+        is_ptt = (
+            from_hotkey
+            and self.config.get("hotkey_mode", "push_to_talk") == "push_to_talk"
+        )
+        try:
+            ptt_override = self.config.get("pushtotalk_max_seconds") if is_ptt else None
+            max_sec = float(
+                ptt_override if ptt_override else self.config.get("max_recording_duration", 1800)
+            )
+        except Exception:
+            max_sec = 1800.0
         if max_sec <= 0:
             return
 
@@ -967,9 +968,8 @@ def setup_hotkey(engine):
     # NSEvent.modifierFlags），目的是補救漏掉的 keyUp / flagsChanged。實測 false positive
     # 太嚴重：背景 thread 拿到的 modifierFlags 不是 live state、CGEventSourceKeyState 對
     # modifier key 也不穩，會在使用者仍按著的時候誤判成已放開，把錄音切成 0.2~0.8s。
-    # 已移除。漏事件的兜底改靠 _arm_watchdog（pushtotalk_max_seconds），預設 60s（從 180s
-    # 收緊；trade-off：keyUp 真的被吞掉時最壞情境的隱私曝光時間從 3 分鐘壓到 1 分鐘，
-    # 但對需要 >60s push-to-talk 的人請改 config 或用 toggle / continuous 模式）。
+    # 已移除。漏事件的兜底改靠 _arm_watchdog（max_recording_duration，預設 30 分鐘）。
+    # 想要更嚴格 cap 可在 config 設 pushtotalk_max_seconds。
 
 
 def setup_continuous_hotkey(engine):
