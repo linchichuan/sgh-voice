@@ -53,8 +53,32 @@ class Transcriber:
         self._ollama_backoff_until = 0.0
         self._ollama_fail_count = 0
         self._voiceprint_mgr = VoiceprintManager()
+        # 連線 cache：避免每次呼叫都重建 TCP/TLS（省 200-500ms/次）
+        self._client_cache = {}
 
-    def reset_clients(self): pass
+    def reset_clients(self):
+        # config 重新載入時清掉，下次呼叫會用新的 api_key/base_url 重建
+        self._client_cache = {}
+
+    def _get_openai_client(self, key, *, base_url=None, api_key=None, timeout=None):
+        """重用 openai.OpenAI client。key=("groq_stt"/"groq_llm"/"openai_llm"/...) +
+        (base_url, api_key) tuple；api_key 換了就重建。"""
+        cached = self._client_cache.get(key)
+        sig = (base_url, api_key)
+        if cached and cached[0] == sig:
+            return cached[1]
+        client = openai.OpenAI(base_url=base_url, api_key=api_key, timeout=timeout) if base_url \
+            else openai.OpenAI(api_key=api_key, timeout=timeout)
+        self._client_cache[key] = (sig, client)
+        return client
+
+    def _get_anthropic_client(self, api_key, timeout=None):
+        cached = self._client_cache.get("anthropic")
+        if cached and cached[0] == api_key:
+            return cached[1]
+        client = anthropic.Anthropic(api_key=api_key, timeout=timeout)
+        self._client_cache["anthropic"] = (api_key, client)
+        return client
 
     @property
     def ollama_detector(self): return get_detector()
@@ -266,7 +290,7 @@ class Transcriber:
         api_key = self.config.get("groq_api_key")
         if not api_key: return None
         try:
-            client = openai.OpenAI(base_url="https://api.groq.com/openai/v1", api_key=api_key, timeout=self._llm_timeout())
+            client = self._get_openai_client("groq_llm", base_url="https://api.groq.com/openai/v1", api_key=api_key, timeout=self._llm_timeout())
             model = self.config.get("groq_model", "llama-3.3-70b-versatile")
             system = self._EDIT_SYSTEM if mode == "edit" else (system_prompt or self._get_system_prompt())
             user_text = self._wrap_edit_text(text, edit_context) if mode == "edit" else text
@@ -286,7 +310,7 @@ class Transcriber:
         api_key = self.config.get("openrouter_api_key")
         if not api_key: return None
         try:
-            client = openai.OpenAI(base_url="https://openrouter.ai/api/v1", api_key=api_key, timeout=self._llm_timeout())
+            client = self._get_openai_client("openrouter_llm", base_url="https://openrouter.ai/api/v1", api_key=api_key, timeout=self._llm_timeout())
             model = self.config.get("openrouter_model", "qwen/qwen3.6-plus")
             system = self._EDIT_SYSTEM if mode == "edit" else (system_prompt or self._get_system_prompt())
             t0 = time.time()
@@ -305,7 +329,7 @@ class Transcriber:
         api_key = self.config.get("anthropic_api_key")
         if not api_key: return None
         try:
-            client = anthropic.Anthropic(api_key=api_key, timeout=self._llm_timeout())
+            client = self._get_anthropic_client(api_key, timeout=self._llm_timeout())
             model = self.config.get("claude_model", "claude-haiku-4-5-20251001")
             system = self._EDIT_SYSTEM if mode == "edit" else (system_prompt or self._get_system_prompt())
             t0 = time.time()
@@ -324,7 +348,7 @@ class Transcriber:
         api_key = self.config.get("openai_api_key")
         if not api_key: return None
         try:
-            client = openai.OpenAI(api_key=api_key, timeout=self._llm_timeout())
+            client = self._get_openai_client("openai_llm", api_key=api_key, timeout=self._llm_timeout())
             model = self.config.get("openai_model", "gpt-4o")
             system = self._EDIT_SYSTEM if mode == "edit" else (system_prompt or self._get_system_prompt())
             t0 = time.time()
@@ -477,7 +501,7 @@ class Transcriber:
             else:
                 file_obj = open(audio_source, "rb")
             timeout_s = self._stt_timeout(duration)
-            client = openai.OpenAI(base_url="https://api.groq.com/openai/v1", api_key=api_key, timeout=timeout_s)
+            client = self._get_openai_client("groq_stt", base_url="https://api.groq.com/openai/v1", api_key=api_key, timeout=timeout_s)
             try:
                 prompt = self._build_stt_prompt()
                 model = self.config.get("groq_whisper_model", "whisper-large-v3-turbo")
@@ -514,7 +538,7 @@ class Transcriber:
             else:
                 file_obj = open(audio_source, "rb")
             timeout_s = self._stt_timeout(duration)
-            client = openai.OpenAI(api_key=api_key, timeout=timeout_s)
+            client = self._get_openai_client("openai_stt", api_key=api_key, timeout=timeout_s)
             try:
                 prompt = self._build_stt_prompt()
                 resp = client.audio.transcriptions.create(model="whisper-1", file=file_obj, prompt=prompt)
