@@ -114,7 +114,38 @@ class Transcriber:
                 print(" " + _t(f"✅ Ollama 預熱完成", f"✅ Ollama 準備完了", f"✅ Ollama ready"))
             except Exception: pass
 
-        threading.Thread(target=lambda: (_warmup_ollama(), _warmup_whisper()), daemon=True).start()
+        def _warmup_llm_clients():
+            """背景預熱 LLM HTTPS 連線（建立 TCP/TLS pool），第一次正式呼叫省 200-500ms。"""
+            import time as _time
+            _time.sleep(2)
+            engine = self.config.get("llm_engine", "claude")
+            try:
+                if engine == "claude" and self.config.get("anthropic_api_key"):
+                    c = self._get_anthropic_client(self.config.get("anthropic_api_key"), timeout=10)
+                    c.messages.create(model=self.config.get("claude_model", "claude-haiku-4-5-20251001"),
+                                      max_tokens=1, messages=[{"role": "user", "content": "."}])
+                    print(" ✅ Claude 連線預熱完成")
+                elif engine == "groq" and self.config.get("groq_api_key"):
+                    c = self._get_openai_client("groq_llm", base_url="https://api.groq.com/openai/v1",
+                                                api_key=self.config.get("groq_api_key"), timeout=10)
+                    c.chat.completions.create(model=self.config.get("groq_model", "llama-3.3-70b-versatile"),
+                                              max_tokens=1, messages=[{"role": "user", "content": "."}])
+                    print(" ✅ Groq LLM 連線預熱完成")
+                elif engine == "openrouter" and self.config.get("openrouter_api_key"):
+                    c = self._get_openai_client("openrouter_llm", base_url="https://openrouter.ai/api/v1",
+                                                api_key=self.config.get("openrouter_api_key"), timeout=10)
+                    c.chat.completions.create(model=self.config.get("openrouter_model", "qwen/qwen3-30b-a3b:free"),
+                                              max_tokens=1, messages=[{"role": "user", "content": "."}])
+                    print(" ✅ OpenRouter 連線預熱完成")
+                elif engine == "openai" and self.config.get("openai_api_key"):
+                    c = self._get_openai_client("openai_llm", api_key=self.config.get("openai_api_key"), timeout=10)
+                    c.chat.completions.create(model=self.config.get("openai_model", "gpt-4o-mini"),
+                                              max_tokens=1, messages=[{"role": "user", "content": "."}])
+                    print(" ✅ OpenAI 連線預熱完成")
+            except Exception as e:
+                print(f" ⚠️  LLM 預熱跳過: {type(e).__name__}")
+
+        threading.Thread(target=lambda: (_warmup_ollama(), _warmup_whisper(), _warmup_llm_clients()), daemon=True).start()
 
     # ─── LLM 核心 (Transcoder 模式：保持原語，嚴禁翻譯) ───
 
