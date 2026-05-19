@@ -283,6 +283,16 @@ def paste_text(text):
         _paste_log(f"Clipboard copy error: {e}")
         return
 
+    # ★ 立刻 sample changeCount，鎖定「剛複製完當下」的版本號。
+    # 之後 modifier wait / paste fallback 期間若 user 動剪貼簿，changeCount 會跳，
+    # 後面 _restore 才能正確偵測「期間使用者改過剪貼簿 → 不要覆蓋」。
+    baseline_change_count = None
+    try:
+        from AppKit import NSPasteboard
+        baseline_change_count = NSPasteboard.generalPasteboard().changeCount()
+    except Exception:
+        pass
+
     # ★ 動態 polling 等修飾鍵放開（取代固定 sleep(0.6)，典型 50-150ms 即可解除）
     _wait_modifiers_released(max_wait=0.6)
 
@@ -355,16 +365,8 @@ def paste_text(text):
         _paste_log("全部方法失敗，文字保留在剪貼簿")
         notify("SGH Voice", "📋 文字已複製到剪貼簿，請手動貼上")
     elif old_clipboard is not None:
-        # 用 NSPasteboard.changeCount() 鎖定「我們剛 copy 完當下」的版本號。
-        # 若使用者期間有任何 copy/cut 操作（即使內容碰巧跟我們相同），changeCount 必增。
-        # 比起值比對更穩，可避免「使用者手動複製相同字串」的誤覆蓋 race。
-        baseline_change_count = None
-        try:
-            from AppKit import NSPasteboard
-            baseline_change_count = NSPasteboard.generalPasteboard().changeCount()
-        except Exception:
-            pass
-
+        # baseline_change_count 已在 copy 後立刻 sample（line ~289）
+        # 1.5s 後若 changeCount 沒變 → 表示期間沒有任何 copy/cut 操作（即使內容相同），可安全還原
         def _restore():
             time.sleep(1.5)
             try:
