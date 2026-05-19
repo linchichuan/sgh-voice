@@ -200,6 +200,49 @@ def _paste_log(msg):
         pass
 
 
+def _wait_modifiers_released(max_wait=0.6, poll_interval=0.01):
+    """Polling 等修飾鍵（Cmd/Shift/Opt/Ctrl）全部放開，避免送 Cmd+V 跟使用者按鍵打架。
+    典型 50-150ms 即可放開，原 fixed sleep(0.6) 是 worst-case 容錯。"""
+    try:
+        from Quartz import CGEventSourceFlagsState, kCGEventSourceStateHIDSystemState
+        MOD_MASK = (
+            0x100000 |  # NSCommandKeyMask
+            0x80000  |  # NSAlternateKeyMask
+            0x20000  |  # NSShiftKeyMask
+            0x40000     # NSControlKeyMask
+        )
+        deadline = time.monotonic() + max_wait
+        while time.monotonic() < deadline:
+            flags = CGEventSourceFlagsState(kCGEventSourceStateHIDSystemState)
+            if (flags & MOD_MASK) == 0:
+                return  # 修飾鍵都放開了，立刻 return
+            time.sleep(poll_interval)
+    except Exception:
+        # Quartz 不可用就 fallback 到 fixed sleep（保守處理）
+        time.sleep(max_wait)
+
+
+def _wait_clipboard_change(old_value, max_wait=0.2, poll_interval=0.01):
+    """Polling 等剪貼簿被新值更新（Cmd+C 後讀內容用）。
+    典型 30-50ms 內就會變化。"""
+    try:
+        import pyperclip
+        deadline = time.monotonic() + max_wait
+        while time.monotonic() < deadline:
+            cur = pyperclip.paste()
+            if cur != old_value:
+                return cur
+            time.sleep(poll_interval)
+        return pyperclip.paste()
+    except Exception:
+        time.sleep(max_wait)
+        try:
+            import pyperclip
+            return pyperclip.paste()
+        except Exception:
+            return ""
+
+
 def paste_text(text):
     """複製到剪貼簿 + Cmd+V 貼上，完成後還原原有剪貼簿內容"""
     if not text:
@@ -233,8 +276,8 @@ def paste_text(text):
         _paste_log(f"Clipboard copy error: {e}")
         return
 
-    # ★ 等待修飾鍵完全放開 (稍微增加到 0.6s)
-    time.sleep(0.6)
+    # ★ 動態 polling 等修飾鍵放開（取代固定 sleep(0.6)，典型 50-150ms 即可解除）
+    _wait_modifiers_released(max_wait=0.6)
 
     pasted = False
 
@@ -259,23 +302,17 @@ def paste_text(text):
             CGEventSetFlags(event_down, kCGEventFlagMaskCommand)
             event_up = CGEventCreateKeyboardEvent(None, V_KEYCODE, False)
             CGEventSetFlags(event_up, kCGEventFlagMaskCommand)
-            
-            # 使用兩次發送以提升成功率 (有時第一次會被忽略)
-            for _ in range(1):
-                CGEventPost(kCGSessionEventTap, event_down)
-                time.sleep(0.02)
-                CGEventPost(kCGSessionEventTap, event_up)
-                time.sleep(0.05)
-            
+            CGEventPost(kCGSessionEventTap, event_down)
+            time.sleep(0.02)
+            CGEventPost(kCGSessionEventTap, event_up)
             pasted = True
             _paste_log("Quartz CGEvent 貼上發送完成")
         except Exception as e:
             _paste_log(f"CGEvent exception: {e}")
 
-    # 方法 2: osascript System Events keystroke (傳統方法)
+    # 方法 2: osascript System Events keystroke（Quartz 失敗才用）
     if not pasted:
         try:
-            # 確保 System Events 知道要對誰發送
             result = subprocess.run([
                 "osascript", "-e",
                 'tell application "System Events" to keystroke "v" using command down'
@@ -286,9 +323,8 @@ def paste_text(text):
         except Exception as e:
             _paste_log(f"osascript exception: {e}")
 
-    # 方法 3: AXValue 直接插入 (終極 fallback，限支援 Accessibility 的 App)
-    if not pasted or (is_trusted and len(text) > 100):
-        # 即使方法 1/2 "成功"，如果是長文也嘗試 AXValue 直接寫入 (速度更快，不依賴剪貼簿)
+    # 方法 3: AXValue 直接插入（最後 fallback，僅在 Quartz + osascript 都失敗時）
+    if not pasted:
         try:
             escaped = text.replace('\\', '\\\\').replace('"', '\\"').replace('\n', '\\r')
             result = subprocess.run([
@@ -309,10 +345,15 @@ def paste_text(text):
         _paste_log("全部方法失敗，文字保留在剪貼簿")
         notify("SGH Voice", "📋 文字已複製到剪貼簿，請手動貼上")
     elif old_clipboard is not None:
+        pasted_text_snapshot = text
         def _restore():
-            # 延遲還原剪貼簿，確保貼上動作已完成
-            time.sleep(3.0)
+            # 1.5s 後還原，但若期間使用者手動 copy 了新東西就跳過還原
+            time.sleep(1.5)
             try:
+                current = pyperclip.paste()
+                if current != pasted_text_snapshot:
+                    # 使用者已主動改變剪貼簿（自己 copy 了別的）→ 別覆蓋
+                    return
                 pyperclip.copy(old_clipboard)
             except Exception:
                 pass
@@ -757,16 +798,12 @@ class VoiceEngine:
             except Exception:
                 pass
 
-            # 等使用者鬆開修飾鍵，再送 Cmd+C
-            time.sleep(0.25)
+            # Polling 等鬆鍵（典型 50ms 內），不再固定 sleep(0.25)
+            _wait_modifiers_released(max_wait=0.3)
             if not self._simulate_cmd_c():
                 return
-            # 等剪貼簿更新
-            time.sleep(0.2)
-            try:
-                selected = pyperclip.paste() or ""
-            except Exception:
-                selected = ""
+            # Polling 等剪貼簿變化（典型 30-50ms 內），不再固定 sleep(0.2)
+            selected = _wait_clipboard_change(old_clip or "", max_wait=0.25) or ""
 
             if not selected.strip():
                 log("warn", "未偵測到選取文字，已取消改寫")
@@ -791,12 +828,9 @@ class VoiceEngine:
 
             paste_text(rewritten)
             log("ok", f"Quick-Rewrite 完成 ({len(rewritten)} 字)")
-            try:
-                self.overlay.show("done")
-                time.sleep(0.4)
-                self.overlay.show("idle")
-            except Exception:
-                pass
+            # 直接切回 idle，省掉 0.4s 過場（overlay.show_transcript 在 _transcribe_and_paste 才用）
+            try: self.overlay.show("idle")
+            except Exception: pass
         finally:
             self._rewrite_in_progress = False
 

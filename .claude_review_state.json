@@ -12,12 +12,13 @@
     ],
     "updated_at": "2026-05-16T22:41:19Z"
   },
-  "updated_at": "2026-05-17T23:51:33Z",
+  "updated_at": "2026-05-19T23:38:13Z",
   "has_code_change": true,
   "has_doc_change": false,
   "code_review": {
-    "executed": false,
-    "passed": false
+    "executed": true,
+    "passed": false,
+    "last_run": "2026-05-19T23:38:13Z"
   },
   "doc_review": {
     "executed": false,
@@ -33,9 +34,19 @@
     "reason": null
   },
   "iteration_history": {
-    "current_round": 0,
-    "findings_by_round": [],
-    "total_rounds_session": 1
+    "current_round": 1,
+    "findings_by_round": [
+      {
+        "round": 1,
+        "total": 0,
+        "p0": 0,
+        "p1": 0,
+        "p2": 0,
+        "nit": 0,
+        "timestamp": "2026-05-19T23:38:13Z"
+      }
+    ],
+    "total_rounds_session": 2
   },
   "changed_files_since_review": [
     "/Users/lin/voice-input/app.py",
