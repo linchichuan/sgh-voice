@@ -204,12 +204,19 @@ def _wait_modifiers_released(max_wait=0.6, poll_interval=0.01):
     """Polling 等修飾鍵（Cmd/Shift/Opt/Ctrl）全部放開，避免送 Cmd+V 跟使用者按鍵打架。
     典型 50-150ms 即可放開，原 fixed sleep(0.6) 是 worst-case 容錯。"""
     try:
-        from Quartz import CGEventSourceFlagsState, kCGEventSourceStateHIDSystemState
+        from Quartz import (
+            CGEventSourceFlagsState,
+            kCGEventSourceStateHIDSystemState,
+            kCGEventFlagMaskCommand,
+            kCGEventFlagMaskAlternate,
+            kCGEventFlagMaskShift,
+            kCGEventFlagMaskControl,
+        )
         MOD_MASK = (
-            0x100000 |  # NSCommandKeyMask
-            0x80000  |  # NSAlternateKeyMask
-            0x20000  |  # NSShiftKeyMask
-            0x40000     # NSControlKeyMask
+            kCGEventFlagMaskCommand
+            | kCGEventFlagMaskAlternate
+            | kCGEventFlagMaskShift
+            | kCGEventFlagMaskControl
         )
         deadline = time.monotonic() + max_wait
         while time.monotonic() < deadline:
@@ -324,6 +331,9 @@ def paste_text(text):
             _paste_log(f"osascript exception: {e}")
 
     # 方法 3: AXValue 直接插入（最後 fallback，僅在 Quartz + osascript 都失敗時）
+    # 注意：set AXValue 是「取代整個元素內容」，不是 append。所以絕對不能在 Cmd+V
+    # 已成功時又跑一次（會把現有文字 + 剛貼上的內容整個清空只留 text）。原本舊版
+    # 對 is_trusted + 長文無條件補跑 AXValue 的設計在多行編輯器會誤刪內容，已移除。
     if not pasted:
         try:
             escaped = text.replace('\\', '\\\\').replace('"', '\\"').replace('\n', '\\r')
@@ -345,15 +355,29 @@ def paste_text(text):
         _paste_log("全部方法失敗，文字保留在剪貼簿")
         notify("SGH Voice", "📋 文字已複製到剪貼簿，請手動貼上")
     elif old_clipboard is not None:
-        pasted_text_snapshot = text
+        # 用 NSPasteboard.changeCount() 鎖定「我們剛 copy 完當下」的版本號。
+        # 若使用者期間有任何 copy/cut 操作（即使內容碰巧跟我們相同），changeCount 必增。
+        # 比起值比對更穩，可避免「使用者手動複製相同字串」的誤覆蓋 race。
+        baseline_change_count = None
+        try:
+            from AppKit import NSPasteboard
+            baseline_change_count = NSPasteboard.generalPasteboard().changeCount()
+        except Exception:
+            pass
+
         def _restore():
-            # 1.5s 後還原，但若期間使用者手動 copy 了新東西就跳過還原
             time.sleep(1.5)
             try:
-                current = pyperclip.paste()
-                if current != pasted_text_snapshot:
-                    # 使用者已主動改變剪貼簿（自己 copy 了別的）→ 別覆蓋
-                    return
+                if baseline_change_count is not None:
+                    from AppKit import NSPasteboard
+                    current_count = NSPasteboard.generalPasteboard().changeCount()
+                    if current_count != baseline_change_count:
+                        # 使用者期間動過剪貼簿 → 別覆蓋
+                        return
+                else:
+                    # AppKit 不可用 → 退回值比對（次佳）
+                    if pyperclip.paste() != text:
+                        return
                 pyperclip.copy(old_clipboard)
             except Exception:
                 pass
