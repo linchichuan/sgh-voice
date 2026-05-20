@@ -243,7 +243,16 @@ class Transcriber:
         if not raw or not raw.strip(): return None
         t_stt = time.time() - t_stt0
 
-        # Cache 最後一次成功 STT，retry hotkey 可跳過 STT 直接重跑 LLM
+        # 句尾 meta-command 偵測（可能改寫 raw + mode + edit_context）
+        if mode == "dictate":
+            stripped, override_style = self._detect_voice_command(raw)
+            if override_style:
+                raw = stripped
+                mode = "edit"
+                edit_context = override_style
+                print(f" 🎙→✏️ [voice command] 偵測到指令，切換為 {override_style}")
+
+        # Cache retry 用：必須在 voice_command 處理「之後」才存，否則 retry 會重跑指令字面
         self._last_stt_cache = {
             "raw": raw,
             "mode": mode,
@@ -254,15 +263,6 @@ class Transcriber:
             "stt_source": stt_source,
             "timestamp": time.time(),
         }
-
-        # 句尾 meta-command 偵測
-        if mode == "dictate":
-            stripped, override_style = self._detect_voice_command(raw)
-            if override_style:
-                raw = stripped
-                mode = "edit"
-                edit_context = override_style
-                print(f" 🎙→✏️ [voice command] 偵測到指令，切換為 {override_style}")
 
         scene_key = self.config.get("active_scene", "general")
         # 進化 3: 詞庫傳播 - 套用 App-Specific Corrections

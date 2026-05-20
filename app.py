@@ -759,8 +759,8 @@ class VoiceEngine:
             return
         try:
             if was_recording:
-                # 停 recorder，但 _on_done callback 不會跑（我們設 cancel flag）
-                self._cancel_inflight = True
+                # 純錄音中：直接停 recorder + 重置 engine 狀態，不會進入 _transcribe_and_paste。
+                # 不設 _cancel_inflight（否則 flag 會殘留到下一次正常錄音的 paste 階段被誤吞）。
                 try: self.recorder._stop_event.set()
                 except Exception: pass
                 self.recorder.is_recording = False
@@ -770,6 +770,7 @@ class VoiceEngine:
                     self._record_start_ts = None
                 log("warn", "🚫 錄音已取消")
             if was_processing:
+                # 處理中：pipeline 已經跑起來，無法 abort LLM call，只能標記讓 paste 階段跳過
                 self._cancel_inflight = True
                 log("warn", "🚫 處理中的轉寫已標記取消（paste 階段會跳過）")
             try: self.overlay.show("idle")
