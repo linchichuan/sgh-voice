@@ -445,8 +445,8 @@ class Transcriber:
             resp = client.chat.completions.create(model=model, messages=messages, temperature=0.0, max_tokens=self._dynamic_max_tokens(text))
             res = re.sub(r'<think>[\s\S]*?</think>|<think>[\s\S]*$', '', resp.choices[0].message.content).strip()
             self._track_usage("groq", model, resp.usage.prompt_tokens, resp.usage.completion_tokens)
-            if self._is_llm_hallucination(res, text):
-                print(f" ⚠️ [Groq] 偵測到幻覺，已捨棄: {res[:20]}..."); return None
+            status, res = self._validate_llm_result(text, res, "Groq", mode=mode)
+            if status == 'discard': return None
             print(" " + _t(f"⚡ [Groq] 完成 ({time.time()-t0:.2f}s)", f"⚡ [Groq] 完了", f"⚡ [Groq] Done"))
             return res
         except Exception as e:
@@ -464,8 +464,8 @@ class Transcriber:
             resp = client.chat.completions.create(model=model, messages=messages, temperature=0.0, max_tokens=self._dynamic_max_tokens(text), extra_headers={"HTTP-Referer": "https://shingihou.com", "X-Title": "SGH Voice"})
             res = re.sub(r'<think>[\s\S]*?</think>|<think>[\s\S]*$', '', resp.choices[0].message.content).strip()
             self._track_usage("openrouter", model, resp.usage.prompt_tokens, resp.usage.completion_tokens)
-            if self._is_llm_hallucination(res, text):
-                print(f" ⚠️ [OpenRouter] 偵測到幻覺，已捨棄"); return None
+            status, res = self._validate_llm_result(text, res, "OpenRouter", mode=mode)
+            if status == 'discard': return None
             print(" " + _t(f"✅ [OpenRouter] 完成 ({time.time()-t0:.2f}s)", f"✅ [OpenRouter] 完了", f"✅ [OpenRouter] Done"))
             return res
         except Exception as e:
@@ -483,8 +483,8 @@ class Transcriber:
             resp = client.messages.create(model=model, system=system, messages=messages, max_tokens=self._dynamic_max_tokens(text), temperature=0.0)
             res = resp.content[0].text.strip()
             self._track_usage("anthropic", model, resp.usage.input_tokens, resp.usage.output_tokens)
-            if self._is_llm_hallucination(res, text):
-                print(f" ⚠️ [Claude] 偵測到幻覺，已捨棄: {res[:20]}..."); return None
+            status, res = self._validate_llm_result(text, res, "Claude", mode=mode)
+            if status == 'discard': return None
             print(" " + _t(f"☁️ [Claude] 完成 ({time.time()-t0:.2f}s)", f"☁️ [Claude] 完了", f"☁️ [Claude] Done"))
             return res
         except Exception as e:
@@ -502,8 +502,8 @@ class Transcriber:
             resp = client.chat.completions.create(model=model, messages=messages, temperature=0.0, max_tokens=self._dynamic_max_tokens(text))
             res = resp.choices[0].message.content.strip()
             self._track_usage("openai", model, resp.usage.prompt_tokens, resp.usage.completion_tokens)
-            if self._is_llm_hallucination(res, text):
-                print(f" ⚠️ [OpenAI] 偵測到對話幻覺，已捨棄"); return None
+            status, res = self._validate_llm_result(text, res, "OpenAI", mode=mode)
+            if status == 'discard': return None
             print(" " + _t(f"🤖 [OpenAI] 完成", f"🤖 [OpenAI] 完了", f"🤖 [OpenAI] Done"))
             return res
         except Exception: return None
@@ -800,6 +800,83 @@ class Transcriber:
             # 大量擴寫（> 120%）+ 低重疊（< 55%）→ 補寫型幻覺
             if overlap < 0.55 and len(r) > len(o) * 1.2: return True
         return False
+
+    def _validate_llm_result(self, raw_input, llm_result, engine_label, mode="dictate"):
+        """LLM 結果守門：先檢查全段幻覺（丟棄），再檢查尾部補寫（截斷）。
+        Returns: (status, processed_result)
+          status='discard' → caller 應 return None（result 為 None）
+          status='ok'      → caller 應 return processed_result（可能已截斷）
+
+        ⚠️ mode='edit' 時跳過 trailing truncation：edit mode（Quick-Rewrite / 翻譯 /
+        Email 草稿 / 語音指令改寫）本來就是 LLM 應該主動加內容/重寫，截斷會誤毀正常輸出。
+        只有 mode='dictate'（口述清理）才該防止 LLM 自己接話。
+        """
+        if self._is_llm_hallucination(llm_result, raw_input):
+            print(f" ⚠️ [{engine_label}] 偵測到幻覺，已捨棄: {(llm_result or '')[:20]}...")
+            return 'discard', None
+        if mode == "dictate":
+            truncated = self._truncate_trailing_hallucination(raw_input, llm_result)
+            if truncated is not None:
+                print(f" ✂️  [{engine_label}] 截斷尾部 LLM 補寫（{len(llm_result)}字→{len(truncated)}字）")
+                return 'ok', truncated
+        return 'ok', llm_result
+
+    def _truncate_trailing_hallucination(self, original_text, llm_result):
+        """偵測「raw 內容完整保留，但 LLM 在結尾自己接話」的補寫型幻覺，回傳截斷版。
+        - 若不是這種模式（含完全改寫、無擴寫、純標點擴寫）→ 回傳 None（caller 用原 result）。
+        - 觸發條件：raw ≥15 字，final 比 raw 長 15% 以上，且 raw 的尾段（≥4 連續字元）能在
+          final 找到對應位置，該位置之後 final 還有 ≥6 字實質內容（去掉純標點/空白）。
+
+        ⚠️ 這是先前 production review 抓到的真實 bug 修復：
+          raw  ='...色色名稱不用到這麼大'
+          LLM 加上 '，所以你看能不能調整。而且你仔細看，從' → 信任殺手
+          existing _is_llm_hallucination 因為 overlap 高、length ratio 1.25 剛好未觸發。
+        """
+        if not original_text or not llm_result:
+            return None
+        o = original_text.strip()
+        r = llm_result.strip()
+        if len(o) < 10:
+            return None  # 太短易誤判
+        if len(r) <= len(o) * 1.15:
+            return None  # 沒明顯擴寫
+
+        try:
+            from difflib import SequenceMatcher
+        except Exception:
+            return None
+
+        matcher = SequenceMatcher(None, o, r, autojunk=False)
+        # 找「raw 內容在 final 落點到哪」：所有覆蓋到 o 結尾區域的 matching block 取最遠端。
+        # block.size 門檻設 2 才不會漏掉短連續匹配（例如「我覺得」3 字）。
+        o_clean_end = len(o.rstrip(' ，。、！？.,!?\n\t'))
+        end_in_result = None
+        for block in matcher.get_matching_blocks():
+            if block.size >= 2 and (block.a + block.size) >= max(0, o_clean_end - 3):
+                end_in_result = block.b + block.size
+
+        if end_in_result is None:
+            return None  # o 的結尾沒對應到 r → 不是 trailing extension
+
+        trailing = r[end_in_result:]
+        substantive_trailing = trailing.strip(' ，。、！？.,!?\n\t')
+        # 4 字以下視為合理擴寫（嗎？、對吧、謝謝 等），4 字以上才視為實質補寫
+        if len(substantive_trailing) < 4:
+            return None
+
+        # 截斷：保留到 raw 結尾對應位置，可能多帶一兩個合理的結束標點
+        truncated = r[:end_in_result]
+        # 補一個句號（若沒有結尾標點）
+        if truncated and truncated[-1] not in '，。、！？.,!?\n\t':
+            # 從 trailing 取第一個標點（若有）跟著
+            for ch in trailing:
+                if ch in '。！？.!?':
+                    truncated += ch
+                    break
+            else:
+                # 沒有合適標點，補上中文句號
+                truncated += '。'
+        return truncated
 
     _EDIT_SYSTEM = (
         "TASK: PURE TEXT EDITING.\n"
