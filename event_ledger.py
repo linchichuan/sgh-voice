@@ -50,7 +50,8 @@ def new_session():
 
 def end_session():
     """Pipeline 結束時呼叫（無論成功 / early-return / exception）。
-    從 _active_list 移除自己的 session。Caller 應該用 try/finally 確保被叫到。"""
+    從 _active_list 移除自己的 session，並清掉 TLS 避免之後同 thread 的事件
+    （例如 hotkey thread 跑完 retry_last_llm 後又被叫去處理 cancel）誤關聯到已結束的 session。"""
     sid = getattr(_tls, "session_id", None)
     if sid is None:
         return
@@ -59,7 +60,7 @@ def end_session():
             _active_list.remove(sid)
         except ValueError:
             pass  # 已被移除（防禦性）
-    # 注意：不清 _tls.session_id，後續同 thread 還能用到（雖然新 new_session 會覆蓋）
+    _tls.session_id = None
 
 
 def current_session():
