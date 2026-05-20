@@ -1,5 +1,6 @@
 package com.shingihou.sghvoice.api
 
+import com.github.houbb.opencc4j.util.ZhConverterUtil
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
@@ -15,6 +16,7 @@ import org.json.JSONObject
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 import kotlin.coroutines.resumeWithException
+import kotlin.math.min
 
 /**
  * 通用 LLM 客戶端
@@ -47,6 +49,14 @@ class LlmClient(private val apiConfig: ApiConfig) {
         private const val LINE_PROMPT = BASE_PROMPT + "7. 語氣設定為【LINE 訊息】：文字精簡、口語自然，不要過於死板。"
         private const val EMAIL_PROMPT = BASE_PROMPT + "7. 語氣設定為【正式 Email】：文字得體、結構嚴謹且專業。"
         private const val NORMAL_PROMPT = BASE_PROMPT + "7. 語氣設定為【一般文字】：語氣中立，字句稍微順過即可。"
+
+        // 尾部截斷觸發門檻：raw 必須 ≥10 字、final 至少 > raw × 1.15、實質補寫 ≥4 字
+        private const val MIN_RAW_LEN_FOR_TRUNCATE = 10
+        private const val TRUNCATE_LEN_RATIO = 1.15
+        private const val MIN_SUBSTANTIVE_TRAILING = 4
+        private const val MIN_RAW_TAIL_LEN = 4
+        private val TRIM_PUNCT_CHARS = "，。、！？.,!?\n\t ".toCharArray()
+        private val SENTENCE_END_PUNCT = "，。、！？.,!?\n\t".toCharArray()
     }
 
     private val httpClient = OkHttpClient.Builder()
@@ -57,8 +67,11 @@ class LlmClient(private val apiConfig: ApiConfig) {
 
     /**
      * 對語音辨識結果進行後處理
+     *
+     * @param mode "dictate"（預設）= 口述清理，會套用尾部幻覺截斷；
+     *             "edit"            = 改寫/翻譯/Email 草稿等，LLM 本來就該主動加內容，跳過截斷。
      */
-    suspend fun postProcess(text: String, sceneExtra: String = ""): String {
+    suspend fun postProcess(text: String, sceneExtra: String = "", mode: String = "dictate"): String {
         if (text.isBlank()) return text
         if (apiConfig.llmEngine == "none") return text
 
@@ -78,11 +91,85 @@ class LlmClient(private val apiConfig: ApiConfig) {
         }
 
         val engine = apiConfig.llmEngine
-        return when (engine) {
+        val raw = when (engine) {
             "claude" -> processClaude(text, systemPrompt)
             "openai" -> processOpenAiLike(text, systemPrompt, OPENAI_API_URL, apiConfig.openAiApiKey, "gpt-4o")
             "groq" -> processOpenAiLike(text, systemPrompt, GROQ_API_URL, apiConfig.groqApiKey, ApiConfig.DEFAULT_GROQ_LLM_MODEL)
-            else -> text
+            else -> return text
+        }
+
+        // LLM 失敗（空字串）→ fallback 到原 text
+        if (raw.isBlank()) return text
+
+        // 守門：偵測尾部幻覺（LLM 自己接話）並截斷。validateLlmResult 回 null = 該丟棄。
+        val validated = validateLlmResult(text, raw, mode)
+        return validated ?: text
+    }
+
+    /**
+     * LLM 結果守門：目前實作只做尾部補寫截斷（dictate mode）。
+     * 全段幻覺偵測（_is_llm_hallucination）尚未移植，視之後需要再加。
+     *
+     * @return null = 應丟棄（fallback 原 text）；非 null = 處理後可用字串
+     */
+    internal fun validateLlmResult(rawInput: String, llmResult: String, mode: String): String? {
+        if (llmResult.isBlank()) return null
+        if (mode != "dictate") return llmResult
+        val truncated = truncateTrailingHallucination(rawInput, llmResult)
+        return truncated ?: llmResult
+    }
+
+    /**
+     * 偵測「raw 內容完整保留，但 LLM 在結尾自己接話」的補寫型幻覺，回傳截斷版。
+     * 不是這種模式回 null（caller 用原 result）。
+     *
+     * 對應 macOS 版 transcriber.py:_truncate_trailing_hallucination。
+     * Kotlin 沒有 difflib，改用「raw 尾段定位 + 尾段後的實質補寫長度」啟發式判斷。
+     */
+    internal fun truncateTrailingHallucination(originalText: String, llmResult: String): String? {
+        if (originalText.isBlank() || llmResult.isBlank()) return null
+        val oRaw = originalText.trim()
+        val rRaw = llmResult.trim()
+        if (oRaw.length < MIN_RAW_LEN_FOR_TRUNCATE) return null
+        if (rRaw.length <= oRaw.length * TRUNCATE_LEN_RATIO) return null
+
+        // 同時用 OpenCC s2twp 正規化 raw 跟 final，避免 simplified vs traditional 比對 miss
+        val o = safeToTraditional(oRaw)
+        val r = safeToTraditional(rRaw)
+
+        // 取 raw 尾段（最多 10 字，但不少於 raw 的一半，避免太短誤判）作為定位錨點。
+        // 去掉純標點/空白後若不足 4 字 → 跳過，不夠特徵。
+        val tailLen = min(10, o.length / 2).coerceAtLeast(1)
+        val rawTailWithPunct = o.substring(o.length - tailLen)
+        val rawTail = rawTailWithPunct.trimEnd(*TRIM_PUNCT_CHARS)
+        if (rawTail.length < MIN_RAW_TAIL_LEN) return null
+
+        // 在 r 找 rawTail 的最末出現位置
+        val idx = r.lastIndexOf(rawTail)
+        if (idx < 0) return null
+
+        val endInResult = idx + rawTail.length
+        if (endInResult >= r.length) return null
+
+        val trailing = r.substring(endInResult)
+        val substantive = trailing.trim(*TRIM_PUNCT_CHARS)
+        if (substantive.length < MIN_SUBSTANTIVE_TRAILING) return null
+
+        // 觸發截斷
+        var truncated = r.substring(0, endInResult)
+        if (truncated.isNotEmpty() && truncated.last() !in SENTENCE_END_PUNCT) {
+            // 從原 trailing 取第一個句尾標點接上；沒有則補中文句號
+            val firstEnd = trailing.firstOrNull { it in "。！？.!?".toCharArray() }
+            truncated += (firstEnd ?: '。')
+        }
+        return truncated
+    }
+
+    private fun safeToTraditional(text: String): String {
+        return try {
+            ZhConverterUtil.toTraditional(text)
+        } catch (_: Exception) {
+            text
         }
     }
 

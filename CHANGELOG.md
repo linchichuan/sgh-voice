@@ -1,5 +1,44 @@
 # Changelog
 
+## v2.2.0 (2026-05-20) — Perceived Responsiveness & Production Trust
+
+跨平台 Release：macOS / iOS / Android 三平台同步升版。針對「實際很快但感覺不夠快」做整體優化，10 個 bug 透過 4 輪 codex review loop 被攔下，沒一個 ship 出去。
+
+### ⚡ 感知速度提升（macOS）
+- **5 處固定 sleep → polling**：`paste_text` 的 `sleep(0.6)` 等修飾鍵 → Quartz `CGEventSourceFlagsState` 輪詢（典型 50-150ms 解除）。Quick-Rewrite 的 `sleep(0.25)` + `sleep(0.2)` 同樣改 polling。Overlay 過場 `sleep(0.4)` 移除。
+- **AXValue 補刀邏輯修復**：原本長文 Quartz 成功後還補一次 AXValue 會把編輯器既有內容清空只剩貼上的字。現在只在 Quartz + osascript 都失敗才走 AXValue。
+- **剪貼簿還原 3s → 1.5s + NSPasteboard.changeCount() race-free 守門**：使用者期間動過剪貼簿（即使內容碰巧相同）也不會被誤覆蓋。
+
+### 🎮 工作流摩擦解除（macOS）
+- **Retry hotkey** `right_option+y`：用 cache 的 raw STT 重跑 LLM，跳過 STT 階段（省 1.5s），不用重錄就能換一版輸出。
+- **Cancel hotkey** `right_option+x`：錄音中按下 = 立刻丟棄音訊；處理中按下 = paste 階段自動跳過。Pipeline 已開始的 LLM call 會跑完但結果不貼。
+
+### 👀 處理視覺化（macOS）
+- **Overlay 階段化**：原本只有一個「處理中…」label，現在會依管線進度切換 `🎧 辨識中` → `✨ 整理中` → `📋 貼上中`，三語都有。
+- 多 race 防護：`_pending_stage_prefix` 在 init / done / idle / recording / show_transcript 都會清，避免異步主執行緒排程跟背景 stage 設定的 race。
+
+### 🛡️ 生產級信任修復（三平台）
+- **LLM 尾部幻覺截斷**（macOS + iOS + Android）：偵測「raw 內容完整保留 + LLM 在結尾自己接話加新句子」的補寫型幻覺，自動截斷而非整段捨棄。例：raw 結尾「色色名稱不用到這麼大」，LLM 加上「，所以你看能不能調整。而且你仔細看，從」→ 自動截到「不用到這麼大。」
+  - macOS 用 `difflib.SequenceMatcher` + OpenCC `s2twp` 雙向正規化，處理簡體 raw + LLM 繁化 + 擴寫的混合 case。
+  - iOS 用 `String.range(of:options:.backwards)` 簡化版（暫無 OpenCC 依賴）。
+  - Android 用 `String.lastIndexOf` + opencc4j `ZhConverterUtil.toTraditional` 同樣雙向正規化。
+- **Mode gating**：只在 dictate mode 套用截斷，edit mode（Quick-Rewrite / 翻譯 / Email 草稿 / 語音指令改寫）跳過 — 改寫本來就是 LLM 應該加內容，截斷會誤毀正常輸出。
+
+### 🔧 內部優化
+- HTTP client cache（macOS）：5 個雲端 LLM/STT client 連線重用，每次省 200-500ms TCP/TLS handshake。
+- Signal handler（macOS）：SIGINT/SIGTERM/atexit 乾淨關閉 PortAudio 串流，不再殘留 leaked semaphore。
+- Anthropic 連線預熱（macOS）：啟動時背景送 1 token ping，第一次正式錄音不付握手成本。
+- `_should_skip_llm` 邏輯保留（不放寬，避免犧牲品質）。
+
+### 📦 平台版本
+- macOS: v2.2.0 (app.py + Dashboard footer)
+- iOS: MARKETING_VERSION 2.2.0
+- Android: versionName 2.2.0, versionCode 15
+
+### 🤖 開發品質
+- 4 輪 codex auto-review loop 攔下 10 個 bug（含 4 個 UI race、3 個 LLM 截斷 edge case、1 個 cancel flag 殘留、1 個 retry cache 時機、1 個 clipboard race）。沒一個 ship。
+- 約 +494 行 / 4 個檔案（macOS app/transcriber/overlay/config）+ iOS/Android LlmClient 各 ~80 行。
+
 ## v2.1.0 (2026-04-29) — Personalization & Productivity Release
 
 - **個人化 Few-shot 後處理**：LLM 後處理會注入最近 3 筆 `whisper_raw → final_text` 歷史範例，5 個引擎統一支援，rewrite API 會自動跳過。
