@@ -50,8 +50,14 @@ def new_session():
 
 def end_session():
     """Pipeline 結束時呼叫（無論成功 / early-return / exception）。
-    從 _active_list 移除自己的 session，並清掉 TLS 避免之後同 thread 的事件
-    （例如 hotkey thread 跑完 retry_last_llm 後又被叫去處理 cancel）誤關聯到已結束的 session。"""
+    從 _active_list 移除自己的 session，**保留** TLS 不清掉，原因：
+    - app.py _transcribe_and_paste 在 transcribe() 回傳「之後」會繼續 paste_text，
+      paste_text 在同 thread 呼叫 event_ledger.paste_method 需要拿到剛結束的 session
+      才能跟 pipeline_complete 串接到同一 session。
+    - 各 hotkey callback 都是 short-lived thread（threading.Thread.start() spawn），
+      函式結束 thread 就死，TLS 隨之回收，不會 leak 到後續事件。
+    - 對 _resolve_session：TLS 有 sid 就用 TLS（覆蓋了 paste correlation 需求）；
+      閒置期間沒人開 new_session，TLS 已隨 thread 死亡 → 新 hotkey thread 拿不到舊 TLS。"""
     sid = getattr(_tls, "session_id", None)
     if sid is None:
         return
@@ -60,7 +66,6 @@ def end_session():
             _active_list.remove(sid)
         except ValueError:
             pass  # 已被移除（防禦性）
-    _tls.session_id = None
 
 
 def current_session():
