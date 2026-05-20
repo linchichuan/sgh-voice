@@ -161,8 +161,10 @@ def pipeline_complete(total_ms, stt_ms, llm_ms, stt_source, llm_source, mode, ch
     }
     if app_id: fields["app_id"] = app_id
     log("pipeline_complete", **fields)
-    # Pipeline 結束 → 清掉 active session pointer。下一輪 new_session() 會重設。
-    # 結果：idle 期間的 UI events 寫 session=null（語意正確：沒 pipeline 可關聯）；
-    # 處理中的 cancel/retry 仍能透過 _last_active 拿到對應 session。
+    # Pipeline 結束 → 清掉 active session pointer，但只清「自己」這個 session。
+    # 若有更新的 pipeline B 已搶占 _last_active，此次完成的 A 不該清 B 的 pointer，
+    # 否則 B 還在跑時 UI events（cancel/retry）會失去與 B 的關聯。
+    my_session = getattr(_tls, "session_id", None)
     with _active_lock:
-        _last_active = None
+        if _last_active == my_session:
+            _last_active = None
