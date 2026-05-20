@@ -609,10 +609,21 @@ class VoiceEngine:
             self._safe_status_change("processing")
         log("info", f"錄音 {duration:.1f}s，開始辨識處理…")
 
+        # 階段化 overlay label：STT / LLM / paste 三段，幫助使用者知道目前卡哪。
+        # 但若 user 此時已開始新錄音（continuous 模式 / 快速連按），overlay 已被切回
+        # "recording"，這時候 update_stage 會把錄音動畫的 prefix 偷換掉 → 顯示錯亂。
+        # 所以 callback 內要再次 check 當前 is_recording 才能真正套用。
+        def _on_stage(stage):
+            with self._state_lock:
+                if self.is_recording:
+                    return
+            try: self.overlay.update_stage(stage)
+            except Exception: pass
+
         result = None
         try:
             audio_input = audio_array if audio_array is not None else filepath
-            result = self.transcriber.transcribe(audio_input, duration, mode, edit_context)
+            result = self.transcriber.transcribe(audio_input, duration, mode, edit_context, on_stage=_on_stage)
 
             if result:
                 final = result["final"] or ""
@@ -629,6 +640,7 @@ class VoiceEngine:
                     log("warn", "🚫 已取消，跳過 paste")
                     self._cancel_inflight = False
                 elif self.config.get("auto_paste") and final:
+                    _on_stage("paste")
                     with self._paste_lock:
                         try:
                             paste_text(final)
@@ -800,7 +812,15 @@ class VoiceEngine:
             self._safe_status_change("processing")
             log("info", f"🔁 Retry：跳過 STT，重跑 LLM（raw={cache['raw'][:30]}...）")
 
-            result = self.transcriber.retry_last_llm()
+            def _retry_on_stage(stage):
+                # 同 _transcribe_and_paste：若 user 在 retry 期間開始新錄音，不要偷改 prefix
+                with self._state_lock:
+                    if self.is_recording:
+                        return
+                try: self.overlay.update_stage(stage)
+                except Exception: pass
+
+            result = self.transcriber.retry_last_llm(on_stage=_retry_on_stage)
             if not result:
                 log("warn", "Retry 失敗（cache 過期或 LLM 全部失敗）")
                 try: self.overlay.show("idle")
@@ -817,6 +837,7 @@ class VoiceEngine:
                 return
 
             if self.config.get("auto_paste", True):
+                _retry_on_stage("paste")
                 with self._paste_lock:
                     try: paste_text(final)
                     except Exception as e: log("warn", f"Retry paste: {e}")

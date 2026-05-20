@@ -56,6 +56,11 @@ class StatusOverlay:
         self._timer = None
         self._dot_count = 0
         self._updater = None
+        self._current_prefix = ""
+        # update_stage 從背景 thread 設定，但 _start_animation 在主執行緒晚一拍才跑。
+        # 用 _pending_stage_prefix 保留早到的 stage 標籤，動畫啟動時優先使用，避免被
+        # generic "Processing" 覆寫導致 STT label 在第一秒消失。
+        self._pending_stage_prefix = None
 
         if HAS_APPKIT:
             self._setup_window()
@@ -75,10 +80,22 @@ class StatusOverlay:
                     lang = 'ja'
         
         db = {
-            'zh-TW': {'recording': '🔴  錄音中', 'processing': '⏳  辨識處理中', 'done': '✅  完成'},
-            'zh-CN': {'recording': '🔴  录音中', 'processing': '⏳  识别处理中', 'done': '✅  完成'},
-            'ja': {'recording': '🔴  録音中', 'processing': '⏳  認識処理中', 'done': '✅  完了'},
-            'en': {'recording': '🔴  Recording', 'processing': '⏳  Processing', 'done': '✅  Done'},
+            'zh-TW': {
+                'recording': '🔴  錄音中', 'processing': '⏳  辨識處理中', 'done': '✅  完成',
+                'stage_stt': '🎧  辨識中', 'stage_llm': '✨  整理中', 'stage_paste': '📋  貼上中',
+            },
+            'zh-CN': {
+                'recording': '🔴  录音中', 'processing': '⏳  识别处理中', 'done': '✅  完成',
+                'stage_stt': '🎧  识别中', 'stage_llm': '✨  整理中', 'stage_paste': '📋  粘贴中',
+            },
+            'ja': {
+                'recording': '🔴  録音中', 'processing': '⏳  認識処理中', 'done': '✅  完了',
+                'stage_stt': '🎧  認識中', 'stage_llm': '✨  整理中', 'stage_paste': '📋  貼り付け中',
+            },
+            'en': {
+                'recording': '🔴  Recording', 'processing': '⏳  Processing', 'done': '✅  Done',
+                'stage_stt': '🎧  Transcribing', 'stage_llm': '✨  Refining', 'stage_paste': '📋  Pasting',
+            },
         }
         return db[lang]
 
@@ -171,6 +188,8 @@ class StatusOverlay:
             self._start_animation(status)
         elif status == "done":
             self._stop_animation()
+            # Pipeline 結束 → 清掉 stage 殘留，下次 processing 才不會殘留上輪的 "貼上中"
+            self._pending_stage_prefix = None
             self._label.setStringValue_(self.texts["done"])
             self._label.setTextColor_(
                 AppKit.NSColor.colorWithCalibratedRed_green_blue_alpha_(0.0, 0.82, 0.63, 1.0)
@@ -182,19 +201,26 @@ class StatusOverlay:
             )
         else:  # idle / hide
             self._stop_animation()
+            self._pending_stage_prefix = None
             self._window.orderOut_(None)
 
     def _start_animation(self, status):
-        """動畫效果：... 跳動"""
+        """動畫效果：... 跳動。_current_prefix 由 update_stage() 動態更新而不中斷動畫。"""
         self._stop_animation()
         self._dot_count = 0
-        prefix = self.texts["recording"] if status == "recording" else self.texts["processing"]
+        if status == "recording":
+            self._current_prefix = self.texts["recording"]
+            # 新錄音開始 → 清掉前一輪殘留的 stage label
+            self._pending_stage_prefix = None
+        else:
+            # processing：若 update_stage 已搶先送來 stage label，用 pending（避免被 generic 覆寫）
+            self._current_prefix = self._pending_stage_prefix or self.texts["processing"]
 
         def _animate(timer):
             self._dot_count = (self._dot_count + 1) % 4
             dots = "." * self._dot_count + "   "[self._dot_count:]
             if self._label:
-                self._label.setStringValue_(f"{prefix}{dots}")
+                self._label.setStringValue_(f"{self._current_prefix}{dots}")
 
         self._timer = Foundation.NSTimer.scheduledTimerWithTimeInterval_repeats_block_(
             0.5, True, _animate
@@ -204,6 +230,20 @@ class StatusOverlay:
         if self._timer:
             self._timer.invalidate()
             self._timer = None
+
+    def update_stage(self, stage):
+        """處理中換階段標籤（stt / llm / paste）。不重啟動畫，只更新文字 prefix。
+        Thread-safe — 從 background thread 呼叫也安全（NSTextField 在下個 animate tick 套用）。
+        同時記到 _pending_stage_prefix，讓晚一拍才執行的 _start_animation 也能正確套用。"""
+        key = f"stage_{stage}"
+        try:
+            new_prefix = self.texts.get(key)
+        except Exception:
+            new_prefix = None
+        if not new_prefix:
+            return
+        self._current_prefix = new_prefix
+        self._pending_stage_prefix = new_prefix
 
     # ─── 即時轉寫顯示（C 連續模式 / 一般模式皆可用）────────
     def show_transcript(self, text, duration=2.5):

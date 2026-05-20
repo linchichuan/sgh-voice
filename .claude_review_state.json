@@ -9,11 +9,12 @@
     "touched_files": [
       "app.py",
       "config.py",
+      "overlay.py",
       "transcriber.py"
     ],
     "updated_at": "2026-05-16T22:41:19Z"
   },
-  "updated_at": "2026-05-20T00:20:17Z",
+  "updated_at": "2026-05-20T00:30:18Z",
   "has_code_change": true,
   "has_doc_change": false,
   "code_review": {
@@ -42,6 +43,7 @@
   "changed_files_since_review": [
     "/Users/lin/voice-input/app.py",
     "/Users/lin/voice-input/config.py",
+    "/Users/lin/voice-input/overlay.py",
     "/Users/lin/voice-input/scripts/dictionary_promote_from_history.py",
     "/Users/lin/voice-input/scripts/update_style_profile.py",
     "/Users/lin/voice-input/transcriber.py"

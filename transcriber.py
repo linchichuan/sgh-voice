@@ -193,10 +193,17 @@ class Transcriber:
 
         return f"{base}{app_prompt}{personal_prompt}{scene_prompt}".strip()
 
-    def transcribe(self, audio_source, audio_duration=0, mode="dictate", edit_context=""):
+    def transcribe(self, audio_source, audio_duration=0, mode="dictate", edit_context="", on_stage=None):
+        """on_stage: callable(stage_name: 'stt'|'llm'|'paste') 用來通知 UI 階段切換。"""
+        def _stage(s):
+            if on_stage:
+                try: on_stage(s)
+                except Exception: pass
+
         t0 = time.time()
         is_hybrid = self.config.get("enable_hybrid_mode", True)
         stt_source, llm_source = "none", "none"
+        _stage("stt")
 
         # ── 自動偵測前景 App (App Awareness) ───────────────
         app_info = detect_app_style(self.config)
@@ -275,6 +282,7 @@ class Transcriber:
         corrected = self._apply_smart_replace(corrected)
 
         # ── LLM 階段 ─────────────────────────────────────
+        _stage("llm")
         t_llm0 = time.time()
         final = None
         
@@ -331,9 +339,14 @@ class Transcriber:
         threading.Thread(target=self.memory.add_to_history, args=(entry,), daemon=True).start()
         return {"raw": raw, "final": final, "process_time": process_time}
 
-    def retry_last_llm(self):
+    def retry_last_llm(self, on_stage=None):
         """Retry hotkey 入口：用 cache 的 raw STT 重跑 corrections + LLM，回傳 result dict。
         跳過 STT 階段（省 1.5s），讓使用者拿到第二版而不用重錄。"""
+        def _stage(s):
+            if on_stage:
+                try: on_stage(s)
+                except Exception: pass
+
         cache = self._last_stt_cache
         if not cache:
             return None
@@ -341,6 +354,7 @@ class Transcriber:
         if time.time() - cache.get("timestamp", 0) > 1800:
             return None
 
+        _stage("llm")
         t0 = time.time()
         raw = cache["raw"]
         mode = cache["mode"]
