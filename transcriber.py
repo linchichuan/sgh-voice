@@ -514,7 +514,7 @@ class Transcriber:
             system = self._EDIT_SYSTEM if mode == "edit" else (system_prompt or self._get_system_prompt())
             user_text = self._wrap_edit_text(text, edit_context) if mode == "edit" else text
             t0 = time.time()
-            messages = [{"role": "system", "content": system}, *self._few_shot_pairs(mode), {"role": "user", "content": user_text}]
+            messages = [{"role": "system", "content": system}, *self._few_shot_pairs(mode, current_text=text), {"role": "user", "content": user_text}]
             resp = client.chat.completions.create(model=model, messages=messages, temperature=0.0, max_tokens=self._dynamic_max_tokens(text))
             res = re.sub(r'<think>[\s\S]*?</think>|<think>[\s\S]*$', '', resp.choices[0].message.content).strip()
             self._track_usage("groq", model, resp.usage.prompt_tokens, resp.usage.completion_tokens)
@@ -533,7 +533,7 @@ class Transcriber:
             model = self.config.get("openrouter_model", "qwen/qwen3.6-plus")
             system = self._EDIT_SYSTEM if mode == "edit" else (system_prompt or self._get_system_prompt())
             t0 = time.time()
-            messages = [{"role": "system", "content": system}, *self._few_shot_pairs(mode), {"role": "user", "content": self._wrap_edit_text(text, edit_context) if mode == "edit" else text}]
+            messages = [{"role": "system", "content": system}, *self._few_shot_pairs(mode, current_text=text), {"role": "user", "content": self._wrap_edit_text(text, edit_context) if mode == "edit" else text}]
             resp = client.chat.completions.create(model=model, messages=messages, temperature=0.0, max_tokens=self._dynamic_max_tokens(text), extra_headers={"HTTP-Referer": "https://shingihou.com", "X-Title": "SGH Voice"})
             res = re.sub(r'<think>[\s\S]*?</think>|<think>[\s\S]*$', '', resp.choices[0].message.content).strip()
             self._track_usage("openrouter", model, resp.usage.prompt_tokens, resp.usage.completion_tokens)
@@ -552,7 +552,7 @@ class Transcriber:
             model = self.config.get("claude_model", "claude-haiku-4-5-20251001")
             system = self._EDIT_SYSTEM if mode == "edit" else (system_prompt or self._get_system_prompt())
             t0 = time.time()
-            messages = [*self._few_shot_pairs(mode), {"role": "user", "content": self._wrap_edit_text(text, edit_context) if mode == "edit" else text}]
+            messages = [*self._few_shot_pairs(mode, current_text=text), {"role": "user", "content": self._wrap_edit_text(text, edit_context) if mode == "edit" else text}]
             resp = client.messages.create(model=model, system=system, messages=messages, max_tokens=self._dynamic_max_tokens(text), temperature=0.0)
             res = resp.content[0].text.strip()
             self._track_usage("anthropic", model, resp.usage.input_tokens, resp.usage.output_tokens)
@@ -571,7 +571,7 @@ class Transcriber:
             model = self.config.get("openai_model", "gpt-4o")
             system = self._EDIT_SYSTEM if mode == "edit" else (system_prompt or self._get_system_prompt())
             t0 = time.time()
-            messages = [{"role": "system", "content": system}, *self._few_shot_pairs(mode), {"role": "user", "content": self._wrap_edit_text(text, edit_context) if mode == "edit" else text}]
+            messages = [{"role": "system", "content": system}, *self._few_shot_pairs(mode, current_text=text), {"role": "user", "content": self._wrap_edit_text(text, edit_context) if mode == "edit" else text}]
             resp = client.chat.completions.create(model=model, messages=messages, temperature=0.0, max_tokens=self._dynamic_max_tokens(text))
             res = resp.choices[0].message.content.strip()
             self._track_usage("openai", model, resp.usage.prompt_tokens, resp.usage.completion_tokens)
@@ -586,7 +586,7 @@ class Transcriber:
         if self.ollama_detector.status != OllamaStatus.CONNECTED: return None
         try:
             system = system_prompt or self._get_system_prompt()
-            messages = [{"role": "system", "content": system}, *self._few_shot_pairs(), {"role": "user", "content": text}]
+            messages = [{"role": "system", "content": system}, *self._few_shot_pairs(current_text=text), {"role": "user", "content": text}]
             resp = self.local_llm.chat.completions.create(model=self.config.get("local_llm_model", "qwen3.5:latest"), messages=messages, temperature=0.0, max_tokens=1024)
             return resp.choices[0].message.content.strip()
         except Exception:
@@ -629,9 +629,15 @@ class Transcriber:
 
         return True, ""
 
-    def _few_shot_pairs(self, mode=None):
+    def _few_shot_pairs(self, mode=None, current_text=None):
         """產生個人化 few-shot user/assistant 訊息對。
-        edit 模式（rewrite API）不注入；enable_fewshot 為 False 時不注入。"""
+        edit 模式（rewrite API）不注入；enable_fewshot 為 False 時不注入。
+
+        ⚠️ Degenerate-input gate（v2.1.1）：current_text 太短時跳過 few-shot。
+        原因：當 Whisper raw 近乎空（0.x 秒誤觸 / 純噪音），LLM 看到 system + 3 對
+        few-shot + 幾乎沒內容的 user，會直接複誦最近 assistant example 當輸出
+        （已實測 Claude 把上一段 150 字整段吐回）。
+        """
         if mode == "edit":
             return []
         if not self.config.get("enable_fewshot", True):
@@ -639,10 +645,21 @@ class Transcriber:
         n = int(self.config.get("fewshot_count", 3))
         if n <= 0:
             return []
+        if current_text is not None:
+            stripped = (current_text or "").strip()
+            min_chars = int(self.config.get("fewshot_min_input_chars", 8))
+            if len(stripped) < min_chars:
+                return []
         try:
             examples = self.memory.get_few_shot_examples(n=n)
         except Exception:
             return []
+        # 額外守門：current_text 短於最短範例 raw 的一半 → 也視為退化，避免 LLM 偏向複誦
+        if current_text is not None and examples:
+            cur_len = len((current_text or "").strip())
+            shortest_raw = min(len(r.strip()) for r, _ in examples)
+            if cur_len < shortest_raw * 0.5:
+                return []
         pairs = []
         for raw, fin in examples:
             pairs.append({"role": "user", "content": raw})
@@ -852,9 +869,37 @@ class Transcriber:
         "Please provide", "let me know", "I'll need more",
     )
 
+    def _echoes_fewshot(self, result_stripped, original_stripped):
+        """偵測 LLM 退化複誦 few-shot example：result 與某筆 example 的 final_text 完全相等，
+        且該 example 的 final 跟當前 input 沒明顯關聯（避免誤殺合理的重複語句）。
+        只在 few-shot 啟用時檢查；memory 取得失敗就 silently 放行。"""
+        if not result_stripped or not original_stripped:
+            return False
+        if not self.config.get("enable_fewshot", True):
+            return False
+        try:
+            n = int(self.config.get("fewshot_count", 3))
+            examples = self.memory.get_few_shot_examples(n=n)
+        except Exception:
+            return False
+        for raw, fin in examples:
+            fin_s = (fin or "").strip()
+            if not fin_s:
+                continue
+            if result_stripped == fin_s:
+                # 跟當前 raw 也一樣 → 視為合法重複（使用者真的講了同一句）
+                if original_stripped == fin_s:
+                    return False
+                return True
+        return False
+
     def _is_llm_hallucination(self, result, original_text):
         if not result or not original_text: return False
         r = result.strip(); o = original_text.strip()
+        # 0. Few-shot echo：LLM 複誦最近 few-shot example 的 assistant 內容
+        # （degenerate input 下的常見退化模式，即使輸入長度未觸發 #3 也要擋）
+        if self._echoes_fewshot(r, o):
+            return True
         # 1. 助理對話起手詞
         for m in self._CONV_MARKERS:
             if r.startswith(m): return True

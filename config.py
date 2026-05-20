@@ -269,6 +269,7 @@ DEFAULT_CONFIG = {
     "enable_filler_removal": True,          # 移除填充詞
     "enable_fewshot": True,                 # 個人化 few-shot：把最近的 raw→final 範例餵給 LLM
     "fewshot_count": 3,                     # 注入的範例數（0=關閉，建議 2~5；越多越貼但 token 成本越高）
+    "fewshot_min_input_chars": 8,           # 當前 raw 短於此字數時不注入 few-shot，防 LLM 退化複誦上一段（v2.1.1）
     "rewrite_hotkey": "right_option+r",     # Quick-Rewrite 全域熱鍵（空字串=關閉）；選取文字後按下，LLM 改寫並貼回
     "default_rewrite_style": "concise",     # Quick-Rewrite 預設風格（concise/formal/casual/email/technical/translate_en/translate_ja/translate_zh）
     "retry_hotkey": "right_option+y",       # Retry 全域熱鍵（空字串=關閉）；用最後一次的 raw STT 重跑 LLM，省 1.5s 不用重錄
