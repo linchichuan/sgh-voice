@@ -834,11 +834,11 @@ class Transcriber:
         """
         if not original_text or not llm_result:
             return None
-        o = original_text.strip()
+        o_raw = original_text.strip()
         r = llm_result.strip()
-        if len(o) < 10:
+        if len(o_raw) < 10:
             return None  # 太短易誤判
-        if len(r) <= len(o) * 1.15:
+        if len(r) <= len(o_raw) * 1.15:
             return None  # 沒明顯擴寫
 
         try:
@@ -846,17 +846,30 @@ class Transcriber:
         except Exception:
             return None
 
+        # 用 OpenCC 把 o 轉成繁體後再跟 r 比對。LLM 已 enforce 繁體輸出，若不做這步，
+        # 「raw 簡體结尾 → LLM 轉繁體擴寫」會被誤判成「LLM 沒接到 o 的結尾 + 加新內容」
+        # → 截在錯誤位置丟掉合法字。
+        if self._opencc:
+            try:
+                o = self._opencc.convert(o_raw)
+            except Exception:
+                o = o_raw
+        else:
+            o = o_raw
+
         matcher = SequenceMatcher(None, o, r, autojunk=False)
-        # 找「raw 內容在 final 落點到哪」：所有覆蓋到 o 結尾區域的 matching block 取最遠端。
+        # 找「raw 內容在 final 落點到哪」：matching block 必須真正到達 o 結尾（無 tolerance）。
+        # 若 LLM 改了 o 的最末字元（typo fix），block 會止步在那之前 → 不會誤截。
+        # 代價：LLM 同時改尾端字元 + 擴寫時不截（罕見，安全優先）。
         # block.size 門檻設 2 才不會漏掉短連續匹配（例如「我覺得」3 字）。
         o_clean_end = len(o.rstrip(' ，。、！？.,!?\n\t'))
         end_in_result = None
         for block in matcher.get_matching_blocks():
-            if block.size >= 2 and (block.a + block.size) >= max(0, o_clean_end - 3):
+            if block.size >= 2 and (block.a + block.size) >= o_clean_end:
                 end_in_result = block.b + block.size
 
         if end_in_result is None:
-            return None  # o 的結尾沒對應到 r → 不是 trailing extension
+            return None  # o 的結尾沒精確對應到 r → 可能是改寫不是擴寫，安全跳過
 
         trailing = r[end_in_result:]
         substantive_trailing = trailing.strip(' ，。、！？.,!?\n\t')
