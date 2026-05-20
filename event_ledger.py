@@ -147,7 +147,9 @@ def user_action(action, phase, **extra):
 
 
 def pipeline_complete(total_ms, stt_ms, llm_ms, stt_source, llm_source, mode, chars_out, app_id=None):
-    """每個成功的 transcribe() 收尾時記一筆，方便聚合 p50/p90/p95。"""
+    """每個成功的 transcribe() 收尾時記一筆，方便聚合 p50/p90/p95。
+    收完後清掉 _last_active，避免閒置期 UI events（cancel/retry on idle）誤關聯到舊 session。"""
+    global _last_active
     fields = {
         "total_ms": int(total_ms),
         "stt_ms": int(stt_ms),
@@ -159,3 +161,8 @@ def pipeline_complete(total_ms, stt_ms, llm_ms, stt_source, llm_source, mode, ch
     }
     if app_id: fields["app_id"] = app_id
     log("pipeline_complete", **fields)
+    # Pipeline 結束 → 清掉 active session pointer。下一輪 new_session() 會重設。
+    # 結果：idle 期間的 UI events 寫 session=null（語意正確：沒 pipeline 可關聯）；
+    # 處理中的 cancel/retry 仍能透過 _last_active 拿到對應 session。
+    with _active_lock:
+        _last_active = None
