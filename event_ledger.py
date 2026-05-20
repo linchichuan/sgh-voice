@@ -29,19 +29,37 @@ _lock = threading.Lock()
 # Thread-local session：避免重疊轉寫（背景 transcribe 還在跑時新錄音開始）
 # 用同一個 global session_id 會把後續事件錯記到新 session。
 _tls = threading.local()
+# 最近一次 new_session() 結果，給 UI thread 的 user_action（cancel/retry）等
+# 沒有自己 session 的 caller 自動關聯到 active pipeline。
+_last_active = None
+_active_lock = threading.Lock()
 
 
 def new_session():
     """每次錄音/retry/cancel 互動開始時呼叫，回傳新的 session_id（綁定到當前 thread）。
-    用 ns timestamp + thread ident 避免兩個重疊 transcription 在同 ms 拿到同 id。"""
+    用 ns timestamp + thread ident 避免兩個重疊 transcription 在同 ms 拿到同 id。
+    同時更新 _last_active，讓 UI thread 的 cancel/retry 能自動關聯。"""
+    global _last_active
     tid = threading.get_ident() & 0xFFFF  # thread ident 低 16 bits
     sid = f"{time.time_ns():x}-{tid:04x}"
     _tls.session_id = sid
+    with _active_lock:
+        _last_active = sid
     return sid
 
 
 def current_session():
     return getattr(_tls, "session_id", None)
+
+
+def _resolve_session():
+    """log() 取 session 的邏輯：先用 caller thread 的 TLS，沒有就 fallback 到最近 active。
+    讓 UI thread 的 cancel/retry events 自動關聯到當下 pipeline。"""
+    sid = getattr(_tls, "session_id", None)
+    if sid:
+        return sid
+    with _active_lock:
+        return _last_active
 
 
 def log(event_type, **fields):
@@ -51,7 +69,7 @@ def log(event_type, **fields):
         entry = {
             "ts": datetime.now().isoformat(timespec="milliseconds"),
             "type": event_type,
-            "session": getattr(_tls, "session_id", None),
+            "session": _resolve_session(),
         }
         # 確保 fields 不會 leak 文字內容（白名單檢查）
         for k, v in fields.items():

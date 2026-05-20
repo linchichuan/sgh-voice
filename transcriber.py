@@ -316,13 +316,26 @@ class Transcriber:
         elif self.config.get("enable_claude_polish"):
             pref_engine = self.config.get("llm_engine", "ollama")
             
-            def try_groq(): return self._groq_llm_process(corrected, mode, edit_context, system_prompt=system_prompt), "groq"
-            def try_or(): return self._openrouter_process(corrected, mode, edit_context, system_prompt=system_prompt), "openrouter"
-            def try_claude(): return self._claude_process(corrected, mode, edit_context, system_prompt=system_prompt), "claude"
-            def try_openai(): return self._openai_process(corrected, mode, edit_context, system_prompt=system_prompt), "openai"
+            # 每個 route 先檢查「是否已 configured」，未配置直接回 (None, None) → skip 不記事件。
+            # 若 configured，無論結果如何（成功或 ollama detector down 等真實失敗）都會以 attempt
+            # 形式記到 ledger，這樣 local LLM 真實 outage 不會被誤判成 skip 而消失。
+            def try_groq():
+                if not self.config.get("groq_api_key"): return None, None
+                return self._groq_llm_process(corrected, mode, edit_context, system_prompt=system_prompt), "groq"
+            def try_or():
+                if not self.config.get("openrouter_api_key"): return None, None
+                return self._openrouter_process(corrected, mode, edit_context, system_prompt=system_prompt), "openrouter"
+            def try_claude():
+                if not self.config.get("anthropic_api_key"): return None, None
+                return self._claude_process(corrected, mode, edit_context, system_prompt=system_prompt), "claude"
+            def try_openai():
+                if not self.config.get("openai_api_key"): return None, None
+                return self._openai_process(corrected, mode, edit_context, system_prompt=system_prompt), "openai"
             def try_ollama():
-                if is_hybrid and mode == "dictate": return self._local_llm_process(corrected, system_prompt=system_prompt), "local"
-                return None, None
+                if not (is_hybrid and mode == "dictate"): return None, None
+                # 注意：ollama detector down / backoff 是真實 attempt（會被 _local_llm_process 內部處理），
+                # 這裡不做 detector 檢查，讓事件正確記到 ledger 反映 local LLM outage。
+                return self._local_llm_process(corrected, system_prompt=system_prompt), "local"
 
 
             routes_map = {
@@ -337,13 +350,10 @@ class Transcriber:
                 t_route = time.time()
                 res, source = route()
                 route_latency_ms = (time.time() - t_route) * 1000
-                # 區分 skip vs real attempt：
-                # - source=None → try_ollama 在 edit mode 跳過（明確 skip 信號）
-                # - source 有值但 latency < 50ms 且 res=None → provider method 沒 API key 早 return
-                #   （真實 API 呼叫至少 ~100ms RTT，<50ms 必為早 return）
-                #   → 兩者都不算真實 attempt，不污染 ledger
-                skipped = (source is None) or (not res and route_latency_ms < 50)
-                if not skipped:
+                # source=None → route 內部已判斷為「未配置」(沒 API key / ollama 在 edit mode)
+                # 視為 skip，不記事件，不增加 fallback_index。其餘一律算真實 attempt
+                # （包含 ollama detector down 這種 fast-fail，需要被觀測到）。
+                if source is not None:
                     event_ledger.llm_attempt(
                         source, mode, route_latency_ms,
                         ok=bool(res), fallback_index=attempt_idx,
