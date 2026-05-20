@@ -846,18 +846,24 @@ class Transcriber:
         except Exception:
             return None
 
-        # 用 OpenCC 把 o 轉成繁體後再跟 r 比對。LLM 已 enforce 繁體輸出，若不做這步，
-        # 「raw 簡體结尾 → LLM 轉繁體擴寫」會被誤判成「LLM 沒接到 o 的結尾 + 加新內容」
-        # → 截在錯誤位置丟掉合法字。
+        # 用 OpenCC 同時正規化 o 跟 r 後再比對。
+        # - 只轉 o 不轉 r：LLM 若不照繁體 enforce 吐簡體擴寫，matcher 會 miss → 漏截
+        # - 都不轉：raw 簡體結尾 + LLM 轉繁體擴寫 → matcher 在 o 結尾止步 → 漏截
+        # - 都轉：simplified vs traditional 統一空間下比對，匹配範圍最完整。
+        # 注意 SequenceMatcher 回傳的 index 對應「正規化後 r」，因此 slice 也用 r_norm；
+        # caller 的 OpenCC 終層套用是 idempotent，不會雙轉。
         if self._opencc:
             try:
                 o = self._opencc.convert(o_raw)
+                r_norm = self._opencc.convert(r)
             except Exception:
                 o = o_raw
+                r_norm = r
         else:
             o = o_raw
+            r_norm = r
 
-        matcher = SequenceMatcher(None, o, r, autojunk=False)
+        matcher = SequenceMatcher(None, o, r_norm, autojunk=False)
         # 找「raw 內容在 final 落點到哪」：matching block 必須真正到達 o 結尾（無 tolerance）。
         # 若 LLM 改了 o 的最末字元（typo fix），block 會止步在那之前 → 不會誤截。
         # 代價：LLM 同時改尾端字元 + 擴寫時不截（罕見，安全優先）。
@@ -871,14 +877,16 @@ class Transcriber:
         if end_in_result is None:
             return None  # o 的結尾沒精確對應到 r → 可能是改寫不是擴寫，安全跳過
 
-        trailing = r[end_in_result:]
+        # trailing 跟 truncation 一律走正規化空間（r_norm），確保跟 matcher index 對齊
+        trailing = r_norm[end_in_result:]
         substantive_trailing = trailing.strip(' ，。、！？.,!?\n\t')
         # 4 字以下視為合理擴寫（嗎？、對吧、謝謝 等），4 字以上才視為實質補寫
         if len(substantive_trailing) < 4:
             return None
 
-        # 截斷：保留到 raw 結尾對應位置，可能多帶一兩個合理的結束標點
-        truncated = r[:end_in_result]
+        # 截斷：用 r_norm 的 index 切，return 出去的就是已繁體化的版本，
+        # caller 後續再跑 OpenCC 也是 idempotent，無雙轉風險。
+        truncated = r_norm[:end_in_result]
         # 補一個句號（若沒有結尾標點）
         if truncated and truncated[-1] not in '，。、！？.,!?\n\t':
             # 從 trailing 取第一個標點（若有）跟著
