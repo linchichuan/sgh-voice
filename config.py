@@ -1,6 +1,6 @@
 """
 config.py — 設定與資料持久化層
-所有本地資料都存在 ~/.voice-input/
+所有本地資料都存在 ~/.voice-input/（可能是 symlink 指向外接 SSD）
 """
 import json
 import os
@@ -11,6 +11,47 @@ from datetime import datetime, date
 
 # 跨 thread 序列化 stats.json 的 read-modify-write，避免 update_stats 與 _track_usage race
 _STATS_LOCK = threading.RLock()
+
+
+def _ensure_data_dir():
+    """Bootstrap：決定 ~/.voice-input 該指向哪裡。
+    優先 SSD（/Volumes/Satechi_SSD/voice-input/app-data），SSD 沒掛時 fallback 到
+    本機 ~/.voice-input.local。透過 symlink 達成，下游所有 os.path.expanduser
+    ('~/.voice-input/...') 都不用改。
+
+    行為：
+    - ~/.voice-input 是 symlink → 視當前 SSD 狀態必要時 re-link
+    - ~/.voice-input 是真實目錄 → 不動（尚未遷移，由使用者手動跑 migration）
+    - ~/.voice-input 不存在 → 建立 symlink 指向當前可用的 target
+    """
+    home = os.path.expanduser("~")
+    link = os.path.join(home, ".voice-input")
+    ssd_target = "/Volumes/Satechi_SSD/voice-input/app-data"
+    local_fallback = os.path.join(home, ".voice-input.local")
+
+    if os.path.isdir(ssd_target) and os.access(ssd_target, os.W_OK):
+        target = ssd_target
+    else:
+        try:
+            os.makedirs(local_fallback, exist_ok=True)
+        except OSError:
+            return  # 連 fallback 都建不出來就放棄，讓下游正常炸給 user 看
+        target = local_fallback
+
+    try:
+        if os.path.islink(link):
+            current = os.readlink(link)
+            if current != target:
+                os.unlink(link)
+                os.symlink(target, link)
+        elif not os.path.exists(link):
+            os.symlink(target, link)
+        # 真實目錄：不動，等使用者手動 migrate
+    except OSError:
+        pass
+
+
+_ensure_data_dir()
 
 # Apple Silicon 才支援 mlx-whisper / mlx-qwen3-asr（MLX = Metal GPU）
 # Intel Mac 自動退回純雲端（OpenAI Whisper API / Groq），否則本地 STT 會 ImportError
