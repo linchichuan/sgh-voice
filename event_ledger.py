@@ -26,20 +26,22 @@ MAX_SIZE_BYTES = 50 * 1024 * 1024  # 50MB
 ROTATED_SUFFIX = ".1"
 
 _lock = threading.Lock()
-_session_id = None
-_session_lock = threading.Lock()
+# Thread-local session：避免重疊轉寫（背景 transcribe 還在跑時新錄音開始）
+# 用同一個 global session_id 會把後續事件錯記到新 session。
+_tls = threading.local()
 
 
 def new_session():
-    """每次錄音/retry/cancel 互動開始時呼叫，回傳新的 session_id。"""
-    global _session_id
-    with _session_lock:
-        _session_id = f"{int(time.time() * 1000):x}"
-        return _session_id
+    """每次錄音/retry/cancel 互動開始時呼叫，回傳新的 session_id（綁定到當前 thread）。
+    用 ns timestamp + thread ident 避免兩個重疊 transcription 在同 ms 拿到同 id。"""
+    tid = threading.get_ident() & 0xFFFF  # thread ident 低 16 bits
+    sid = f"{time.time_ns():x}-{tid:04x}"
+    _tls.session_id = sid
+    return sid
 
 
 def current_session():
-    return _session_id
+    return getattr(_tls, "session_id", None)
 
 
 def log(event_type, **fields):
@@ -49,7 +51,7 @@ def log(event_type, **fields):
         entry = {
             "ts": datetime.now().isoformat(timespec="milliseconds"),
             "type": event_type,
-            "session": _session_id,
+            "session": getattr(_tls, "session_id", None),
         }
         # 確保 fields 不會 leak 文字內容（白名單檢查）
         for k, v in fields.items():

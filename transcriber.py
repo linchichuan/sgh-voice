@@ -332,14 +332,23 @@ class Transcriber:
                 "openai": [try_openai, try_groq, try_or, try_claude, try_ollama],
                 "ollama": [try_ollama, try_groq, try_or, try_claude, try_openai],
             }
-            for fallback_idx, route in enumerate(routes_map.get(pref_engine, routes_map["ollama"])):
+            attempt_idx = 0  # 只 count 真正嘗試過的 provider（skip 的不算 fallback depth）
+            for route in routes_map.get(pref_engine, routes_map["ollama"]):
                 t_route = time.time()
                 res, source = route()
                 route_latency_ms = (time.time() - t_route) * 1000
-                event_ledger.llm_attempt(
-                    source or "unknown", mode, route_latency_ms,
-                    ok=bool(res), fallback_index=fallback_idx,
-                )
+                # 區分 skip vs real attempt：
+                # - source=None → try_ollama 在 edit mode 跳過（明確 skip 信號）
+                # - source 有值但 latency < 50ms 且 res=None → provider method 沒 API key 早 return
+                #   （真實 API 呼叫至少 ~100ms RTT，<50ms 必為早 return）
+                #   → 兩者都不算真實 attempt，不污染 ledger
+                skipped = (source is None) or (not res and route_latency_ms < 50)
+                if not skipped:
+                    event_ledger.llm_attempt(
+                        source, mode, route_latency_ms,
+                        ok=bool(res), fallback_index=attempt_idx,
+                    )
+                    attempt_idx += 1
                 if res: final, llm_source = res, source; break
 
         if final is None:
@@ -383,6 +392,9 @@ class Transcriber:
     def retry_last_llm(self, on_stage=None):
         """Retry hotkey 入口：用 cache 的 raw STT 重跑 corrections + LLM，回傳 result dict。
         跳過 STT 階段（省 1.5s），讓使用者拿到第二版而不用重錄。"""
+        # 開新 session（retry 是獨立互動，跟原 transcribe session 區隔以便 ledger 分析）
+        event_ledger.new_session()
+
         def _stage(s):
             if on_stage:
                 try: on_stage(s)

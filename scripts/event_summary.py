@@ -30,6 +30,21 @@ def load_events(path, days, tail):
     if not os.path.exists(path):
         print(f"⚠️  事件檔不存在：{path}")
         return []
+    # --tail 模式：直接取末 N 筆，不套 days cutoff（避免「過去 7 天內無事件」誤回空集）
+    if tail and tail > 0:
+        events = []
+        with open(path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    events.append(json.loads(line))
+                except Exception:
+                    continue
+        return events[-tail:]
+
+    # 一般模式：days cutoff 篩選
     cutoff = (datetime.now() - timedelta(days=days)).isoformat() if days else None
     events = []
     with open(path, "r", encoding="utf-8") as f:
@@ -44,8 +59,6 @@ def load_events(path, days, tail):
             if cutoff and e.get("ts", "") < cutoff:
                 continue
             events.append(e)
-    if tail and tail > 0:
-        events = events[-tail:]
     return events
 
 
