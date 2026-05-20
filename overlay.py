@@ -299,7 +299,10 @@ class StatusOverlay:
         if not self._window:
             return
         try:
-            self._pending_stage_prefix = None  # 防禦性：transcript 淡出後一定確保清掉
+            # 故意不動 _pending_stage_prefix：
+            # 這個 timer 是上一輪 pipeline 排的，可能在下一輪 pipeline 已設好新 pending 之後
+            # 才 fire。動它會把新 pipeline 的 stage label 偷掉。pending 在 _do_show_transcript
+            # 進入時已經清過了，這裡不需要再清。
             self._window.orderOut_(None)
             # 還原原本尺寸（180x40）以免下次 status 顯示時太寬
             screen = AppKit.NSScreen.mainScreen()
