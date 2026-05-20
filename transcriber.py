@@ -12,6 +12,7 @@ import openai
 import anthropic
 from config import load_smart_replace, SCENE_PRESETS, DEFAULT_APP_STYLES, detect_app_style, LOCAL_MODEL_PATHS, BREEZE_MODELS
 from ollama_detector import get_detector, OllamaStatus
+import event_ledger
 from voiceprint import VoiceprintManager
 import os
 
@@ -200,6 +201,9 @@ class Transcriber:
                 try: on_stage(s)
                 except Exception: pass
 
+        # 開新 session 讓所有後續事件可串接（pipeline_complete 跟 silent failures 都對應同一個 session）
+        event_ledger.new_session()
+
         t0 = time.time()
         is_hybrid = self.config.get("enable_hybrid_mode", True)
         stt_source, llm_source = "none", "none"
@@ -213,41 +217,59 @@ class Transcriber:
             ok, reason = self._audio_quality_check(audio_source)
             if not ok:
                 print(f" 🚫 [audio gate] 跳過：{reason}")
+                event_ledger.audio_gate_reject(reason=reason, audio_sec=round(float(audio_duration), 2))
                 return None
 
         if isinstance(audio_source, np.ndarray) and self.config.get("enable_voiceprint", False):
             if self._voiceprint_mgr.is_enrolled:
                 vp_score = self._voiceprint_mgr.verify(audio_source)
-                if vp_score < self.config.get("voiceprint_threshold", 0.97): return None
+                threshold = self.config.get("voiceprint_threshold", 0.97)
+                if vp_score < threshold:
+                    event_ledger.voiceprint_reject(vp_score, threshold)
+                    return None
 
-        # ── STT 階段 ─────────────────────────────────────
+        # ── STT 階段（每次嘗試都記 stt_attempt 事件）─────────
+        def _try_stt(source_name, fn, *args, **kwargs):
+            t_attempt = time.time()
+            try:
+                result = fn(*args, **kwargs)
+                latency_ms = (time.time() - t_attempt) * 1000
+                event_ledger.stt_attempt(source_name, audio_duration, latency_ms, ok=bool(result))
+                return result
+            except Exception as e:
+                latency_ms = (time.time() - t_attempt) * 1000
+                event_ledger.stt_attempt(source_name, audio_duration, latency_ms, ok=False, error=type(e).__name__)
+                return None
+
         t_stt0 = time.time()
         raw = None
         stt_engine = self.config.get("stt_engine", "mlx-whisper")
-        
+
         # 進化 5: 資源管理 - 長音訊 (>30s) 優先走 Groq 以節省本地資源
         if audio_duration > 30 and self.config.get("groq_api_key"):
-            raw = self._groq_stt(audio_source, duration=audio_duration)
+            raw = _try_stt("groq", self._groq_stt, audio_source, duration=audio_duration)
             if raw: stt_source = "groq"
 
         if not raw:
             if stt_engine == "groq":
-                raw = self._groq_stt(audio_source, duration=audio_duration)
+                raw = _try_stt("groq", self._groq_stt, audio_source, duration=audio_duration)
                 if raw: stt_source = "groq"
             elif stt_engine != "cloud-only" and is_hybrid:
                 if isinstance(audio_source, np.ndarray) or audio_duration <= self.config.get("hybrid_audio_threshold", 15):
-                    raw = self._local_stt(audio_source)
+                    raw = _try_stt("local", self._local_stt, audio_source)
                     if raw: stt_source = "local"
 
         if not raw and self.config.get("groq_api_key"):
-            raw = self._groq_stt(audio_source, duration=audio_duration)
+            raw = _try_stt("groq", self._groq_stt, audio_source, duration=audio_duration)
             if raw: stt_source = "groq"
 
         if not raw and self.config.get("openai_api_key"):
-            raw = self._whisper_api_fallback(audio_source, duration=audio_duration)
+            raw = _try_stt("openai_whisper", self._whisper_api_fallback, audio_source, duration=audio_duration)
             if raw: stt_source = "cloud"
 
-        if not raw or not raw.strip(): return None
+        if not raw or not raw.strip():
+            event_ledger.log("stt_all_failed", audio_sec=round(float(audio_duration), 2))
+            return None
         t_stt = time.time() - t_stt0
 
         # 句尾 meta-command 偵測（可能改寫 raw + mode + edit_context）
@@ -310,13 +332,20 @@ class Transcriber:
                 "openai": [try_openai, try_groq, try_or, try_claude, try_ollama],
                 "ollama": [try_ollama, try_groq, try_or, try_claude, try_openai],
             }
-            for route in routes_map.get(pref_engine, routes_map["ollama"]):
+            for fallback_idx, route in enumerate(routes_map.get(pref_engine, routes_map["ollama"])):
+                t_route = time.time()
                 res, source = route()
+                route_latency_ms = (time.time() - t_route) * 1000
+                event_ledger.llm_attempt(
+                    source or "unknown", mode, route_latency_ms,
+                    ok=bool(res), fallback_index=fallback_idx,
+                )
                 if res: final, llm_source = res, source; break
 
         if final is None:
             final = self._local_filler_removal(corrected) if self.config.get("enable_filler_removal") else corrected
             llm_source = "regex"
+            event_ledger.log("llm_all_failed_fell_to_regex", mode=mode)
         t_llm = time.time() - t_llm0
 
         if self._opencc and final: final = self._opencc.convert(final)
@@ -327,6 +356,18 @@ class Transcriber:
             app_name = app_info.get("app_name", "Unknown")
             print(f" ⏱  App={app_name} | STT={t_stt:.2f}s({stt_source}) | LLM={t_llm:.2f}s({llm_source}) | total={process_time:.2f}s | {chars}字")
         except Exception: pass
+
+        # Ledger: 整段 pipeline 完成（給 p50/p90/p95 聚合用）
+        event_ledger.pipeline_complete(
+            total_ms=process_time * 1000,
+            stt_ms=t_stt * 1000,
+            llm_ms=t_llm * 1000,
+            stt_source=stt_source,
+            llm_source=llm_source,
+            mode=mode,
+            chars_out=len(final or ""),
+            app_id=app_id,
+        )
 
         # 歷史寫入
         entry = {
@@ -813,12 +854,26 @@ class Transcriber:
         """
         if self._is_llm_hallucination(llm_result, raw_input):
             print(f" ⚠️ [{engine_label}] 偵測到幻覺，已捨棄: {(llm_result or '')[:20]}...")
+            event_ledger.validator_action(
+                "discard", "hallucination", engine_label,
+                len_in=len(raw_input or ""), len_out=len(llm_result or ""),
+                reason="full_segment_hallucination",
+            )
             return 'discard', None
         if mode == "dictate":
             truncated = self._truncate_trailing_hallucination(raw_input, llm_result)
             if truncated is not None:
                 print(f" ✂️  [{engine_label}] 截斷尾部 LLM 補寫（{len(llm_result)}字→{len(truncated)}字）")
+                event_ledger.validator_action(
+                    "truncate", "trailing_hallucination", engine_label,
+                    len_in=len(llm_result), len_out=len(truncated),
+                    reason="trailing_extension",
+                )
                 return 'ok', truncated
+        event_ledger.validator_action(
+            "pass", "trailing_hallucination", engine_label,
+            len_in=len(raw_input or ""), len_out=len(llm_result or ""),
+        )
         return 'ok', llm_result
 
     def _truncate_trailing_hallucination(self, original_text, llm_result):

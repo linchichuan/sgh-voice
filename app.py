@@ -21,6 +21,7 @@ import tempfile
 import locale
 import signal
 import atexit
+import event_ledger
 
 
 _active_engines = []
@@ -308,6 +309,7 @@ def paste_text(text):
     _paste_log(f"AXIsProcessTrusted={is_trusted}, app={app_info}")
 
     # 方法 1: Quartz CGEvent (最原生可靠，如果已授權)
+    paste_method_used = None
     if is_trusted:
         try:
             from Quartz import (
@@ -323,6 +325,7 @@ def paste_text(text):
             time.sleep(0.02)
             CGEventPost(kCGSessionEventTap, event_up)
             pasted = True
+            paste_method_used = "quartz"
             _paste_log("Quartz CGEvent 貼上發送完成")
         except Exception as e:
             _paste_log(f"CGEvent exception: {e}")
@@ -337,6 +340,7 @@ def paste_text(text):
             _paste_log(f"osascript returncode={result.returncode}")
             if result.returncode == 0:
                 pasted = True
+                paste_method_used = "osascript"
         except Exception as e:
             _paste_log(f"osascript exception: {e}")
 
@@ -355,11 +359,23 @@ def paste_text(text):
             ], capture_output=True, text=True, timeout=5)
             if result.returncode == 0:
                 pasted = True
+                paste_method_used = "axvalue"
                 _paste_log("AXValue 直接插入成功")
         except Exception as e:
             _paste_log(f"AXValue exception: {e}")
 
     _paste_log(f"最終結果: pasted={pasted}")
+    # Ledger: 哪個 paste method 真正生效（追蹤 fallback chain 觸發率）
+    try:
+        bundle_id = curr_app.bundleIdentifier() if 'curr_app' in dir() else None
+    except Exception:
+        bundle_id = None
+    event_ledger.paste_method(
+        method=paste_method_used or "clipboard_only",
+        success=bool(pasted),
+        text_len=len(text or ""),
+        app_id=bundle_id,
+    )
 
     if not pasted:
         _paste_log("全部方法失敗，文字保留在剪貼簿")
@@ -768,7 +784,12 @@ class VoiceEngine:
             was_processing = self.is_processing
         if not was_recording and not was_processing:
             log("warn", "目前沒有可取消的錄音/處理")
+            event_ledger.user_action("cancel", phase="idle")
             return
+        event_ledger.user_action(
+            "cancel",
+            phase="recording" if was_recording else "processing",
+        )
         try:
             if was_recording:
                 # 純錄音中：直接停 recorder + 重置 engine 狀態，不會進入 _transcribe_and_paste。
@@ -803,8 +824,10 @@ class VoiceEngine:
         cache = getattr(self.transcriber, "_last_stt_cache", None)
         if not cache:
             log("warn", "沒有可重做的紀錄（先錄一段）")
+            event_ledger.user_action("retry", phase="no_cache")
             return
 
+        event_ledger.user_action("retry", phase="processing")
         self._retry_in_progress = True
         try:
             try: self.overlay.show("processing")
