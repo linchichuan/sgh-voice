@@ -1,32 +1,20 @@
 {
   "schema_version": 2,
-  "session_id": "b51b59c4-72c5-408b-bdc0-15b481c7638f",
+  "session_id": "f08596f7-7f05-4094-b0cb-d9f05fc2e75f",
   "session_commit_scope": {
-    "session_id": "b51b59c4-72c5-408b-bdc0-15b481c7638f",
+    "session_id": "f08596f7-7f05-4094-b0cb-d9f05fc2e75f",
     "baseline_dirty_files": [
       ".claude_review_state.json"
     ],
-    "touched_files": [
-      "CHANGELOG.md",
-      "android/SGHVoice/app/build.gradle.kts",
-      "android/SGHVoice/app/src/main/java/com/shingihou/sghvoice/api/LlmClient.kt",
-      "app.py",
-      "config.py",
-      "event_ledger.py",
-      "ios/SGHVoice/SGHVoice/API/LlmClient.swift",
-      "overlay.py",
-      "scripts/event_summary.py",
-      "transcriber.py"
-    ],
-    "updated_at": "2026-05-16T22:41:19Z"
+    "touched_files": [],
+    "updated_at": "2026-05-20T06:10:15Z"
   },
-  "updated_at": "2026-05-20T05:45:40Z",
-  "has_code_change": true,
-  "has_doc_change": true,
+  "updated_at": "2026-05-20T06:10:15Z",
+  "has_code_change": false,
+  "has_doc_change": false,
   "code_review": {
-    "executed": true,
-    "passed": false,
-    "last_run": "2026-05-19T23:38:13Z"
+    "executed": false,
+    "passed": false
   },
   "doc_review": {
     "executed": false,
@@ -37,9 +25,7 @@
     "passed": false
   },
   "aggregate_gate": {
-    "executed": false,
-    "gate": null,
-    "reason": null
+    "executed": false
   },
   "iteration_history": {
     "current_round": 0,
