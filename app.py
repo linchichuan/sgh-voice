@@ -435,6 +435,8 @@ class VoiceEngine:
         # 多段轉寫並行時序列化 paste，避免剪貼簿/Cmd+V 互踩
         self._paste_lock = threading.Lock()
         self._inflight_transcriptions = 0
+        # Cancel hotkey 標記：set 後 paste 階段會跳過
+        self._cancel_inflight = False
 
     def start_background_tasks(self):
         """主程式啟動後再跑背景任務，避免搶佔啟動時的系統資源"""
@@ -623,7 +625,10 @@ class VoiceEngine:
                 except Exception as e:
                     log("warn", f"Stats update: {e}")
 
-                if self.config.get("auto_paste") and final:
+                if getattr(self, "_cancel_inflight", False):
+                    log("warn", "🚫 已取消，跳過 paste")
+                    self._cancel_inflight = False
+                elif self.config.get("auto_paste") and final:
                     with self._paste_lock:
                         try:
                             paste_text(final)
@@ -739,6 +744,90 @@ class VoiceEngine:
             except Exception as e:
                 log("warn", f"rewrite {fn_name} error: {e}")
         return None
+
+    # ─── Cancel (中止當前錄音或處理中的轉寫) ─────────────
+    def cancel_current(self):
+        """Cancel hotkey：
+        - 錄音中 → 立刻停止 recorder + 丟棄音訊（不轉寫）
+        - 處理中 → 設 _cancel_inflight flag，後續 paste 階段檢查跳過
+        UI 立刻回 idle，給使用者「控制感」。"""
+        with self._state_lock:
+            was_recording = self.is_recording
+            was_processing = self.is_processing
+        if not was_recording and not was_processing:
+            log("warn", "目前沒有可取消的錄音/處理")
+            return
+        try:
+            if was_recording:
+                # 停 recorder，但 _on_done callback 不會跑（我們設 cancel flag）
+                self._cancel_inflight = True
+                try: self.recorder._stop_event.set()
+                except Exception: pass
+                self.recorder.is_recording = False
+                self._cancel_watchdog()
+                with self._state_lock:
+                    self.is_recording = False
+                    self._record_start_ts = None
+                log("warn", "🚫 錄音已取消")
+            if was_processing:
+                self._cancel_inflight = True
+                log("warn", "🚫 處理中的轉寫已標記取消（paste 階段會跳過）")
+            try: self.overlay.show("idle")
+            except Exception: pass
+            self._safe_status_change("idle")
+        except Exception as e:
+            log("error", f"cancel_current 失敗: {e}")
+
+    # ─── Retry (重做最後一筆，跳過 STT) ───────────────────
+    def retry_last_transcription(self):
+        """Retry hotkey：用 cache 的 raw STT 重跑 LLM，貼上新版。
+        不重錄、不重跑 STT，省 1.5-2s。"""
+        if getattr(self, "_retry_in_progress", False):
+            return
+        if self.is_recording:
+            log("warn", "錄音中，無法 retry")
+            return
+        cache = getattr(self.transcriber, "_last_stt_cache", None)
+        if not cache:
+            log("warn", "沒有可重做的紀錄（先錄一段）")
+            return
+
+        self._retry_in_progress = True
+        try:
+            try: self.overlay.show("processing")
+            except Exception: pass
+            self._safe_status_change("processing")
+            log("info", f"🔁 Retry：跳過 STT，重跑 LLM（raw={cache['raw'][:30]}...）")
+
+            result = self.transcriber.retry_last_llm()
+            if not result:
+                log("warn", "Retry 失敗（cache 過期或 LLM 全部失敗）")
+                try: self.overlay.show("idle")
+                except Exception: pass
+                self._safe_status_change("idle")
+                return
+
+            final = (result.get("final") or "").strip()
+            if not final:
+                log("warn", "Retry 結果為空")
+                try: self.overlay.show("idle")
+                except Exception: pass
+                self._safe_status_change("idle")
+                return
+
+            if self.config.get("auto_paste", True):
+                with self._paste_lock:
+                    try: paste_text(final)
+                    except Exception as e: log("warn", f"Retry paste: {e}")
+
+            log("ok", f"Retry 完成 ({len(final)} 字)")
+            try: self.overlay.show_transcript(final, duration=2.5)
+            except Exception:
+                try: self.overlay.show("done")
+                except Exception: pass
+            self._safe_status_change("idle")
+        finally:
+            self._retry_in_progress = False
 
     # ─── Continuous Mode (C) ──────────────────────────────
     def toggle_continuous_mode(self):
@@ -1206,6 +1295,89 @@ def setup_rewrite_hotkey(engine):
     log("ok", f"Quick-Rewrite hotkey: {hotkey_str}")
 
 
+def _setup_action_hotkey(engine, config_key, action_callback, label):
+    """共用：建立全域熱鍵監聽，rising-edge 觸發 action_callback（背景 thread）。
+    config_key 為 None 或空字串時直接 noop（功能關閉）。"""
+    try:
+        from AppKit import NSEvent, NSKeyDown, NSKeyUp, NSFlagsChanged
+    except ImportError:
+        return
+
+    hotkey_str = engine.config.get(config_key, "")
+    if not hotkey_str:
+        return
+
+    KEY_MAP = {
+        'right_cmd': 54, 'cmd': 55, 'command': 55, 'cmd_l': 55, 'right_command': 54,
+        'right_alt': 61, 'right_option': 61, 'alt': 58, 'option': 58, 'alt_l': 58,
+        'ctrl': 59, 'control': 59, 'shift': 56, 'right_shift': 60, 'space': 49,
+        'f1': 122, 'f2': 120, 'f3': 99, 'f4': 118, 'f5': 96, 'f6': 97, 'f7': 98, 'f8': 100,
+        'a': 0, 'b': 11, 'c': 8, 'd': 2, 'e': 14, 'f': 3, 'g': 5, 'h': 4, 'i': 34, 'j': 38,
+        'k': 40, 'l': 37, 'm': 46, 'n': 45, 'o': 31, 'p': 35, 'q': 12, 'r': 15, 's': 1,
+        't': 17, 'u': 32, 'v': 9, 'w': 13, 'x': 7, 'y': 16, 'z': 6,
+        'escape': 53, 'esc': 53,
+    }
+    target_keys = set()
+    for p in hotkey_str.lower().replace("+", " ").split():
+        if p in KEY_MAP:
+            target_keys.add(KEY_MAP[p])
+    if not target_keys:
+        log("warn", f"Unknown {config_key}: {hotkey_str}")
+        return
+
+    currently_pressed = set()
+    KEY_EVENT_MASK = (1 << 10) | (1 << 11) | (1 << 12)
+
+    def _on_event(event):
+        try:
+            etype = event.type()
+            vk = event.keyCode()
+        except Exception:
+            return
+        if etype == NSKeyDown:
+            currently_pressed.add(vk)
+        elif etype == NSKeyUp:
+            currently_pressed.discard(vk)
+        elif etype == NSFlagsChanged:
+            flags = event.modifierFlags()
+            if vk in target_keys:
+                pressed = False
+                if vk in (54, 55):   pressed = (flags & 0x100000) > 0
+                elif vk in (58, 61): pressed = (flags & 0x80000) > 0
+                elif vk in (59, 62): pressed = (flags & 0x40000) > 0
+                elif vk in (56, 60): pressed = (flags & 0x20000) > 0
+                if pressed: currently_pressed.add(vk)
+                else: currently_pressed.discard(vk)
+
+        is_active = target_keys.issubset(currently_pressed)
+        if is_active and not getattr(_on_event, "last_active", False):
+            threading.Thread(target=action_callback, daemon=True).start()
+        _on_event.last_active = is_active
+
+    def _global(ev):
+        try: _on_event(ev)
+        except Exception as e: log("warn", f"{label} global handler: {e}")
+
+    def _local(ev):
+        try: _on_event(ev)
+        except Exception as e: log("warn", f"{label} local handler: {e}")
+        return ev
+
+    NSEvent.addGlobalMonitorForEventsMatchingMask_handler_(KEY_EVENT_MASK, _global)
+    NSEvent.addLocalMonitorForEventsMatchingMask_handler_(KEY_EVENT_MASK, _local)
+    log("ok", f"{label} hotkey: {hotkey_str}")
+
+
+def setup_retry_hotkey(engine):
+    """Retry hotkey：跳過 STT 重跑 LLM，貼上新版。預設 right_option+y。"""
+    _setup_action_hotkey(engine, "retry_hotkey", engine.retry_last_transcription, "Retry")
+
+
+def setup_cancel_hotkey(engine):
+    """Cancel hotkey：錄音中或處理中按下 → 丟棄並回 idle。預設 right_option+x。"""
+    _setup_action_hotkey(engine, "cancel_hotkey", engine.cancel_current, "Cancel")
+
+
 def _setup_hotkey_pynput(engine):
     """Fallback: use pynput (standard implementation)"""
     from pynput import keyboard
@@ -1468,6 +1640,12 @@ def run_menubar():
 
             # Start Continuous-mode hotkey listener (C)
             setup_continuous_hotkey(engine)
+
+            # Start Retry hotkey listener（重做最後一筆，跳過 STT）
+            setup_retry_hotkey(engine)
+
+            # Start Cancel hotkey listener（中止當前錄音/處理）
+            setup_cancel_hotkey(engine)
 
             # Start Clipboard AI Learning observer
             start_clipboard_observer(engine)

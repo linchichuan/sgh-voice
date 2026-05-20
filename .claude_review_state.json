@@ -8,11 +8,12 @@
     ],
     "touched_files": [
       "app.py",
+      "config.py",
       "transcriber.py"
     ],
     "updated_at": "2026-05-16T22:41:19Z"
   },
-  "updated_at": "2026-05-19T23:47:43Z",
+  "updated_at": "2026-05-20T00:17:15Z",
   "has_code_change": true,
   "has_doc_change": false,
   "code_review": {

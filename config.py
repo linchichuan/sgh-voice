@@ -271,6 +271,8 @@ DEFAULT_CONFIG = {
     "fewshot_count": 3,                     # 注入的範例數（0=關閉，建議 2~5；越多越貼但 token 成本越高）
     "rewrite_hotkey": "right_option+r",     # Quick-Rewrite 全域熱鍵（空字串=關閉）；選取文字後按下，LLM 改寫並貼回
     "default_rewrite_style": "concise",     # Quick-Rewrite 預設風格（concise/formal/casual/email/technical/translate_en/translate_ja/translate_zh）
+    "retry_hotkey": "right_option+y",       # Retry 全域熱鍵（空字串=關閉）；用最後一次的 raw STT 重跑 LLM，省 1.5s 不用重錄
+    "cancel_hotkey": "right_option+x",      # Cancel 全域熱鍵（空字串=關閉）；錄音中按下=丟棄；處理中按下=跳過 paste
     "continuous_hotkey": "",                # 連續錄音 toggle 熱鍵（空字串=關閉）；按一次開麥克風長監聽，再按一次關
     "continuous_silence_duration": 1.5,     # 連續模式：偵測到此秒數靜音即切片送 ASR
     "continuous_min_segment_duration": 0.6, # 連續模式：低於此秒數的片段直接丟棄（防止單音/咳嗽觸發）

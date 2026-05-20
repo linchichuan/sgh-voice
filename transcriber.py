@@ -55,6 +55,8 @@ class Transcriber:
         self._voiceprint_mgr = VoiceprintManager()
         # 連線 cache：避免每次呼叫都重建 TCP/TLS（省 200-500ms/次）
         self._client_cache = {}
+        # 最後一次成功 STT 的 raw 文字 + 中繼狀態（retry hotkey 用，跳過 STT 重跑 LLM）
+        self._last_stt_cache = None  # dict: {raw, mode, app_info, audio_duration, timestamp}
 
     def reset_clients(self):
         # config 重新載入時清掉，下次呼叫會用新的 api_key/base_url 重建
@@ -241,6 +243,18 @@ class Transcriber:
         if not raw or not raw.strip(): return None
         t_stt = time.time() - t_stt0
 
+        # Cache 最後一次成功 STT，retry hotkey 可跳過 STT 直接重跑 LLM
+        self._last_stt_cache = {
+            "raw": raw,
+            "mode": mode,
+            "edit_context": edit_context,
+            "audio_duration": audio_duration,
+            "app_info": app_info,
+            "app_id": app_id,
+            "stt_source": stt_source,
+            "timestamp": time.time(),
+        }
+
         # 句尾 meta-command 偵測
         if mode == "dictate":
             stripped, override_style = self._detect_voice_command(raw)
@@ -315,6 +329,93 @@ class Transcriber:
             "app_name": app_info.get("app_name"), "bundle_id": app_id
         }
         threading.Thread(target=self.memory.add_to_history, args=(entry,), daemon=True).start()
+        return {"raw": raw, "final": final, "process_time": process_time}
+
+    def retry_last_llm(self):
+        """Retry hotkey 入口：用 cache 的 raw STT 重跑 corrections + LLM，回傳 result dict。
+        跳過 STT 階段（省 1.5s），讓使用者拿到第二版而不用重錄。"""
+        cache = self._last_stt_cache
+        if not cache:
+            return None
+        # 30 分鐘前的 cache 太舊，不重跑（可能 context 已變）
+        if time.time() - cache.get("timestamp", 0) > 1800:
+            return None
+
+        t0 = time.time()
+        raw = cache["raw"]
+        mode = cache["mode"]
+        edit_context = cache.get("edit_context", "")
+        app_info = cache.get("app_info") or {}
+        app_id = cache.get("app_id")
+
+        scene_key = self.config.get("active_scene", "general")
+        corrected = self.memory.apply_corrections(
+            raw,
+            scene_corrections=SCENE_PRESETS.get(scene_key, {}).get("corrections"),
+            scene_key=scene_key,
+            app_id=app_id,
+        )
+        corrected = self._apply_smart_replace(corrected)
+
+        # ── LLM 階段（同 transcribe 主路徑邏輯，但用 temperature=0.3 讓結果有差異） ──
+        final = None
+        system_prompt = self._get_system_prompt(app_info)
+        llm_source = "none"
+
+        if mode == "dictate" and self._should_skip_llm(corrected):
+            final, llm_source = corrected, "skip"
+        elif self.config.get("enable_claude_polish"):
+            pref_engine = self.config.get("llm_engine", "ollama")
+
+            def try_groq(): return self._groq_llm_process(corrected, mode, edit_context, system_prompt=system_prompt), "groq"
+            def try_or(): return self._openrouter_process(corrected, mode, edit_context, system_prompt=system_prompt), "openrouter"
+            def try_claude(): return self._claude_process(corrected, mode, edit_context, system_prompt=system_prompt), "claude"
+            def try_openai(): return self._openai_process(corrected, mode, edit_context, system_prompt=system_prompt), "openai"
+            def try_ollama():
+                if self.config.get("enable_hybrid_mode", True) and mode == "dictate":
+                    return self._local_llm_process(corrected, system_prompt=system_prompt), "local"
+                return None, None
+
+            routes_map = {
+                "groq": [try_groq, try_or, try_claude, try_openai, try_ollama],
+                "openrouter": [try_or, try_groq, try_claude, try_openai, try_ollama],
+                "claude": [try_claude, try_groq, try_or, try_openai, try_ollama],
+                "openai": [try_openai, try_groq, try_or, try_claude, try_ollama],
+                "ollama": [try_ollama, try_groq, try_or, try_claude, try_openai],
+            }
+            for route in routes_map.get(pref_engine, routes_map["ollama"]):
+                res, source = route()
+                if res: final, llm_source = res, source; break
+
+        if final is None:
+            final = self._local_filler_removal(corrected) if self.config.get("enable_filler_removal") else corrected
+            llm_source = "regex"
+
+        if self._opencc and final: final = self._opencc.convert(final)
+
+        process_time = time.time() - t0
+        print(f" 🔁 [retry] LLM={llm_source} total={process_time:.2f}s | {len(final or '')}字")
+
+        # 寫 history（標記 mode=retry）
+        try:
+            from datetime import datetime
+            entry = {
+                "timestamp": datetime.now().isoformat(),
+                "whisper_raw": raw,
+                "final_text": final,
+                "mode": f"retry({mode})",
+                "process_time": round(process_time, 2),
+                "stt_time": 0.0,
+                "llm_time": round(process_time, 2),
+                "stt_source": cache.get("stt_source", "cache"),
+                "llm_source": llm_source,
+                "app_name": app_info.get("app_name"),
+                "bundle_id": app_id,
+            }
+            threading.Thread(target=self.memory.add_to_history, args=(entry,), daemon=True).start()
+        except Exception:
+            pass
+
         return {"raw": raw, "final": final, "process_time": process_time}
 
     def _groq_llm_process(self, text, mode, edit_context, system_prompt=None):
