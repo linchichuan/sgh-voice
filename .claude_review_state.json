@@ -12,13 +12,15 @@
       "android/SGHVoice/app/src/main/java/com/shingihou/sghvoice/api/LlmClient.kt",
       "app.py",
       "config.py",
+      "event_ledger.py",
       "ios/SGHVoice/SGHVoice/API/LlmClient.swift",
       "overlay.py",
+      "scripts/event_summary.py",
       "transcriber.py"
     ],
     "updated_at": "2026-05-16T22:41:19Z"
   },
-  "updated_at": "2026-05-20T01:41:13Z",
+  "updated_at": "2026-05-20T05:16:46Z",
   "has_code_change": true,
   "has_doc_change": true,
   "code_review": {
@@ -50,9 +52,11 @@
     "/Users/lin/voice-input/android/SGHVoice/app/src/main/java/com/shingihou/sghvoice/api/LlmClient.kt",
     "/Users/lin/voice-input/app.py",
     "/Users/lin/voice-input/config.py",
+    "/Users/lin/voice-input/event_ledger.py",
     "/Users/lin/voice-input/ios/SGHVoice/SGHVoice/API/LlmClient.swift",
     "/Users/lin/voice-input/overlay.py",
     "/Users/lin/voice-input/scripts/dictionary_promote_from_history.py",
+    "/Users/lin/voice-input/scripts/event_summary.py",
     "/Users/lin/voice-input/scripts/update_style_profile.py",
     "/Users/lin/voice-input/transcriber.py"
   ],
