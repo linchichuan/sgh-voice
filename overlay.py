@@ -261,7 +261,10 @@ class StatusOverlay:
             )
 
     def _do_show_transcript(self, text, duration):
-        """主執行緒：拓寬視窗 + 顯示節錄文字 + 自動淡出。"""
+        """主執行緒：拓寬視窗 + 顯示節錄文字 + 自動淡出。
+        Pipeline 結束 → 清掉 stage 殘留，下次 processing（例如 Quick-Rewrite）才不會
+        從前一次的 "貼上中" 開始顯示。"""
+        self._pending_stage_prefix = None
         snippet = text.strip().replace("\n", " ")
         if len(snippet) > 70:
             snippet = snippet[:68] + "…"
@@ -296,6 +299,7 @@ class StatusOverlay:
         if not self._window:
             return
         try:
+            self._pending_stage_prefix = None  # 防禦性：transcript 淡出後一定確保清掉
             self._window.orderOut_(None)
             # 還原原本尺寸（180x40）以免下次 status 顯示時太寬
             screen = AppKit.NSScreen.mainScreen()
