@@ -29,23 +29,37 @@ _lock = threading.Lock()
 # Thread-local session：避免重疊轉寫（背景 transcribe 還在跑時新錄音開始）
 # 用同一個 global session_id 會把後續事件錯記到新 session。
 _tls = threading.local()
-# 最近一次 new_session() 結果，給 UI thread 的 user_action（cancel/retry）等
-# 沒有自己 session 的 caller 自動關聯到 active pipeline。
-_last_active = None
+# Active session list（newest 在末端）。每個 new_session() append，end_session() remove。
+# UI thread 的 user_action 在 TLS 無 session 時 fallback 到最新的 active（list[-1]）。
+# 用 list 而非單一 pointer：處理重疊 pipeline + early-return 不會誤清誰的 session。
+_active_list = []
 _active_lock = threading.Lock()
 
 
 def new_session():
     """每次錄音/retry/cancel 互動開始時呼叫，回傳新的 session_id（綁定到當前 thread）。
     用 ns timestamp + thread ident 避免兩個重疊 transcription 在同 ms 拿到同 id。
-    同時更新 _last_active，讓 UI thread 的 cancel/retry 能自動關聯。"""
-    global _last_active
+    同時 append 到 _active_list，讓 UI thread 的 cancel/retry 能自動關聯到最新 active。"""
     tid = threading.get_ident() & 0xFFFF  # thread ident 低 16 bits
     sid = f"{time.time_ns():x}-{tid:04x}"
     _tls.session_id = sid
     with _active_lock:
-        _last_active = sid
+        _active_list.append(sid)
     return sid
+
+
+def end_session():
+    """Pipeline 結束時呼叫（無論成功 / early-return / exception）。
+    從 _active_list 移除自己的 session。Caller 應該用 try/finally 確保被叫到。"""
+    sid = getattr(_tls, "session_id", None)
+    if sid is None:
+        return
+    with _active_lock:
+        try:
+            _active_list.remove(sid)
+        except ValueError:
+            pass  # 已被移除（防禦性）
+    # 注意：不清 _tls.session_id，後續同 thread 還能用到（雖然新 new_session 會覆蓋）
 
 
 def current_session():
@@ -53,13 +67,14 @@ def current_session():
 
 
 def _resolve_session():
-    """log() 取 session 的邏輯：先用 caller thread 的 TLS，沒有就 fallback 到最近 active。
-    讓 UI thread 的 cancel/retry events 自動關聯到當下 pipeline。"""
+    """log() 取 session 的邏輯：先用 caller thread 的 TLS，沒有就 fallback 到最新的 active。
+    讓 UI thread 的 cancel/retry events 自動關聯到當前正在跑的 pipeline。
+    所有 active pipeline 都結束 → list 空 → 回 None（語意正確：沒可關聯的）。"""
     sid = getattr(_tls, "session_id", None)
     if sid:
         return sid
     with _active_lock:
-        return _last_active
+        return _active_list[-1] if _active_list else None
 
 
 def log(event_type, **fields):
@@ -148,8 +163,7 @@ def user_action(action, phase, **extra):
 
 def pipeline_complete(total_ms, stt_ms, llm_ms, stt_source, llm_source, mode, chars_out, app_id=None):
     """每個成功的 transcribe() 收尾時記一筆，方便聚合 p50/p90/p95。
-    收完後清掉 _last_active，避免閒置期 UI events（cancel/retry on idle）誤關聯到舊 session。"""
-    global _last_active
+    Session 清理由 caller 的 try/finally + end_session() 負責，本 helper 只記事件。"""
     fields = {
         "total_ms": int(total_ms),
         "stt_ms": int(stt_ms),
@@ -161,10 +175,3 @@ def pipeline_complete(total_ms, stt_ms, llm_ms, stt_source, llm_source, mode, ch
     }
     if app_id: fields["app_id"] = app_id
     log("pipeline_complete", **fields)
-    # Pipeline 結束 → 清掉 active session pointer，但只清「自己」這個 session。
-    # 若有更新的 pipeline B 已搶占 _last_active，此次完成的 A 不該清 B 的 pointer，
-    # 否則 B 還在跑時 UI events（cancel/retry）會失去與 B 的關聯。
-    my_session = getattr(_tls, "session_id", None)
-    with _active_lock:
-        if _last_active == my_session:
-            _last_active = None

@@ -196,13 +196,19 @@ class Transcriber:
 
     def transcribe(self, audio_source, audio_duration=0, mode="dictate", edit_context="", on_stage=None):
         """on_stage: callable(stage_name: 'stt'|'llm'|'paste') 用來通知 UI 階段切換。"""
+        # 開新 session + 注意：所有 early return 都會走 finally end_session()
+        # 避免 _active_list 殘留無效 session 讓後續 UI events 誤關聯
+        event_ledger.new_session()
+        try:
+            return self._transcribe_inner(audio_source, audio_duration, mode, edit_context, on_stage)
+        finally:
+            event_ledger.end_session()
+
+    def _transcribe_inner(self, audio_source, audio_duration, mode, edit_context, on_stage):
         def _stage(s):
             if on_stage:
                 try: on_stage(s)
                 except Exception: pass
-
-        # 開新 session 讓所有後續事件可串接（pipeline_complete 跟 silent failures 都對應同一個 session）
-        event_ledger.new_session()
 
         t0 = time.time()
         is_hybrid = self.config.get("enable_hybrid_mode", True)
@@ -402,9 +408,14 @@ class Transcriber:
     def retry_last_llm(self, on_stage=None):
         """Retry hotkey 入口：用 cache 的 raw STT 重跑 corrections + LLM，回傳 result dict。
         跳過 STT 階段（省 1.5s），讓使用者拿到第二版而不用重錄。"""
-        # 開新 session（retry 是獨立互動，跟原 transcribe session 區隔以便 ledger 分析）
+        # 開新 session（retry 是獨立互動）+ try/finally 確保 early return 也 end_session
         event_ledger.new_session()
+        try:
+            return self._retry_last_llm_inner(on_stage)
+        finally:
+            event_ledger.end_session()
 
+    def _retry_last_llm_inner(self, on_stage):
         def _stage(s):
             if on_stage:
                 try: on_stage(s)
