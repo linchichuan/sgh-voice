@@ -12,7 +12,7 @@
     ],
     "updated_at": "2026-05-20T06:10:15Z"
   },
-  "updated_at": "2026-05-21T02:12:36Z",
+  "updated_at": "2026-05-21T02:49:38Z",
   "has_code_change": true,
   "has_doc_change": false,
   "code_review": {
@@ -50,7 +50,10 @@
     "/Users/lin/voice-input/scripts/event_summary.py",
     "/Users/lin/voice-input/scripts/update_style_profile.py",
     "/Users/lin/voice-input/transcriber.py",
-    "/Volumes/Satechi_SSD/GitHub/meishi.shingihou.com/auto_clinic_sale/scripts/daily-gmail-check.js"
+    "/Volumes/Satechi_SSD/GitHub/meishi.shingihou.com/auto_clinic_sale/scripts/daily-gmail-check.js",
+    "/Volumes/Satechi_SSD/GitHub/meishi.shingihou.com/auto_clinic_sale/scripts/daily-invite.js",
+    "/Volumes/Satechi_SSD/GitHub/meishi.shingihou.com/auto_clinic_sale/scripts/discover-candidates.js",
+    "/Volumes/Satechi_SSD/GitHub/meishi.shingihou.com/auto_clinic_sale/scripts/lib.js"
   ],
   "review_phase": "pending_review"
 }
