@@ -9,17 +9,51 @@
             "firebase.json",
             "firestore.rules",
             "vercel.json",
+            "REVIEW.md",
             "**/.*",
             "**/node_modules/**"
         ],
         "headers": [
             {
-                "source": "**/*.@(js|css|html)",
+                "source": "**/*.html",
                 "headers": [
-                    {
-                        "key": "Cache-Control",
-                        "value": "max-age=3600"
-                    }
+                    { "key": "Cache-Control", "value": "no-cache, max-age=0, must-revalidate" }
+                ]
+            },
+            {
+                "source": "/",
+                "headers": [
+                    { "key": "Cache-Control", "value": "no-cache, max-age=0, must-revalidate" }
+                ]
+            },
+            {
+                "source": "**/*.@(js|css)",
+                "headers": [
+                    { "key": "Cache-Control", "value": "public, max-age=3600, must-revalidate" }
+                ]
+            },
+            {
+                "source": "**/*.@(png|jpg|jpeg|webp|svg|ico|woff2)",
+                "headers": [
+                    { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+                ]
+            },
+            {
+                "source": "/llms.txt",
+                "headers": [
+                    { "key": "Cache-Control", "value": "public, max-age=3600" }
+                ]
+            },
+            {
+                "source": "/sitemap.xml",
+                "headers": [
+                    { "key": "Cache-Control", "value": "public, max-age=86400" }
+                ]
+            },
+            {
+                "source": "/robots.txt",
+                "headers": [
+                    { "key": "Cache-Control", "value": "public, max-age=86400" }
                 ]
             }
         ]
