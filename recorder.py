@@ -25,11 +25,24 @@ class Recorder:
         self._start_time = None
 
     def start(self, on_done=None):
-        """開始錄音"""
+        """開始錄音。
+        防 PortAudio deadlock：若上一段 _record_loop thread 還活著（stream 沒收完），
+        會等最多 2s；超時就 raise，由 caller 決定怎麼處理（不要硬開新 stream，否則 PA
+        會在 Pa_OpenStream 內 deadlock，整個 audio 子系統就鎖死）。"""
         if self.is_recording:
             return
         if sd is None:
             raise RuntimeError("請安裝 sounddevice: pip install sounddevice soundfile")
+
+        # 等上一段 thread 完全結束（含 InputStream 的 __exit__ tear-down）
+        if self._thread is not None and self._thread.is_alive():
+            print(" ⚠️ 上一段錄音 thread 尚未結束（PortAudio 可能還在收尾），等 2s…")
+            self._thread.join(timeout=2.0)
+            if self._thread.is_alive():
+                raise RuntimeError(
+                    "上一段 audio stream 未釋放 — 拒絕開新錄音以防 PortAudio deadlock。"
+                    "請重啟 app。"
+                )
 
         self.is_recording = True
         self.audio_data = []
@@ -37,23 +50,28 @@ class Recorder:
         self._on_done = on_done
         self._start_time = time.time()
 
-        self._thread = threading.Thread(target=self._record_loop, daemon=True)
+        self._thread = threading.Thread(target=self._record_loop, daemon=True, name="recorder")
         self._thread.start()
 
     def stop(self):
-        """停止錄音，回傳 (音訊數據, 音訊檔路徑, 錄音秒數)"""
+        """停止錄音，回傳 (音訊數據, 音訊檔路徑, 錄音秒數)。
+        thread.join 設長 timeout（5s），不夠就明確 log 但不假裝成功 — 否則下次 start
+        會踩到還活著的 thread → 由 start() 那邊偵測 + raise。"""
         if not self._start_time:
             return None, None, 0
         self._stop_event.set()
         self.is_recording = False
         duration = time.time() - self._start_time if self._start_time else 0
         if self._thread:
-            self._thread.join(timeout=3)
+            self._thread.join(timeout=5)
+            if self._thread.is_alive():
+                # PortAudio 卡住沒有乾淨辦法強殺 daemon thread；
+                # 留 thread reference，下次 start() 會偵測 + 拒絕
+                print(f" ⚠️ recorder thread 未在 5s 內結束（PortAudio 可能 stuck）")
         self._start_time = None
 
         audio_array = None
         if self.audio_data:
-            # 只做一次 concatenate，同時給 transcriber 和 _save 使用
             audio_array = np.concatenate(self.audio_data, axis=0).flatten()
 
         filepath = self._save(audio_array)
@@ -68,19 +86,24 @@ class Recorder:
         chunk = int(sr * 0.1)
         total = 0
         max_chunks = int(max_dur / 0.1)
-        # 靜音偵測：Toggle 模式下連續靜音自動停止
         silence_chunks = int(silence_duration / 0.1)
         consecutive_silence = 0
-        has_voice = False  # 是否偵測過有聲音
+        has_voice = False
 
         try:
-            with sd.InputStream(samplerate=sr, channels=1, dtype="float32") as stream:
+            # blocksize=chunk 讓 read 的 block 跟我們 loop 對齊，
+            # 不會 buffer 太大導致 stop 後還要消化 1+s 殘留
+            with sd.InputStream(samplerate=sr, channels=1, dtype="float32",
+                                blocksize=chunk) as stream:
                 while not self._stop_event.is_set() and total < max_chunks:
-                    data, _ = stream.read(chunk)
+                    try:
+                        data, _ = stream.read(chunk)
+                    except sd.PortAudioError as e:
+                        print(f" ⚠️ PortAudio read error: {e}")
+                        break
                     self.audio_data.append(data.copy())
                     total += 1
 
-                    # RMS 能量偵測
                     rms = np.sqrt(np.mean(data ** 2))
                     if rms > silence_threshold:
                         has_voice = True
@@ -88,14 +111,17 @@ class Recorder:
                     else:
                         consecutive_silence += 1
 
-                    # Toggle 模式：有聲音後連續靜音超過閾值自動停止
                     if hotkey_mode == "toggle" and has_voice and consecutive_silence >= silence_chunks:
                         print(f" 🔇 靜音 {silence_duration}s，自動停止錄音")
                         break
+        except sd.PortAudioError as e:
+            print(f" ⚠️ PortAudio stream error: {e}")
         except Exception as e:
-            print(f"Recording error: {e}")
+            print(f" Recording error: {e}")
+        finally:
+            # 確保旗標被重置，即使 stream 開失敗 / read 拋 exception 也一樣
+            self.is_recording = False
 
-        self.is_recording = False
         if self._on_done and self.audio_data:
             filepath = self._save()
             duration = time.time() - self._start_time if self._start_time else 0
