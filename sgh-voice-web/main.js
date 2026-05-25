@@ -2,26 +2,32 @@
 
 // --- Navbar scroll effect ---
 const navbar = document.getElementById("navbar");
-window.addEventListener("scroll", () => {
-    navbar.classList.toggle("scrolled", window.scrollY > 20);
-}, { passive: true });
+if (navbar) {
+    window.addEventListener("scroll", () => {
+        navbar.classList.toggle("scrolled", window.scrollY > 20);
+    }, { passive: true });
+}
 
 // --- Language dropdown toggle ---
 const langBtn = document.getElementById("langBtn");
 const langDropdown = document.getElementById("langDropdown");
-langBtn.addEventListener("click", (e) => {
-    e.stopPropagation();
-    langDropdown.classList.toggle("open");
-});
-document.addEventListener("click", () => langDropdown.classList.remove("open"));
+if (langBtn && langDropdown) {
+    langBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        langDropdown.classList.toggle("open");
+    });
+    document.addEventListener("click", () => langDropdown.classList.remove("open"));
+}
 
 // --- Mobile menu toggle ---
 const mobileToggle = document.getElementById("mobileToggle");
 const navLinks = document.querySelector(".nav-links");
-if (mobileToggle) {
+if (mobileToggle && navLinks) {
+    if (!navLinks.id) navLinks.id = "navLinks";
     mobileToggle.addEventListener("click", () => {
-        navLinks.classList.toggle("mobile-open");
-        mobileToggle.classList.toggle("active");
+        const isOpen = navLinks.classList.toggle("mobile-open");
+        mobileToggle.classList.toggle("active", isOpen);
+        mobileToggle.setAttribute("aria-expanded", String(isOpen));
     });
 }
 
@@ -32,9 +38,10 @@ document.querySelectorAll('a[href^="#"]').forEach(link => {
         if (target) {
             e.preventDefault();
             target.scrollIntoView({ behavior: "smooth" });
-            if (navLinks.classList.contains("mobile-open")) {
+            if (navLinks && navLinks.classList.contains("mobile-open")) {
                 navLinks.classList.remove("mobile-open");
                 mobileToggle.classList.remove("active");
+                mobileToggle.setAttribute("aria-expanded", "false");
             }
         }
     });
@@ -48,66 +55,84 @@ function waitForFirestore(callback, retries = 20) {
 }
 
 // --- Subscribe form → Firestore ---
-document.getElementById("subscribeForm").addEventListener("submit", function (e) {
-    e.preventDefault();
-    const email = document.getElementById("emailInput").value.trim();
-    if (!email) return;
+const subscribeForm = document.getElementById("subscribeForm");
+if (subscribeForm) {
+    subscribeForm.addEventListener("submit", function (e) {
+        e.preventDefault();
 
-    const submitBtn = this.querySelector('button[type="submit"]');
-    submitBtn.disabled = true;
-    submitBtn.style.opacity = "0.6";
-
-    waitForFirestore(async ({ db, collection, addDoc, serverTimestamp }) => {
-        try {
-            await addDoc(collection(db, "sgh-voice-subscribers"), {
-                email: email,
-                createdAt: serverTimestamp(),
-                source: "landing-page",
-                lang: document.documentElement.lang || "ja"
-            });
+        // Honeypot：ボットが埋めると silently 拒否
+        const honeypot = document.getElementById("subscribeWebsite");
+        if (honeypot && honeypot.value) {
             document.querySelector("#subscribeForm .input-group").style.display = "none";
             document.querySelector("#subscribeForm .subscribe-note").style.display = "none";
             document.getElementById("subscribeSuccess").style.display = "flex";
-        } catch (err) {
-            console.error("Subscribe error:", err);
-            submitBtn.disabled = false;
-            submitBtn.style.opacity = "1";
-            const msg = (window.SGH_I18N && window.SGH_I18N["subscribe.error"])
-                || "エラーが発生しました。もう一度お試しください。";
-            alert(msg);
+            return;
         }
+
+        const email = document.getElementById("emailInput").value.trim();
+        if (!email) return;
+
+        const submitBtn = this.querySelector('button[type="submit"]');
+        submitBtn.disabled = true;
+        submitBtn.style.opacity = "0.6";
+
+        waitForFirestore(async ({ db, collection, addDoc, serverTimestamp }) => {
+            try {
+                await addDoc(collection(db, "sgh-voice-subscribers"), {
+                    email: email,
+                    createdAt: serverTimestamp(),
+                    source: "landing-page",
+                    lang: document.documentElement.lang || "ja"
+                });
+                document.querySelector("#subscribeForm .input-group").style.display = "none";
+                document.querySelector("#subscribeForm .subscribe-note").style.display = "none";
+                document.getElementById("subscribeSuccess").style.display = "flex";
+            } catch (err) {
+                console.error("Subscribe error:", err);
+                submitBtn.disabled = false;
+                submitBtn.style.opacity = "1";
+                const msg = (window.SGH_I18N && window.SGH_I18N["subscribe.error"])
+                    || "エラーが発生しました。もう一度お試しください。";
+                alert(msg);
+            }
+        });
     });
-});
+}
 
 // (NPP form handler is defined inline in index.html)
 
 // --- Intersection Observer for scroll animations ---
-const observerOptions = { threshold: 0.1, rootMargin: "0px 0px -40px 0px" };
-const observer = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
-        if (entry.isIntersecting) {
-            entry.target.classList.add("visible");
-            observer.unobserve(entry.target);
-        }
+// 防禦：prefers-reduced-motion 啟用、或 IntersectionObserver 不存在時，直接顯示，不做 opacity-0 隱藏
+const prefersReducedMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const supportsObserver = typeof IntersectionObserver !== "undefined";
+
+if (!prefersReducedMotion && supportsObserver) {
+    const observerOptions = { threshold: 0.1, rootMargin: "0px 0px -40px 0px" };
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.classList.add("visible");
+                observer.unobserve(entry.target);
+            }
+        });
+    }, observerOptions);
+
+    document.querySelectorAll(".feature-card, .step-card, .pricing-card, .download-card, .contact-card").forEach(el => {
+        el.style.opacity = "0";
+        el.style.transform = "translateY(24px)";
+        el.style.transition = "opacity 0.6s ease, transform 0.6s ease";
+        observer.observe(el);
     });
-}, observerOptions);
 
-document.querySelectorAll(".feature-card, .step-card, .pricing-card, .download-card, .contact-card").forEach(el => {
-    el.style.opacity = "0";
-    el.style.transform = "translateY(24px)";
-    el.style.transition = "opacity 0.6s ease, transform 0.6s ease";
-    observer.observe(el);
-});
+    const visibleStyle = document.createElement("style");
+    visibleStyle.textContent = `.visible { opacity: 1 !important; transform: translateY(0) !important; }`;
+    document.head.appendChild(visibleStyle);
 
-// Add visible class styles
-const style = document.createElement("style");
-style.textContent = `.visible { opacity: 1 !important; transform: translateY(0) !important; }`;
-document.head.appendChild(style);
-
-// --- Stagger animation delay ---
-document.querySelectorAll(".features-grid .feature-card").forEach((el, i) => {
-    el.style.transitionDelay = `${i * 80}ms`;
-});
-document.querySelectorAll(".steps-grid .step-card").forEach((el, i) => {
-    el.style.transitionDelay = `${i * 120}ms`;
-});
+    // Stagger animation delay
+    document.querySelectorAll(".features-grid .feature-card").forEach((el, i) => {
+        el.style.transitionDelay = `${i * 60}ms`;
+    });
+    document.querySelectorAll(".steps-grid .step-card").forEach((el, i) => {
+        el.style.transitionDelay = `${i * 100}ms`;
+    });
+}

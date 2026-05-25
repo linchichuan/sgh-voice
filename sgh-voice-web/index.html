@@ -5,27 +5,120 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="theme-color" content="#2563eb">
+    <meta name="author" content="Shingihou Co., Ltd.">
     <title>SGH Voice — 話すだけで、プロ品質のテキストに。 v2.1.0</title>
     <meta name="description" content="SGH Voice は、あなたの意図を汲み取る AI 音声入力アシスタント。中国語・日本語・英語を自動認識し、口語を洗練された書き言葉へ整えます。データは 100% あなたの手元に。">
-    <meta property="og:title" content="SGH Voice — 話すだけで、プロ品質のテキストに。 v2.1.0">
-    <meta property="og:description" content="SGH Voice は、あなたの意図を汲み取る AI 音声入力アシスタント。中・日・英対応、データは 100% あなたの手元に。">
-    <meta property="og:url" content="https://voice.shingihou.com">
+    <link rel="canonical" href="https://voice.shingihou.com/">
+
+    <!-- Favicons -->
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="/assets/favicon-192.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png">
+    <link rel="mask-icon" href="/assets/favicon-source.svg" color="#2563eb">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="SGH Voice">
+    <meta property="og:title" content="SGH Voice — 話すだけで、プロ品質のテキストに。">
+    <meta property="og:description" content="あなたの意図を汲み取る AI 音声入力。中・日・英自動認識、データは 100% あなたの手元に。macOS · iOS · Android 対応。">
+    <meta property="og:url" content="https://voice.shingihou.com/">
+    <meta property="og:image" content="https://voice.shingihou.com/assets/generated/og-share.webp">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="SGH Voice — One Voice, Infinite Possibilities.">
     <meta property="og:locale" content="ja_JP">
     <meta property="og:locale:alternate" content="zh_TW">
     <meta property="og:locale:alternate" content="en_US">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="SGH Voice — 話すだけで、プロ品質のテキストに。">
+    <meta name="twitter:description" content="あなたの意図を汲み取る AI 音声入力。中・日・英自動認識、データは 100% あなたの手元に。">
+    <meta name="twitter:image" content="https://voice.shingihou.com/assets/generated/og-share.webp">
+
+    <!-- hreflang -->
     <link rel="alternate" hreflang="ja" href="https://voice.shingihou.com/?lang=ja">
     <link rel="alternate" hreflang="zh-Hant" href="https://voice.shingihou.com/?lang=zh">
     <link rel="alternate" hreflang="en" href="https://voice.shingihou.com/?lang=en">
     <link rel="alternate" hreflang="x-default" href="https://voice.shingihou.com/">
+
+    <!-- Preload critical assets (LCP optimization) -->
+    <link rel="preload" as="image" href="/assets/generated/hero-main.webp" fetchpriority="high">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
         href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Noto+Sans+JP:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@400;500;600;700&family=Noto+Sans:wght@400;500;600;700&display=swap"
         rel="stylesheet">
     <link rel="stylesheet" href="style.css">
+
+    <!-- JSON-LD: SoftwareApplication -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "SGH Voice",
+      "alternateName": ["SGHボイス", "新義豊 ボイス"],
+      "applicationCategory": "ProductivityApplication",
+      "operatingSystem": ["macOS", "iOS", "Android"],
+      "softwareVersion": "2.1.0",
+      "url": "https://voice.shingihou.com/",
+      "downloadUrl": "https://github.com/linchichuan/sgh-voice/releases",
+      "image": "https://voice.shingihou.com/assets/generated/og-share.webp",
+      "description": "AI-powered trilingual (Japanese / Traditional Chinese / English) voice input tool with on-device processing, BYOK model, and dedicated medical-domain mode.",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "JPY"
+      },
+      "publisher": {
+        "@type": "Organization",
+        "name": "Shingihou Co., Ltd.",
+        "url": "https://shingihou.com",
+        "logo": "https://voice.shingihou.com/assets/favicon-512.png"
+      },
+      "featureList": [
+        "Trilingual mixed-language recognition (Japanese / Chinese / English)",
+        "Medical specialty mode for healthcare professionals",
+        "On-device AI with Breeze-ASR-25",
+        "Hybrid local + cloud processing",
+        "Custom dictionary",
+        "Voiceprint verification",
+        "Multi-cloud failover (Groq, OpenRouter, Claude, OpenAI)"
+      ]
+    }
+    </script>
+
+    <!-- JSON-LD: Organization -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "name": "Shingihou Co., Ltd.",
+      "alternateName": "新義豊株式会社",
+      "url": "https://shingihou.com",
+      "logo": "https://voice.shingihou.com/assets/favicon-512.png",
+      "email": "info@shingihou.com",
+      "address": {
+        "@type": "PostalAddress",
+        "addressLocality": "Fukuoka",
+        "addressCountry": "JP"
+      },
+      "sameAs": [
+        "https://github.com/linchichuan/sgh-voice"
+      ]
+    }
+    </script>
 </head>
 
 <body>
+    <noscript>
+        <div style="background:#fef3c7;border-bottom:1px solid #fde68a;padding:12px 20px;text-align:center;font-family:sans-serif;font-size:14px;color:#78350f;">
+            JavaScript が無効です。SGH Voice の Landing Page は JS を有効にすると最適に動作します。
+            主要機能のご紹介・ダウンロードリンクは <a href="https://github.com/linchichuan/sgh-voice/releases" style="color:#1e40af;font-weight:600;">GitHub Releases</a> をご覧ください。
+        </div>
+    </noscript>
+
     <!-- ===== Navigation ===== -->
     <nav class="navbar" id="navbar">
         <div class="nav-container">
@@ -66,7 +159,7 @@
                 </div>
                 <a href="#download" class="nav-cta" data-i18n="nav.cta">無料で始める</a>
             </div>
-            <button class="mobile-toggle" id="mobileToggle" aria-label="Toggle menu">
+            <button class="mobile-toggle" id="mobileToggle" aria-label="Toggle menu" aria-expanded="false" aria-controls="navLinks">
                 <span></span><span></span><span></span>
             </button>
         </div>
@@ -75,9 +168,18 @@
     <!-- ===== Hero ===== -->
     <section class="hero" id="hero">
         <div class="hero-bg">
-            <div class="hero-orb hero-orb-1"></div>
-            <div class="hero-orb hero-orb-2"></div>
-            <div class="hero-orb hero-orb-3"></div>
+            <picture>
+                <source srcset="/assets/generated/hero-main.webp" type="image/webp">
+                <img src="/assets/generated/hero-main.png"
+                     alt=""
+                     class="hero-bg-image"
+                     fetchpriority="high"
+                     decoding="async"
+                     width="1920" height="1080"
+                     role="presentation">
+            </picture>
+            <div class="hero-orb hero-orb-1" aria-hidden="true"></div>
+            <div class="hero-orb hero-orb-2" aria-hidden="true"></div>
         </div>
         <div class="container hero-content">
             <div class="hero-badge" data-i18n="hero.badge">思考を言葉に · v2.1.0</div>
@@ -85,7 +187,12 @@
                 <span data-i18n="hero.title1">話すだけで、</span><br>
                 <span class="gradient-text" data-i18n="hero.title2">プロの文章に。</span>
             </h1>
-            <p class="hero-subtitle" data-i18n="hero.subtitle">SGH Voice は、あなたの意図を汲み取る専属速記者のような存在です。単なる文字起こしではなく、無駄な言葉を削ぎ落とし、誤字を直し、完璧に整えます。中・日・英対応、データは 100% あなたの手元に。</p>
+            <p class="hero-subtitle" data-i18n="hero.subtitle">あなたの意図を汲み取る、AI 専属速記者。<br>中・日・英対応 · データは 100% あなたの手元に。</p>
+            <div class="hero-chips" aria-label="Key benefits">
+                <span class="hero-chip" data-i18n="hero.chip1">✦ 無駄な言葉を削除</span>
+                <span class="hero-chip" data-i18n="hero.chip2">✦ 誤字を自動修正</span>
+                <span class="hero-chip" data-i18n="hero.chip3">✦ 即座に整形</span>
+            </div>
             <div class="hero-actions">
                 <a href="#download" class="btn btn-primary">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
@@ -129,7 +236,15 @@
                 <h2 class="section-title" data-i18n="features.title">すべてをAIに任せる、<br>新しい音声入力体験</h2>
             </div>
             <div class="features-grid">
-                <div class="feature-card feature-card-large">
+                <div class="feature-card feature-card-large feature-card-visual">
+                    <div class="feature-thumb">
+                        <picture>
+                            <source srcset="/assets/generated/feature-trilingual.webp" type="image/webp">
+                            <img src="/assets/generated/feature-trilingual.png"
+                                 alt="あいうえお · 繁體中文 · ABC が一つの流れに統合される視覚表現"
+                                 loading="lazy" decoding="async" width="800" height="600">
+                        </picture>
+                    </div>
                     <div class="feature-icon">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="28"
                             height="28">
@@ -142,7 +257,15 @@
                     <h3 data-i18n="features.f1.title">3言語混合認識</h3>
                     <p data-i18n="features.f1.desc">中国語（繁体字）・日本語・英語をシームレスに混合して話しても、AIが自動で正確に文字起こしします。言語切替は不要です。</p>
                 </div>
-                <div class="feature-card feature-card-large feature-card-medical">
+                <div class="feature-card feature-card-large feature-card-medical feature-card-visual">
+                    <div class="feature-thumb">
+                        <picture>
+                            <source srcset="/assets/generated/feature-medical.webp" type="image/webp">
+                            <img src="/assets/generated/feature-medical.png"
+                                 alt="医療専門用語（処方・診断・ペプチド等）を高精度認識するイメージ"
+                                 loading="lazy" decoding="async" width="800" height="600">
+                        </picture>
+                    </div>
                     <div class="feature-icon feature-icon-medical">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="28"
                             height="28">
@@ -157,6 +280,23 @@
                             医療従事者・MR・CRA・研究者向けの専用モード。処方薬名（アムロジピン、オプジーボ等）、診療科目、検査名（心電図、MRI、内視鏡）、バイオ用語（iPS細胞、CAR-T、PD-1）を高精度で認識。カルテ記入、症例報告、論文ドラフトの音声入力を劇的に効率化します。
                         </p>
                     </div>
+                </div>
+                <div class="feature-card feature-card-large feature-card-visual feature-card-privacy">
+                    <div class="feature-thumb">
+                        <picture>
+                            <source srcset="/assets/generated/feature-privacy.webp" type="image/webp">
+                            <img src="/assets/generated/feature-privacy.png"
+                                 alt="シールドが個人データを守るシンボル — オンデバイス処理のイメージ"
+                                 loading="lazy" decoding="async" width="800" height="600">
+                        </picture>
+                    </div>
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="28" height="28">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                        </svg>
+                    </div>
+                    <h3 data-i18n="features.f10.title">🔐 データは 100% あなたの手元に</h3>
+                    <p data-i18n="features.f10.desc">音声・APIキー・辞書はすべて端末内で暗号化保存。当社のサーバーに音声データは一切送られません。利用する AI プロバイダーはユーザーが選択・管理します。</p>
                 </div>
                 <div class="feature-card">
                     <div class="feature-icon">
@@ -325,15 +465,15 @@
                     <div class="pricing-badge" data-i18n="pricing.pro.badge">おすすめ</div>
                     <div class="pricing-name" data-i18n="pricing.pro.name">Pro プラン</div>
                     <div class="pricing-price">¥980<small data-i18n="pricing.pro.unit">/月</small></div>
-                    <div class="pricing-period" data-i18n="pricing.pro.period">API 料金込み・使い放題</div>
+                    <div class="pricing-period" data-i18n="pricing.pro.period">準備中 · リリース時に詳細をご案内</div>
                     <ul class="pricing-features">
                         <li data-i18n="pricing.pro.f1">Free プランの全機能</li>
-                        <li data-i18n="pricing.pro.f2">API キー不要（サーバー提供）</li>
+                        <li data-i18n="pricing.pro.f2">API キー不要（サーバー提供 · 通常利用範囲内）</li>
                         <li data-i18n="pricing.pro.f3">優先サポート</li>
                         <li data-i18n="pricing.pro.f4">新機能の先行体験</li>
                         <li data-i18n="pricing.pro.f5">商用利用可</li>
                     </ul>
-                    <a href="#subscribe" class="btn btn-primary" data-i18n="pricing.pro.cta">サブスクライブ</a>
+                    <a href="#subscribe" class="btn btn-primary" data-i18n="pricing.pro.cta">リリース通知を受け取る</a>
                 </div>
             </div>
         </div>
@@ -347,7 +487,10 @@
                     <h2 data-i18n="subscribe.title">最新情報をお届けします</h2>
                     <p data-i18n="subscribe.desc">新機能のリリース情報やアップデートをいち早くお届けします。メールアドレスをご登録ください。</p>
                 </div>
-                <form class="subscribe-form" id="subscribeForm" onsubmit="handleSubscribe(event)">
+                <form class="subscribe-form" id="subscribeForm">
+                    <!-- Honeypot：bot spam 防護。一般使用者看不到也填不到 -->
+                    <input type="text" id="subscribeWebsite" name="website" tabindex="-1" autocomplete="off"
+                           style="position:absolute;left:-9999px;opacity:0;pointer-events:none;" aria-hidden="true">
                     <div class="input-group">
                         <input type="email" id="emailInput" placeholder="mail@example.com" data-i18n-placeholder="subscribe.placeholder" required>
                         <button type="submit" class="btn btn-primary" data-i18n="subscribe.cta">登録する</button>
@@ -371,6 +514,14 @@
             <div class="section-header">
                 <span class="section-label" data-i18n="download.label">ダウンロード</span>
                 <h2 class="section-title" data-i18n="download.title">今すぐ始めましょう</h2>
+            </div>
+            <div class="download-hero">
+                <picture>
+                    <source srcset="/assets/generated/download-devices.webp" type="image/webp">
+                    <img src="/assets/generated/download-devices.png"
+                         alt="macOS · iOS · Android 三デバイスでの SGH Voice 動作イメージ"
+                         loading="lazy" decoding="async" width="1600" height="900">
+                </picture>
             </div>
             <div class="download-grid">
                 <div class="download-card">
@@ -441,6 +592,9 @@
             </div>
             <div class="contact-card">
                 <form class="contact-form" id="nppForm">
+                    <!-- Honeypot：bot spam 防護 -->
+                    <input type="text" id="nppWebsite" name="website" tabindex="-1" autocomplete="off"
+                           style="position:absolute;left:-9999px;opacity:0;pointer-events:none;" aria-hidden="true">
                     <div class="form-row">
                         <div class="form-group">
                             <label for="nppName" data-i18n="beta.form.name">お名前 / ニックネーム</label>
@@ -480,6 +634,13 @@
             nppForm.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const t = (key, fallback) => (window.SGH_I18N && window.SGH_I18N[key]) || fallback;
+                // Honeypot
+                const honey = document.getElementById('nppWebsite');
+                if (honey && honey.value) {
+                    nppForm.style.display = 'none';
+                    document.getElementById('nppSuccess').style.display = 'flex';
+                    return;
+                }
                 const { db, collection, addDoc, serverTimestamp } = window._firestore;
                 const btn = document.getElementById('nppSubmitBtn');
                 const btnLabel = btn.querySelector('span');

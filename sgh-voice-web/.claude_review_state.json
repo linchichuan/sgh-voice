@@ -1,0 +1,40 @@
+{
+  "session_id": "",
+  "updated_at": "2026-05-25T02:52:28Z",
+  "review_mode": "single",
+  "has_code_change": false,
+  "has_doc_change": true,
+  "code_review": {
+    "executed": false,
+    "passed": false,
+    "last_run": ""
+  },
+  "doc_review": {
+    "executed": false,
+    "passed": false,
+    "last_run": ""
+  },
+  "precommit": {
+    "executed": false,
+    "passed": false,
+    "last_run": ""
+  },
+  "aggregate_gate": {
+    "executed": false,
+    "gate": null,
+    "source": null,
+    "reason": null,
+    "last_run": ""
+  },
+  "schema_version": 2,
+  "iteration_history": {
+    "current_round": 0,
+    "max_rounds": 10,
+    "findings_by_round": [],
+    "total_rounds_session": 0,
+    "strategic_reset_fired": false
+  },
+  "changed_files_since_review": [
+    "/Users/lin/voice-input/sgh-voice-web/REVIEW.md"
+  ]
+}

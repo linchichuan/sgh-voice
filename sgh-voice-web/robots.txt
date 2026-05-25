@@ -1,0 +1,24 @@
+User-agent: *
+Allow: /
+Disallow: /assets/generated/
+
+# AI / LLM crawlers — explicit opt-in
+User-agent: GPTBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: Claude-Web
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+Sitemap: https://voice.shingihou.com/sitemap.xml

@@ -1,0 +1,42 @@
+# SGH Voice
+
+> AI-powered voice input tool for macOS, iOS, and Android. Trilingual (Japanese / Traditional Chinese / English) speech recognition with on-device processing options. BYOK (Bring Your Own Key) model — users supply their own API keys to AI providers; the app itself is free.
+
+## Product
+- macOS app (Apple Silicon + Intel)
+- iOS app (iPhone / iPad)
+- Android app (Google Play in review)
+- Open source: https://github.com/linchichuan/sgh-voice
+
+## Key Features
+- Trilingual mixed-language recognition (zh-TW / ja / en) without manual language switching
+- Optional medical-domain mode for healthcare professionals, MRs, CRAs, researchers (prescription drug names, diagnostic terms, biotech vocabulary)
+- Local-first AI: MediaTek Breeze-ASR-25 model runs on-device on Apple Silicon (3.5× faster than Whisper-turbo, 0.8GB 4-bit quantized)
+- Hybrid mode: short utterances → local AI, long utterances → cloud AI for cost optimization
+- Multiple LLM provider support: Ollama, Groq, Claude, OpenAI, OpenRouter (with automatic failover)
+- Custom dictionary for proper nouns and domain-specific terminology
+- Voiceprint verification: filters background voices and ambient noise
+- Android IME (works as keyboard in any app)
+
+## Privacy Stance
+- All API keys stored encrypted on-device (AES-256, EncryptedSharedPreferences)
+- No audio data sent to or stored on Shingihou servers
+- Audio sent to user-configured AI provider (OpenAI / Anthropic / Groq) per their respective privacy policies
+- Custom dictionary stored locally only
+
+## Pricing
+- Free plan: full app functionality, BYOK (user pays AI providers directly)
+- Pro plan (future): server-provided API keys, reasonable-use cap
+
+## Company
+- Shingihou Co., Ltd. (新義豊株式会社) — Fukuoka, Japan
+- Founded 2015
+- Cross-border medical innovation and intelligent automation
+- Contact: info@shingihou.com
+
+## Pages
+- Home: https://voice.shingihou.com/
+- Privacy Policy: https://voice.shingihou.com/privacy.html
+- Terms of Service: https://voice.shingihou.com/terms.html
+- GitHub: https://github.com/linchichuan/sgh-voice
+- Company: https://shingihou.com

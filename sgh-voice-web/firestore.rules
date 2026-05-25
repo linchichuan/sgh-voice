@@ -9,12 +9,27 @@ service cloud.firestore {
                     && request.resource.data.email.size() < 256;
       allow read, update, delete: if false;
     }
-    // Beta request form — anyone can create, no one can read/update/delete
+    // Beta request form (legacy contact-style) — anyone can create
     match /sgh-voice-beta-requests/{docId} {
       allow create: if request.resource.data.keys().hasAll(['name', 'email', 'message', 'createdAt'])
                     && request.resource.data.name is string
                     && request.resource.data.email is string
                     && request.resource.data.message is string;
+      allow read, update, delete: if false;
+    }
+    // Android NPP (Native Pre-Production) testers — index.html 寫進 "npp_testers"
+    // 欄位：name / email / device / lang / timestamp
+    match /npp_testers/{docId} {
+      allow create: if request.resource.data.keys().hasAll(['name', 'email', 'device', 'timestamp'])
+                    && request.resource.data.name is string
+                    && request.resource.data.name.size() > 0
+                    && request.resource.data.name.size() < 100
+                    && request.resource.data.email is string
+                    && request.resource.data.email.size() > 0
+                    && request.resource.data.email.size() < 256
+                    && request.resource.data.email.matches('.+@.+\\..+')
+                    && request.resource.data.device is string
+                    && request.resource.data.device.size() < 200;
       allow read, update, delete: if false;
     }
     // Default: deny all

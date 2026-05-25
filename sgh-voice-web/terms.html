@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SGH Voice - Terms of Service / 利用規約</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+            line-height: 1.8;
+            color: #1a1a2e;
+            background: linear-gradient(135deg, #f8f9ff 0%, #e8ecf8 100%);
+            min-height: 100vh;
+        }
+        .container { max-width: 800px; margin: 0 auto; padding: 40px 24px; }
+        header { text-align: center; margin-bottom: 48px; }
+        header h1 {
+            font-size: 2rem; font-weight: 700;
+            background: linear-gradient(135deg, #2563eb, #7c3aed);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            margin-bottom: 8px;
+        }
+        header p { color: #64748b; font-size: 0.95rem; }
+        .back-link {
+            display: inline-flex; align-items: center; gap: 6px;
+            color: #2563eb; text-decoration: none; font-size: 0.9rem;
+            margin-bottom: 24px;
+        }
+        .back-link:hover { text-decoration: underline; }
+        .card {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(12px);
+            border-radius: 16px;
+            padding: 32px;
+            margin-bottom: 24px;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.6);
+        }
+        h2 {
+            font-size: 1.25rem; font-weight: 600; color: #2563eb;
+            margin-bottom: 16px; padding-bottom: 8px;
+            border-bottom: 2px solid #e2e8f0;
+        }
+        h3 { font-size: 1.05rem; font-weight: 600; margin: 16px 0 8px; color: #334155; }
+        p, li { color: #475569; margin-bottom: 12px; }
+        ul { padding-left: 24px; margin-bottom: 12px; }
+        strong { color: #1e293b; font-weight: 600; }
+        .lang-toggle {
+            display: flex; justify-content: center; gap: 8px;
+            margin-bottom: 32px; flex-wrap: wrap;
+        }
+        .lang-toggle button {
+            padding: 8px 20px; border: 1px solid #2563eb;
+            background: transparent; border-radius: 8px;
+            color: #2563eb; font-weight: 600; cursor: pointer;
+            transition: all 0.2s;
+        }
+        .lang-toggle button.active,
+        .lang-toggle button:hover { background: #2563eb; color: #fff; }
+        .lang-section { display: none; }
+        .lang-section.active { display: block; }
+        footer { text-align: center; margin-top: 48px; color: #94a3b8; font-size: 0.85rem; }
+        .notice {
+            background: #fef3c7; border-left: 4px solid #f59e0b;
+            padding: 12px 16px; border-radius: 8px; margin: 16px 0;
+            color: #78350f; font-size: 0.9rem;
+        }
+        @media (max-width: 600px) {
+            .container { padding: 24px 16px; }
+            header h1 { font-size: 1.5rem; }
+            .card { padding: 20px; }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <a href="/" class="back-link">← Back to SGH Voice</a>
+        <header>
+            <h1>🎙 SGH Voice</h1>
+            <p>Terms of Service / 利用規約 / 使用條款</p>
+        </header>
+
+        <div class="lang-toggle">
+            <button class="active" onclick="switchLang('ja')">日本語</button>
+            <button onclick="switchLang('zh')">繁體中文</button>
+            <button onclick="switchLang('en')">English</button>
+        </div>
+
+        <!-- ===== 日本語 ===== -->
+        <div id="lang-ja" class="lang-section active">
+            <div class="card">
+                <h2>1. はじめに</h2>
+                <p>本利用規約（以下「本規約」）は、新義豊株式会社（以下「当社」）が提供する「SGH Voice」アプリケーション及び関連するウェブサイト voice.shingihou.com（以下総称して「本サービス」）の利用条件を定めるものです。</p>
+                <p><strong>最終更新日：</strong>2026年5月25日</p>
+            </div>
+
+            <div class="card">
+                <h2>2. 適用範囲</h2>
+                <p>本規約は、本サービスを利用するすべての方（以下「ユーザー」）に適用されます。本サービスをダウンロード、インストール、または利用することにより、本規約に同意したものとみなされます。</p>
+            </div>
+
+            <div class="card">
+                <h2>3. 本サービスの内容</h2>
+                <p>本サービスは、ユーザー自身が用意する第三者 AI プロバイダー（OpenAI、Anthropic、Groq、OpenRouter、Ollama 等）の API キーを用いて、音声入力・音声認識・後処理を行う BYOK（Bring Your Own Key）型のツールです。</p>
+                <ul>
+                    <li>アプリ本体は無料で提供されます。</li>
+                    <li>AI 処理に係る API 利用料金は、ユーザーが各プロバイダーへ直接支払うものとし、当社は一切関与しません。</li>
+                    <li>将来的に有料プランを提供する場合は、別途その内容と料金を明示します。</li>
+                </ul>
+            </div>
+
+            <div class="card">
+                <h2>4. 禁止事項</h2>
+                <p>ユーザーは、本サービスの利用にあたり、以下の行為を行ってはなりません。</p>
+                <ul>
+                    <li>法令または公序良俗に違反する行為</li>
+                    <li>他者の権利（著作権、肖像権、プライバシー権等）を侵害する行為</li>
+                    <li>本サービスをリバースエンジニアリングし、商用目的で再配布する行為</li>
+                    <li>本サービスを介して違法な音声データ、機密情報、未成年者の同意なき音声を処理する行為</li>
+                    <li>本サービスのサーバーまたは関連インフラに過度の負荷をかける行為</li>
+                    <li>第三者の API キーを不正に利用する行為</li>
+                </ul>
+            </div>
+
+            <div class="card">
+                <h2>5. 知的財産権</h2>
+                <p>本サービスのソースコード、デザイン、商標、ロゴ等に関する知的財産権は、当社または正当な権利者に帰属します。</p>
+                <p>本サービスはオープンソース部分を含む場合があり、当該部分は各オープンソースライセンスに従って利用されます（詳細は GitHub リポジトリを参照）。</p>
+                <p>ユーザーが本サービスを通じて生成したテキスト（文字起こし結果）の権利は、ユーザーに帰属します。</p>
+            </div>
+
+            <div class="card">
+                <h2>6. 免責事項</h2>
+                <p>当社は、本サービスについて以下を保証しません。</p>
+                <ul>
+                    <li>音声認識及び後処理結果の正確性・完全性</li>
+                    <li>本サービスが特定の目的に適合すること</li>
+                    <li>本サービスが中断またはエラーなく動作すること</li>
+                    <li>第三者 AI プロバイダーの可用性、料金、利用規約</li>
+                </ul>
+                <p>当社は、本サービスの利用または利用不能から生じる一切の損害（直接、間接、付随的、結果的損害を含む）について、適用される法令で許容される最大限度において責任を負いません。</p>
+                <div class="notice">
+                    <strong>医療従事者向けのご注意：</strong>本サービスの医療特化モードは音声入力の補助ツールであり、診断、処方、医療判断の代替手段ではありません。最終的な医療判断は必ず有資格者が行ってください。
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>7. 個人情報の取扱い</h2>
+                <p>本サービスにおける個人情報の取扱いについては、別途定める<a href="privacy.html">プライバシーポリシー</a>をご確認ください。</p>
+            </div>
+
+            <div class="card">
+                <h2>8. サービスの変更・終了</h2>
+                <p>当社は、ユーザーへの事前通知なしに、本サービスの内容を変更、追加、削除、または提供を終了することがあります。これにより生じたいかなる損害についても、当社は責任を負いません。</p>
+            </div>
+
+            <div class="card">
+                <h2>9. 本規約の変更</h2>
+                <p>当社は、必要に応じて本規約を変更することがあります。変更後の規約は、本ウェブサイトに掲載された時点で効力を生じます。重要な変更がある場合は、メールまたはアプリ内通知で告知します。</p>
+            </div>
+
+            <div class="card">
+                <h2>10. 準拠法・管轄裁判所</h2>
+                <p>本規約は日本法に準拠し、本サービスに関する一切の紛争は、福岡地方裁判所を第一審の専属的合意管轄裁判所とします。</p>
+            </div>
+
+            <div class="card">
+                <h2>11. お問い合わせ</h2>
+                <p><strong>新義豊株式会社（Shingihou Co., Ltd.）</strong><br>
+                    所在地：福岡県福岡市<br>
+                    メール：info@shingihou.com</p>
+            </div>
+        </div>
+
+        <!-- ===== 繁體中文 ===== -->
+        <div id="lang-zh" class="lang-section">
+            <div class="card">
+                <h2>1. 前言</h2>
+                <p>本使用條款（以下簡稱「本條款」）規範新義豊株式會社（以下簡稱「本公司」）所提供之「SGH Voice」應用程式及相關網站 voice.shingihou.com（以下統稱「本服務」）的使用條件。</p>
+                <p><strong>最後更新：</strong>2026年5月25日</p>
+            </div>
+
+            <div class="card">
+                <h2>2. 適用範圍</h2>
+                <p>本條款適用於所有使用本服務之人（以下簡稱「使用者」）。下載、安裝或使用本服務即視為已同意本條款。</p>
+            </div>
+
+            <div class="card">
+                <h2>3. 本服務內容</h2>
+                <p>本服務為 BYOK（Bring Your Own Key）型工具，使用者需自行準備第三方 AI 服務商（OpenAI、Anthropic、Groq、OpenRouter、Ollama 等）的 API 金鑰，以進行語音輸入、語音辨識與後處理。</p>
+                <ul>
+                    <li>應用程式本體免費提供。</li>
+                    <li>AI 處理所產生之 API 費用，由使用者直接支付給各服務商，本公司不參與其中。</li>
+                    <li>若未來提供付費方案，將另行明示其內容與費用。</li>
+                </ul>
+            </div>
+
+            <div class="card">
+                <h2>4. 禁止事項</h2>
+                <p>使用者使用本服務時，不得從事以下行為：</p>
+                <ul>
+                    <li>違反法令或公序良俗之行為</li>
+                    <li>侵害他人權利（著作權、肖像權、隱私權等）之行為</li>
+                    <li>對本服務進行逆向工程並以商業目的再散布之行為</li>
+                    <li>透過本服務處理違法音訊、機密資訊、未經未成年人同意之音訊之行為</li>
+                    <li>對本服務伺服器或相關基礎設施造成過度負擔之行為</li>
+                    <li>不當使用第三方 API 金鑰之行為</li>
+                </ul>
+            </div>
+
+            <div class="card">
+                <h2>5. 智慧財產權</h2>
+                <p>本服務之原始碼、設計、商標、標誌等相關智慧財產權，歸屬本公司或正當權利人。</p>
+                <p>本服務可能包含開放原始碼部分，該部分依各開放原始碼授權條款使用（詳情請參閱 GitHub 儲存庫）。</p>
+                <p>使用者透過本服務產生之文字（逐字稿結果），其權利歸屬使用者。</p>
+            </div>
+
+            <div class="card">
+                <h2>6. 免責事項</h2>
+                <p>本公司就本服務不保證以下事項：</p>
+                <ul>
+                    <li>語音辨識及後處理結果之正確性與完整性</li>
+                    <li>本服務適合於特定目的</li>
+                    <li>本服務無中斷或無錯誤運作</li>
+                    <li>第三方 AI 服務商之可用性、費用、使用條款</li>
+                </ul>
+                <p>本公司於適用法令所允許之最大限度內，對因使用或無法使用本服務所生之一切損害（包含直接、間接、附隨、結果性損害）不負任何責任。</p>
+                <div class="notice">
+                    <strong>給醫療從業人員：</strong>本服務之醫療特化模式為語音輸入輔助工具，並非診斷、處方、醫療判斷之替代方案。最終醫療判斷務必由具備資格之專業人員進行。
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>7. 個人資料處理</h2>
+                <p>本服務中個人資料之處理，請參閱另行訂立之<a href="privacy.html">隱私權政策</a>。</p>
+            </div>
+
+            <div class="card">
+                <h2>8. 服務變更・終止</h2>
+                <p>本公司得不經事前通知，變更、增加、刪除本服務內容或終止其提供。對於由此產生之任何損害，本公司不負責任。</p>
+            </div>
+
+            <div class="card">
+                <h2>9. 本條款之變更</h2>
+                <p>本公司得依需要變更本條款。變更後之條款，自刊載於本網站時起生效。如有重要變更，將以電子郵件或應用程式內通知告知。</p>
+            </div>
+
+            <div class="card">
+                <h2>10. 準據法・管轄法院</h2>
+                <p>本條款以日本法為準據法，關於本服務之一切爭議，以日本福岡地方法院為第一審專屬合意管轄法院。</p>
+            </div>
+
+            <div class="card">
+                <h2>11. 聯絡方式</h2>
+                <p><strong>新義豊株式會社（Shingihou Co., Ltd.）</strong><br>
+                    地址：日本福岡縣福岡市<br>
+                    Email：info@shingihou.com</p>
+            </div>
+        </div>
+
+        <!-- ===== English ===== -->
+        <div id="lang-en" class="lang-section">
+            <div class="card">
+                <h2>1. Introduction</h2>
+                <p>These Terms of Service ("Terms") govern your use of the SGH Voice application and the website voice.shingihou.com (collectively, the "Service") provided by Shingihou Co., Ltd. ("we", "us", or "Company").</p>
+                <p><strong>Last updated:</strong> May 25, 2026</p>
+            </div>
+
+            <div class="card">
+                <h2>2. Scope</h2>
+                <p>These Terms apply to all users of the Service ("User", "you"). By downloading, installing, or using the Service, you agree to be bound by these Terms.</p>
+            </div>
+
+            <div class="card">
+                <h2>3. Description of Service</h2>
+                <p>SGH Voice is a Bring-Your-Own-Key (BYOK) tool that uses third-party AI provider API keys (OpenAI, Anthropic, Groq, OpenRouter, Ollama, etc.) supplied by the User to perform voice input, speech recognition, and post-processing.</p>
+                <ul>
+                    <li>The application itself is provided free of charge.</li>
+                    <li>API fees for AI processing are paid directly by the User to each provider; the Company is not involved.</li>
+                    <li>If a paid plan is offered in the future, its content and pricing will be presented separately.</li>
+                </ul>
+            </div>
+
+            <div class="card">
+                <h2>4. Prohibited Conduct</h2>
+                <p>You agree not to engage in any of the following while using the Service:</p>
+                <ul>
+                    <li>Violating any law or public order</li>
+                    <li>Infringing the rights of others (copyright, publicity, privacy, etc.)</li>
+                    <li>Reverse-engineering the Service for commercial redistribution</li>
+                    <li>Processing illegal audio, confidential information, or audio of minors without consent through the Service</li>
+                    <li>Imposing excessive load on our servers or related infrastructure</li>
+                    <li>Misusing any third-party API key not belonging to you</li>
+                </ul>
+            </div>
+
+            <div class="card">
+                <h2>5. Intellectual Property</h2>
+                <p>All intellectual property rights in the Service's source code, design, trademarks, and logos belong to the Company or its lawful right holders.</p>
+                <p>The Service may include open-source components, which are governed by their respective open-source licenses (see GitHub repository for details).</p>
+                <p>Text (transcripts) generated by you through the Service belongs to you.</p>
+            </div>
+
+            <div class="card">
+                <h2>6. Disclaimer of Warranties</h2>
+                <p>The Company makes no warranty regarding:</p>
+                <ul>
+                    <li>The accuracy or completeness of speech-recognition or post-processing results</li>
+                    <li>The Service's fitness for any particular purpose</li>
+                    <li>That the Service will operate uninterrupted or error-free</li>
+                    <li>The availability, pricing, or terms of third-party AI providers</li>
+                </ul>
+                <p>To the maximum extent permitted by applicable law, the Company shall not be liable for any damages (including direct, indirect, incidental, or consequential) arising from use of or inability to use the Service.</p>
+                <div class="notice">
+                    <strong>For healthcare professionals:</strong> The medical-mode feature is a voice-input aid, not a substitute for diagnosis, prescription, or medical judgment. Final clinical decisions must be made by qualified professionals.
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>7. Personal Data</h2>
+                <p>The handling of personal data through the Service is governed by our separate <a href="privacy.html">Privacy Policy</a>.</p>
+            </div>
+
+            <div class="card">
+                <h2>8. Changes to and Termination of Service</h2>
+                <p>The Company may, without prior notice, modify, add, remove, or discontinue any part of the Service. The Company is not liable for any damages arising therefrom.</p>
+            </div>
+
+            <div class="card">
+                <h2>9. Changes to Terms</h2>
+                <p>The Company may revise these Terms as needed. Revised Terms take effect when posted on this website. Material changes will be communicated by email or in-app notice.</p>
+            </div>
+
+            <div class="card">
+                <h2>10. Governing Law and Jurisdiction</h2>
+                <p>These Terms are governed by the laws of Japan. Any dispute arising in connection with the Service shall be subject to the exclusive jurisdiction of the Fukuoka District Court as the court of first instance.</p>
+            </div>
+
+            <div class="card">
+                <h2>11. Contact</h2>
+                <p><strong>Shingihou Co., Ltd.</strong><br>
+                    Address: Fukuoka City, Fukuoka Prefecture, Japan<br>
+                    Email: info@shingihou.com</p>
+            </div>
+        </div>
+
+        <footer>
+            <p>&copy; 2026 Shingihou Co., Ltd. All rights reserved.</p>
+        </footer>
+    </div>
+
+    <script>
+        function switchLang(lang) {
+            document.querySelectorAll('.lang-section').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.lang-toggle button').forEach(el => el.classList.remove('active'));
+            document.getElementById('lang-' + lang).classList.add('active');
+            event.target.classList.add('active');
+        }
+    </script>
+</body>
+
+</html>
