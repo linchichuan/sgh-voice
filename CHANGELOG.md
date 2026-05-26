@@ -1,5 +1,27 @@
 # Changelog
 
+## v2.3.0 (2026-05-27) — Speed Wins
+
+把「實際很慢」也修了。Local Breeze 在實際使用下 cold-start 每次 10–15s，預設改走 Groq Cloud Whisper（avg 1–2s），總處理時間從 ~15s 降到 ~3s。同時補 5/20 之後累積的可靠性修復。
+
+### ⚡ STT 預設切換（macOS）
+- **預設 `stt_engine = groq`**，`enable_hybrid_mode = false`：實測 26 次 local Breeze 平均 STT latency = 11.18s，4 次 Groq 平均 = 2.43s（70s 音檔僅 1.7s）。Local Breeze fp16 / 4bit 的「3.5× faster than whisper-turbo」是 warmed-up benchmark，production cold path 達不到。Groq 跑 H100 + LPU 對 Whisper 優化，差距結構性。
+- **Local 仍保留**：Dashboard 可切回 `mlx-whisper` 供無網路 / 隱私場景使用，舊 config 自動備份在 `~/.voice-input/config.json.bak.*`。
+- **Fallback 鏈不變**：Groq 失敗 → OpenAI Whisper API → 視 stt_engine 設定走 local。
+
+### 🛡️ 可靠性修復（macOS）
+- **PortAudio stream lifecycle**：`recorder.py` 新增 thread liveness 檢查 + 5s join timeout + `try/finally` 保證 `is_recording=False`。修復連續按熱鍵造成 `Pa_OpenStream` 與 `FinishStoppingStream` 競爭、整個 audio 子系統 deadlock 的情況（症狀：app 還活著但每按熱鍵只印 🔴錄音中… 沒下文）。
+- **Few-shot 防退化複誦**（`transcriber.py` + `config.py`）：當 Whisper raw text 短於 `fewshot_min_input_chars`（預設 8）時不注入 few-shot；另在 `_is_llm_hallucination` 加 echo detection — LLM 直接複誦 example 的 `final_text` 視為幻覺丟棄。修復 0.1s 誤觸錄音時 Claude 把前一段 150 字整段吐出來的 bug。
+- **Event ledger production observability**：純 metadata 寫 `~/.voice-input/events.jsonl`（不寫文字內容），串接 audio_gate / voiceprint / stt_attempt / llm_attempt / validator_action / paste_method / pipeline_complete 七種事件 + thread-local session ID，未來 silent failure 可直接溯源。50MB 自動 rotate。
+- **TLS / session 競態修復**：4 輪 codex review attack 拆出 ledger TLS 在 thread-reuse 場景下會 leak session_id 給後續 event 的問題 → 改用 `_active_list` newest-at-end 設計 + `try/finally end_session()`。
+
+### 📦 平台版本
+- macOS: v2.3.0
+- iOS: 2.2.0（不變）
+- Android: 2.2.0（不變）
+
+---
+
 ## v2.2.0 (2026-05-20) — Perceived Responsiveness & Production Trust
 
 跨平台 Release：macOS / iOS / Android 三平台同步升版。針對「實際很快但感覺不夠快」做整體優化，10 個 bug 透過 4 輪 codex review loop 被攔下，沒一個 ship 出去。
