@@ -6,7 +6,7 @@ import os
 import sys
 import json
 from flask import Flask, request, jsonify, send_from_directory, Response
-from config import load_config, save_config, load_stats, update_stats, load_smart_replace, save_smart_replace, DEFAULT_APP_STYLES, BASE_CORRECTIONS as BASE_CORRECTIONS_REF
+from config import load_config, save_config, load_stats, update_stats, load_smart_replace, save_smart_replace, DEFAULT_APP_STYLES, STYLE_PROMPTS, BASE_CORRECTIONS as BASE_CORRECTIONS_REF
 from memory import Memory
 import anthropic
 
@@ -431,19 +431,10 @@ def api_rewrite():
     if not api_key:
         return jsonify({"error": "no API key"}), 400
 
+    # 8 個共用風格取自單一來源 config.STYLE_PROMPTS；meeting 為 Dashboard 專屬情境（對標 Purri）
     style_prompts = {
-        # 基本改寫
-        "concise": "請將以下文字精簡改寫，去除冗詞贅字，保持原意。只輸出改寫結果：",
-        "formal": "請將以下文字改寫為正式書面語氣。只輸出改寫結果：",
-        # 情境改寫（對標 Purri）
-        "meeting": "請將以下語音內容整理為會議記錄格式，包含重點摘要和行動項目。只輸出整理結果：",
-        "email": "請將以下內容改寫為一封得體的 Email 草稿，包含問候語和結尾。只輸出 Email 內容：",
-        "technical": "請將以下內容改寫為技術文件風格，用詞精確、結構清晰。只輸出改寫結果：",
-        "casual": "請將以下文字改寫為輕鬆口語風格，適合聊天或社群貼文。只輸出改寫結果：",
-        # 翻譯
-        "translate_en": "請將以下文字翻譯為英文。只輸出翻譯結果：",
-        "translate_ja": "請將以下文字翻譯為日文。只輸出翻譯結果：",
-        "translate_zh": "請將以下文字翻譯為繁體中文。只輸出翻譯結果：",
+        **STYLE_PROMPTS,
+        "meeting": "請將以下語音內容整理為會議記錄格式，包含重點摘要和行動項目。只輸出整理結果。",
     }
     prompt = style_prompts.get(style, style_prompts["concise"])
 
@@ -455,6 +446,12 @@ def api_rewrite():
             messages=[{"role": "user", "content": f"{prompt}\n\n{text}"}],
         )
         result = resp.content[0].text.strip()
+        # 繁中第三層防護：改寫結果直接回前端，需在此套用 OpenCC s2twp
+        try:
+            from opencc import OpenCC
+            result = OpenCC("s2twp").convert(result)
+        except Exception:
+            pass
         # 追蹤 token 用量
         _track_usage(resp, "rewrite")
         return jsonify({"result": result})

@@ -291,6 +291,20 @@ LOCAL_MODEL_PATHS = {
 # Breeze-ASR-25 基於 whisper-large-v2（80 mel bins），需要特殊處理
 BREEZE_MODELS = {"breeze-asr-25-4bit", "breeze-asr-25"}
 
+# ─── 改寫風格提詞（單一來源）────────────────────────────────
+# 三處共用：transcriber._STYLE_DIRECTIVES（語音控制詞觸發）、app._REWRITE_STYLE_PROMPTS
+# （Quick-Rewrite 熱鍵）、dashboard api_rewrite（面板按鈕）。改一處即全處生效，避免措辭漂移。
+STYLE_PROMPTS = {
+    "concise":     "請將以下文字精簡改寫，去除冗詞贅字，保持原意。只輸出改寫結果，不要任何前後綴。",
+    "formal":      "請將以下文字改寫為正式書面語氣。只輸出改寫結果。",
+    "casual":      "請將以下文字改寫為輕鬆口語風格。只輸出改寫結果。",
+    "email":       "請將以下內容改寫為一封得體的 Email 草稿，包含適當問候與結尾。只輸出 Email 內容。",
+    "technical":   "請將以下內容改寫為技術文件風格，用詞精確、結構清晰。只輸出改寫結果。",
+    "translate_en":"請將以下文字翻譯為英文。只輸出翻譯結果。",
+    "translate_ja":"請將以下文字翻譯為日文。只輸出翻譯結果。",
+    "translate_zh":"請將以下文字翻譯為繁體中文。只輸出翻譯結果。",
+}
+
 DEFAULT_CONFIG = {
     "openai_api_key": "",
     "anthropic_api_key": "",

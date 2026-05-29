@@ -45,6 +45,13 @@ def _graceful_shutdown(signum=None, frame=None):
                     thr.join(timeout=2)
         except Exception:
             pass
+        # 把批量緩衝中尚未落盤的歷史（最多 9 筆）寫入磁碟，避免退出時遺失
+        try:
+            mem = getattr(engine, "memory", None)
+            if mem and hasattr(mem, "flush_history"):
+                mem.flush_history()
+        except Exception:
+            pass
     if signum is not None:
         # 收到訊號時再用預設行為退出，讓 shell exit code 正確
         sys.exit(0)
@@ -131,7 +138,7 @@ import time
 import argparse
 import webbrowser
 
-from config import load_config, save_config, update_stats
+from config import load_config, save_config, update_stats, STYLE_PROMPTS
 from memory import Memory
 from transcriber import Transcriber
 from recorder import Recorder
@@ -718,16 +725,8 @@ class VoiceEngine:
         return result
 
     # ─── Quick-Rewrite (B) ─────────────────────────────────
-    _REWRITE_STYLE_PROMPTS = {
-        "concise":     "請將以下文字精簡改寫，去除冗詞贅字，保持原意。只輸出改寫結果，不要任何前後綴。",
-        "formal":      "請將以下文字改寫為正式書面語氣。只輸出改寫結果。",
-        "casual":      "請將以下文字改寫為輕鬆口語風格。只輸出改寫結果。",
-        "email":       "請將以下內容改寫為一封得體的 Email 草稿，包含適當問候與結尾。只輸出 Email 內容。",
-        "technical":   "請將以下內容改寫為技術文件風格，用詞精確、結構清晰。只輸出改寫結果。",
-        "translate_en":"請將以下文字翻譯為英文。只輸出翻譯結果。",
-        "translate_ja":"請將以下文字翻譯為日文。只輸出翻譯結果。",
-        "translate_zh":"請將以下文字翻譯為繁體中文。只輸出翻譯結果。",
-    }
+    # 風格提詞單一來源見 config.STYLE_PROMPTS
+    _REWRITE_STYLE_PROMPTS = STYLE_PROMPTS
 
     def _simulate_cmd_c(self):
         """模擬 Cmd+C 複製選取的文字。回傳 True 表示送出。"""
@@ -768,7 +767,8 @@ class VoiceEngine:
                     continue
                 res = fn(wrapped, mode="edit", edit_context="")
                 if res:
-                    return res.strip()
+                    # 補繁中第三層防護：改寫路徑不經主管線匯流點的 OpenCC，需在此自行套用
+                    return self.transcriber._apply_final_conversion(res.strip())
             except Exception as e:
                 log("warn", f"rewrite {fn_name} error: {e}")
         return None

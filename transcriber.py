@@ -10,7 +10,7 @@ import numpy as np
 from datetime import datetime
 import openai
 import anthropic
-from config import load_smart_replace, SCENE_PRESETS, DEFAULT_APP_STYLES, detect_app_style, LOCAL_MODEL_PATHS, BREEZE_MODELS
+from config import load_smart_replace, SCENE_PRESETS, DEFAULT_APP_STYLES, detect_app_style, LOCAL_MODEL_PATHS, BREEZE_MODELS, STYLE_PROMPTS
 from ollama_detector import get_detector, OllamaStatus
 import event_ledger
 from voiceprint import VoiceprintManager
@@ -203,6 +203,50 @@ class Transcriber:
         finally:
             event_ledger.end_session()
 
+    def _build_llm_routes(self, corrected, mode, edit_context, system_prompt, is_hybrid):
+        """建構 5 引擎 fallback 路由表（含未配置守衛）。主流程與 retry 共用，避免邏輯分歧。
+        每個 route() 回傳 (result, source)；source=None 代表未配置 → 視為 skip，不計 fallback、不記事件。
+        注意：ollama 的 detector down / backoff 屬真實 attempt（由 _local_llm_process 內部處理），
+        這裡不做 detector 檢查，讓 local LLM outage 能正確記入 ledger。"""
+        def try_groq():
+            if not self.config.get("groq_api_key"): return None, None
+            return self._groq_llm_process(corrected, mode, edit_context, system_prompt=system_prompt), "groq"
+        def try_or():
+            if not self.config.get("openrouter_api_key"): return None, None
+            return self._openrouter_process(corrected, mode, edit_context, system_prompt=system_prompt), "openrouter"
+        def try_claude():
+            if not self.config.get("anthropic_api_key"): return None, None
+            return self._claude_process(corrected, mode, edit_context, system_prompt=system_prompt), "claude"
+        def try_openai():
+            if not self.config.get("openai_api_key"): return None, None
+            return self._openai_process(corrected, mode, edit_context, system_prompt=system_prompt), "openai"
+        def try_ollama():
+            if not (is_hybrid and mode == "dictate"): return None, None
+            return self._local_llm_process(corrected, system_prompt=system_prompt), "local"
+        return {
+            "groq": [try_groq, try_or, try_claude, try_openai, try_ollama],
+            "openrouter": [try_or, try_groq, try_claude, try_openai, try_ollama],
+            "claude": [try_claude, try_groq, try_or, try_openai, try_ollama],
+            "openai": [try_openai, try_groq, try_or, try_claude, try_ollama],
+            "ollama": [try_ollama, try_groq, try_or, try_claude, try_openai],
+        }
+
+    def _run_llm_routes(self, pref_engine, routes_map, mode):
+        """依偏好引擎跑 fallback 鏈，逐次記 llm_attempt 事件，回傳首個成功的 (result, source)。
+        主流程與 retry 共用，確保兩條路徑的事件帳本一致。"""
+        attempt_idx = 0
+        for route in routes_map.get(pref_engine, routes_map["ollama"]):
+            t_route = time.time()
+            res, source = route()
+            route_latency_ms = (time.time() - t_route) * 1000
+            # source=None → 未配置（無 API key / ollama 非 dictate），視為 skip，不記事件、不增 fallback_index。
+            if source is not None:
+                event_ledger.llm_attempt(source, mode, route_latency_ms, ok=bool(res), fallback_index=attempt_idx)
+                attempt_idx += 1
+            if res:
+                return res, source
+        return None, "none"
+
     def _transcribe_impl(self, audio_source, audio_duration, mode, edit_context, on_stage):
         def _stage(s):
             if on_stage:
@@ -249,28 +293,44 @@ class Transcriber:
         t_stt0 = time.time()
         raw = None
         stt_engine = self.config.get("stt_engine", "mlx-whisper")
+        # 用 attempted set 去重：同一引擎只試一次，避免 groq 在「長音訊優先 / 設定引擎 / 兜底」
+        # 三處被重複呼叫，導致逾時疊加。每個 _stt_* 命中後寫 raw + stt_source。
+        attempted = set()
 
-        # 進化 5: 資源管理 - 長音訊 (>30s) 優先走 Groq 以節省本地資源
-        if audio_duration > 30 and self.config.get("groq_api_key"):
+        def _stt_groq():
+            nonlocal raw, stt_source
+            if raw or "groq" in attempted or not self.config.get("groq_api_key"): return
+            attempted.add("groq")
             raw = _try_stt("groq", self._groq_stt, audio_source, duration=audio_duration)
             if raw: stt_source = "groq"
 
-        if not raw:
-            if stt_engine == "groq":
-                raw = _try_stt("groq", self._groq_stt, audio_source, duration=audio_duration)
-                if raw: stt_source = "groq"
-            elif stt_engine != "cloud-only" and is_hybrid:
-                if isinstance(audio_source, np.ndarray) or audio_duration <= self.config.get("hybrid_audio_threshold", 15):
-                    raw = _try_stt("local", self._local_stt, audio_source)
-                    if raw: stt_source = "local"
+        def _stt_local():
+            nonlocal raw, stt_source
+            if raw or "local" in attempted: return
+            if stt_engine == "cloud-only" or not is_hybrid: return
+            if not (isinstance(audio_source, np.ndarray) or audio_duration <= self.config.get("hybrid_audio_threshold", 15)): return
+            attempted.add("local")
+            raw = _try_stt("local", self._local_stt, audio_source)
+            if raw: stt_source = "local"
 
-        if not raw and self.config.get("groq_api_key"):
-            raw = _try_stt("groq", self._groq_stt, audio_source, duration=audio_duration)
-            if raw: stt_source = "groq"
-
-        if not raw and self.config.get("openai_api_key"):
+        def _stt_openai():
+            nonlocal raw, stt_source
+            if raw or "openai" in attempted or not self.config.get("openai_api_key"): return
+            attempted.add("openai")
             raw = _try_stt("openai_whisper", self._whisper_api_fallback, audio_source, duration=audio_duration)
             if raw: stt_source = "cloud"
+
+        # 進化 5: 資源管理 - 長音訊 (>30s) 優先走 Groq 以節省本地資源
+        if audio_duration > 30:
+            _stt_groq()
+        # 主引擎：groq → 直走 groq；否則（hybrid 條件下）走本地 mlx-whisper
+        if stt_engine == "groq":
+            _stt_groq()
+        else:
+            _stt_local()
+        # 兜底 fallback（已試過的引擎會自動跳過）：groq → openai whisper
+        _stt_groq()
+        _stt_openai()
 
         if not raw or not raw.strip():
             event_ledger.log("stt_all_failed", audio_sec=round(float(audio_duration), 2))
@@ -320,51 +380,9 @@ class Transcriber:
             final, llm_source = corrected, "skip"
         elif self.config.get("enable_claude_polish"):
             pref_engine = self.config.get("llm_engine", "ollama")
-            
-            # 每個 route 先檢查「是否已 configured」，未配置直接回 (None, None) → skip 不記事件。
-            # 若 configured，無論結果如何（成功或 ollama detector down 等真實失敗）都會以 attempt
-            # 形式記到 ledger，這樣 local LLM 真實 outage 不會被誤判成 skip 而消失。
-            def try_groq():
-                if not self.config.get("groq_api_key"): return None, None
-                return self._groq_llm_process(corrected, mode, edit_context, system_prompt=system_prompt), "groq"
-            def try_or():
-                if not self.config.get("openrouter_api_key"): return None, None
-                return self._openrouter_process(corrected, mode, edit_context, system_prompt=system_prompt), "openrouter"
-            def try_claude():
-                if not self.config.get("anthropic_api_key"): return None, None
-                return self._claude_process(corrected, mode, edit_context, system_prompt=system_prompt), "claude"
-            def try_openai():
-                if not self.config.get("openai_api_key"): return None, None
-                return self._openai_process(corrected, mode, edit_context, system_prompt=system_prompt), "openai"
-            def try_ollama():
-                if not (is_hybrid and mode == "dictate"): return None, None
-                # 注意：ollama detector down / backoff 是真實 attempt（會被 _local_llm_process 內部處理），
-                # 這裡不做 detector 檢查，讓事件正確記到 ledger 反映 local LLM outage。
-                return self._local_llm_process(corrected, system_prompt=system_prompt), "local"
-
-
-            routes_map = {
-                "groq": [try_groq, try_or, try_claude, try_openai, try_ollama],
-                "openrouter": [try_or, try_groq, try_claude, try_openai, try_ollama],
-                "claude": [try_claude, try_groq, try_or, try_openai, try_ollama],
-                "openai": [try_openai, try_groq, try_or, try_claude, try_ollama],
-                "ollama": [try_ollama, try_groq, try_or, try_claude, try_openai],
-            }
-            attempt_idx = 0  # 只 count 真正嘗試過的 provider（skip 的不算 fallback depth）
-            for route in routes_map.get(pref_engine, routes_map["ollama"]):
-                t_route = time.time()
-                res, source = route()
-                route_latency_ms = (time.time() - t_route) * 1000
-                # source=None → route 內部已判斷為「未配置」(沒 API key / ollama 在 edit mode)
-                # 視為 skip，不記事件，不增加 fallback_index。其餘一律算真實 attempt
-                # （包含 ollama detector down 這種 fast-fail，需要被觀測到）。
-                if source is not None:
-                    event_ledger.llm_attempt(
-                        source, mode, route_latency_ms,
-                        ok=bool(res), fallback_index=attempt_idx,
-                    )
-                    attempt_idx += 1
-                if res: final, llm_source = res, source; break
+            routes_map = self._build_llm_routes(corrected, mode, edit_context, system_prompt, is_hybrid)
+            res, source = self._run_llm_routes(pref_engine, routes_map, mode)
+            if res: final, llm_source = res, source
 
         if final is None:
             final = self._local_filler_removal(corrected) if self.config.get("enable_filler_removal") else corrected
@@ -453,26 +471,10 @@ class Transcriber:
             final, llm_source = corrected, "skip"
         elif self.config.get("enable_claude_polish"):
             pref_engine = self.config.get("llm_engine", "ollama")
-
-            def try_groq(): return self._groq_llm_process(corrected, mode, edit_context, system_prompt=system_prompt), "groq"
-            def try_or(): return self._openrouter_process(corrected, mode, edit_context, system_prompt=system_prompt), "openrouter"
-            def try_claude(): return self._claude_process(corrected, mode, edit_context, system_prompt=system_prompt), "claude"
-            def try_openai(): return self._openai_process(corrected, mode, edit_context, system_prompt=system_prompt), "openai"
-            def try_ollama():
-                if self.config.get("enable_hybrid_mode", True) and mode == "dictate":
-                    return self._local_llm_process(corrected, system_prompt=system_prompt), "local"
-                return None, None
-
-            routes_map = {
-                "groq": [try_groq, try_or, try_claude, try_openai, try_ollama],
-                "openrouter": [try_or, try_groq, try_claude, try_openai, try_ollama],
-                "claude": [try_claude, try_groq, try_or, try_openai, try_ollama],
-                "openai": [try_openai, try_groq, try_or, try_claude, try_ollama],
-                "ollama": [try_ollama, try_groq, try_or, try_claude, try_openai],
-            }
-            for route in routes_map.get(pref_engine, routes_map["ollama"]):
-                res, source = route()
-                if res: final, llm_source = res, source; break
+            is_hybrid = self.config.get("enable_hybrid_mode", True)
+            routes_map = self._build_llm_routes(corrected, mode, edit_context, system_prompt, is_hybrid)
+            res, source = self._run_llm_routes(pref_engine, routes_map, mode)
+            if res: final, llm_source = res, source
 
         if final is None:
             final = self._local_filler_removal(corrected) if self.config.get("enable_filler_removal") else corrected
@@ -516,7 +518,7 @@ class Transcriber:
             t0 = time.time()
             messages = [{"role": "system", "content": system}, *self._few_shot_pairs(mode, current_text=text), {"role": "user", "content": user_text}]
             resp = client.chat.completions.create(model=model, messages=messages, temperature=0.0, max_tokens=self._dynamic_max_tokens(text))
-            res = re.sub(r'<think>[\s\S]*?</think>|<think>[\s\S]*$', '', resp.choices[0].message.content).strip()
+            res = self._clean_thinking_tags(resp.choices[0].message.content)
             self._track_usage("groq", model, resp.usage.prompt_tokens, resp.usage.completion_tokens)
             status, res = self._validate_llm_result(text, res, "Groq", mode=mode)
             if status == 'discard': return None
@@ -535,7 +537,7 @@ class Transcriber:
             t0 = time.time()
             messages = [{"role": "system", "content": system}, *self._few_shot_pairs(mode, current_text=text), {"role": "user", "content": self._wrap_edit_text(text, edit_context) if mode == "edit" else text}]
             resp = client.chat.completions.create(model=model, messages=messages, temperature=0.0, max_tokens=self._dynamic_max_tokens(text), extra_headers={"HTTP-Referer": "https://shingihou.com", "X-Title": "SGH Voice"})
-            res = re.sub(r'<think>[\s\S]*?</think>|<think>[\s\S]*$', '', resp.choices[0].message.content).strip()
+            res = self._clean_thinking_tags(resp.choices[0].message.content)
             self._track_usage("openrouter", model, resp.usage.prompt_tokens, resp.usage.completion_tokens)
             status, res = self._validate_llm_result(text, res, "OpenRouter", mode=mode)
             if status == 'discard': return None
@@ -554,7 +556,7 @@ class Transcriber:
             t0 = time.time()
             messages = [*self._few_shot_pairs(mode, current_text=text), {"role": "user", "content": self._wrap_edit_text(text, edit_context) if mode == "edit" else text}]
             resp = client.messages.create(model=model, system=system, messages=messages, max_tokens=self._dynamic_max_tokens(text), temperature=0.0)
-            res = resp.content[0].text.strip()
+            res = self._clean_thinking_tags(resp.content[0].text)
             self._track_usage("anthropic", model, resp.usage.input_tokens, resp.usage.output_tokens)
             status, res = self._validate_llm_result(text, res, "Claude", mode=mode)
             if status == 'discard': return None
@@ -573,7 +575,7 @@ class Transcriber:
             t0 = time.time()
             messages = [{"role": "system", "content": system}, *self._few_shot_pairs(mode, current_text=text), {"role": "user", "content": self._wrap_edit_text(text, edit_context) if mode == "edit" else text}]
             resp = client.chat.completions.create(model=model, messages=messages, temperature=0.0, max_tokens=self._dynamic_max_tokens(text))
-            res = resp.choices[0].message.content.strip()
+            res = self._clean_thinking_tags(resp.choices[0].message.content)
             self._track_usage("openai", model, resp.usage.prompt_tokens, resp.usage.completion_tokens)
             status, res = self._validate_llm_result(text, res, "OpenAI", mode=mode)
             if status == 'discard': return None
@@ -588,7 +590,10 @@ class Transcriber:
             system = system_prompt or self._get_system_prompt()
             messages = [{"role": "system", "content": system}, *self._few_shot_pairs(current_text=text), {"role": "user", "content": text}]
             resp = self.local_llm.chat.completions.create(model=self.config.get("local_llm_model", "qwen3.5:latest"), messages=messages, temperature=0.0, max_tokens=1024)
-            return resp.choices[0].message.content.strip()
+            # 成功 → 歸零失敗計數與冷卻，否則 Ollama 恢復後仍被舊計數懲罰成滿額退避
+            self._ollama_fail_count = 0
+            self._ollama_backoff_until = 0.0
+            return self._clean_thinking_tags(resp.choices[0].message.content)
         except Exception:
             self._ollama_fail_count += 1
             self._ollama_backoff_until = time.time() + min(120, 5 * (2 ** self._ollama_fail_count))
@@ -663,7 +668,8 @@ class Transcriber:
         pairs = []
         for raw, fin in examples:
             pairs.append({"role": "user", "content": raw})
-            pairs.append({"role": "assistant", "content": fin})
+            # assistant 範例套 OpenCC：避免歷史殘留簡體（如使用者手動編輯）被當範例強化 LLM 輸出簡體
+            pairs.append({"role": "assistant", "content": self._apply_final_conversion(fin)})
         return pairs
 
     def _dynamic_max_tokens(self, text):
@@ -678,6 +684,26 @@ class Transcriber:
     def _llm_timeout(self):
         """雲端 LLM 呼叫的 timeout（秒）。預設 5 秒，超時 fallback 下一個引擎。"""
         return float(self.config.get("llm_timeout_sec", 5.0))
+
+    # reasoning 模型（Qwen3 / DeepSeek-R1 等）會把思考草稿包在 <think>…</think> 輸出。
+    # 雙分支同時涵蓋「成對閉合」與「未閉合（截斷）」兩種情況；單次 re.sub 左到右掃描即可清乾淨。
+    _THINK_PATTERN = re.compile(r'<think>[\s\S]*?</think>|<think>[\s\S]*$')
+
+    def _clean_thinking_tags(self, text):
+        """移除 reasoning token 的 <think> 標籤。所有 LLM 引擎共用，避免逐一複製正則。"""
+        if not text:
+            return text
+        return self._THINK_PATTERN.sub('', text).strip()
+
+    def _apply_final_conversion(self, text):
+        """繁中第三層防護（OpenCC s2twp）。供非主管線路徑（如 Quick-Rewrite）回傳前呼叫。
+        OpenCC 轉換為 idempotent，與主管線匯流點重複套用無雙轉風險。"""
+        if self._opencc and text:
+            try:
+                return self._opencc.convert(text)
+            except Exception:
+                return text
+        return text
 
     def _wrap_edit_text(self, text, edit_context):
         """edit 模式時把風格指令包進 user 訊息。edit_context 既支援 style key 也支援自訂指令。"""
@@ -1036,17 +1062,8 @@ class Transcriber:
         "RULES: 1. Modify ONLY per command. 2. Preserve original formatting. 3. NO CHAT. NO EXPLANATION."
     )
 
-    # 風格指令對照表（與 app.py:VoiceEngine._REWRITE_STYLE_PROMPTS 同義；用於語音控制詞偵測後的 LLM 包裝）
-    _STYLE_DIRECTIVES = {
-        "concise":     "請將以下文字精簡改寫，去除冗詞贅字，保持原意。只輸出改寫結果，不要任何前後綴。",
-        "formal":      "請將以下文字改寫為正式書面語氣。只輸出改寫結果。",
-        "casual":      "請將以下文字改寫為輕鬆口語風格。只輸出改寫結果。",
-        "email":       "請將以下內容改寫為一封得體的 Email 草稿。只輸出 Email 內容。",
-        "technical":   "請將以下內容改寫為技術文件風格，用詞精確。只輸出改寫結果。",
-        "translate_en":"請將以下文字翻譯為英文。只輸出翻譯結果。",
-        "translate_ja":"請將以下文字翻譯為日文。只輸出翻譯結果。",
-        "translate_zh":"請將以下文字翻譯為繁體中文。只輸出翻譯結果。",
-    }
+    # 風格指令對照表 — 單一來源見 config.STYLE_PROMPTS（用於語音控制詞偵測後的 LLM 包裝）
+    _STYLE_DIRECTIVES = STYLE_PROMPTS
 
     # 句尾語音控制詞 patterns。每個 pattern 寬鬆匹配（涵蓋常見口語表達），
     # 命中後切除尾段、改 mode='edit' + edit_context=<style>。
@@ -1079,6 +1096,14 @@ class Transcriber:
     def _build_edit_prompt(self, cmd, original):
         return f"<original>{original}</original>\n<command>{cmd}</command>\nResult:"
 
+    # 用量統計欄位（單一來源，新增引擎只需在此補一個鍵）
+    _USAGE_FIELDS = (
+        "openai_input_tokens", "openai_output_tokens", "openai_whisper_seconds",
+        "anthropic_input_tokens", "anthropic_output_tokens",
+        "groq_input_tokens", "groq_output_tokens", "groq_whisper_seconds",
+        "openrouter_input_tokens", "openrouter_output_tokens",
+    )
+
     def _track_usage(self, source, model, input_tokens=0, output_tokens=0, seconds=0):
         # 統計寫檔丟到 daemon thread + 走 update_stats_atomic（與 update_stats 共用同一把鎖，不再 race）
         def _write():
@@ -1088,10 +1113,9 @@ class Transcriber:
                 month_key = date.today().strftime("%Y-%m")
                 def _mutate(stats):
                     if "usage" not in stats: stats["usage"] = {}
-                    if month_key not in stats["usage"]:
-                        stats["usage"][month_key] = {"openai_input_tokens":0, "openai_output_tokens":0, "openai_whisper_seconds":0, "anthropic_input_tokens":0, "anthropic_output_tokens":0, "groq_input_tokens":0, "groq_output_tokens":0, "groq_whisper_seconds":0, "openrouter_input_tokens":0, "openrouter_output_tokens":0}
-                    m = stats["usage"][month_key]
-                    for f in ["openai_input_tokens", "openai_output_tokens", "openai_whisper_seconds", "anthropic_input_tokens", "anthropic_output_tokens", "groq_input_tokens", "groq_output_tokens", "groq_whisper_seconds", "openrouter_input_tokens", "openrouter_output_tokens"]:
+                    m = stats["usage"].setdefault(month_key, {})
+                    # 單一欄位清單：補齊缺漏鍵（兼顧新月份與舊資料新增引擎）
+                    for f in self._USAGE_FIELDS:
                         if f not in m: m[f] = 0
                     if source == "openai": m["openai_input_tokens"]+=input_tokens; m["openai_output_tokens"]+=output_tokens; m["openai_whisper_seconds"]+=seconds
                     elif source == "anthropic": m["anthropic_input_tokens"]+=input_tokens; m["anthropic_output_tokens"]+=output_tokens
