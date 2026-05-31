@@ -276,6 +276,99 @@ def detect_app_style(config):
 
 DATA_DIR = os.path.expanduser("~/.voice-input")
 CONFIG_FILE = os.path.join(DATA_DIR, "config.json")
+
+# ─── macOS Keychain integration（v2.4.0 引入）─────────────────
+# API key 從 config.json 明文（chmod 600）搬到 macOS Keychain（系統加密）。
+# 行為：
+#   - macOS + keyring 安裝 → 走 Keychain（service=com.shingihou.voice）
+#   - 其他平台 / keyring 失敗 → 自動 fallback 回 config.json + chmod 600（不影響使用）
+#   - load_config() 自動把 Keychain 值塞回 config dict（key 名不變），下游無感
+#   - save_config() 把 Keychain-managed key 寫進 Keychain 後從 JSON 剝離
+KEYCHAIN_SERVICE = "com.shingihou.voice"
+KEYCHAIN_KEYS = {
+    "anthropic_api_key": "anthropic",
+    "openai_api_key": "openai",
+    "groq_api_key": "groq",
+    "openrouter_api_key": "openrouter",
+    "elevenlabs_api_key": "elevenlabs",
+}
+
+_keychain_warned = False
+
+
+def _keychain_available():
+    """檢查 keyring 套件能否使用。失敗就回 False，呼叫端自動 fallback 到 JSON。"""
+    global _keychain_warned
+    try:
+        import keyring  # noqa: F401
+        from keyring.errors import NoKeyringError  # noqa: F401
+        backend = keyring.get_keyring()
+        # 排除明顯不安全或 fail 的 backend（如 fail.Keyring / null.Keyring）
+        mod = type(backend).__module__ or ""
+        if "fail" in mod or "null" in mod:
+            return False
+        return True
+    except Exception:
+        if not _keychain_warned:
+            _keychain_warned = True
+            print(" ⚠️  keyring 不可用，API key 將 fallback 到 config.json（chmod 600）")
+        return False
+
+
+def _keychain_get(key_name):
+    """從 Keychain 讀單一 API key，失敗回 None。"""
+    if not _keychain_available():
+        return None
+    try:
+        import keyring
+        return keyring.get_password(KEYCHAIN_SERVICE, KEYCHAIN_KEYS[key_name])
+    except Exception:
+        return None
+
+
+def _keychain_set(key_name, value):
+    """寫 Keychain。空字串視為「刪除」。失敗回 False。"""
+    if not _keychain_available():
+        return False
+    try:
+        import keyring
+        account = KEYCHAIN_KEYS[key_name]
+        if value is None or value == "":
+            try:
+                keyring.delete_password(KEYCHAIN_SERVICE, account)
+            except Exception:
+                pass  # 不存在就算了
+            return True
+        keyring.set_password(KEYCHAIN_SERVICE, account, value)
+        return True
+    except Exception:
+        return False
+
+
+def _keychain_delete(key_name):
+    """從 Keychain 刪掉一筆 API key。"""
+    if not _keychain_available():
+        return False
+    try:
+        import keyring
+        try:
+            keyring.delete_password(KEYCHAIN_SERVICE, KEYCHAIN_KEYS[key_name])
+        except Exception:
+            pass  # 不存在
+        return True
+    except Exception:
+        return False
+
+
+def _looks_like_real_key(value):
+    """heuristic：判斷 config.json 內的字串是不是真實 API key（非空、非遮罩、有 prefix）。"""
+    if not isinstance(value, str) or not value:
+        return False
+    if "..." in value:  # 被遮罩過的
+        return False
+    # 接受常見 prefix；fallback 接受長度 ≥ 20 的字串（OpenRouter / 第三方 key 不一定有固定 prefix）
+    prefixes = ("sk-", "sk-ant-", "gsk_", "sk-or-", "sk_")
+    return value.startswith(prefixes) or len(value) >= 20
 DICTIONARY_FILE = os.path.join(DATA_DIR, "dictionary.json")
 HISTORY_FILE = os.path.join(DATA_DIR, "history.json")
 STATS_FILE = os.path.join(DATA_DIR, "stats.json")
