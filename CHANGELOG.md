@@ -1,5 +1,71 @@
 # Changelog
 
+## v2.4.0 (2026-06-01) — Hardening & Dashboard Reimagined
+
+**最大規模 release**：全 Dashboard 從 1453 行 monolithic HTML 重寫成 modular SPA、補 macOS Keychain 整合、零測試覆蓋變 55 個 pytest baseline + GitHub Actions CI、完成 APPI / GDPR / PIPL 三重合規 disclosure 重寫。**+9801 / -1561 lines** across 60 files。
+
+### 🏗️ Dashboard 全重寫（從 monolith 變 modular SPA）
+- **舊 static/index.html (1453 LOC monolithic) → 拆成 37 個 SPA 檔案**：8 個 page module（lazy load）+ 4 個 shared lib（api / components / i18n / store）+ tokens.css + base.css + app.js router
+- **品牌對齊 voice.shingihou.com**：DM Sans + Noto Sans CJK 字體、藍 #2563eb / 紫 #7c3aed / 橘 #f97316 三色、Lucide icon（取代所有 emoji）、Tailwind CDN
+- **8 個 page**（4 個全新、4 個重寫）：
+  - 🆕 Voiceprint（含 mandatory ConsentDialog 4-section biometric data 揭露）
+  - 🆕 Cost & Audit（30 天成本曲線 + 月度 breakdown + 預算 gauge + 一次性 cutoff）
+  - 🆕 Models（mlx-whisper / Breeze-ASR-25 三模型 SSE 下載狀態）
+  - 🆕 Onboarding（3-step wizard：選引擎 flavor → 貼 key + Test → 試 mic）
+  - Dashboard（Bento grid + 即時錄音 CTA + 7 日 bar chart）
+  - History（虛擬化 list + edit-to-learn + 5s undo）
+  - Dictionary（5 tab：custom_words / corrections / scene / app / smart_replace + promote-from-history modal）
+  - Settings（6 tab：API keys / STT / LLM / Hotkeys / Privacy / Advanced，含 wipe-all 需手打 DELETE）
+- **a11y 全面修**：WCAG AA 對比度、`:focus-visible` ring、`prefers-reduced-motion` 尊重、所有 input 配 `<label for>`、keyboard 可達
+
+### 🔐 安全 / 合規 hardening
+- **macOS Keychain 整合**：5 個 API key（OpenAI / Anthropic / Groq / OpenRouter / ElevenLabs）從 `config.json` 自動遷移到 macOS Keychain。`config.json` 殘留欄位永遠是空字串。iOS / macOS 終於 parity（service=`com.shingihou.voice`）。失敗時 fallback to JSON + 完整錯誤路徑。
+- **CSRF**：Dashboard 對 POST/PATCH/DELETE 加 Origin/Referer 同源檢查（防瀏覽器到惡意網站的跨來源觸發）
+- **CSP**：baseline `Content-Security-Policy` 含 Tailwind CDN + Lucide CDN + Google Fonts allowlist、`X-Frame-Options: DENY`、`Referrer-Policy: no-referrer`、`X-Content-Type-Options: nosniff`
+- **Host hard-pin**：`run_dashboard()` 拒絕綁定到非 loopback host
+- **`/api/wipe_all` (GDPR Art. 17)**：一次性 token + magic phrase 雙守門；刪 history / events / dictionary / voiceprint / stats / smart_replace / audit.log / audio_backup + SSD 備份目錄；**清 in-memory state**（防 process 內快取重新 persist）
+- **`/api/keychain/delete/<key>`**：個別 Keychain key 刪除 endpoint
+
+### 📋 合規 disclosure（privacy.html × 3 lang × 7 new section）
+- **聲紋 / 生體識別資料**（APPI 要配慮個人情報 / GDPR Art. 9 special category）— enroll 改為 opt-in
+- **Few-shot 過去發話脈絡傳送** — 預設 OFF，明示揭露
+- **醫療模式 + 雲端 LLM 風險警告**（沒 BAA/DPA）
+- **音訊備份保留政策**
+- **events.jsonl 觀測 metadata 揭露**
+- **跨境傳輸**（APPI Art. 28 / PIPL Art. 38）詳列服務商所在國
+- **削除權 / Right to Erasure** 程序
+
+### 🛡️ Production correctness 修
+- **CLI mode crash**：`run_cli` 印 `result['corrected']` 不存在欄位 → 每次 KeyError → 修
+- **Continuous mode race conditions**：start/stop 寫 `is_recording` 沒鎖 + 繞過 PortAudio thread liveness check → 補 `_state_lock` 守門 + thread join timeout
+- **PortAudio lifecycle**（v2.3.0 修了 push-to-talk 路徑，但 continuous mode 沒涵蓋）→ 補
+- **`retry_last_llm` event_ledger 黑洞**：retry 路徑沒寫 `llm_attempt` → 補完整觀測
+- **Voice command stripping edge case**：「請問怎麼把『早安』翻成英文」會被誤判翻譯 → 強制 LEADER pattern（pause 標記 或「以上 / 這段」）+ 12 字門檻
+- **Ollama backoff** 成功時不重置 → 一次暫掛把 backoff 推到 120s 永遠回不來 → 修
+- **`_graceful_shutdown`** 不 flush memory → Ctrl+C 最多 lose 9 筆 history → 補
+- **app awareness gating**：`_get_system_prompt` 尊重 `enable_app_awareness` 預設 False（防 bundle id 洩漏給 LLM）
+
+### ⚙️ Config schema migration
+- **CONFIG_VERSION = 3**（v2 → Keychain migration、v1 → v2 修錯誤 qwen 模型名）
+- 預設值修：`enable_fewshot: False`（合規）、`enable_app_awareness: False`（合規）、`local_llm_model: qwen3:latest`（從不存在的 qwen3.5）、`openrouter_model: qwen/qwen3-30b-a3b:free`（從不存在的 qwen3.6-plus）
+- 新增：`monthly_budget_jpy`、`enable_budget_cutoff`
+
+### 🧪 測試 infrastructure（從 0 變 55）
+- **`tests/` 完整 baseline**：55 pytest（memory / config / transcriber validators / voice command / few-shot / event_ledger / Keychain migration）
+- **`.github/workflows/ci.yml`**：macOS-latest × Python 3.11 + 3.12 matrix，含 ruff + pytest --cov
+- **`pytest.ini` + `requirements-dev.txt`**
+
+### 🤖 開發品質
+- **Agent team workflow**：1 個 SPEC.md → 1 個 Skeleton agent → 8 個 page agent 並行 + 2 個 backend agent 並行 → integration phase 收尾 → Codex round 1 fast review → P1 修補
+- **Codex review** 抓出 7 個 P1（CSP CDN block、wipe in-memory 殘留、Keychain data-loss 路徑、Origin 邏輯漏洞、wipe magic-phrase 可 bypass、wipe 漏 audit.log），全修
+
+### 📦 平台版本
+- macOS: v2.4.0
+- iOS: 2.2.0（未動）
+- Android: 2.2.0（未動）
+
+---
+
 ## v2.3.0 (2026-05-27) — Speed Wins
 
 把「實際很慢」也修了。Local Breeze 在實際使用下 cold-start 每次 10–15s，預設改走 Groq Cloud Whisper（avg 1–2s），總處理時間從 ~15s 降到 ~3s。同時補 5/20 之後累積的可靠性修復。
