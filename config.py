@@ -410,6 +410,9 @@ DEFAULT_CONFIG = {
     # v2.4.0：app awareness 預設關閉。把前景 App bundle id 注入 system prompt 等同
     # 把使用者的工作上下文外洩給 LLM provider。Dashboard 可手動開啟。
     "enable_app_awareness": False,          # 是否把前景 App 識別資訊注入 LLM system prompt
+    # v2.4.0：Cost & Audit 頁的月度預算
+    "monthly_budget_jpy": 0,                # 月度預算（JPY）；0=不限制
+    "enable_budget_cutoff": False,          # 超過預算時是否硬切斷雲端 LLM（避免超支）
     "rewrite_hotkey": "right_option+r",     # Quick-Rewrite 全域熱鍵（空字串=關閉）；選取文字後按下，LLM 改寫並貼回
     "default_rewrite_style": "concise",     # Quick-Rewrite 預設風格（concise/formal/casual/email/technical/translate_en/translate_ja/translate_zh）
     "retry_hotkey": "right_option+y",       # Retry 全域熱鍵（空字串=關閉）；用最後一次的 raw STT 重跑 LLM，省 1.5s 不用重錄

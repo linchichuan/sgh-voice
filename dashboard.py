@@ -736,22 +736,48 @@ _download_status = {"active": False, "progress": 0, "total": 0, "message": "", "
 _MODEL_REPOS = {
     "qwen3-asr": "Qwen/Qwen3-ASR-0.6B",
     "whisper-large-v3": "mlx-community/whisper-large-v3-mlx",
+    # v2.4.0：補上 Models 頁實際展示的 mlx-whisper / Breeze 系列
+    "whisper-turbo": "mlx-community/whisper-turbo",
+    # Breeze 模型不在 HF cache，用本機路徑檢查（見 LOCAL_MODEL_PATHS）
+    "breeze-asr-25-4bit": "__LOCAL_PATH__",
+    "breeze-asr-25": "__LOCAL_PATH__",
 }
+
+
+def _model_disk_size(path):
+    """計算目錄遞迴大小 (bytes)。"""
+    if os.path.isfile(path):
+        try: return os.path.getsize(path)
+        except OSError: return 0
+    total = 0
+    for root, _, files in os.walk(path):
+        for f in files:
+            try: total += os.path.getsize(os.path.join(root, f))
+            except OSError: pass
+    return total
 
 
 @app.route("/api/model/status/<model_key>")
 def api_model_status(model_key):
-    """檢查模型是否已下載"""
+    """檢查模型是否已下載 — 支援 HF cache 與本機路徑兩種來源。"""
+    from config import LOCAL_MODEL_PATHS
+    # 先檢查本機路徑（Breeze 等）
+    if model_key in LOCAL_MODEL_PATHS:
+        path = LOCAL_MODEL_PATHS[model_key]
+        downloaded = os.path.isdir(path) and os.listdir(path)
+        size = _model_disk_size(path) if downloaded else 0
+        return jsonify({"model": model_key, "path": path, "downloaded": bool(downloaded), "size_bytes": size})
+    # 否則檢查 HF cache
     repo_id = _MODEL_REPOS.get(model_key)
-    if not repo_id:
+    if not repo_id or repo_id == "__LOCAL_PATH__":
         return jsonify({"error": "unknown model"}), 400
-    # 檢查 HF 快取
     cache_name = f"models--{repo_id.replace('/', '--')}"
     hf_home = os.environ.get("HF_HOME", os.path.expanduser("~/.cache/huggingface"))
     model_dir = os.path.join(hf_home, "hub", cache_name)
     snapshots = os.path.join(model_dir, "snapshots")
     downloaded = os.path.isdir(snapshots) and len(os.listdir(snapshots)) > 0
-    return jsonify({"model": model_key, "repo": repo_id, "downloaded": downloaded})
+    size = _model_disk_size(model_dir) if downloaded else 0
+    return jsonify({"model": model_key, "repo": repo_id, "downloaded": downloaded, "size_bytes": size})
 
 
 @app.route("/api/model/download/<model_key>", methods=["POST"])
