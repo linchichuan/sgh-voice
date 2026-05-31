@@ -308,9 +308,15 @@ DEFAULT_CONFIG = {
     "enable_claude_polish": True,           # Claude 後處理潤稿
     "enable_auto_learn": True,              # 自動學習修正
     "enable_filler_removal": True,          # 移除填充詞
-    "enable_fewshot": True,                 # 個人化 few-shot：把最近的 raw→final 範例餵給 LLM
+    # v2.4.0 合規修正：few-shot 預設改 False。原本預設 True 會把過去 3 段 raw→final
+    # 對話默默送雲端 LLM，使用者預期只送當下這句 → APPI Art. 27 / GDPR Art. 13 disclosure 風險。
+    # 使用者要享受個人化效果可在 Dashboard 手動開啟（會同時提示 privacy 影響）。
+    "enable_fewshot": False,                # 個人化 few-shot：把最近的 raw→final 範例餵給 LLM（預設關閉，opt-in）
     "fewshot_count": 3,                     # 注入的範例數（0=關閉，建議 2~5；越多越貼但 token 成本越高）
     "fewshot_min_input_chars": 8,           # 當前 raw 短於此字數時不注入 few-shot，防 LLM 退化複誦上一段（v2.1.1）
+    # v2.4.0：app awareness 預設關閉。把前景 App bundle id 注入 system prompt 等同
+    # 把使用者的工作上下文外洩給 LLM provider。Dashboard 可手動開啟。
+    "enable_app_awareness": False,          # 是否把前景 App 識別資訊注入 LLM system prompt
     "rewrite_hotkey": "right_option+r",     # Quick-Rewrite 全域熱鍵（空字串=關閉）；選取文字後按下，LLM 改寫並貼回
     "default_rewrite_style": "concise",     # Quick-Rewrite 預設風格（concise/formal/casual/email/technical/translate_en/translate_ja/translate_zh）
     "retry_hotkey": "right_option+y",       # Retry 全域熱鍵（空字串=關閉）；用最後一次的 raw STT 重跑 LLM，省 1.5s 不用重錄
@@ -333,9 +339,9 @@ DEFAULT_CONFIG = {
     "hybrid_text_threshold": 30,            # 句子小於 30 字用 Local LLM (Qwen)
     "stt_engine": "mlx-whisper" if _IS_APPLE_SILICON else "cloud-only",  # mlx-whisper | qwen3-asr | cloud-only
     "local_whisper_model": "breeze-asr-25-4bit",           # 本地 Whisper 模型（Breeze-ASR-25 繁中最強）
-    "local_llm_model": "qwen3.5:latest",    # Ollama 上的本地模型名稱 (使用 2026 最新 Qwen 3.5)
+    "local_llm_model": "qwen3:latest",      # Ollama 上的本地模型名稱（v2.4.0 修正：qwen3.5/3.6 為不存在的版本，會無聲 fallback 到 regex 後處理）
     "groq_model": "llama-3.3-70b-versatile",      # Groq LLM 模型 (目前的旗艦穩定版)
-    "openrouter_model": "qwen/qwen3.6-plus",               # OpenRouter 模型 (Qwen 3.6 最新旗艦)
+    "openrouter_model": "qwen/qwen3-30b-a3b:free",         # OpenRouter 模型（v2.4.0 修正：原 qwen3.6-plus 不存在；改用免費 MoE 模型）
     "groq_whisper_model": "whisper-large-v3-turbo",  # Groq STT 模型
     "local_llm_timeout_sec": 6.0,           # 本地 Ollama 超時秒數（避免 1.5 秒過短造成頻繁 fallback）
     "llm_timeout_sec": 5.0,                 # 雲端 LLM 超時秒數（Claude/Groq/OpenAI/OpenRouter）超時即 fallback 下一個引擎
@@ -374,17 +380,56 @@ def _ensure_dir():
 
 # ─── Config ──────────────────────────────────────────────
 
+# ─── Config schema migration（v2.4.0 引入）─────────────────────
+# CONFIG_VERSION 規則：
+#   1 = pre-v2.4 schema（沒 config_version 欄位）
+#   2 = v2.4.0：enable_fewshot / enable_app_awareness 預設改 False
+#       + 修正 qwen 不存在的模型名
+# 升級流程：load_config 時若偵測舊版 schema，套用對應 migration，再覆寫 config_version。
+CONFIG_VERSION = 2
+
+def _migrate_config(saved):
+    """套用版本之間的 migration。回傳 (migrated_dict, did_migrate: bool)。"""
+    version = saved.get("config_version", 1)
+    did_migrate = False
+    # v1 → v2 (v2.4.0)
+    if version < 2:
+        # qwen 模型名修正
+        if saved.get("local_llm_model") in ("qwen3.5:latest", "qwen3.5"):
+            saved["local_llm_model"] = "qwen3:latest"
+        if saved.get("openrouter_model") in ("qwen/qwen3.6-plus", "qwen/qwen3.6"):
+            saved["openrouter_model"] = "qwen/qwen3-30b-a3b:free"
+        # enable_fewshot / enable_app_awareness 保持使用者既有偏好（不強制翻 False）
+        # — 但若 key 不存在，補上新的安全預設 False（由 DEFAULT_CONFIG merge 處理）
+        saved["config_version"] = 2
+        did_migrate = True
+    return saved, did_migrate
+
+
 def load_config():
     _ensure_dir()
     if os.path.exists(CONFIG_FILE):
         with open(CONFIG_FILE, "r", encoding="utf-8") as f:
             saved = json.load(f)
-        return {**DEFAULT_CONFIG, **saved}
-    return DEFAULT_CONFIG.copy()
+        saved, migrated = _migrate_config(saved)
+        merged = {**DEFAULT_CONFIG, **saved}
+        # 若有 migration 發生，把新版立刻寫回，避免 crash 時遺失
+        if migrated:
+            try:
+                with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+                    json.dump(merged, f, ensure_ascii=False, indent=2)
+                os.chmod(CONFIG_FILE, 0o600)
+                print(f" ⚙️ config.json migrated to v{CONFIG_VERSION}")
+            except OSError:
+                pass
+        return merged
+    return {**DEFAULT_CONFIG, "config_version": CONFIG_VERSION}
 
 
 def save_config(config):
     _ensure_dir()
+    # 確保 config_version 被寫入
+    config = {**config, "config_version": CONFIG_VERSION}
     with open(CONFIG_FILE, "w", encoding="utf-8") as f:
         json.dump(config, f, ensure_ascii=False, indent=2)
     # 強制 config.json 權限為 600（含 API Key，僅本人可讀寫）

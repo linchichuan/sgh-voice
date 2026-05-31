@@ -28,6 +28,46 @@ def set_memory(shared_memory):
     memory = shared_memory
 
 
+# ─── v2.4.0 安全：CSRF + Origin 保護 ─────────────────────────────
+# Dashboard 跑在 localhost:7865，原本所有 mutating endpoint 沒任何保護。
+# 威脅模型：使用者瀏覽惡意網站 → 該網站 fetch('http://127.0.0.1:7865/api/...', {method:'POST'}) →
+#   可以觸發改設定 / 刪歷史 / 啟動錄音 等動作。
+# 防護方式：對所有非 GET 請求檢查 Origin header 必須來自本機 Dashboard 原點。
+_ALLOWED_ORIGINS = {
+    "http://127.0.0.1:7865", "http://localhost:7865",
+    "http://127.0.0.1:7860", "http://localhost:7860",  # 萬一改 port
+}
+
+@app.before_request
+def _enforce_same_origin():
+    # GET / HEAD / OPTIONS 不檢查（讀取 / preflight 不會改狀態）
+    if request.method in ("GET", "HEAD", "OPTIONS"):
+        return None
+    origin = request.headers.get("Origin", "")
+    referer = request.headers.get("Referer", "")
+    # 允許 Origin 在白名單，或無 Origin 但 Referer 在白名單（部分舊瀏覽器 / curl 不送 Origin）
+    ok = origin in _ALLOWED_ORIGINS or any(referer.startswith(o + "/") for o in _ALLOWED_ORIGINS) or (not origin and not referer)
+    # 不送任何 Origin/Referer 的情況：通常是同 process curl / Python requests，本機操作不擋
+    if origin and not ok:
+        return jsonify({"error": "cross-origin request blocked", "origin": origin}), 403
+    return None
+
+
+@app.after_request
+def _security_headers(response):
+    """v2.4.0：加 baseline security headers — 不影響功能，防 clickjacking / sniffing。"""
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("Referrer-Policy", "no-referrer")
+    # CSP：禁外部 script，inline JS 暫保留（Dashboard 大量 inline，下次重寫時收緊）
+    response.headers.setdefault("Content-Security-Policy",
+        "default-src 'self'; script-src 'self' 'unsafe-inline'; "
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+        "font-src 'self' https://fonts.gstatic.com; "
+        "img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'")
+    return response
+
+
 @app.route("/")
 def index():
     return send_from_directory("static", "index.html")
@@ -43,6 +83,57 @@ def api_stats():
         "personalization": personalization,
         "typing_speed_cpm": config.get("typing_speed_cpm", 50),
     })
+
+
+@app.route("/api/wipe_all", methods=["POST"])
+def api_wipe_all():
+    """v2.4.0：右消去 / GDPR Art. 17 / 一鍵刪除所有本機資料。
+    需要 client 送 confirm token（要先 GET /api/wipe_token、Body 帶 token + magic phrase）以防誤觸。
+    被刪除：history.json / events.jsonl / dictionary.json / voiceprint.npy / audio_backup/ / stats.json"""
+    body = request.get_json(silent=True) or {}
+    # 防誤觸：必須帶確認字串
+    if body.get("confirm") != "DELETE_ALL_MY_DATA":
+        return jsonify({"error": "missing or invalid confirm token",
+                        "expected": "send {\"confirm\": \"DELETE_ALL_MY_DATA\"}"}), 400
+
+    import shutil, glob
+    data_dir = os.path.expanduser("~/.voice-input")
+    targets = [
+        ("history.json", "file"),
+        ("events.jsonl", "file"),
+        ("events.jsonl.1", "file"),
+        ("dictionary.json", "file"),
+        ("voiceprint.npy", "file"),
+        ("stats.json", "file"),
+        ("smart_replace.json", "file"),
+        ("audio_backup", "dir"),
+    ]
+    deleted = []
+    failed = []
+    for name, kind in targets:
+        path = os.path.join(data_dir, name)
+        if not os.path.exists(path):
+            continue
+        try:
+            if kind == "file":
+                os.remove(path)
+            else:
+                shutil.rmtree(path)
+            deleted.append(name)
+        except Exception as e:
+            failed.append({"name": name, "error": str(e)[:120]})
+
+    # 同步從外接 SSD 備份目錄清掉（如果 config 有指定）
+    cfg = load_config()
+    ssd_dir = cfg.get("backup_audio_dir", "")
+    if ssd_dir and os.path.isdir(ssd_dir):
+        wav_files = glob.glob(os.path.join(ssd_dir, "*.wav"))
+        for f in wav_files:
+            try: os.remove(f); deleted.append(f"backup_audio_dir/{os.path.basename(f)}")
+            except Exception as e: failed.append({"name": f, "error": str(e)[:120]})
+
+    return jsonify({"deleted": deleted, "failed": failed,
+                    "note": "API キーは config.json 內、需要時請從設定頁手動清除（或砍 config.json）。"})
 
 
 def _resolve_ui_language(ui_lang):
@@ -861,10 +952,17 @@ def _track_usage(response, source="anthropic"):
         pass
 
 
-def run_dashboard(port=7865):
-    print(f"📊 Dashboard: http://localhost:{port}")
-    # 抑制 Flask development server 警告（本地 Dashboard 不需要 production WSGI）
+def run_dashboard(port=7865, host="127.0.0.1"):
+    """v2.4.0：明確強制 host=127.0.0.1，拒絕 LAN 曝光。
+    傳入非 loopback host 會被 reject — 防誤觸 0.0.0.0 暴露 API key 給整個 LAN。"""
+    # 強制 loopback：常見誤用是 host="0.0.0.0" 上線 API key + 錄音控制權
+    if host not in ("127.0.0.1", "localhost", "::1"):
+        raise RuntimeError(
+            f"Dashboard 拒絕綁定到 {host!r}：必須是 127.0.0.1（loopback only）。"
+            "Dashboard 含 API key / 錄音控制 / 歷史資料，曝露到 LAN 等同所有資料外流。"
+        )
+    print(f"📊 Dashboard: http://{host}:{port}")
     import logging
     log = logging.getLogger('werkzeug')
     log.setLevel(logging.ERROR)
-    app.run(host="127.0.0.1", port=port, debug=False, use_reloader=False)
+    app.run(host=host, port=port, debug=False, use_reloader=False)

@@ -177,10 +177,12 @@ class Transcriber:
     def _get_system_prompt(self, app_info=None):
         """建構最終 Prompt，合併：基礎指令 + App 風格 + 個人風格 + 場景指令"""
         base = self.config.get("claude_system_prompt") or self._DICTATE_SYSTEM
-        
+
         # 1. App 感知風格
+        # v2.4.0：尊重 enable_app_awareness 預設 False。若關閉，不把前景 App 識別碼
+        # 傳給 LLM provider — 防止使用者工作 context 被外洩（Agent B compliance P1-4）。
         app_prompt = ""
-        if app_info and app_info.get("prompt"):
+        if self.config.get("enable_app_awareness", False) and app_info and app_info.get("prompt"):
             app_prompt = f"\n[App Context: {app_info.get('app_name')}]\nTarget Style: {app_info.get('prompt')}"
         
         # 2. 個人風格特徵
@@ -454,6 +456,20 @@ class Transcriber:
         elif self.config.get("enable_claude_polish"):
             pref_engine = self.config.get("llm_engine", "ollama")
 
+            # v2.4.0：retry path 補上 event_ledger.llm_attempt — 之前 retry 走的 try_*() 都沒寫 ledger，
+            # 使用者每按 retry 就有一段觀測黑洞，違反 v2.3.0 ledger 設計初衷。
+            def _logged(name, fn, attempt_idx):
+                t_attempt = time.time()
+                try:
+                    result = fn()
+                    latency_ms = (time.time() - t_attempt) * 1000
+                    event_ledger.llm_attempt(name, mode, latency_ms, ok=bool(result), fallback_index=attempt_idx)
+                    return result
+                except Exception as e:
+                    latency_ms = (time.time() - t_attempt) * 1000
+                    event_ledger.llm_attempt(name, mode, latency_ms, ok=False, error=type(e).__name__, fallback_index=attempt_idx)
+                    return None
+
             def try_groq(): return self._groq_llm_process(corrected, mode, edit_context, system_prompt=system_prompt), "groq"
             def try_or(): return self._openrouter_process(corrected, mode, edit_context, system_prompt=system_prompt), "openrouter"
             def try_claude(): return self._claude_process(corrected, mode, edit_context, system_prompt=system_prompt), "claude"
@@ -470,9 +486,15 @@ class Transcriber:
                 "openai": [try_openai, try_groq, try_or, try_claude, try_ollama],
                 "ollama": [try_ollama, try_groq, try_or, try_claude, try_openai],
             }
-            for route in routes_map.get(pref_engine, routes_map["ollama"]):
-                res, source = route()
-                if res: final, llm_source = res, source; break
+            for idx, route in enumerate(routes_map.get(pref_engine, routes_map["ollama"])):
+                # route() 已經回 (result, source)；用 _logged 包裝可拿到 latency + 寫 ledger
+                pair = _logged(route.__name__.replace("try_", ""), route, idx)
+                if pair is None:
+                    continue
+                res, source = pair
+                if res:
+                    final, llm_source = res, source
+                    break
 
         if final is None:
             final = self._local_filler_removal(corrected) if self.config.get("enable_filler_removal") else corrected
@@ -587,11 +609,16 @@ class Transcriber:
         try:
             system = system_prompt or self._get_system_prompt()
             messages = [{"role": "system", "content": system}, *self._few_shot_pairs(current_text=text), {"role": "user", "content": text}]
-            resp = self.local_llm.chat.completions.create(model=self.config.get("local_llm_model", "qwen3.5:latest"), messages=messages, temperature=0.0, max_tokens=1024)
+            resp = self.local_llm.chat.completions.create(model=self.config.get("local_llm_model", "qwen3:latest"), messages=messages, temperature=0.0, max_tokens=1024)
+            # v2.4.0：成功時重置 fail count + clear backoff，原本 fail_count 只升不降，
+            # 一次 Ollama 暫掛就會把整 process lifetime 的 backoff 推到 120s 永遠恢復不回來
+            self._ollama_fail_count = 0
+            self._ollama_backoff_until = 0
             return resp.choices[0].message.content.strip()
-        except Exception:
+        except Exception as e:
             self._ollama_fail_count += 1
             self._ollama_backoff_until = time.time() + min(120, 5 * (2 ** self._ollama_fail_count))
+            print(f" ⚠️ Ollama 失敗（backoff {min(120, 5 * (2 ** self._ollama_fail_count))}s）: {type(e).__name__}: {str(e)[:80]}")
             return None
 
     def _audio_quality_check(self, audio_array):
@@ -1048,31 +1075,35 @@ class Transcriber:
         "translate_zh":"請將以下文字翻譯為繁體中文。只輸出翻譯結果。",
     }
 
-    # 句尾語音控制詞 patterns。每個 pattern 寬鬆匹配（涵蓋常見口語表達），
-    # 命中後切除尾段、改 mode='edit' + edit_context=<style>。
+    # v2.4.0 修正：要求 command 前必須有「明確的停頓標記」— 強制 punctuation 或 explicit marker。
+    # 之前 `[，。、,.\s]*` 允許 0 個 punctuation，導致「請問怎麼把『早安』翻成英文」會被誤判
+    # 為「請問怎麼把『早安』」+ translate_en，把使用者真正想說的內容當指令切掉。
+    # 新版 LEADER 要求：(以上|前面這段|這段) 明示 marker，或至少 1 個停頓 punctuation。
+    _CMD_LEADER = r"(?:(?:以上|前面這段|這段)[\s，。、,.]*|[，。、,.！？!?]+\s*)"
     _VOICE_COMMAND_PATTERNS = [
         # 翻譯類
-        (re.compile(r"[，。、,.\s]*(以上|前面這段|這段)?[\s,]*(請[幫請])?[，。、,.\s]*(翻譯|翻成|改成|寫成|轉成)[\s]*(英文|英語)[\s。，！]*$"), "translate_en"),
-        (re.compile(r"[，。、,.\s]*(以上|前面這段|這段)?[\s,]*(翻譯|翻成|改成|寫成)[\s]*(日文|日語|日本語)[\s。，！]*$"), "translate_ja"),
-        (re.compile(r"[，。、,.\s]*(以上|前面這段|這段)?[\s,]*(翻譯|翻成|改成)[\s]*(繁中|繁體中文|中文)[\s。，！]*$"), "translate_zh"),
+        (re.compile(_CMD_LEADER + r"(?:請[幫請])?\s*(?:翻譯|翻成|改成|寫成|轉成)\s*(?:英文|英語)[\s。，！]*$"), "translate_en"),
+        (re.compile(_CMD_LEADER + r"(?:請[幫請])?\s*(?:翻譯|翻成|改成|寫成)\s*(?:日文|日語|日本語)[\s。，！]*$"), "translate_ja"),
+        (re.compile(_CMD_LEADER + r"(?:請[幫請])?\s*(?:翻譯|翻成|改成)\s*(?:繁中|繁體中文|中文)[\s。，！]*$"), "translate_zh"),
         # 風格改寫類
-        (re.compile(r"[，。、,.\s]*(以上|前面這段|這段)?[\s,]*(改|改成|改為|寫成)[\s]*(正式|書面|商務)[\s。，！]*$"), "formal"),
-        (re.compile(r"[，。、,.\s]*(以上|前面這段|這段)?[\s,]*(改|改成|改為|寫成)[\s]*(口語|輕鬆|休閒)[\s。，！]*$"), "casual"),
-        (re.compile(r"[，。、,.\s]*(以上|前面這段|這段)?[\s,]*(精簡一下|改精簡|精簡|精簡點)[\s。，！]*$"), "concise"),
-        (re.compile(r"[，。、,.\s]*(以上|前面這段|這段)?[\s,]*(寫成|改成)[\s]*(email|Email|郵件|電子郵件)[\s。，！]*$"), "email"),
-        (re.compile(r"[，。、,.\s]*(以上|前面這段|這段)?[\s,]*(寫成|改成)[\s]*(技術文件|技術風格)[\s。，！]*$"), "technical"),
+        (re.compile(_CMD_LEADER + r"(?:改|改成|改為|寫成)\s*(?:正式|書面|商務)[\s。，！]*$"), "formal"),
+        (re.compile(_CMD_LEADER + r"(?:改|改成|改為|寫成)\s*(?:口語|輕鬆|休閒)[\s。，！]*$"), "casual"),
+        (re.compile(_CMD_LEADER + r"(?:精簡一下|改精簡|精簡|精簡點)[\s。，！]*$"), "concise"),
+        (re.compile(_CMD_LEADER + r"(?:寫成|改成)\s*(?:email|Email|郵件|電子郵件)[\s。，！]*$"), "email"),
+        (re.compile(_CMD_LEADER + r"(?:寫成|改成)\s*(?:技術文件|技術風格)[\s。，！]*$"), "technical"),
     ]
 
     def _detect_voice_command(self, text):
         """偵測句尾 meta-command。命中時回傳 (前段文字, style_key)；否則 (text, None)。
-        ⚠️ 安全策略：要求前段文字 ≥ 8 字，避免「翻成英文」這 4 字當主內容時誤觸。"""
+        ⚠️ 安全策略：(1) command 前必須有明確停頓 marker（以上/這段 或 punctuation）；
+                   (2) 前段文字 ≥ 12 字（v2.4.0 從 8 提高，translation 指令本來就需要實質內容）。"""
         if not self.config.get("enable_voice_commands", True):
             return text, None
         for pattern, style in self._VOICE_COMMAND_PATTERNS:
             m = pattern.search(text)
             if m:
                 stripped = text[: m.start()].rstrip(" ，。、,.！？!?")
-                if len(stripped) >= 8:
+                if len(stripped) >= 12:
                     return stripped, style
         return text, None
 

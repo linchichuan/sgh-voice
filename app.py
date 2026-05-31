@@ -33,7 +33,8 @@ def _register_engine_for_cleanup(engine):
 
 
 def _graceful_shutdown(signum=None, frame=None):
-    """Ctrl+C / SIGTERM 時把錄音串流乾淨收掉，避免 PortAudio 留下半開的麥克風。"""
+    """Ctrl+C / SIGTERM 時把錄音串流乾淨收掉、刷出 memory pending writes，
+    避免 PortAudio 留下半開的麥克風 + 最多 9 筆 history 因 batch write 而 lost。"""
     for engine in _active_engines:
         try:
             rec = getattr(engine, "recorder", None)
@@ -43,6 +44,13 @@ def _graceful_shutdown(signum=None, frame=None):
                 thr = getattr(rec, "_thread", None)
                 if thr and thr.is_alive():
                     thr.join(timeout=2)
+        except Exception:
+            pass
+        # v2.4.0：flush memory pending writes（每 10 筆才寫一次，shutdown 不 flush 就 lost）
+        try:
+            mem = getattr(engine, "memory", None)
+            if mem and hasattr(mem, "flush_history"):
+                mem.flush_history()
         except Exception:
             pass
     if signum is not None:
@@ -883,11 +891,24 @@ class VoiceEngine:
             self.start_continuous_mode()
 
     def start_continuous_mode(self):
-        if self.is_recording:
-            log("warn", "已在錄音中，無法啟動連續模式")
-            return
-        self._continuous_active = True
-        self.is_recording = True
+        # v2.4.0：補上 _state_lock 保護 + PortAudio thread liveness 檢查（與 Recorder.start 對齊）
+        # 之前 is_recording / _continuous_active 寫入完全沒鎖，且繞過 Recorder.start 的 thread-alive
+        # 檢查 → 若上一段 push-to-talk 的 _record_loop 還在收尾就硬開連續 stream，會 deadlock
+        # 在 Pa_OpenStream。把守門集中到 start_continuous_mode 入口處。
+        with self._state_lock:
+            if self.is_recording:
+                log("warn", "已在錄音中，無法啟動連續模式")
+                return
+            # 防 PortAudio deadlock：等上一段 recorder thread 完全結束
+            prev_thread = getattr(self.recorder, "_thread", None)
+            if prev_thread is not None and prev_thread.is_alive():
+                log("warn", "上一段錄音 thread 尚未結束，等 2s…")
+                prev_thread.join(timeout=2.0)
+                if prev_thread.is_alive():
+                    log("error", "audio stream 未釋放，拒絕啟動連續模式")
+                    return
+            self._continuous_active = True
+            self.is_recording = True
         try: self.overlay.show("recording")
         except Exception: pass
         self._safe_status_change("recording")
@@ -929,11 +950,22 @@ class VoiceEngine:
         self.recorder.start_continuous(on_segment=_on_segment, on_voice_change=_on_voice)
 
     def stop_continuous_mode(self):
-        if not getattr(self, "_continuous_active", False):
-            return
-        self.recorder._stop_event.set()
-        self._continuous_active = False
-        self.is_recording = False
+        # v2.4.0：補 _state_lock 保護 + 等 thread 真的 join 結束。原本只 set stop_event 然後
+        # 立刻把 is_recording 翻 False，但 recorder thread 還在 InputStream 收尾 → 下次 start
+        # 又會撞上 thread alive 守門被 reject。改成 join with timeout，並把狀態翻轉收進 lock。
+        with self._state_lock:
+            if not getattr(self, "_continuous_active", False):
+                return
+            self.recorder._stop_event.set()
+        # 鎖外 join（避免 join 期間擋住其他 lock 取得者）
+        thread = getattr(self.recorder, "_thread", None)
+        if thread is not None:
+            thread.join(timeout=5)
+            if thread.is_alive():
+                log("warn", "continuous recorder thread 5s 未結束（PortAudio 可能 stuck）")
+        with self._state_lock:
+            self._continuous_active = False
+            self.is_recording = False
         try: self.overlay.show("idle")
         except Exception: pass
         self._safe_status_change("idle")
@@ -1511,11 +1543,11 @@ def run_cli():
             print("⚠️  未偵測到音訊\n")
             continue
 
+        # v2.4.0：transcribe() 只回傳 {raw, final, process_time}，沒有 corrected 中間欄位。
+        # 之前印 result['corrected'] 每次都 KeyError crash → CLI mode 完全不可用。
         print(f"\n📝 Whisper: {result['raw']}")
-        if result['corrected'] != result['raw']:
-            print(f"📖 詞庫修正: {result['corrected']}")
-        if result['final'] != result['corrected']:
-            print(f"🤖 Claude:  {result['final']}")
+        if result['final'] != result['raw']:
+            print(f"✨ 後處理:  {result['final']}")
         print(f"✅ 最終: {result['final']}")
         print(f"⏱  耗時: {result['process_time']:.1f}s")
 

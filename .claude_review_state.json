@@ -8,13 +8,16 @@
     ],
     "touched_files": [
       "CHANGELOG.md",
+      "app.py",
       "build.sh",
       "config.py",
+      "dashboard.py",
+      "sgh-voice-web/privacy.html",
       "transcriber.py"
     ],
     "updated_at": "2026-05-20T06:10:15Z"
   },
-  "updated_at": "2026-05-26T15:37:35Z",
+  "updated_at": "2026-05-31T15:45:59Z",
   "has_code_change": true,
   "has_doc_change": true,
   "code_review": {
@@ -45,6 +48,7 @@
     "/Users/lin/voice-input/android/SGHVoice/app/src/main/java/com/shingihou/sghvoice/api/LlmClient.kt",
     "/Users/lin/voice-input/app.py",
     "/Users/lin/voice-input/config.py",
+    "/Users/lin/voice-input/dashboard.py",
     "/Users/lin/voice-input/event_ledger.py",
     "/Users/lin/voice-input/ios/SGHVoice/SGHVoice/API/LlmClient.swift",
     "/Users/lin/voice-input/overlay.py",

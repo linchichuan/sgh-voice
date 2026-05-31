@@ -162,7 +162,7 @@
             <div class="card">
                 <h2>1. はじめに</h2>
                 <p>本プライバシーポリシーは、新義豊株式会社（以下「当社」）が提供する「SGH Voice」アプリケーション（以下「本アプリ」）における個人情報の取扱いについて説明します。</p>
-                <p><strong>最終更新日：</strong>2026年2月28日</p>
+                <p><strong>最終更新日：</strong>2026年6月1日（v2.4.0 改訂）</p>
             </div>
 
             <div class="card">
@@ -170,18 +170,20 @@
                 <h3>2.1 音声データ</h3>
                 <p>本アプリは、マイクを使用して音声を録音します。この録音データは、音声認識（Speech-to-Text）処理のためにのみ使用されます。</p>
                 <ul>
-                    <li>音声データは端末上で一時的に保持され、処理完了後に自動的に削除されます。</li>
-                    <li>音声データは外部のAI API（OpenAI Whisper、Groq等）に送信されて文字起こしされます。</li>
+                    <li>音声データは端末上で一時的に保持され、処理完了後に自動的に削除されます（音声バックアップ機能を有効にした場合を除く。詳細は10項参照）。</li>
+                    <li>音声データは、選択された <strong>STT (Speech-to-Text) プロバイダー</strong>（OpenAI Whisper API / Groq Whisper API）にのみ送信されます。</li>
+                    <li>LLM 後処理（Anthropic / OpenAI / Groq / OpenRouter / Ollama）には音声ではなく、文字起こし後のテキストのみが送信されます。</li>
                     <li>当社のサーバーに音声データを保存することはありません。</li>
                 </ul>
 
                 <h3>2.2 API キー</h3>
-                <p>ユーザーが入力したAPI
-                    キー（OpenAI、Anthropic、Groq、ElevenLabs）は、端末内の暗号化ストレージ（EncryptedSharedPreferences）に安全に保存されます。これらのキーが当社のサーバーに送信されることはありません。
-                </p>
+                <p>ユーザーが入力した API キー（OpenAI / Anthropic / Groq / OpenRouter / ElevenLabs）は、端末内の保護領域に保存されます。v2.4.0 以降、macOS では Keychain への移行を進めており、それ以前のバージョンでは <code>~/.voice-input/config.json</code> にファイルパーミッション 600 で保管されます。これらのキーが当社のサーバーに送信されることは一切ありません。</p>
 
                 <h3>2.3 辞書データ</h3>
                 <p>ユーザーが登録したカスタム辞書および修正ルールは、端末のローカルストレージにのみ保存されます。</p>
+
+                <h3>2.4 発話履歴</h3>
+                <p>各回の音声認識結果と最終出力テキストは <code>~/.voice-input/history.json</code> に保存され、Dashboard で参照・編集・削除できます。当社のサーバーには送信されません。13項の削除請求機能で一括消去できます。</p>
             </div>
 
             <div class="card">
@@ -196,28 +198,88 @@
 
             <div class="card">
                 <h2>4. 第三者への提供</h2>
-                <p>音声データは、ユーザーが設定したAPI
-                    プロバイダー（OpenAI、Anthropic、Groq）に音声認識・テキスト処理の目的で送信されます。各プロバイダーのプライバシーポリシーについては、各社のウェブサイトをご確認ください。</p>
-                <p>それ以外の第三者への情報提供は一切行いません。</p>
+                <p>用途別に、ユーザーが選択した以下の第三者プロバイダーにデータを送信します：</p>
+                <ul>
+                    <li><strong>STT (Speech-to-Text)：</strong>OpenAI Whisper API / Groq Whisper API — 音声を文字に変換</li>
+                    <li><strong>LLM 後処理：</strong>Anthropic / OpenAI / Groq / OpenRouter / Ollama（ローカル）— 文字起こし結果を整理・校正</li>
+                    <li><strong>OpenRouter</strong> はリクエスト毎に内部で複数のモデルプロバイダー（Meta / DeepSeek 等）にサブルーティングする場合があります。本アプリは送信先モデルをユーザーが選択できる仕様としており、各サブプロバイダーのプライバシーポリシーをご確認ください。</li>
+                </ul>
+                <p>各プロバイダーのプライバシーポリシーについては、各社のウェブサイトをご確認ください。それ以外の第三者への情報提供は一切行いません。</p>
             </div>
 
             <div class="card">
                 <h2>5. マイクの使用について</h2>
-                <p>本アプリは <code>android.permission.RECORD_AUDIO</code>
-                    権限を使用します。この権限は、ユーザーが音声入力ボタンを押した際の音声録音にのみ使用されます。バックグラウンドでの録音は一切行いません。</p>
+                <p>本アプリは macOS / iOS / Android 各プラットフォームのマイク権限（<code>NSMicrophoneUsageDescription</code> / <code>android.permission.RECORD_AUDIO</code>）を使用します。この権限は、ユーザーがホットキー押下または録音ボタンを操作した時の音声録音にのみ使用されます。バックグラウンドでの録音は一切行いません。</p>
             </div>
 
             <div class="card">
                 <h2>6. データの保護</h2>
                 <ul>
-                    <li>API キーは AES-256 で暗号化して保存</li>
-                    <li>すべてのAPI 通信は HTTPS で暗号化</li>
-                    <li>音声データは処理後に即座に削除</li>
+                    <li>API キーはファイルパーミッション 600 で保存（macOS v2.4.0 以降は Keychain への移行を順次実施）</li>
+                    <li>すべての API 通信は HTTPS / TLS 1.2 以上で暗号化</li>
+                    <li>音声データは処理後に即座に削除（音声バックアップを有効化した場合を除く）</li>
+                    <li>当社のサーバーへ送信されるデータはありません（BYOK モデル）</li>
                 </ul>
             </div>
 
             <div class="card">
-                <h2>7. お問い合わせ</h2>
+                <h2>7. 声紋（生体識別データ）</h2>
+                <p>本アプリは任意機能として「声紋検証」を提供します。有効化すると、ユーザー本人の声から抽出した MFCC 特徴量（80次元の数値ベクトル）が端末内（<code>~/.voice-input/voiceprint.npy</code>）にのみ保存されます。当該データは個人情報保護法上の<strong>「要配慮個人情報」に該当する生体識別符号</strong>として取り扱い、外部に送信することは一切ありません。</p>
+                <p>v2.4.0 以降、声紋登録には明示的な同意（オプトイン）が必須となっており、同意なき自動登録は行いません。Dashboard からいつでも削除できます。</p>
+            </div>
+
+            <div class="card">
+                <h2>8. 過去発話の文脈送信（Few-shot 機能）</h2>
+                <p>後処理 LLM に現在の発話を送信する際、文体や用語の一貫性を保つため、ユーザーの過去発話のうち直近最大3件（音声認識結果と最終結果のペア）を文脈として併せて送信できる機能を提供しています。</p>
+                <p><strong>v2.4.0 から初期設定では無効（送信件数 0 件）となっており、Dashboard で明示的に有効化した場合のみ動作します。</strong>利用時は、過去の発話内容も LLM プロバイダーに送信される点にご留意ください。</p>
+            </div>
+
+            <div class="card">
+                <h2>9. 医療モード利用時の注意</h2>
+                <p>医療モード（<code>medical</code> / <code>medical_consultation</code>）を有効にした場合、生成テキストには診療内容・症状・処方等の医療情報が含まれる可能性があります。これらは要配慮個人情報に該当します。</p>
+                <p>送信先の AI プロバイダー（OpenAI / Anthropic / Groq / OpenRouter）は医療情報処理に関する個別契約（BAA / DPA）を締結していないため、<strong>特定の患者を識別可能な情報の入力は禁止します。</strong>医療現場でのご利用には、ローカル LLM（Ollama）の使用を推奨します。</p>
+            </div>
+
+            <div class="card">
+                <h2>10. 音声バックアップ</h2>
+                <p>初期設定では録音音声は文字起こし完了後に即時削除されます。ユーザーが Dashboard で「音声バックアップ先」を指定した場合のみ、WAV ファイルが当該ディレクトリに保管されます。保管された音声の管理責任はユーザーに帰属します。当社のサーバーには送信されません。</p>
+            </div>
+
+            <div class="card">
+                <h2>11. イベントログ（観測用メタデータ）</h2>
+                <p><code>~/.voice-input/events.jsonl</code> に、認識成否、レイテンシ、フォアグラウンドアプリの bundle id 等の<strong>メタデータのみ</strong>を記録します。発話内容や音声波形は記録しません。最大 50MB で自動ローテートし、当社のサーバーには送信されません。</p>
+                <p>フォアグラウンドアプリ識別を無効化したい場合は、Dashboard 設定の「App awareness」をオフにしてください（v2.4.0 から初期設定はオフ）。</p>
+            </div>
+
+            <div class="card">
+                <h2>12. 国外移転（個人情報保護法 第28条 / PIPL 第38条）</h2>
+                <p>選択された API プロバイダーが米国等の日本国外で運用されている場合、当該プロバイダーの契約条件に基づき個人情報が国外移転されます。プロバイダー別の所在国は次の通りです：</p>
+                <ul>
+                    <li>OpenAI（米国）— STT および LLM</li>
+                    <li>Anthropic（米国）— LLM のみ</li>
+                    <li>Groq（米国）— STT および LLM</li>
+                    <li>OpenRouter（米国・モデル毎にサブプロバイダー有）— LLM</li>
+                    <li>Ollama（端末内ローカル処理のため国外移転なし）</li>
+                </ul>
+                <p>本アプリをご利用される際は、当該国の法令に基づく保護水準をご確認ください。</p>
+            </div>
+
+            <div class="card">
+                <h2>13. 削除請求（消去権）</h2>
+                <p>Dashboard 設定 →「すべてのローカルデータを削除」より、以下のローカルデータを一括削除できます：</p>
+                <ul>
+                    <li>履歴（<code>history.json</code>）</li>
+                    <li>イベントログ（<code>events.jsonl</code>）</li>
+                    <li>カスタム辞書（<code>dictionary.json</code>）</li>
+                    <li>声紋データ（<code>voiceprint.npy</code>）</li>
+                    <li>音声バックアップ（<code>audio_backup/</code> 配下の WAV ファイル）</li>
+                    <li>使用統計（<code>stats.json</code>）</li>
+                </ul>
+                <p>API キーは別途、Dashboard 設定画面より個別に削除できます。</p>
+            </div>
+
+            <div class="card">
+                <h2>14. お問い合わせ</h2>
                 <p>プライバシーに関するご質問は、以下までお問い合わせください：</p>
                 <p><strong>新義豊株式会社（Shingihou Co., Ltd.）</strong><br>
                     所在地：福岡県福岡市<br>
@@ -230,7 +292,7 @@
             <div class="card">
                 <h2>1. 前言</h2>
                 <p>本隱私權政策說明新義豊株式會社（以下簡稱「本公司」）所提供之「SGH Voice」應用程式（以下簡稱「本應用程式」）如何處理個人資訊。</p>
-                <p><strong>最後更新：</strong>2026年2月28日</p>
+                <p><strong>最後更新：</strong>2026 年 6 月 1 日（v2.4.0 改訂）</p>
             </div>
 
             <div class="card">
@@ -238,17 +300,20 @@
                 <h3>2.1 語音資料</h3>
                 <p>本應用程式使用麥克風錄製語音。該錄音資料僅用於語音辨識（Speech-to-Text）處理。</p>
                 <ul>
-                    <li>語音資料在裝置上暫時保存，處理完成後自動刪除。</li>
-                    <li>語音資料會傳送至外部 AI API（OpenAI Whisper、Groq 等）進行文字轉譯。</li>
+                    <li>語音資料在裝置上暫時保存，處理完成後自動刪除（啟用音訊備份功能除外，詳見第 10 項）。</li>
+                    <li>語音資料僅傳送至所選之 <strong>STT (Speech-to-Text) 服務商</strong>（OpenAI Whisper API / Groq Whisper API）。</li>
+                    <li>LLM 後處理（Anthropic / OpenAI / Groq / OpenRouter / Ollama）收到的是文字轉譯結果，並非原始語音。</li>
                     <li>本公司不會在伺服器上儲存任何語音資料。</li>
                 </ul>
 
                 <h3>2.2 API 金鑰</h3>
-                <p>使用者輸入的 API
-                    金鑰（OpenAI、Anthropic、Groq、ElevenLabs）以加密方式安全儲存於裝置內（EncryptedSharedPreferences）。這些金鑰不會被傳送至本公司的伺服器。</p>
+                <p>使用者輸入的 API 金鑰（OpenAI / Anthropic / Groq / OpenRouter / ElevenLabs）儲存於裝置內保護區域。v2.4.0 起在 macOS 上將漸進遷移至 Keychain，此前版本則以檔案權限 600 儲存於 <code>~/.voice-input/config.json</code>。這些金鑰不會被傳送至本公司的伺服器。</p>
 
                 <h3>2.3 詞庫資料</h3>
                 <p>使用者註冊的自訂詞庫及修正規則僅儲存在裝置的本機儲存空間中。</p>
+
+                <h3>2.4 發話歷史</h3>
+                <p>每次語音辨識結果與最終輸出文字會儲存於 <code>~/.voice-input/history.json</code>，可從 Dashboard 檢視、編輯、刪除。不會傳送至本公司伺服器。可透過第 13 項的刪除請求功能一次清除。</p>
             </div>
 
             <div class="card">
@@ -263,26 +328,88 @@
 
             <div class="card">
                 <h2>4. 第三方資訊提供</h2>
-                <p>語音資料會傳送至使用者設定的 API 供應商（OpenAI、Anthropic、Groq）以進行語音辨識與文字處理。各供應商的隱私權政策請參閱其官方網站。</p>
-                <p>除此之外，本公司不會向任何第三方提供資訊。</p>
+                <p>依用途別，使用者所選之以下第三方服務商會接收對應資料：</p>
+                <ul>
+                    <li><strong>STT (Speech-to-Text)：</strong>OpenAI Whisper API / Groq Whisper API — 將語音轉為文字</li>
+                    <li><strong>LLM 後處理：</strong>Anthropic / OpenAI / Groq / OpenRouter / Ollama（本機）— 整理潤稿文字結果</li>
+                    <li><strong>OpenRouter</strong> 可能依請求動態路由至內部多個模型服務商（Meta / DeepSeek 等子服務商）。請另行確認各子服務商之隱私權政策。</li>
+                </ul>
+                <p>各服務商之隱私權政策請參閱其官方網站。除此之外，本公司不會向任何第三方提供資訊。</p>
             </div>
 
             <div class="card">
                 <h2>5. 關於麥克風使用</h2>
-                <p>本應用程式使用 <code>android.permission.RECORD_AUDIO</code> 權限。此權限僅在使用者按下語音輸入按鈕時使用。不會進行任何背景錄音。</p>
+                <p>本應用程式使用 macOS / iOS / Android 各平台之麥克風權限（<code>NSMicrophoneUsageDescription</code> / <code>android.permission.RECORD_AUDIO</code>）。此權限僅在使用者按下熱鍵或錄音按鈕時使用，不會進行任何背景錄音。</p>
             </div>
 
             <div class="card">
                 <h2>6. 資料保護</h2>
                 <ul>
-                    <li>API 金鑰使用 AES-256 加密儲存</li>
-                    <li>所有 API 通訊皆透過 HTTPS 加密</li>
-                    <li>語音資料處理後立即刪除</li>
+                    <li>API 金鑰以檔案權限 600 儲存（macOS v2.4.0 起逐步遷移至 Keychain）</li>
+                    <li>所有 API 通訊皆透過 HTTPS / TLS 1.2 以上加密</li>
+                    <li>語音資料處理後立即刪除（除非啟用音訊備份）</li>
+                    <li>不會有任何資料傳送至本公司的伺服器（BYOK 自帶金鑰模式）</li>
                 </ul>
             </div>
 
             <div class="card">
-                <h2>7. 聯絡方式</h2>
+                <h2>7. 聲紋（生物特徵識別資料）</h2>
+                <p>本應用程式提供可選之「聲紋驗證」功能。啟用後，從使用者本人聲音抽取的 MFCC 特徵（80 維數值向量）僅儲存於裝置內（<code>~/.voice-input/voiceprint.npy</code>）。該資料屬<strong>個人資料保護法上之「特種個人資料 / 生物特徵識別」</strong>，本公司不會以任何方式對外傳送。</p>
+                <p>v2.4.0 起，聲紋註冊必須經過明示同意（opt-in），不會自動註冊。可隨時於 Dashboard 刪除。</p>
+            </div>
+
+            <div class="card">
+                <h2>8. 過往發話的脈絡傳送（Few-shot 功能）</h2>
+                <p>在傳送目前發話至後處理 LLM 時，為保持文體與用詞一致性，本應用程式提供將近期最多 3 筆過往發話（語音辨識結果與最終結果配對）作為脈絡一併傳送的功能。</p>
+                <p><strong>v2.4.0 起預設為關閉（傳送 0 筆），僅在 Dashboard 明示啟用時才會運作。</strong>啟用時請留意，過往發話內容亦會傳送至 LLM 服務商。</p>
+            </div>
+
+            <div class="card">
+                <h2>9. 醫療模式使用注意</h2>
+                <p>啟用醫療模式（<code>medical</code> / <code>medical_consultation</code>）時，生成文字可能包含診療內容、症狀、處方等醫療資訊。此屬特種個人資料。</p>
+                <p>送往的 AI 服務商（OpenAI / Anthropic / Groq / OpenRouter）並未針對醫療資訊處理簽訂個別契約（BAA / DPA），<strong>禁止輸入足以識別特定患者的資訊。</strong>於醫療現場使用時，建議切換為本機 LLM（Ollama）。</p>
+            </div>
+
+            <div class="card">
+                <h2>10. 音訊備份</h2>
+                <p>預設情況下，錄音音訊在文字轉譯完成後立即刪除。僅當使用者於 Dashboard 指定「音訊備份位置」時，WAV 檔案才會保留於該目錄。所保存音訊的管理責任由使用者承擔。不會傳送至本公司伺服器。</p>
+            </div>
+
+            <div class="card">
+                <h2>11. 事件日誌（觀測用 Metadata）</h2>
+                <p>於 <code>~/.voice-input/events.jsonl</code> 僅記錄辨識成功/失敗、延遲、前景應用之 bundle id 等<strong>後設資料</strong>。<strong>不會記錄發話內容或音訊波形。</strong>最大 50MB 自動 rotate，不會傳送至本公司伺服器。</p>
+                <p>若欲關閉前景應用識別，可於 Dashboard 設定中將「App awareness」關閉（v2.4.0 起預設關閉）。</p>
+            </div>
+
+            <div class="card">
+                <h2>12. 跨境傳輸（個資法 / PIPL 第 38 條）</h2>
+                <p>所選 API 服務商若於日本國外運作（如美國），則個人資料將依該服務商契約條款進行跨境傳輸。各服務商所在地如下：</p>
+                <ul>
+                    <li>OpenAI（美國）— STT 與 LLM</li>
+                    <li>Anthropic（美國）— 僅 LLM</li>
+                    <li>Groq（美國）— STT 與 LLM</li>
+                    <li>OpenRouter（美國，依模型可能路由至各國子服務商）— LLM</li>
+                    <li>Ollama（裝置內本機處理，無跨境傳輸）</li>
+                </ul>
+                <p>使用本服務時，請確認所在國法令對應之保護水準。</p>
+            </div>
+
+            <div class="card">
+                <h2>13. 刪除請求（消去權）</h2>
+                <p>於 Dashboard 設定 →「刪除所有本機資料」可一次刪除以下本機資料：</p>
+                <ul>
+                    <li>歷史（<code>history.json</code>）</li>
+                    <li>事件日誌（<code>events.jsonl</code>）</li>
+                    <li>自訂詞庫（<code>dictionary.json</code>）</li>
+                    <li>聲紋資料（<code>voiceprint.npy</code>）</li>
+                    <li>音訊備份（<code>audio_backup/</code> 內之 WAV 檔）</li>
+                    <li>使用統計（<code>stats.json</code>）</li>
+                </ul>
+                <p>API 金鑰可從 Dashboard 設定頁面個別刪除。</p>
+            </div>
+
+            <div class="card">
+                <h2>14. 聯絡方式</h2>
                 <p>如有隱私權相關問題，請聯繫：</p>
                 <p><strong>新義豊株式會社（Shingihou Co., Ltd.）</strong><br>
                     地址：日本福岡縣福岡市<br>
@@ -296,28 +423,28 @@
                 <h2>1. Introduction</h2>
                 <p>This Privacy Policy describes how Shingihou Co., Ltd. ("we", "us") handles personal information in
                     the "SGH Voice" application ("the App").</p>
-                <p><strong>Last Updated:</strong> February 28, 2026</p>
+                <p><strong>Last Updated:</strong> June 1, 2026 (v2.4.0 revision)</p>
             </div>
 
             <div class="card">
                 <h2>2. Information We Collect</h2>
                 <h3>2.1 Audio Data</h3>
-                <p>The App uses the microphone to record audio. This recording data is used solely for speech-to-text
-                    processing.</p>
+                <p>The App uses the microphone to record audio. This recording data is used solely for speech-to-text processing.</p>
                 <ul>
-                    <li>Audio data is temporarily stored on the device and automatically deleted after processing.</li>
-                    <li>Audio data is sent to external AI APIs (OpenAI Whisper, Groq, etc.) for transcription.</li>
+                    <li>Audio data is temporarily stored on the device and automatically deleted after processing (unless audio backup is enabled — see Section 10).</li>
+                    <li>Audio data is sent <strong>only to the selected STT (Speech-to-Text) provider</strong> (OpenAI Whisper API / Groq Whisper API).</li>
+                    <li>LLM post-processing (Anthropic / OpenAI / Groq / OpenRouter / Ollama) receives <strong>only the transcribed text, not the audio</strong>.</li>
                     <li>We do not store any audio data on our servers.</li>
                 </ul>
 
                 <h3>2.2 API Keys</h3>
-                <p>API keys entered by the user (OpenAI, Anthropic, Groq, ElevenLabs) are securely stored in the
-                    device's encrypted storage (EncryptedSharedPreferences). These keys are never transmitted to our
-                    servers.</p>
+                <p>API keys entered by the user (OpenAI / Anthropic / Groq / OpenRouter / ElevenLabs) are stored in a protected location on the device. Starting with v2.4.0, macOS gradually migrates to Keychain; prior versions store them in <code>~/.voice-input/config.json</code> with file permissions 600. These keys are never transmitted to our servers.</p>
 
                 <h3>2.3 Dictionary Data</h3>
-                <p>Custom dictionaries and correction rules registered by the user are stored only in the device's local
-                    storage.</p>
+                <p>Custom dictionaries and correction rules registered by the user are stored only in the device's local storage.</p>
+
+                <h3>2.4 Transcription History</h3>
+                <p>Each speech-recognition result and final output text is stored locally in <code>~/.voice-input/history.json</code>. The history can be viewed, edited, and deleted from the Dashboard. It is never transmitted to our servers. Section 13 describes the one-click erasure procedure.</p>
             </div>
 
             <div class="card">
@@ -332,26 +459,84 @@
 
             <div class="card">
                 <h2>4. Third-Party Sharing</h2>
-                <p>Audio data is sent to API providers (OpenAI, Anthropic, Groq) configured by the user for speech
-                    recognition and text processing purposes. Please refer to each provider's website for their privacy
-                    policies.</p>
-                <p>We do not share any information with any other third parties.</p>
+                <p>Depending on the configured purpose, the following third-party providers receive data:</p>
+                <ul>
+                    <li><strong>STT (Speech-to-Text):</strong> OpenAI Whisper API / Groq Whisper API — convert audio to text</li>
+                    <li><strong>LLM post-processing:</strong> Anthropic / OpenAI / Groq / OpenRouter / Ollama (local) — clean up the transcribed text</li>
+                    <li><strong>OpenRouter</strong> may dynamically route requests to internal model sub-providers (Meta / DeepSeek, etc.). Please review each sub-provider's privacy policy.</li>
+                </ul>
+                <p>Please refer to each provider's website for their privacy policies. We do not share information with any other third parties.</p>
             </div>
 
             <div class="card">
                 <h2>5. Microphone Usage</h2>
-                <p>The App uses the <code>android.permission.RECORD_AUDIO</code> permission. This permission is used
-                    solely for recording audio when the user presses the voice input button. No background recording is
-                    performed.</p>
+                <p>The App uses each platform's microphone permission (<code>NSMicrophoneUsageDescription</code> on macOS/iOS, <code>android.permission.RECORD_AUDIO</code> on Android). This permission is used only when the user presses the hotkey or recording button. No background recording is performed.</p>
             </div>
 
             <div class="card">
                 <h2>6. Data Security</h2>
                 <ul>
-                    <li>API keys are encrypted with AES-256</li>
-                    <li>All API communications are encrypted via HTTPS</li>
-                    <li>Audio data is deleted immediately after processing</li>
+                    <li>API keys stored with file permissions 600 (macOS migrates to Keychain starting v2.4.0)</li>
+                    <li>All API communications are encrypted via HTTPS / TLS 1.2 or higher</li>
+                    <li>Audio data is deleted immediately after processing (unless audio backup is enabled)</li>
+                    <li>No data is transmitted to our servers (BYOK — Bring Your Own Key model)</li>
                 </ul>
+            </div>
+
+            <div class="card">
+                <h2>7. Voiceprint (Biometric Data)</h2>
+                <p>The App provides an optional "voiceprint verification" feature. When enabled, MFCC features extracted from the user's voice (an 80-dimension numerical vector) are stored only on the device (<code>~/.voice-input/voiceprint.npy</code>). This data qualifies as <strong>biometric data uniquely identifying a natural person under GDPR Art. 9(1), and as "sensitive personal information / 要配慮個人情報" under APPI</strong>. It is never transmitted externally.</p>
+                <p>Starting with v2.4.0, voiceprint enrollment requires explicit consent (opt-in); no automatic enrollment occurs. It can be deleted at any time from the Dashboard.</p>
+            </div>
+
+            <div class="card">
+                <h2>8. Few-shot Context Transmission</h2>
+                <p>To preserve stylistic and terminological consistency, the App can attach up to 3 prior dictation pairs (speech-recognition result + final output) as context when sending the current utterance to the post-processing LLM.</p>
+                <p><strong>Starting with v2.4.0, this feature is disabled by default (0 entries sent).</strong> It only operates when explicitly enabled in the Dashboard. When enabled, please note that prior dictation content is also sent to the LLM provider.</p>
+            </div>
+
+            <div class="card">
+                <h2>9. Medical Mode Notice</h2>
+                <p>When the medical mode (<code>medical</code> / <code>medical_consultation</code>) is enabled, generated text may contain clinical content, symptoms, prescriptions, and similar medical information — which qualifies as sensitive personal information.</p>
+                <p>The destination AI providers (OpenAI / Anthropic / Groq / OpenRouter) have not signed individual contracts (BAA / DPA) for medical-data processing. <strong>Entering information that can identify a specific patient is prohibited.</strong> For clinical use, we recommend switching to a local LLM (Ollama).</p>
+            </div>
+
+            <div class="card">
+                <h2>10. Audio Backup</h2>
+                <p>By default, recorded audio is deleted immediately after transcription. Only when the user specifies an "audio backup directory" in the Dashboard are WAV files retained in that directory. The user is responsible for the management of any retained audio. No audio is transmitted to our servers.</p>
+            </div>
+
+            <div class="card">
+                <h2>11. Event Log (Observability Metadata)</h2>
+                <p>The App writes <strong>metadata only</strong> (recognition success/failure, latency, foreground application bundle id, etc.) to <code>~/.voice-input/events.jsonl</code>. <strong>No utterance content or audio waveform is logged.</strong> The file auto-rotates at 50MB and is never transmitted to our servers.</p>
+                <p>To disable foreground-app identification, switch off "App awareness" in the Dashboard (disabled by default starting v2.4.0).</p>
+            </div>
+
+            <div class="card">
+                <h2>12. Cross-Border Transfer (APPI Art. 28 / PIPL Art. 38)</h2>
+                <p>When the selected API provider operates outside Japan (e.g., the United States), personal data is subject to cross-border transfer under that provider's contractual terms. Provider locations:</p>
+                <ul>
+                    <li>OpenAI (United States) — STT and LLM</li>
+                    <li>Anthropic (United States) — LLM only</li>
+                    <li>Groq (United States) — STT and LLM</li>
+                    <li>OpenRouter (United States, sub-providers may operate in additional jurisdictions per model) — LLM</li>
+                    <li>Ollama (local on-device — no cross-border transfer)</li>
+                </ul>
+                <p>Please review the data-protection standards applicable in those jurisdictions when using this App.</p>
+            </div>
+
+            <div class="card">
+                <h2>13. Right to Erasure (GDPR Art. 17 / APPI Art. 17)</h2>
+                <p>Via Dashboard Settings → "Delete all local data", you can delete the following local data in one action:</p>
+                <ul>
+                    <li>History (<code>history.json</code>)</li>
+                    <li>Event log (<code>events.jsonl</code>)</li>
+                    <li>Custom dictionary (<code>dictionary.json</code>)</li>
+                    <li>Voiceprint (<code>voiceprint.npy</code>)</li>
+                    <li>Audio backup (WAV files under <code>audio_backup/</code>)</li>
+                    <li>Usage statistics (<code>stats.json</code>)</li>
+                </ul>
+                <p>API keys can be deleted individually from the Dashboard Settings page.</p>
             </div>
 
             <div class="card">
