@@ -474,9 +474,17 @@ body {
     padding: 100px 0;
 }
 
+/* v2.4.0: 拆 showcase 大卡（3 個 USP）+ utility 小卡 grid（5 個）兩段 */
+.features-showcase {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 20px;
+    margin-bottom: 24px;
+}
+
 .features-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 20px;
 }
 
@@ -495,12 +503,10 @@ body {
     transform: translateY(-4px);
 }
 
+/* v2.4.0: feature-card-large 改回 block — 之前 grid: auto 1fr 跟 feature-thumb 撞，
+   把全寬圖塞進左欄、文字擠右側細條（被使用者截圖回報）。Codex review 確認後修。 */
 .feature-card-large {
-    grid-column: span 3;
-    display: grid;
-    grid-template-columns: auto 1fr;
-    gap: 20px;
-    align-items: center;
+    display: block;
     background: linear-gradient(135deg, #eff6ff 0%, #f5f3ff 100%);
 }
 
@@ -518,7 +524,7 @@ body {
 }
 
 .feature-card-large .feature-icon {
-    margin-bottom: 0;
+    margin-bottom: 16px;
     width: 64px;
     height: 64px;
 }
@@ -1024,14 +1030,7 @@ body {
         transform: translateY(-7px) rotate(-45deg);
     }
 
-    .features-grid {
-        grid-template-columns: 1fr;
-    }
-
-    .feature-card-large {
-        grid-column: span 1;
-        grid-template-columns: 1fr;
-    }
+    /* features-grid + features-showcase 的 1024 / 640 breakpoint 已上移到專屬 media block */
 
     .steps-grid {
         flex-direction: column;
@@ -1089,6 +1088,21 @@ body {
 /* ============================================================
    Rebuild additions (2026-05-25) — hero image / chips / thumbnails
    ============================================================ */
+
+/* v2.4.0 responsive grid for showcase + features */
+@media (max-width: 1024px) {
+    .features-showcase,
+    .features-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 640px) {
+    .features-showcase,
+    .features-grid {
+        grid-template-columns: 1fr;
+    }
+}
 
 /* Hero background image (placed inside .hero-bg, behind orbs) */
 .hero-bg-image {
@@ -1155,24 +1169,18 @@ body {
     object-fit: cover;
 }
 
+/* v2.4.0: feature-card-visual 上方有 thumb 圖，padding 重設讓 thumb 接邊。
+   text 子元素直接享 card 既有 padding，不再用 negative margin hack。 */
 .feature-card-visual {
     padding-top: 0;
     overflow: hidden;
 }
 
-.feature-card-visual > *:not(.feature-thumb) {
-    padding-left: 0;
-    padding-right: 0;
+.feature-card-visual .feature-thumb {
+    margin: 0 -28px 20px;
 }
 
-.feature-card-visual .feature-icon,
-.feature-card-visual h3,
-.feature-card-visual p {
-    margin-left: 32px;
-    margin-right: 32px;
-}
-
-.feature-card-visual h3 {
+.feature-card-visual .feature-icon {
     margin-top: 0;
 }
 
