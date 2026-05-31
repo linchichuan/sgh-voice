@@ -6,7 +6,7 @@ import os
 import sys
 import json
 from flask import Flask, request, jsonify, send_from_directory, Response
-from config import load_config, save_config, load_stats, update_stats, load_smart_replace, save_smart_replace, DEFAULT_APP_STYLES, BASE_CORRECTIONS as BASE_CORRECTIONS_REF
+from config import load_config, save_config, load_stats, update_stats, load_smart_replace, save_smart_replace, DEFAULT_APP_STYLES, BASE_CORRECTIONS as BASE_CORRECTIONS_REF, KEYCHAIN_KEYS, _keychain_available, _keychain_delete
 from memory import Memory
 import anthropic
 
@@ -828,6 +828,32 @@ def api_model_download_progress():
 
 
 # ─── Voiceprint Management ───────────────────────────────
+
+@app.route("/api/keychain/delete/<key_name>", methods=["POST"])
+def api_keychain_delete(key_name):
+    """v2.4.0：明確刪除某一支 Keychain 內的 API key（Settings 頁用）。
+    回傳 {ok, key, keychain_available}。"""
+    if key_name not in KEYCHAIN_KEYS:
+        return jsonify({"ok": False, "error": f"unknown key: {key_name}",
+                        "allowed": list(KEYCHAIN_KEYS.keys())}), 400
+    available = _keychain_available()
+    if not available:
+        # 沒 keyring 也要清掉 config.json 內的明文（fallback 路徑）
+        config = load_config()
+        config[key_name] = ""
+        save_config(config)
+        return jsonify({"ok": True, "key": key_name, "keychain_available": False,
+                        "note": "keyring 不可用，已清除 config.json fallback 值"})
+    ok = _keychain_delete(key_name)
+    # 同時把 config.json 內可能殘留的明文清掉（防舊資料殘留）
+    try:
+        config = load_config()
+        config[key_name] = ""
+        save_config(config)
+    except Exception:
+        pass
+    return jsonify({"ok": ok, "key": key_name, "keychain_available": True})
+
 
 @app.route("/api/voiceprint/status")
 def api_voiceprint_status():

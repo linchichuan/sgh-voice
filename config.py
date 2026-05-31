@@ -528,13 +528,30 @@ def load_config():
     if os.path.exists(CONFIG_FILE):
         with open(CONFIG_FILE, "r", encoding="utf-8") as f:
             saved = json.load(f)
-        saved, migrated = _migrate_config(saved)
+        saved, migrated_basic = _migrate_config(saved)
+
+        # v2 → v3：若 keyring 可用，把明文 key 搬進 Keychain（idempotent）
+        migrated_kc = False
+        if _keychain_available():
+            saved, migrated_kc = _migrate_to_keychain(saved)
+
+        # 把 Keychain 中的 key 填回 dict（key 名不變，下游無感）
+        if _keychain_available():
+            for key_name in KEYCHAIN_KEYS.keys():
+                kc_val = _keychain_get(key_name)
+                if kc_val:
+                    saved[key_name] = kc_val
+                # 如果 Keychain 沒值但 JSON 有值（keyring 暫時失效時的舊資料），保留 JSON 值 → fallback 行為
+
         merged = {**DEFAULT_CONFIG, **saved}
-        # 若有 migration 發生，把新版立刻寫回，避免 crash 時遺失
-        if migrated:
+
+        # 若有 migration 發生（任一種），把新版立刻寫回，避免 crash 時遺失
+        if migrated_basic or migrated_kc:
             try:
+                # 寫回 JSON 時用 _strip_keychain_keys_for_json 把已搬到 Keychain 的 key 從明文剝離
+                to_write = _strip_keychain_keys_for_json(merged)
                 with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-                    json.dump(merged, f, ensure_ascii=False, indent=2)
+                    json.dump(to_write, f, ensure_ascii=False, indent=2)
                 os.chmod(CONFIG_FILE, 0o600)
                 print(f" ⚙️ config.json migrated to v{CONFIG_VERSION}")
             except OSError:
@@ -543,13 +560,39 @@ def load_config():
     return {**DEFAULT_CONFIG, "config_version": CONFIG_VERSION}
 
 
+def _strip_keychain_keys_for_json(config):
+    """在寫 config.json 前，把 Keychain-managed API key 從 dict 剝離（避免明文寫盤）。
+    僅當 keyring 可用時剝離；keyring 失效時保留 JSON 明文 fallback 路徑。"""
+    if not _keychain_available():
+        return config
+    cleaned = dict(config)
+    for key_name in KEYCHAIN_KEYS.keys():
+        cleaned[key_name] = ""
+    return cleaned
+
+
 def save_config(config):
     _ensure_dir()
     # 確保 config_version 被寫入
     config = {**config, "config_version": CONFIG_VERSION}
+
+    # API key 處理：能進 Keychain 的進 Keychain；空字串 = 維持現狀（沿用既有遮罩語意）
+    if _keychain_available():
+        for key_name in KEYCHAIN_KEYS.keys():
+            val = config.get(key_name, "")
+            # 空字串或遮罩 → 不動 Keychain（保留既有值）
+            if not val or "..." in str(val):
+                continue
+            _keychain_set(key_name, val)
+        # 寫 JSON 前先剝離 keychain key（不寫明文）
+        to_write = _strip_keychain_keys_for_json(config)
+    else:
+        # keyring 不可用：fallback 到舊行為（明文 + chmod 600）
+        to_write = config
+
     with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-        json.dump(config, f, ensure_ascii=False, indent=2)
-    # 強制 config.json 權限為 600（含 API Key，僅本人可讀寫）
+        json.dump(to_write, f, ensure_ascii=False, indent=2)
+    # 強制 config.json 權限為 600（含 fallback 路徑的 API Key，僅本人可讀寫）
     try:
         os.chmod(CONFIG_FILE, 0o600)
     except OSError:
