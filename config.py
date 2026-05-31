@@ -478,8 +478,9 @@ def _ensure_dir():
 #   1 = pre-v2.4 schema（沒 config_version 欄位）
 #   2 = v2.4.0：enable_fewshot / enable_app_awareness 預設改 False
 #       + 修正 qwen 不存在的模型名
+#   3 = v2.4.0 Keychain Integration：API key 從 config.json 搬到 macOS Keychain
 # 升級流程：load_config 時若偵測舊版 schema，套用對應 migration，再覆寫 config_version。
-CONFIG_VERSION = 2
+CONFIG_VERSION = 3
 
 def _migrate_config(saved):
     """套用版本之間的 migration。回傳 (migrated_dict, did_migrate: bool)。"""
@@ -496,7 +497,30 @@ def _migrate_config(saved):
         # — 但若 key 不存在，補上新的安全預設 False（由 DEFAULT_CONFIG merge 處理）
         saved["config_version"] = 2
         did_migrate = True
+    # v2 → v3 (Keychain Integration)
+    # 注意：實際把 key 搬進 Keychain 的動作在 load_config 內處理（要呼叫 _keychain_set 而且
+    # 需要 keyring 可用才能 bump version）。這裡只占位、不改 version。
     return saved, did_migrate
+
+
+def _migrate_to_keychain(saved):
+    """v2 → v3：把 config.json 內明文 API key 搬到 Keychain。
+    冪等：跑兩次第二次沒事做。
+    回傳 (migrated_dict, did_migrate: bool)。
+    前提：呼叫端已確認 _keychain_available() 為 True。"""
+    if saved.get("config_version", 1) >= 3:
+        return saved, False
+    moved = []
+    for key_name in KEYCHAIN_KEYS.keys():
+        val = saved.get(key_name, "")
+        if _looks_like_real_key(val):
+            if _keychain_set(key_name, val):
+                moved.append(key_name)
+                saved[key_name] = ""  # 從 JSON 清掉明文
+    saved["config_version"] = 3
+    if moved:
+        print(f" 🔐 Migrated {len(moved)} API key(s) to macOS Keychain: {', '.join(moved)}")
+    return saved, True
 
 
 def load_config():
