@@ -27,6 +27,7 @@
       "static/js/lib/i18n.js",
       "static/js/lib/store.js",
       "static/js/pages/cost-audit.js",
+      "static/js/pages/cost-audit/pricing.js",
       "static/js/pages/dashboard.js",
       "static/js/pages/dictionary.js",
       "static/js/pages/dictionary/app-corrections.js",
@@ -65,7 +66,7 @@
     ],
     "updated_at": "2026-05-20T06:10:15Z"
   },
-  "updated_at": "2026-05-31T16:21:20Z",
+  "updated_at": "2026-05-31T16:22:12Z",
   "has_code_change": true,
   "has_doc_change": true,
   "code_review": {
@@ -110,6 +111,7 @@
     "/Users/lin/voice-input/static/js/lib/i18n.js",
     "/Users/lin/voice-input/static/js/lib/store.js",
     "/Users/lin/voice-input/static/js/pages/cost-audit.js",
+    "/Users/lin/voice-input/static/js/pages/cost-audit/pricing.js",
     "/Users/lin/voice-input/static/js/pages/dashboard.js",
     "/Users/lin/voice-input/static/js/pages/dictionary.js",
     "/Users/lin/voice-input/static/js/pages/dictionary/app-corrections.js",

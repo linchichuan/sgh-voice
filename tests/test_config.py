@@ -20,13 +20,14 @@ def test_load_config_returns_default_with_version(isolated_data_dir, monkeypatch
 
 
 def test_save_config_persists_version(isolated_data_dir):
-    """save_config 寫入 config.json，read back 含 config_version。"""
+    """save_config 寫入 config.json，read back 含 config_version。
+    注意：API key 欄位會被 Keychain 整合搬走，所以用非敏感欄位 (claude_model) 驗證。"""
     import config as cfg
-    cfg.save_config({"openai_api_key": "test-key"})
+    cfg.save_config({"claude_model": "test-model-id"})
     with open(cfg.CONFIG_FILE, "r", encoding="utf-8") as f:
         raw = json.load(f)
     assert raw.get("config_version") == cfg.CONFIG_VERSION
-    assert raw.get("openai_api_key") == "test-key"
+    assert raw.get("claude_model") == "test-model-id"
 
 
 def test_migrate_config_v1_to_v2_fixes_qwen_models(isolated_data_dir):
@@ -61,7 +62,7 @@ def test_save_config_sets_0600_permissions(isolated_data_dir):
     if platform.system() == "Windows":
         pytest.skip("POSIX 權限不適用 Windows")
     import config as cfg
-    cfg.save_config({"anthropic_api_key": "sk-secret"})
+    cfg.save_config({"claude_model": "x"})
     mode = stat.S_IMODE(os.stat(cfg.CONFIG_FILE).st_mode)
     # 應該只有 owner read/write（0o600）
     assert mode & 0o077 == 0, f"config.json mode {oct(mode)} 給了其他人權限"
