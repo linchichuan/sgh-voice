@@ -141,4 +141,8 @@ export const regenerateStyleProfile = ()       => request('POST', '/api/style_pr
 export const getAuditLog            = ()       => request('GET',  '/api/audit-log');
 
 // ---------- GDPR ----------
-export const wipeAll = () => request('POST', '/api/wipe_all', { confirm: 'DELETE_ALL_MY_DATA' });
+// v2.4.0：兩步驟 — 先要 token、再帶 token 執行刪除（防 JS 攻擊者直接 wipeAll() bypass UI 守門）
+export async function wipeAll() {
+  const { token } = await request('POST', '/api/wipe_all/token');
+  return request('POST', '/api/wipe_all', { token, confirm: 'DELETE_ALL_MY_DATA' });
+}

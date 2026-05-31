@@ -514,16 +514,25 @@ def _migrate_to_keychain(saved):
     if saved.get("config_version", 1) >= 3:
         return saved, False
     moved = []
+    failed = []
     for key_name in KEYCHAIN_KEYS.keys():
         val = saved.get(key_name, "")
         if _looks_like_real_key(val):
             if _keychain_set(key_name, val):
                 moved.append(key_name)
-                saved[key_name] = ""  # 從 JSON 清掉明文
-    saved["config_version"] = 3
+                saved[key_name] = ""  # 從 JSON 清掉明文（已安全搬到 Keychain）
+            else:
+                failed.append(key_name)
+                # ⚠️ Keychain write 失敗：**保留 JSON 明文** 作為 fallback。
+                # 不能 strip — 否則使用者下次啟動會發現 key 不見了。
+    # 只有所有應搬的 key 都成功才 bump version；任一失敗則保持舊版（下次 load 會再試）
+    if not failed:
+        saved["config_version"] = 3
     if moved:
         print(f" 🔐 Migrated {len(moved)} API key(s) to macOS Keychain: {', '.join(moved)}")
-    return saved, True
+    if failed:
+        print(f" ⚠️ Keychain write failed for {len(failed)} key(s) — kept in JSON fallback: {', '.join(failed)}")
+    return saved, bool(moved) or bool(failed)
 
 
 def load_config():
@@ -564,13 +573,19 @@ def load_config():
 
 
 def _strip_keychain_keys_for_json(config):
-    """在寫 config.json 前，把 Keychain-managed API key 從 dict 剝離（避免明文寫盤）。
-    僅當 keyring 可用時剝離；keyring 失效時保留 JSON 明文 fallback 路徑。"""
+    """在寫 config.json 前，把已成功存入 Keychain 的 API key 從 dict 剝離（避免明文寫盤）。
+    安全策略：
+    1. keyring 完全失效（_keychain_available=False）→ 保留所有 JSON 明文 fallback。
+    2. 個別 key 不在 Keychain（_keychain_get 回空）→ 保留 JSON 明文（migration 失敗時的救命路徑）。
+    3. key 在 Keychain → 從 JSON dict 清空。
+    這樣即使 Keychain 寫入失敗，使用者下次啟動仍能用 JSON 中的 fallback key。"""
     if not _keychain_available():
         return config
     cleaned = dict(config)
     for key_name in KEYCHAIN_KEYS.keys():
-        cleaned[key_name] = ""
+        # 只有確認 Keychain 內有對應值才從 JSON 剝離 — 否則保留 JSON 明文 fallback
+        if _keychain_get(key_name):
+            cleaned[key_name] = ""
     return cleaned
 
 

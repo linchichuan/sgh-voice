@@ -40,31 +40,47 @@ _ALLOWED_ORIGINS = {
 
 @app.before_request
 def _enforce_same_origin():
+    """v2.4.0 同源強制。Codex review round 1 修正：
+    原本「origin truthy 才 block」會讓「無 Origin + 惡意 Referer」靜默放行。
+    新邏輯：明確區分三種情境並分別判定。"""
     # GET / HEAD / OPTIONS 不檢查（讀取 / preflight 不會改狀態）
     if request.method in ("GET", "HEAD", "OPTIONS"):
         return None
     origin = request.headers.get("Origin", "")
     referer = request.headers.get("Referer", "")
-    # 允許 Origin 在白名單，或無 Origin 但 Referer 在白名單（部分舊瀏覽器 / curl 不送 Origin）
-    ok = origin in _ALLOWED_ORIGINS or any(referer.startswith(o + "/") for o in _ALLOWED_ORIGINS) or (not origin and not referer)
-    # 不送任何 Origin/Referer 的情況：通常是同 process curl / Python requests，本機操作不擋
-    if origin and not ok:
-        return jsonify({"error": "cross-origin request blocked", "origin": origin}), 403
+    # 三種情境：
+    # A. 兩者皆空 → 本機 curl / Python requests / 同 process / Electron — 不擋
+    # B. 至少有一個有值 → 必須白名單通過才放行
+    if not origin and not referer:
+        return None
+    origin_ok = origin in _ALLOWED_ORIGINS if origin else True  # 若 origin 為空，不用 origin 判定
+    referer_ok = any(referer.startswith(o + "/") for o in _ALLOWED_ORIGINS) if referer else True
+    # 兩個 header 都必須通過（任一不通過就拒絕）
+    if not (origin_ok and referer_ok):
+        return jsonify({"error": "cross-origin request blocked",
+                        "origin": origin, "referer_host": referer.split("/")[2] if "/" in referer[8:] else ""}), 403
     return None
 
 
 @app.after_request
 def _security_headers(response):
-    """v2.4.0：加 baseline security headers — 不影響功能，防 clickjacking / sniffing。"""
+    """v2.4.0：baseline security headers。Codex round 1 修正 CSP：必須允許
+    Tailwind CDN + Lucide CDN，否則新 SPA 在瀏覽器完全壞掉。"""
     response.headers.setdefault("X-Frame-Options", "DENY")
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     response.headers.setdefault("Referrer-Policy", "no-referrer")
-    # CSP：禁外部 script，inline JS 暫保留（Dashboard 大量 inline，下次重寫時收緊）
+    # CSP：明確允許 Tailwind CDN（cdn.tailwindcss.com）+ Lucide CDN（unpkg.com）
+    # + Google Fonts（fonts.googleapis.com / fonts.gstatic.com）
+    # 'unsafe-inline' for script 用於 Tailwind config 與 lucide.createIcons 呼叫；style 用於 Tailwind runtime
+    # 下版（v2.5.0）改用 SRI hash + 自 host CDN bundle 收緊
     response.headers.setdefault("Content-Security-Policy",
-        "default-src 'self'; script-src 'self' 'unsafe-inline'; "
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://unpkg.com; "
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
         "font-src 'self' https://fonts.gstatic.com; "
-        "img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'")
+        "img-src 'self' data:; "
+        "connect-src 'self'; "
+        "frame-ancestors 'none'")
     return response
 
 
@@ -85,16 +101,46 @@ def api_stats():
     })
 
 
+import secrets, time as _time
+# v2.4.0：wipe nonce 機制（Codex round 1 修正：原本 client-side 固定字串可被 JS 攻擊者直接 bypass）
+_WIPE_TOKEN_STORE = {}  # token → expiry_unix_ts
+
+
+@app.route("/api/wipe_all/token", methods=["POST"])
+def api_wipe_token():
+    """產生一次性 wipe 確認 token。Client 必須在使用者 UI 互動（typed DELETE）後才能取得，
+    然後在 5 分鐘內 POST 到 /api/wipe_all 完成刪除。Token 用過即廢、過期自動丟。"""
+    token = secrets.token_urlsafe(32)
+    _WIPE_TOKEN_STORE[token] = _time.time() + 300  # 5 分鐘有效
+    # 同時清理過期 token（amortized）
+    now = _time.time()
+    for t in list(_WIPE_TOKEN_STORE.keys()):
+        if _WIPE_TOKEN_STORE[t] < now:
+            del _WIPE_TOKEN_STORE[t]
+    return jsonify({"token": token, "expires_in": 300})
+
+
 @app.route("/api/wipe_all", methods=["POST"])
 def api_wipe_all():
     """v2.4.0：右消去 / GDPR Art. 17 / 一鍵刪除所有本機資料。
-    需要 client 送 confirm token（要先 GET /api/wipe_token、Body 帶 token + magic phrase）以防誤觸。
-    被刪除：history.json / events.jsonl / dictionary.json / voiceprint.npy / audio_backup/ / stats.json"""
+    需要 client 先 POST /api/wipe_all/token 拿 nonce、再帶 nonce 來這支才執行。
+    被刪除：history.json / events.jsonl / dictionary.json / voiceprint.npy /
+            audio_backup/ / stats.json / audit.log / smart_replace.json"""
     body = request.get_json(silent=True) or {}
-    # 防誤觸：必須帶確認字串
-    if body.get("confirm") != "DELETE_ALL_MY_DATA":
-        return jsonify({"error": "missing or invalid confirm token",
-                        "expected": "send {\"confirm\": \"DELETE_ALL_MY_DATA\"}"}), 400
+    token = body.get("token", "")
+    confirm = body.get("confirm", "")
+    # 雙重守門：必須帶 token + confirm phrase
+    if confirm != "DELETE_ALL_MY_DATA":
+        return jsonify({"error": "missing confirm phrase",
+                        "hint": "POST {token, confirm: 'DELETE_ALL_MY_DATA'}"}), 400
+    if not token or token not in _WIPE_TOKEN_STORE:
+        return jsonify({"error": "invalid or expired wipe token",
+                        "hint": "POST /api/wipe_all/token first"}), 400
+    if _WIPE_TOKEN_STORE[token] < _time.time():
+        del _WIPE_TOKEN_STORE[token]
+        return jsonify({"error": "wipe token expired", "hint": "request new token"}), 400
+    # Token 用過即廢
+    del _WIPE_TOKEN_STORE[token]
 
     import shutil, glob
     data_dir = os.path.expanduser("~/.voice-input")
@@ -106,6 +152,7 @@ def api_wipe_all():
         ("voiceprint.npy", "file"),
         ("stats.json", "file"),
         ("smart_replace.json", "file"),
+        ("audit.log", "file"),                # Codex round 1 補：之前漏掉，audit log 也是 PII
         ("audio_backup", "dir"),
     ]
     deleted = []
@@ -132,8 +179,22 @@ def api_wipe_all():
             try: os.remove(f); deleted.append(f"backup_audio_dir/{os.path.basename(f)}")
             except Exception as e: failed.append({"name": f, "error": str(e)[:120]})
 
+    # ⚠️ Codex round 1：清 in-memory state — 不清的話 process 內 Memory 物件還持有
+    # 已刪資料，下次 add_to_history / save 又會把資料寫回磁碟，GDPR 沒落地。
+    try:
+        if hasattr(memory, "clear_all_in_memory"):
+            memory.clear_all_in_memory()
+        else:
+            # Fallback：直接重置 memory 物件
+            from memory import Memory
+            globals()["memory"] = Memory()
+            if _engine and hasattr(_engine, "memory"):
+                _engine.memory = globals()["memory"]
+    except Exception as e:
+        failed.append({"name": "in_memory_state", "error": str(e)[:120]})
+
     return jsonify({"deleted": deleted, "failed": failed,
-                    "note": "API キーは config.json 內、需要時請從設定頁手動清除（或砍 config.json）。"})
+                    "note": "API キーは Keychain / config.json 內、需要時請從設定頁手動清除（或用 /api/keychain/delete/<key>）。"})
 
 
 def _resolve_ui_language(ui_lang):

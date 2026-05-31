@@ -26,6 +26,17 @@ class Memory:
         self.history = load_history()
         self.cleanup_bad_corrections()
 
+    def clear_all_in_memory(self):
+        """v2.4.0：wipe_all GDPR Art. 17 後呼叫 — 把 process 內快取的 history / dictionary
+        重置為空，避免後續寫入又把已刪資料 persistence 回磁碟。
+        ⚠️ 此 method 只清 RAM，不碰磁碟（磁碟刪除由 caller 完成）。"""
+        with self._history_lock:
+            self.history = []
+            self._history_write_count = 0
+        # dictionary 重置為空骨架，使用者下次 add 從零開始
+        self.dictionary = {"custom_words": {"manual_added": [], "auto_added": []},
+                           "corrections": {}, "corrections_by_scene": {}, "corrections_by_app": {}}
+
     # ─── Whisper Prompt ──────────────────────────────────
 
     def build_whisper_prompt(self, custom_words, scene_words=None):

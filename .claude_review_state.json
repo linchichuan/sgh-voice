@@ -15,6 +15,7 @@
       "build.sh",
       "config.py",
       "dashboard.py",
+      "memory.py",
       "pytest.ini",
       "requirements-dev.txt",
       "requirements.txt",
@@ -69,7 +70,7 @@
     ],
     "updated_at": "2026-05-20T06:10:15Z"
   },
-  "updated_at": "2026-05-31T16:30:38Z",
+  "updated_at": "2026-05-31T16:45:12Z",
   "has_code_change": true,
   "has_doc_change": true,
   "code_review": {
@@ -104,6 +105,7 @@
     "/Users/lin/voice-input/dashboard.py",
     "/Users/lin/voice-input/event_ledger.py",
     "/Users/lin/voice-input/ios/SGHVoice/SGHVoice/API/LlmClient.swift",
+    "/Users/lin/voice-input/memory.py",
     "/Users/lin/voice-input/overlay.py",
     "/Users/lin/voice-input/scripts/dictionary_promote_from_history.py",
     "/Users/lin/voice-input/scripts/event_summary.py",
