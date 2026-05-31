@@ -479,12 +479,12 @@ body {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 20px;
-    margin-bottom: 24px;
+    margin-bottom: 28px;
 }
 
 .features-grid {
     display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
     gap: 20px;
 }
 
@@ -503,10 +503,7 @@ body {
     transform: translateY(-4px);
 }
 
-/* v2.4.0: feature-card-large 改回 block — 之前 grid: auto 1fr 跟 feature-thumb 撞，
-   把全寬圖塞進左欄、文字擠右側細條（被使用者截圖回報）。Codex review 確認後修。 */
 .feature-card-large {
-    display: block;
     background: linear-gradient(135deg, #eff6ff 0%, #f5f3ff 100%);
 }
 
@@ -1091,14 +1088,12 @@ body {
 
 /* v2.4.0 responsive grid for showcase + features */
 @media (max-width: 1024px) {
-    .features-showcase,
     .features-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 }
 
 @media (max-width: 640px) {
-    .features-showcase,
     .features-grid {
         grid-template-columns: 1fr;
     }
@@ -1151,13 +1146,11 @@ body {
     -webkit-backdrop-filter: blur(8px);
 }
 
-/* Feature card with image thumbnail */
+/* Feature card image thumbnail（v2.4.0 final 重構：
+   - 永遠用 clamp 控制高度，不再用 aspect-ratio（防 4/3 模式下 tablet 變 540px 超高）
+   - 所有特殊化（margin / radius）由 .feature-card-visual .feature-thumb 高 specificity rule 接手 */
 .feature-thumb {
-    margin: -32px -32px 20px;
     overflow: hidden;
-    border-top-left-radius: var(--radius-lg);
-    border-top-right-radius: var(--radius-lg);
-    aspect-ratio: 16 / 9;
     background: linear-gradient(135deg, #f8faff 0%, #eef2ff 100%);
 }
 
@@ -1172,16 +1165,60 @@ body {
 /* v2.4.0: feature-card-visual 上方有 thumb 圖，padding 重設讓 thumb 接邊。
    text 子元素直接享 card 既有 padding，不再用 negative margin hack。 */
 .feature-card-visual {
-    padding-top: 0;
+    display: flex;
+    flex-direction: column;
+    min-height: 100%;
+    padding: 0 24px 26px;
     overflow: hidden;
 }
 
 .feature-card-visual .feature-thumb {
-    margin: 0 -28px 20px;
+    margin: 0 -24px 22px;
+    height: clamp(190px, 17vw, 230px);
+    min-height: 0;
+    aspect-ratio: auto;
+    border-bottom: 1px solid rgba(37, 99, 235, 0.08);
+    border-top-left-radius: var(--radius-lg);
+    border-top-right-radius: var(--radius-lg);
 }
 
 .feature-card-visual .feature-icon {
+    width: 48px;
+    height: 48px;
     margin-top: 0;
+    margin-bottom: 14px;
+}
+
+.feature-card-visual h3,
+.feature-card-visual p {
+    max-width: none;
+}
+
+.feature-card-visual h3 {
+    font-size: 1.12rem;
+    line-height: 1.45;
+    margin-bottom: 10px;
+}
+
+.feature-card-visual p {
+    font-size: 0.92rem;
+    line-height: 1.75;
+    /* flex: 1 → 短文 card 的 description 區會「撐開」吃滿空白，3 張卡視覺等高
+       醫療卡文字長就自然多佔位、其他 2 卡的空白歸到 p 自己；底部 padding 一致 */
+    flex: 1 1 auto;
+    margin: 0;
+}
+
+.feature-card-visual .feature-thumb img {
+    object-position: center;
+}
+
+.feature-card-medical .feature-thumb img {
+    object-position: center right;
+}
+
+.feature-card-privacy .feature-thumb img {
+    object-position: center;
 }
 
 /* Privacy card distinct accent */
@@ -1207,11 +1244,39 @@ body {
     height: auto;
 }
 
-/* Mobile hide orbs (they overlap badly with hero image) */
-@media (max-width: 768px) {
-    .feature-thumb {
-        aspect-ratio: 4 / 3;
+/* v2.4.0 final: showcase 從 3-col 直接降到 1-col（中間 980-1024 區段如果用 2-col
+   會在 3 cards / 2 cols 產生孤兒，跟之前 5-cards-in-3-col 的 orphan 同理）。
+   utility .features-grid 用 auto-fit minmax(190px,1fr) 已經 fluid，不用額外 breakpoint。 */
+@media (max-width: 980px) {
+    .features-showcase {
+        grid-template-columns: 1fr;
+        max-width: 720px;
+        margin-left: auto;
+        margin-right: auto;
     }
+
+    .feature-card-visual {
+        /* card 變成 full-width 時，內 padding 拉大讓圖文不貼邊 */
+        padding: 0 28px 28px;
+    }
+
+    .feature-card-visual .feature-thumb {
+        margin: 0 -28px 24px;
+        /* 圖在 full-width card 上 cap 240px 防止變成超高 banner */
+        height: clamp(200px, 30vw, 260px);
+    }
+}
+
+@media (max-width: 600px) {
+    .feature-card-visual {
+        padding: 0 22px 24px;
+    }
+
+    .feature-card-visual .feature-thumb {
+        margin: 0 -22px 20px;
+        height: clamp(180px, 45vw, 220px);
+    }
+
     .download-hero {
         margin-bottom: 32px;
     }
