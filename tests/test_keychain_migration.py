@@ -20,11 +20,15 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 
 # ─── Fake keyring backend ────────────────────────────────────
 
-class _InMemoryKeyring:
+from keyring.backend import KeyringBackend
+
+
+class _InMemoryKeyring(KeyringBackend):
     """Pretend to be a working keyring backend (passes _keychain_available check)."""
-    priority = 1
+    priority = 1  # type: ignore[assignment]
 
     def __init__(self):
+        super().__init__()
         self._store = {}
 
     def get_password(self, service, account):
