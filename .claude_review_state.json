@@ -47,6 +47,7 @@
       "static/js/pages/settings/dirty.js",
       "static/js/pages/settings/hotkeys.js",
       "static/js/pages/settings/i18n-strings.js",
+      "static/js/pages/settings/index.js",
       "static/js/pages/settings/llm.js",
       "static/js/pages/settings/privacy.js",
       "static/js/pages/settings/stt.js",
@@ -64,7 +65,7 @@
     ],
     "updated_at": "2026-05-20T06:10:15Z"
   },
-  "updated_at": "2026-05-31T16:19:46Z",
+  "updated_at": "2026-05-31T16:20:15Z",
   "has_code_change": true,
   "has_doc_change": true,
   "code_review": {
@@ -129,6 +130,7 @@
     "/Users/lin/voice-input/static/js/pages/settings/dirty.js",
     "/Users/lin/voice-input/static/js/pages/settings/hotkeys.js",
     "/Users/lin/voice-input/static/js/pages/settings/i18n-strings.js",
+    "/Users/lin/voice-input/static/js/pages/settings/index.js",
     "/Users/lin/voice-input/static/js/pages/settings/llm.js",
     "/Users/lin/voice-input/static/js/pages/settings/privacy.js",
     "/Users/lin/voice-input/static/js/pages/settings/stt.js",
