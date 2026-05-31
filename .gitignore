@@ -54,7 +54,9 @@ config.json
 dictionary.json
 *.log
 *.tmp
-static/
+# 註：v2.4.0 起 static/ 是 SPA 原始碼（不再 ignore）。
+# 若需排除 build/generated 內容，請用具體 glob 而非整目錄。
+# static/  ← 此行 v2.4.0 移除
 
 # 空目錄（誤建）
 -g/

@@ -8,6 +8,7 @@
     ],
     "touched_files": [
       ".github/workflows/ci.yml",
+      ".gitignore",
       ".kiro/specs/dashboard-rewrite/SPEC.md",
       "CHANGELOG.md",
       "app.py",

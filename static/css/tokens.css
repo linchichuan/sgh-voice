@@ -1,0 +1,30 @@
+:root {
+  /* Brand — aligned with voice.shingihou.com */
+  --brand-blue:   #2563eb;
+  --brand-purple: #7c3aed;
+  --brand-orange: #f97316;
+
+  /* Semantic */
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger:  #ef4444;
+
+  /* Light mode — DEFAULT */
+  --bg:        #f8fafc;
+  --surface:   #ffffff;
+  --surface-2: #f1f5f9;
+  --border:    #e2e8f0;
+  --text:      #0f172a;  /* 16.7:1 on bg */
+  --text-2:    #475569;  /* 7.5:1 */
+  --text-3:    #64748b;  /* 4.8:1 — passes AA body text */
+}
+
+[data-theme="dark"] {
+  --bg:        #0b1120;
+  --surface:   #111827;
+  --surface-2: #1f2937;
+  --border:    #334155;
+  --text:      #f8fafc;
+  --text-2:    #cbd5e1;  /* 11.5:1 */
+  --text-3:    #94a3b8;  /* 6.7:1 */
+}

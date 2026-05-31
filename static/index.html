@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#2563eb">
+  <title>SGH Voice — Dashboard</title>
+
+  <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%232563eb'><path d='M12 14a3 3 0 0 0 3-3V5a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2z'/></svg>">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="/css/tokens.css">
+  <link rel="stylesheet" href="/css/base.css">
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: ['class', '[data-theme="dark"]'],
+      theme: {
+        extend: {
+          colors: {
+            brand: { blue: '#2563eb', purple: '#7c3aed', orange: '#f97316' },
+          },
+          fontFamily: {
+            sans: ['DM Sans', 'Noto Sans JP', 'Noto Sans TC', 'system-ui', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+        },
+      },
+    };
+  </script>
+
+  <script src="https://unpkg.com/lucide@latest" defer></script>
+</head>
+<body>
+  <div class="app-shell">
+
+    <header class="app-header" role="banner">
+      <a href="#/" class="flex items-center gap-2 font-semibold text-[var(--text)] no-underline">
+        <span class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-br from-brand-blue to-brand-purple text-white">
+          <i data-lucide="mic" class="w-4 h-4"></i>
+        </span>
+        <span class="hidden sm:inline">SGH Voice</span>
+        <span class="text-xs text-[var(--text-3)] mono">v2.4.0</span>
+      </a>
+
+      <div id="rec-status" class="rec-indicator" data-state="idle" aria-live="polite">
+        <span class="rec-dot" aria-hidden="true"></span>
+        <span class="rec-label">Idle</span>
+      </div>
+
+      <div class="ml-auto flex items-center gap-2">
+        <button id="cmdk-btn" type="button" class="hidden md:inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-[var(--text-2)] border border-[var(--border)] hover:bg-[var(--surface-2)] transition" aria-label="Open command palette">
+          <i data-lucide="search" class="w-4 h-4"></i>
+          <span class="mono text-xs">⌘K</span>
+        </button>
+
+        <button id="theme-toggle" type="button" class="inline-flex items-center justify-center w-9 h-9 rounded-lg text-[var(--text-2)] hover:bg-[var(--surface-2)] transition" aria-label="Toggle theme">
+          <i data-lucide="moon" class="w-4 h-4"></i>
+        </button>
+
+        <div class="relative">
+          <button id="lang-toggle" type="button" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm text-[var(--text-2)] hover:bg-[var(--surface-2)] transition" aria-haspopup="listbox" aria-expanded="false" aria-label="Change language">
+            <span id="lang-current">日本語</span>
+            <i data-lucide="chevron-down" class="w-3.5 h-3.5"></i>
+          </button>
+          <ul id="lang-menu" role="listbox" class="hidden absolute right-0 mt-1 min-w-[140px] rounded-lg border border-[var(--border)] bg-[var(--surface)] shadow-lg overflow-hidden" tabindex="-1">
+            <li><button type="button" role="option" data-lang="ja" class="w-full text-left px-3 py-2 text-sm hover:bg-[var(--surface-2)]">日本語</button></li>
+            <li><button type="button" role="option" data-lang="zh" class="w-full text-left px-3 py-2 text-sm hover:bg-[var(--surface-2)]">繁體中文</button></li>
+            <li><button type="button" role="option" data-lang="en" class="w-full text-left px-3 py-2 text-sm hover:bg-[var(--surface-2)]">English</button></li>
+          </ul>
+        </div>
+      </div>
+    </header>
+
+    <aside class="app-sidebar" role="navigation" aria-label="Main">
+      <nav class="flex-1">
+        <div class="nav-group-label" data-i18n-key="nav.group.main">MAIN</div>
+        <a href="#/" class="nav-item" data-route="#/"><i data-lucide="layout-dashboard" class="w-4 h-4"></i><span data-i18n-key="nav.dashboard">Dashboard</span></a>
+        <a href="#/history" class="nav-item" data-route="#/history"><i data-lucide="history" class="w-4 h-4"></i><span data-i18n-key="nav.history">History</span></a>
+        <a href="#/dictionary" class="nav-item" data-route="#/dictionary"><i data-lucide="book-open" class="w-4 h-4"></i><span data-i18n-key="nav.dictionary">Dictionary</span></a>
+
+        <div class="nav-group-label" data-i18n-key="nav.group.intelligence">INTELLIGENCE</div>
+        <a href="#/voiceprint" class="nav-item" data-route="#/voiceprint"><i data-lucide="fingerprint" class="w-4 h-4"></i><span data-i18n-key="nav.voiceprint">Voiceprint</span></a>
+        <a href="#/cost-audit" class="nav-item" data-route="#/cost-audit"><i data-lucide="bar-chart-3" class="w-4 h-4"></i><span data-i18n-key="nav.cost">Cost & Audit</span></a>
+        <a href="#/models" class="nav-item" data-route="#/models"><i data-lucide="cpu" class="w-4 h-4"></i><span data-i18n-key="nav.models">Models</span></a>
+
+        <div class="nav-group-label" data-i18n-key="nav.group.system">SYSTEM</div>
+        <a href="#/settings" class="nav-item" data-route="#/settings"><i data-lucide="settings" class="w-4 h-4"></i><span data-i18n-key="nav.settings">Settings</span></a>
+        <a href="#/onboarding" class="nav-item" data-route="#/onboarding"><i data-lucide="sparkles" class="w-4 h-4"></i><span data-i18n-key="nav.onboarding">Onboarding</span></a>
+      </nav>
+
+      <footer class="mt-2 pt-3 border-t border-[var(--border)] flex flex-col gap-2">
+        <div id="service-status-pills" class="flex flex-wrap gap-1.5 px-1" aria-label="Service status"></div>
+      </footer>
+    </aside>
+
+    <main id="page-slot" class="app-main" tabindex="-1"></main>
+  </div>
+
+  <div id="toast-root" aria-live="polite" aria-atomic="true"></div>
+
+  <noscript>
+    <div style="padding:2rem;text-align:center;font-family:system-ui;">
+      <h1>JavaScript required</h1>
+      <p>SGH Voice Dashboard needs JavaScript to run. Please enable it in your browser.</p>
+    </div>
+  </noscript>
+
+  <script type="module" src="/js/app.js"></script>
+</body>
+</html>
