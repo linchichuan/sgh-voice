@@ -57,8 +57,13 @@ def _enforce_same_origin():
     referer_ok = any(referer.startswith(o + "/") for o in _ALLOWED_ORIGINS) if referer else True
     # 兩個 header 都必須通過（任一不通過就拒絕）
     if not (origin_ok and referer_ok):
+        # referer host 解析防禦：畸形值（如 "evil.com/x"）不能讓 403 變 500
+        try:
+            referer_host = referer.split("/")[2] if referer.startswith(("http://", "https://")) else ""
+        except IndexError:
+            referer_host = ""
         return jsonify({"error": "cross-origin request blocked",
-                        "origin": origin, "referer_host": referer.split("/")[2] if "/" in referer[8:] else ""}), 403
+                        "origin": origin, "referer_host": referer_host}), 403
     return None
 
 
@@ -598,30 +603,28 @@ def api_rewrite():
     if not api_key:
         return jsonify({"error": "no API key"}), 400
 
-    style_prompts = {
-        # 基本改寫
-        "concise": "請將以下文字精簡改寫，去除冗詞贅字，保持原意。只輸出改寫結果：",
-        "formal": "請將以下文字改寫為正式書面語氣。只輸出改寫結果：",
-        # 情境改寫（對標 Purri）
-        "meeting": "請將以下語音內容整理為會議記錄格式，包含重點摘要和行動項目。只輸出整理結果：",
-        "email": "請將以下內容改寫為一封得體的 Email 草稿，包含問候語和結尾。只輸出 Email 內容：",
-        "technical": "請將以下內容改寫為技術文件風格，用詞精確、結構清晰。只輸出改寫結果：",
-        "casual": "請將以下文字改寫為輕鬆口語風格，適合聊天或社群貼文。只輸出改寫結果：",
-        # 翻譯
-        "translate_en": "請將以下文字翻譯為英文。只輸出翻譯結果：",
-        "translate_ja": "請將以下文字翻譯為日文。只輸出翻譯結果：",
-        "translate_zh": "請將以下文字翻譯為繁體中文。只輸出翻譯結果：",
-    }
-    prompt = style_prompts.get(style, style_prompts["concise"])
+    # v2.5.0：風格 prompt 統一收斂到 config.REWRITE_STYLE_DIRECTIVES（與
+    # transcriber._STYLE_DIRECTIVES / Quick-Rewrite 同源），並補上原本獨缺的
+    # system prompt（含 <command>/<text> injection 防護 + 繁中規則）與 OpenCC 終層。
+    from config import REWRITE_STYLE_DIRECTIVES, EDIT_SYSTEM_PROMPT
+    directive = REWRITE_STYLE_DIRECTIVES.get(style, REWRITE_STYLE_DIRECTIVES["concise"])
 
     try:
-        client = anthropic.Anthropic(api_key=api_key)
+        client = anthropic.Anthropic(api_key=api_key, max_retries=0)
         resp = client.messages.create(
             model=config.get("claude_model", "claude-haiku-4-5-20251001"),
             max_tokens=1024,
-            messages=[{"role": "user", "content": f"{prompt}\n\n{text}"}],
+            system=EDIT_SYSTEM_PROMPT,
+            messages=[{"role": "user", "content": f"<command>{directive}</command>\n<text>{text}</text>"}],
         )
         result = resp.content[0].text.strip()
+        # 繁中終層防護（translate_ja 豁免：s2twp 會錯誤轉換日文新字體 国→國）
+        if style != "translate_ja":
+            try:
+                from opencc import OpenCC
+                result = OpenCC("s2twp").convert(result)
+            except Exception:
+                pass
         # 追蹤 token 用量
         _track_usage(resp, "rewrite")
         return jsonify({"result": result})
@@ -676,7 +679,13 @@ def api_get_smart_replace():
 
 @app.route("/api/smart_replace", methods=["POST"])
 def api_save_smart_replace():
+    # 驗證：必須是 {str: str} dict — 壞 payload 寫進 smart_replace.json 後，
+    # 每次轉寫都會在 _apply_smart_replace 炸掉，整條聽寫管線失效
     rules = request.json
+    if not isinstance(rules, dict) or not all(
+        isinstance(k, str) and isinstance(v, str) for k, v in rules.items()
+    ):
+        return jsonify({"error": "rules must be a dict of string→string"}), 400
     save_smart_replace(rules)
     return jsonify({"ok": True})
 
@@ -1089,6 +1098,10 @@ def run_dashboard(port=7865, host="127.0.0.1"):
             f"Dashboard 拒絕綁定到 {host!r}：必須是 127.0.0.1（loopback only）。"
             "Dashboard 含 API key / 錄音控制 / 歷史資料，曝露到 LAN 等同所有資料外流。"
         )
+    # 把實際使用的 port 加進同源白名單 — 7865 被占用時 _find_free_port 會 fallback
+    # 到 7866+，若白名單只認 7865/7860，Dashboard 自己的 POST/PATCH/DELETE 會被
+    # 自家 CSRF 防護 403，設定頁全部存不了。
+    _ALLOWED_ORIGINS.update({f"http://127.0.0.1:{port}", f"http://localhost:{port}"})
     print(f"📊 Dashboard: http://{host}:{port}")
     import logging
     log = logging.getLogger('werkzeug')

@@ -89,6 +89,12 @@ class Memory:
             if CASE_INSENSITIVE_CORRECTIONS:
                 # 不分大小寫替換：用正則 re.IGNORECASE
                 pattern = re.escape(wrong)
+                # 純 ASCII 且頭尾是 word char 的規則套 word boundary，
+                # 否則 "cloud"→"Claude" 會把 Cloudflare 改成 Claudeflare、
+                # "Google Cloud Platform" 改成 "Google Claude Platform"。
+                # CJK 規則維持子字串匹配（中日文無空白分詞，\b 不適用）。
+                if wrong.isascii() and re.match(r"\w", wrong) and re.search(r"\w$", wrong):
+                    pattern = r"\b" + pattern + r"\b"
                 result = re.sub(pattern, right, result, flags=re.IGNORECASE)
             else:
                 result = result.replace(wrong, right)
@@ -309,12 +315,12 @@ class Memory:
         return True
 
     def get_style_profile(self):
-        """獲取用戶個人風格特徵描述（用於注入 Prompt）"""
-        profile = self.dictionary.get("style_profile", "")
-        if not profile:
-            # 預設一些通用的商務偏好
-            return "偏好專業、精確且有禮貌的商務語氣。"
-        return profile
+        """獲取用戶個人風格特徵描述（用於注入 Prompt）。
+        ⚠️ 預設必須為空：舊版預設「偏好專業、精確且有禮貌的商務語氣」會在每一次
+        dictate 請求中與 _DICTATE_SYSTEM 的逐字轉寫契約（NEVER paraphrase）正面衝突，
+        是改寫型幻覺（→ 被 validator 丟棄 → fallback 連鎖 → 延遲上升）的系統性誘因。
+        風格只能由使用者明確設定。"""
+        return self.dictionary.get("style_profile", "")
 
     def update_style_profile(self, new_profile):
         """更新風格特徵描述"""

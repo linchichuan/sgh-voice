@@ -726,6 +726,10 @@ class VoiceEngine:
                     self.is_processing = False
                     self._processing_start_ts = None
                     going_idle = not self.is_recording
+                    # cancel flag 兜底清理：若該次 transcribe 回 None（audio gate /
+                    # STT 全失敗），flag 沒被 paste 階段消費，會殘留到「下一次」
+                    # 正常錄音 → 成功結果被誤吞。inflight 歸零時一律重置。
+                    self._cancel_inflight = False
                 else:
                     going_idle = False
             if going_idle:
@@ -733,16 +737,8 @@ class VoiceEngine:
         return result
 
     # ─── Quick-Rewrite (B) ─────────────────────────────────
-    _REWRITE_STYLE_PROMPTS = {
-        "concise":     "請將以下文字精簡改寫，去除冗詞贅字，保持原意。只輸出改寫結果，不要任何前後綴。",
-        "formal":      "請將以下文字改寫為正式書面語氣。只輸出改寫結果。",
-        "casual":      "請將以下文字改寫為輕鬆口語風格。只輸出改寫結果。",
-        "email":       "請將以下內容改寫為一封得體的 Email 草稿，包含適當問候與結尾。只輸出 Email 內容。",
-        "technical":   "請將以下內容改寫為技術文件風格，用詞精確、結構清晰。只輸出改寫結果。",
-        "translate_en":"請將以下文字翻譯為英文。只輸出翻譯結果。",
-        "translate_ja":"請將以下文字翻譯為日文。只輸出翻譯結果。",
-        "translate_zh":"請將以下文字翻譯為繁體中文。只輸出翻譯結果。",
-    }
+    # v2.5.0：風格 prompt 統一收斂到 config.REWRITE_STYLE_DIRECTIVES（單一事實來源），
+    # 由 transcriber._wrap_edit_text 以 <command>/<text> 結構包裝（含 injection 防護）。
 
     def _simulate_cmd_c(self):
         """模擬 Cmd+C 複製選取的文字。回傳 True 表示送出。"""
@@ -772,18 +768,30 @@ class VoiceEngine:
             return False
 
     def _rewrite_text(self, text, style):
-        """共用改寫核心，沿用主 LLM fallback 鏈，但用獨立 system prompt（_EDIT_SYSTEM）。"""
-        prompt = self._REWRITE_STYLE_PROMPTS.get(style, self._REWRITE_STYLE_PROMPTS["concise"])
-        wrapped = f"{prompt}\n\n{text}"
+        """共用改寫核心，沿用主 LLM fallback 鏈，但用獨立 system prompt（_EDIT_SYSTEM）。
+        edit_context=style → _wrap_edit_text 自動查 REWRITE_STYLE_DIRECTIVES 並以
+        <command>/<text> 結構包裝（選取文字含指令字樣也不會被執行）。"""
+        if style not in self.transcriber._STYLE_DIRECTIVES:
+            style = "concise"
         # 走 transcriber 的 LLM fallback 鏈（mode='edit' 會跳 few-shot 並用 _EDIT_SYSTEM）
         for fn_name in ("_groq_llm_process", "_openrouter_process", "_claude_process", "_openai_process"):
             try:
                 fn = getattr(self.transcriber, fn_name, None)
                 if not fn:
                     continue
-                res = fn(wrapped, mode="edit", edit_context="")
+                res = fn(text, mode="edit", edit_context=style)
                 if res:
-                    return res.strip()
+                    res = res.strip()
+                    # 繁中終層防護：Quick-Rewrite 不走 _transcribe_impl 的 OpenCC，
+                    # 這裡補上（Groq Llama / qwen free 模型中文輸出偏簡體）。
+                    # translate_ja 豁免：s2twp 會把日文新字體錯誤轉換（国→國）。
+                    opencc = getattr(self.transcriber, "_opencc", None)
+                    if opencc and style != "translate_ja":
+                        try:
+                            res = opencc.convert(res)
+                        except Exception:
+                            pass
+                    return res
             except Exception as e:
                 log("warn", f"rewrite {fn_name} error: {e}")
         return None
@@ -925,23 +933,24 @@ class VoiceEngine:
             try:
                 if duration < 0.4:
                     return
-                result = self.transcriber.transcribe(audio_array, audio_duration=duration)
+                # history_mode="continuous"：由 transcriber 內部寫一筆正確標記的歷史。
+                # 原本這裡再手動 add_to_history 一次 → 每段切片寫兩筆重複歷史，
+                # 污染統計 / few-shot 範例 / dictionary promote 來源。
+                result = self.transcriber.transcribe(
+                    audio_array, audio_duration=duration, history_mode="continuous"
+                )
                 if not result:
                     return
                 final = (result.get("final") or "").strip()
                 if not final:
                     return
-                from datetime import datetime
-                self.memory.add_to_history({
-                    "timestamp": datetime.now().isoformat(timespec="seconds"),
-                    "whisper_raw": result.get("raw", ""),
-                    "final_text": final,
-                    "duration": round(duration, 2),
-                    "mode": "continuous",
-                })
                 if self.config.get("auto_paste", True):
-                    try: paste_text(final)
-                    except Exception as e: log("warn", f"continuous paste: {e}")
+                    # max_pending_segments=2 允許兩段並行處理 → paste 必須拿
+                    # _paste_lock 序列化（與 _transcribe_and_paste 同一把鎖），
+                    # 否則剪貼簿互相覆蓋、Cmd+V 打架、文字貼錯段
+                    with self._paste_lock:
+                        try: paste_text(final)
+                        except Exception as e: log("warn", f"continuous paste: {e}")
                 try: self.overlay.show_transcript(final, duration=2.5)
                 except Exception: pass
                 log("ok", f"[continuous] {final[:60]}")
@@ -954,7 +963,24 @@ class VoiceEngine:
             except Exception:
                 pass
 
-        self.recorder.start_continuous(on_segment=_on_segment, on_voice_change=_on_voice)
+        def _on_stopped():
+            # 連續模式 stream 死亡（麥克風被拔 / PortAudioError）時的自動復原：
+            # 沒有這個 callback 的話 _continuous_active / is_recording 永久卡 True，
+            # 之後所有 push-to-talk 都被擋掉且無提示。
+            with self._state_lock:
+                was_active = getattr(self, "_continuous_active", False)
+                if not was_active:
+                    return  # 正常 stop_continuous_mode 路徑已自行收尾
+                self._continuous_active = False
+                self.is_recording = False
+            log("warn", "連續模式 stream 已結束（裝置中斷？），狀態已自動重置")
+            try: self.overlay.show("idle")
+            except Exception: pass
+            self._safe_status_change("idle")
+
+        self.recorder.start_continuous(
+            on_segment=_on_segment, on_voice_change=_on_voice, on_stopped=_on_stopped
+        )
 
     def stop_continuous_mode(self):
         # v2.4.0：補 _state_lock 保護 + 等 thread 真的 join 結束。原本只 set stop_event 然後
@@ -963,6 +989,9 @@ class VoiceEngine:
         with self._state_lock:
             if not getattr(self, "_continuous_active", False):
                 return
+            # 先翻 False 再 set stop_event：讓 recorder 的 on_stopped callback
+            # 能辨別「正常關閉」（不觸發裝置中斷警告路徑）
+            self._continuous_active = False
             self.recorder._stop_event.set()
         # 鎖外 join（避免 join 期間擋住其他 lock 取得者）
         thread = getattr(self.recorder, "_thread", None)

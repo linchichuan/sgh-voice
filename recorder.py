@@ -133,7 +133,10 @@ class Recorder:
                 self._on_done(filepath, duration)
 
     def _save(self, audio_array=None):
-        """儲存音訊檔（供 fallback 和 SSD 備份使用）"""
+        """儲存音訊檔（供 fallback 和 SSD 備份使用）。
+        ⚠️ 檔名必須每段唯一：STT 改為優先讀 wav 後，固定檔名會讓並行轉寫互相
+        覆寫/搬走音檔（A 還在上傳，B 的 stop() 覆寫同一檔 → A 轉出 B 的內容；
+        或 A 的 _backup 把檔案 move 走 → B 的 STT 讀不到、音訊整段遺失）。"""
         if audio_array is None and not self.audio_data:
             return None
         try:
@@ -141,7 +144,7 @@ class Recorder:
             sr = self.config.get("sample_rate", 16000)
             if len(audio) < sr * 0.3:
                 return None
-            fp = os.path.join(tempfile.gettempdir(), "voice_input_rec.wav")
+            fp = os.path.join(tempfile.gettempdir(), f"voice_input_{time.time_ns()}.wav")
             sf.write(fp, audio, sr)
             return fp
         except Exception as e:
@@ -149,10 +152,13 @@ class Recorder:
             return None
 
     # ─── Continuous Mode (C) ─────────────────────────────
-    def start_continuous(self, on_segment, on_voice_change=None):
+    def start_continuous(self, on_segment, on_voice_change=None, on_stopped=None):
         """連續錄音模式：麥克風長開，偵測 voice/silence 邊界，每完成一段呼叫
         on_segment(audio_array: np.ndarray, duration_sec: float)。
-        on_voice_change(is_voice: bool) 用於 UI 狀態（可選）。"""
+        on_voice_change(is_voice: bool) 用於 UI 狀態（可選）。
+        on_stopped() 在 loop 結束（含例外死亡，如麥克風被拔）時必定呼叫 —
+        讓 engine 重置狀態，否則 stream 例外死亡後 is_recording 永久卡 True，
+        之後所有 push-to-talk 都被擋掉且無任何提示。"""
         if self.is_recording:
             return False
         if sd is None:
@@ -162,13 +168,13 @@ class Recorder:
         self._start_time = time.time()
         self._thread = threading.Thread(
             target=self._continuous_loop,
-            args=(on_segment, on_voice_change),
+            args=(on_segment, on_voice_change, on_stopped),
             daemon=True,
         )
         self._thread.start()
         return True
 
-    def _continuous_loop(self, on_segment, on_voice_change):
+    def _continuous_loop(self, on_segment, on_voice_change, on_stopped=None):
         sr = self.config.get("sample_rate", 16000)
         silence_threshold = self.config.get("silence_threshold", 0.001)
         silence_duration = float(self.config.get("continuous_silence_duration", 1.5))
@@ -182,11 +188,21 @@ class Recorder:
         seg_buffer = []
         consecutive_silence = 0
         in_voice = False
+        # pre-roll ring buffer：起音的弱輔音/氣音常低於 RMS 閾值（100-300ms），
+        # 沒有 pre-roll 時句首字會被剪掉，Whisper 漏字。voice onset 時 prepend 進 buffer。
+        from collections import deque
+        preroll = deque(maxlen=3)  # 3 chunks = 300ms
 
-        def _flush_segment():
-            """送出當前 buffer，回呼 on_segment（背景執行）。"""
+        def _flush_segment(has_trailing_silence=True):
+            """送出當前 buffer，回呼 on_segment（背景執行）。
+            has_trailing_silence：buffer 尾端是否帶有靜音 chunk —
+            - 靜音切片（VAD 邊界）→ True：尾端有 silence_chunks 個靜音可裁
+            - max 強制切片 / stop 最後 flush → False：buffer 全是語音，
+              照裁會切掉 1.3 秒正在講的話；最短長度檢查也不該加計 silence_chunks
+              （否則 stop 前最後一句 < 2.1s 整段被丟，與設定的 0.6s 下限不符）。"""
             nonlocal seg_buffer
-            if len(seg_buffer) < min_seg_chunks + silence_chunks:
+            required = min_seg_chunks + (silence_chunks if has_trailing_silence else 0)
+            if len(seg_buffer) < required:
                 seg_buffer = []
                 return
             max_pending = max(1, int(self.config.get("continuous_max_pending_segments", 2)))
@@ -197,11 +213,12 @@ class Recorder:
                     return
                 self._pending_segments += 1
             audio_array = np.concatenate(seg_buffer, axis=0).flatten()
-            # 削掉尾端大部分靜音，留 200ms 緩衝供 ASR 吃
-            tail_keep = int(sr * 0.2)
-            tail_cut = max(0, silence_chunks * chunk - tail_keep)
-            if tail_cut > 0:
-                audio_array = audio_array[:-tail_cut] if tail_cut < len(audio_array) else audio_array
+            # 削掉尾端大部分靜音，留 200ms 緩衝供 ASR 吃（僅在尾端真的是靜音時）
+            if has_trailing_silence:
+                tail_keep = int(sr * 0.2)
+                tail_cut = max(0, silence_chunks * chunk - tail_keep)
+                if tail_cut > 0:
+                    audio_array = audio_array[:-tail_cut] if tail_cut < len(audio_array) else audio_array
             seg_buffer = []
             duration = len(audio_array) / sr
             def _run_segment():
@@ -225,14 +242,19 @@ class Recorder:
                     if is_voice:
                         if not in_voice:
                             in_voice = True
+                            # 把 pre-roll（起音前 300ms）prepend 進段落，保住句首弱輔音
+                            if preroll:
+                                seg_buffer.extend(preroll)
+                                preroll.clear()
                             if on_voice_change:
                                 try: on_voice_change(True)
                                 except Exception: pass
                         seg_buffer.append(data.copy())
                         consecutive_silence = 0
                         # 強制切片：太長就先送出避免 Whisper 太重
+                        # （buffer 全是語音，不可裁尾 → has_trailing_silence=False）
                         if len(seg_buffer) >= max_seg_chunks:
-                            _flush_segment()
+                            _flush_segment(has_trailing_silence=False)
                             in_voice = False
                             if on_voice_change:
                                 try: on_voice_change(False)
@@ -248,13 +270,20 @@ class Recorder:
                                 if on_voice_change:
                                     try: on_voice_change(False)
                                     except Exception: pass
-                # 結束時還有 buffer 就最後送一次
+                        else:
+                            preroll.append(data.copy())
+                # 結束時還有 buffer 就最後送一次（尾端沒有靜音可裁）
                 if in_voice and seg_buffer:
-                    _flush_segment()
+                    _flush_segment(has_trailing_silence=False)
         except Exception as e:
             print(f"Continuous recording error: {e}")
         finally:
             self.is_recording = False
+            # 通知 engine：loop 已結束（正常 stop 或例外死亡都要通知，
+            # 否則 engine 端 _continuous_active / is_recording 永久卡死）
+            if on_stopped:
+                try: on_stopped()
+                except Exception: pass
 
     @staticmethod
     def list_devices():
