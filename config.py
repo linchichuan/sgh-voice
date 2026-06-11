@@ -421,6 +421,7 @@ DEFAULT_CONFIG = {
     "continuous_silence_duration": 1.5,     # 連續模式：偵測到此秒數靜音即切片送 ASR
     "continuous_min_segment_duration": 0.6, # 連續模式：低於此秒數的片段直接丟棄（防止單音/咳嗽觸發）
     "continuous_max_segment_duration": 30.0,# 連續模式：超過此秒數強制切片（避免 Whisper 吃太重）
+    "continuous_max_pending_segments": 2,   # 連續模式同時處理中的片段上限，避免 STT/LLM 堆積吃記憶體
     "enable_audio_gate": True,              # 音訊品質前置守門（太靜/削峰/純噪音直接 skip Whisper）
     "audio_gate_rms_min": 0.003,            # RMS 下限（低於此=靜音/背景音）
     "audio_gate_clipping_max": 0.05,        # 削峰樣本比例上限（>5% 視為失真）
@@ -431,6 +432,7 @@ DEFAULT_CONFIG = {
     "enable_auto_format": True,             # 自動格式化
     "enable_self_correction": True,         # 偵測口語修正
     "enable_hybrid_mode": _IS_APPLE_SILICON, # 混合模式開關 (Local + Cloud)，僅 Apple Silicon 預設開啟
+    "enable_model_warmup": False,           # 啟動後預熱本地 STT/LLM；速度較快但 idle 記憶體較高，預設關閉
     "hybrid_audio_threshold": 15,           # 錄音小於 15 秒用 Local Whisper
     "hybrid_text_threshold": 30,            # 句子小於 30 字用 Local LLM (Qwen)
     "stt_engine": "mlx-whisper" if _IS_APPLE_SILICON else "cloud-only",  # mlx-whisper | qwen3-asr | cloud-only

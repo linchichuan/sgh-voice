@@ -1,5 +1,6 @@
 """Tests for transcriber.py validator helpers: _should_skip_llm, _sanitize_repetition,
 _is_llm_hallucination."""
+import numpy as np
 import pytest
 
 
@@ -74,3 +75,38 @@ def test_is_llm_hallucination_passes_clean_output(mock_transcriber):
     raw = "今天去開會討論了很多事情明天還要繼續處理"
     good = "今天去開會，討論了很多事情，明天還要繼續處理。"
     assert mock_transcriber._is_llm_hallucination(good, raw) is False
+
+
+def test_transcribe_prefers_wav_path_and_releases_audio_array(mock_transcriber, monkeypatch, tmp_path):
+    """一般錄音同時有 ndarray + wav 時，STT 應讀 wav，並在品質檢查後釋放 ndarray 參考。"""
+    import transcriber as tr_mod
+
+    wav_path = tmp_path / "sample.wav"
+    wav_path.write_bytes(b"fake wav")
+    audio = np.ones(16000, dtype=np.float32)
+    source = {"array": audio, "path": str(wav_path)}
+    seen = {}
+
+    mock_transcriber.config.update({
+        "enable_audio_gate": False,
+        "enable_hybrid_mode": True,
+        "stt_engine": "mlx-whisper",
+        "enable_claude_polish": False,
+    })
+    monkeypatch.setattr(tr_mod, "detect_app_style", lambda config: {
+        "bundle_id": "",
+        "app_name": "",
+        "style": "default",
+        "prompt": "",
+    })
+
+    def fake_local_stt(audio_input):
+        seen["audio_input"] = audio_input
+        return "測試內容"
+
+    monkeypatch.setattr(mock_transcriber, "_local_stt", fake_local_stt)
+    result = mock_transcriber._transcribe_impl(source, 1.0, "dictate", "", None)
+
+    assert seen["audio_input"] == str(wav_path)
+    assert source["array"] is None
+    assert result["final"] == "測試內容"

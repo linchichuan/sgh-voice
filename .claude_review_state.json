@@ -1,82 +1,28 @@
 {
   "schema_version": 2,
-  "session_id": "f08596f7-7f05-4094-b0cb-d9f05fc2e75f",
+  "session_id": "b394bfc6-7c6e-4be3-80b7-73f0ef46e4b2",
   "session_commit_scope": {
-    "session_id": "f08596f7-7f05-4094-b0cb-d9f05fc2e75f",
+    "session_id": "b394bfc6-7c6e-4be3-80b7-73f0ef46e4b2",
     "baseline_dirty_files": [
-      ".claude_review_state.json"
-    ],
-    "touched_files": [
-      ".github/workflows/ci.yml",
-      ".gitignore",
-      ".kiro/specs/dashboard-rewrite/SPEC.md",
-      "CHANGELOG.md",
+      ".claude_review_state.json",
       "app.py",
-      "build.sh",
       "config.py",
       "dashboard.py",
-      "memory.py",
-      "pytest.ini",
-      "requirements-dev.txt",
-      "requirements.txt",
-      "sgh-voice-web/privacy.html",
-      "static/css/base.css",
-      "static/css/tokens.css",
-      "static/index.html",
-      "static/js/app.js",
-      "static/js/lib/api.js",
-      "static/js/lib/components.js",
-      "static/js/lib/i18n.js",
-      "static/js/lib/store.js",
-      "static/js/pages/cost-audit.js",
-      "static/js/pages/cost-audit/audit-table.js",
-      "static/js/pages/cost-audit/chart.js",
-      "static/js/pages/cost-audit/pricing.js",
-      "static/js/pages/dashboard.js",
-      "static/js/pages/dictionary.js",
-      "static/js/pages/dictionary/app-corrections.js",
-      "static/js/pages/dictionary/corrections.js",
-      "static/js/pages/dictionary/custom-words.js",
-      "static/js/pages/dictionary/promote-modal.js",
-      "static/js/pages/dictionary/scene-corrections.js",
-      "static/js/pages/dictionary/smart-replace.js",
-      "static/js/pages/dictionary/util.js",
-      "static/js/pages/history.js",
-      "static/js/pages/history/filters.js",
-      "static/js/pages/history/row.js",
-      "static/js/pages/models.js",
-      "static/js/pages/onboarding.js",
-      "static/js/pages/settings.js",
-      "static/js/pages/settings/advanced.js",
-      "static/js/pages/settings/api-keys.js",
-      "static/js/pages/settings/dirty.js",
-      "static/js/pages/settings/hotkeys.js",
-      "static/js/pages/settings/i18n-strings.js",
-      "static/js/pages/settings/index.js",
-      "static/js/pages/settings/llm.js",
-      "static/js/pages/settings/privacy.js",
-      "static/js/pages/settings/stt.js",
-      "static/js/pages/voiceprint.js",
-      "tests/__init__.py",
-      "tests/conftest.py",
+      "recorder.py",
       "tests/test_config.py",
-      "tests/test_event_ledger.py",
-      "tests/test_keychain_migration.py",
-      "tests/test_memory.py",
-      "tests/test_transcriber_few_shot.py",
+      "tests/test_dashboard_static.py",
       "tests/test_transcriber_validators.py",
-      "tests/test_transcriber_voice_command.py",
       "transcriber.py"
     ],
-    "updated_at": "2026-05-20T06:10:15Z"
+    "touched_files": [],
+    "updated_at": "2026-06-11T02:31:28Z"
   },
-  "updated_at": "2026-05-31T16:46:46Z",
-  "has_code_change": true,
-  "has_doc_change": true,
+  "updated_at": "2026-06-11T02:31:28Z",
+  "has_code_change": false,
+  "has_doc_change": false,
   "code_review": {
-    "executed": true,
-    "passed": false,
-    "last_run": "2026-05-31T16:46:46Z"
+    "executed": false,
+    "passed": false
   },
   "doc_review": {
     "executed": false,
@@ -87,23 +33,11 @@
     "passed": false
   },
   "aggregate_gate": {
-    "executed": false,
-    "gate": null,
-    "reason": null
+    "executed": false
   },
   "iteration_history": {
-    "current_round": 1,
-    "findings_by_round": [
-      {
-        "round": 1,
-        "total": 0,
-        "p0": 0,
-        "p1": 0,
-        "p2": 0,
-        "nit": 0,
-        "timestamp": "2026-05-31T16:46:46Z"
-      }
-    ],
+    "current_round": 0,
+    "findings_by_round": [],
     "total_rounds_session": 3
   },
   "changed_files_since_review": [

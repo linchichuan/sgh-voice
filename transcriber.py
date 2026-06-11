@@ -90,7 +90,12 @@ class Transcriber:
     def local_llm(self):
         detector = self.ollama_detector
         base_url = detector.base_url or "http://127.0.0.1:11434/v1"
-        return openai.OpenAI(base_url=base_url, api_key="ollama", timeout=self.config.get("local_llm_timeout_sec", 6.0))
+        return self._get_openai_client(
+            "ollama_llm",
+            base_url=base_url,
+            api_key="ollama",
+            timeout=self.config.get("local_llm_timeout_sec", 6.0),
+        )
 
     def warmup(self):
         def _warmup_whisper():
@@ -220,20 +225,34 @@ class Transcriber:
         app_info = detect_app_style(self.config)
         app_id = app_info.get("bundle_id")
 
-        if isinstance(audio_source, np.ndarray):
-            ok, reason = self._audio_quality_check(audio_source)
+        audio_array = None
+        stt_input = audio_source
+        if isinstance(audio_source, dict):
+            audio_array = audio_source.get("array")
+            stt_input = audio_source.get("path") or audio_array
+        elif isinstance(audio_source, np.ndarray):
+            audio_array = audio_source
+
+        if isinstance(audio_array, np.ndarray):
+            ok, reason = self._audio_quality_check(audio_array)
             if not ok:
                 print(f" 🚫 [audio gate] 跳過：{reason}")
                 event_ledger.audio_gate_reject(reason=reason, audio_sec=round(float(audio_duration), 2))
                 return None
 
-        if isinstance(audio_source, np.ndarray) and self.config.get("enable_voiceprint", False):
+        if isinstance(audio_array, np.ndarray) and self.config.get("enable_voiceprint", False):
             if self._voiceprint_mgr.is_enrolled:
-                vp_score = self._voiceprint_mgr.verify(audio_source)
+                vp_score = self._voiceprint_mgr.verify(audio_array)
                 threshold = self.config.get("voiceprint_threshold", 0.97)
                 if vp_score < threshold:
                     event_ledger.voiceprint_reject(vp_score, threshold)
                     return None
+
+        # 若 caller 同時提供 array + wav path，品質/聲紋檢查後就釋放 array 參考。
+        # STT 優先讀 wav，避免慢速 STT/LLM 期間多持有一整段 float32 音訊。
+        if isinstance(audio_source, dict) and audio_source.get("path"):
+            audio_source["array"] = None
+            audio_array = None
 
         # ── STT 階段（每次嘗試都記 stt_attempt 事件）─────────
         def _try_stt(source_name, fn, *args, **kwargs):
@@ -254,24 +273,24 @@ class Transcriber:
 
         # 進化 5: 資源管理 - 長音訊 (>30s) 優先走 Groq 以節省本地資源
         if audio_duration > 30 and self.config.get("groq_api_key"):
-            raw = _try_stt("groq", self._groq_stt, audio_source, duration=audio_duration)
+            raw = _try_stt("groq", self._groq_stt, stt_input, duration=audio_duration)
             if raw: stt_source = "groq"
 
         if not raw:
             if stt_engine == "groq":
-                raw = _try_stt("groq", self._groq_stt, audio_source, duration=audio_duration)
+                raw = _try_stt("groq", self._groq_stt, stt_input, duration=audio_duration)
                 if raw: stt_source = "groq"
             elif stt_engine != "cloud-only" and is_hybrid:
-                if isinstance(audio_source, np.ndarray) or audio_duration <= self.config.get("hybrid_audio_threshold", 15):
-                    raw = _try_stt("local", self._local_stt, audio_source)
+                if isinstance(stt_input, (np.ndarray, str)) or audio_duration <= self.config.get("hybrid_audio_threshold", 15):
+                    raw = _try_stt("local", self._local_stt, stt_input)
                     if raw: stt_source = "local"
 
         if not raw and self.config.get("groq_api_key"):
-            raw = _try_stt("groq", self._groq_stt, audio_source, duration=audio_duration)
+            raw = _try_stt("groq", self._groq_stt, stt_input, duration=audio_duration)
             if raw: stt_source = "groq"
 
         if not raw and self.config.get("openai_api_key"):
-            raw = _try_stt("openai_whisper", self._whisper_api_fallback, audio_source, duration=audio_duration)
+            raw = _try_stt("openai_whisper", self._whisper_api_fallback, stt_input, duration=audio_duration)
             if raw: stt_source = "cloud"
 
         if not raw or not raw.strip():
@@ -632,19 +651,21 @@ class Transcriber:
 
         # 1) RMS 太低 → 純靜音/背景音（沿用原本 0.003 但可調）
         rms_min = float(self.config.get("audio_gate_rms_min", 0.003))
-        rms = float(np.sqrt(np.mean(audio_array.astype(np.float32) ** 2)))
+        audio_view = np.asarray(audio_array, dtype=np.float32)
+        rms = float(np.sqrt(np.mean(audio_view ** 2)))
         if rms < rms_min:
             return False, f"rms={rms:.4f} < {rms_min}"
 
         # 2) Clipping 比例過高 → 削峰失真，Whisper 會幻覺
         clip_max = float(self.config.get("audio_gate_clipping_max", 0.05))
         peak_thresh = 0.98
-        clip_ratio = float(np.mean(np.abs(audio_array) > peak_thresh))
+        abs_audio = np.abs(audio_view)
+        clip_ratio = float(np.mean(abs_audio > peak_thresh))
         if clip_ratio > clip_max:
             return False, f"clipping={clip_ratio:.2%} > {clip_max:.2%}"
 
         # 3) Crest factor（峰值/RMS）過低 → 平頂雜訊；過高 → 單一爆音
-        peak = float(np.max(np.abs(audio_array)))
+        peak = float(np.max(abs_audio))
         if peak > 1e-6:
             crest = peak / max(rms, 1e-9)
             crest_min = float(self.config.get("audio_gate_crest_min", 1.8))

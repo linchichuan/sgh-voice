@@ -17,6 +17,8 @@ def test_load_config_returns_default_with_version(isolated_data_dir, monkeypatch
     assert "claude_model" in loaded
     assert loaded.get("enable_fewshot") is False  # v2.4.0 預設關
     assert loaded.get("enable_app_awareness") is False  # v2.4.0 預設關
+    assert loaded.get("enable_model_warmup") is False  # 降低 idle 記憶體，使用者可手動開啟
+    assert loaded.get("continuous_max_pending_segments") == 2
 
 
 def test_save_config_persists_version(isolated_data_dir):

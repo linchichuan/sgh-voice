@@ -464,7 +464,7 @@ class VoiceEngine:
 
     def start_background_tasks(self):
         """主程式啟動後再跑背景任務，避免搶佔啟動時的系統資源"""
-        if self.config.get("enable_hybrid_mode", True):
+        if self.config.get("enable_hybrid_mode", True) and self.config.get("enable_model_warmup", False):
             print(get_i18n("log_warmup"))
             threading.Thread(target=self.transcriber.warmup, daemon=True).start()
 
@@ -646,7 +646,14 @@ class VoiceEngine:
 
         result = None
         try:
-            audio_input = audio_array if audio_array is not None else filepath
+            audio_input = (
+                {"array": audio_array, "path": filepath}
+                if audio_array is not None and filepath
+                else (audio_array if audio_array is not None else filepath)
+            )
+            # audio_input dict now owns the ndarray reference; keep this frame lighter while
+            # STT/LLM runs, especially when cloud STT reads the wav file directly.
+            audio_array = None
             result = self.transcriber.transcribe(audio_input, duration, mode, edit_context, on_stage=_on_stage)
 
             if result:

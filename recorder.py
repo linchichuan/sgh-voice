@@ -23,6 +23,8 @@ class Recorder:
         self._thread = None
         self._stop_event = threading.Event()
         self._start_time = None
+        self._segment_lock = threading.Lock()
+        self._pending_segments = 0
 
     def start(self, on_done=None):
         """開始錄音。
@@ -75,6 +77,8 @@ class Recorder:
             audio_array = np.concatenate(self.audio_data, axis=0).flatten()
 
         filepath = self._save(audio_array)
+        # 釋放每個 100ms chunk 的 list/array 參考；後續流程只需要 audio_array 或 wav 檔。
+        self.audio_data = []
         return audio_array, filepath, duration
 
     def _record_loop(self):
@@ -185,6 +189,13 @@ class Recorder:
             if len(seg_buffer) < min_seg_chunks + silence_chunks:
                 seg_buffer = []
                 return
+            max_pending = max(1, int(self.config.get("continuous_max_pending_segments", 2)))
+            with self._segment_lock:
+                if self._pending_segments >= max_pending:
+                    print(f" ⚠️ continuous segment dropped: pending={self._pending_segments}")
+                    seg_buffer = []
+                    return
+                self._pending_segments += 1
             audio_array = np.concatenate(seg_buffer, axis=0).flatten()
             # 削掉尾端大部分靜音，留 200ms 緩衝供 ASR 吃
             tail_keep = int(sr * 0.2)
@@ -193,12 +204,19 @@ class Recorder:
                 audio_array = audio_array[:-tail_cut] if tail_cut < len(audio_array) else audio_array
             seg_buffer = []
             duration = len(audio_array) / sr
+            def _run_segment():
+                try:
+                    on_segment(audio_array, duration)
+                finally:
+                    with self._segment_lock:
+                        self._pending_segments = max(0, self._pending_segments - 1)
             threading.Thread(
-                target=on_segment, args=(audio_array, duration), daemon=True
+                target=_run_segment, daemon=True
             ).start()
 
         try:
-            with sd.InputStream(samplerate=sr, channels=1, dtype="float32") as stream:
+            with sd.InputStream(samplerate=sr, channels=1, dtype="float32",
+                                blocksize=chunk) as stream:
                 while not self._stop_event.is_set():
                     data, _ = stream.read(chunk)
                     rms = float(np.sqrt(np.mean(data ** 2)))

@@ -86,7 +86,22 @@ def _security_headers(response):
 
 @app.route("/")
 def index():
-    return send_from_directory("static", "index.html")
+    return send_from_directory(_get_static_folder(), "index.html")
+
+
+@app.route("/css/<path:filename>")
+def static_css(filename):
+    return send_from_directory(os.path.join(_get_static_folder(), "css"), filename)
+
+
+@app.route("/js/<path:filename>")
+def static_js(filename):
+    return send_from_directory(os.path.join(_get_static_folder(), "js"), filename)
+
+
+@app.route("/assets/<path:filename>")
+def static_assets(filename):
+    return send_from_directory(os.path.join(_get_static_folder(), "assets"), filename)
 
 
 @app.route("/api/stats")
