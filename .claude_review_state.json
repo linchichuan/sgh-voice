@@ -1,32 +1,31 @@
 {
   "schema_version": 2,
-  "session_id": "b394bfc6-7c6e-4be3-80b7-73f0ef46e4b2",
+  "session_id": "78622762-af21-46c1-8672-69f045711e18",
   "session_commit_scope": {
-    "session_id": "b394bfc6-7c6e-4be3-80b7-73f0ef46e4b2",
+    "session_id": "78622762-af21-46c1-8672-69f045711e18",
     "baseline_dirty_files": [
       ".claude_review_state.json",
+      "README.en.md",
+      "README.ja.md",
+      "README.md",
       "app.py",
-      "config.py",
-      "dashboard.py",
-      "recorder.py",
-      "tests/test_config.py",
-      "tests/test_dashboard_static.py",
-      "tests/test_transcriber_validators.py",
-      "transcriber.py"
+      "build.sh",
+      "dashboard_window.py",
+      "sgh-voice-web/.firebase/hosting..cache",
+      "sgh-voice-web/i18n.js",
+      "sgh-voice-web/index.html",
+      "static/index.html",
+      "voiceinput.spec"
     ],
     "touched_files": [
       "CLAUDE.md",
       "app.py",
-      "config.py",
-      "dashboard.py",
-      "memory.py",
       "recorder.py",
-      "tests/test_v250_optimizations.py",
-      "transcriber.py"
+      "tests/test_recorder_stream_recovery.py"
     ],
-    "updated_at": "2026-06-11T02:31:28Z"
+    "updated_at": "2026-06-12T23:20:03Z"
   },
-  "updated_at": "2026-06-11T06:42:46Z",
+  "updated_at": "2026-06-12T23:57:15Z",
   "has_code_change": true,
   "has_doc_change": true,
   "code_review": {
@@ -53,6 +52,7 @@
   },
   "changed_files_since_review": [
     "/Users/lin/.claude/projects/-Users-lin-voice-input/memory/MEMORY.md",
+    "/Users/lin/.claude/projects/-Users-lin-voice-input/memory/bugs_and_fixes.md",
     "/Users/lin/.claude/projects/-Users-lin-voice-input/memory/v250_prompt_architecture.md",
     "/Users/lin/voice-input/.kiro/specs/dashboard-rewrite/SPEC.md",
     "/Users/lin/voice-input/CHANGELOG.md",
@@ -110,6 +110,7 @@
     "/Users/lin/voice-input/tests/test_event_ledger.py",
     "/Users/lin/voice-input/tests/test_keychain_migration.py",
     "/Users/lin/voice-input/tests/test_memory.py",
+    "/Users/lin/voice-input/tests/test_recorder_stream_recovery.py",
     "/Users/lin/voice-input/tests/test_transcriber_few_shot.py",
     "/Users/lin/voice-input/tests/test_transcriber_validators.py",
     "/Users/lin/voice-input/tests/test_transcriber_voice_command.py",

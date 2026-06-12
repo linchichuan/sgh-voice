@@ -442,7 +442,7 @@ class VoiceEngine:
     """語音輸入核心引擎，被 CLI / MenuBar / Dashboard 共用"""
 
     def __init__(self):
-        self.version = "2.4.0"
+        self.version = "2.5.0"
         self.config = load_config()
         self.memory = Memory()
         self.transcriber = Transcriber(self.config, self.memory)
@@ -489,7 +489,12 @@ class VoiceEngine:
         try:
             self.overlay.show("recording")
             self._safe_status_change("recording")
-            self.recorder.start()
+            # on_error：stream 開啟失敗（PortAudio 裝置清單過期等）時由 recorder
+            # thread 回呼。閉包鎖定本段的 start_ts，避免 callback 晚到時誤殺新錄音。
+            start_ts = self._record_start_ts
+            self.recorder.start(
+                on_error=lambda msg, _ts=start_ts: self._on_recorder_error(msg, _ts)
+            )
             log("rec", "錄音中…")
             self._arm_watchdog(from_hotkey=from_hotkey)
             return True
@@ -499,6 +504,27 @@ class VoiceEngine:
                 self._record_start_ts = None
             self._safe_status_change("idle")
             raise
+
+    def _on_recorder_error(self, msg, armed_for_ts):
+        """recorder thread 回報「麥克風串流開啟失敗」：重置 engine 狀態 + 明確告知使用者。
+        沒有這個 handler 時，engine 的 is_recording 卡 True、紅燈照亮，
+        但實際上一個 chunk 都沒收到，stop 後音訊是空的且毫無提示（2026-06-13 實際災情）。"""
+        with self._state_lock:
+            if self._record_start_ts != armed_for_ts:
+                return  # 已經是新的一段錄音，別動
+            self.is_recording = False
+            self._record_start_ts = None
+        self._cancel_watchdog()
+        log("error", f"🎙 {msg}")
+        log("warn", "已重新初始化音訊系統，請再按一次熱鍵重試；若仍失敗請檢查 系統設定→隱私權與安全性→麥克風，或重啟 App")
+        try: self.overlay.show("idle")
+        except Exception: pass
+        self._safe_status_change("idle")
+        cb = self._on_hotkey_reset
+        if cb:
+            try: cb()
+            except Exception as e:
+                log("warn", f"hotkey reset callback error: {e}")
 
     def _arm_watchdog(self, from_hotkey=False):
         """錄音保險：超過 max 秒仍在錄音 → 強制停止。所有 path 共用同一上限：
@@ -596,6 +622,14 @@ class VoiceEngine:
             return None
 
         if (audio_array is None or (hasattr(audio_array, '__len__') and len(audio_array) == 0)) and not filepath:
+            # 不可以靜默：使用者按了停止卻什麼都沒發生，會以為 App 壞了。
+            # 帶上 recorder 的串流錯誤（若有），讓「為什麼沒錄到」可被診斷。
+            rec_err = getattr(self.recorder, "last_error", None)
+            if rec_err:
+                log("error", f"🎙 未錄到音訊：{rec_err}")
+                log("warn", "已重新初始化音訊系統，請再試一次；若持續失敗請重啟 App")
+            else:
+                log("warn", "未錄到任何音訊（錄音過短，或麥克風沒有輸入）")
             with self._state_lock:
                 pending = self._inflight_transcriptions
             if pending == 0:

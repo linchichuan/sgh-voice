@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="theme-color" content="#2563eb">
     <meta name="author" content="Shingihou Co., Ltd.">
-    <title>SGH Voice — 話すだけで、プロ品質のテキストに。 v2.4.0</title>
+    <title>SGH Voice — 話すだけで、プロ品質のテキストに。 v2.5.0</title>
     <meta name="description" content="SGH Voice は、あなたの意図を汲み取る AI 音声入力アシスタント。中国語・日本語・英語を自動認識し、口語を洗練された書き言葉へ整えます。データは 100% あなたの手元に。">
     <link rel="canonical" href="https://voice.shingihou.com/">
 
@@ -61,7 +61,7 @@
       "alternateName": ["SGHボイス", "新義豊 ボイス"],
       "applicationCategory": "ProductivityApplication",
       "operatingSystem": ["macOS", "iOS", "Android"],
-      "softwareVersion": "2.4.0",
+      "softwareVersion": "2.5.0",
       "url": "https://voice.shingihou.com/",
       "downloadUrl": "https://github.com/linchichuan/sgh-voice/releases",
       "image": "https://voice.shingihou.com/assets/generated/og-share.webp",
@@ -182,16 +182,16 @@
             <div class="hero-orb hero-orb-2" aria-hidden="true"></div>
         </div>
         <div class="container hero-content">
-            <div class="hero-badge" data-i18n="hero.badge">思考を言葉に · v2.4.0</div>
+            <div class="hero-badge" data-i18n="hero.badge">品質・安定性アップデート · v2.5.0</div>
             <h1 class="hero-title">
                 <span data-i18n="hero.title1">話すだけで、</span><br>
                 <span class="gradient-text" data-i18n="hero.title2">プロの文章に。</span>
             </h1>
             <p class="hero-subtitle" data-i18n="hero.subtitle">あなたの意図を汲み取る、AI 専属速記者。<br>中・日・英対応 · データは 100% あなたの手元に。</p>
             <div class="hero-chips" aria-label="Key benefits">
-                <span class="hero-chip" data-i18n="hero.chip1">✦ 無駄な言葉を削除</span>
-                <span class="hero-chip" data-i18n="hero.chip2">✦ 誤字を自動修正</span>
-                <span class="hero-chip" data-i18n="hero.chip3">✦ 即座に整形</span>
+                <span class="hero-chip" data-i18n="hero.chip1">✦ Prompt 精度を改善</span>
+                <span class="hero-chip" data-i18n="hero.chip2">✦ Quick-Rewrite 強化</span>
+                <span class="hero-chip" data-i18n="hero.chip3">✦ 長文処理を安定化</span>
             </div>
             <div class="hero-actions">
                 <a href="#download" class="btn btn-primary">
@@ -273,9 +273,9 @@
                             <path d="M8 12h8" />
                         </svg>
                     </div>
-                    <h3 data-i18n="features.f7.title">🏥 医療・製薬・バイオ 特化モード</h3>
+                    <h3 data-i18n="features.f7.title">🏥 SOAP・医療文書モード</h3>
                     <p data-i18n="features.f7.desc">
-                        医療従事者・MR・CRA・研究者向けの専用モード。処方薬名（アムロジピン、オプジーボ等）、診療科目、検査名（心電図、MRI、内視鏡）、バイオ用語（iPS細胞、CAR-T、PD-1）を高精度で認識。
+                        医療・製薬・バイオ分野の用語を保持しながら、看診メモや相談内容を SOAP 形式などの構造化文書へ整理できます。医療内容の判断は行わず、入力補助として利用します。
                     </p>
                 </div>
                 <div class="feature-card feature-card-large feature-card-visual feature-card-privacy">
@@ -306,8 +306,8 @@
                             <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
                         </svg>
                     </div>
-                    <h3 data-i18n="features.f2.title">AI 自動校正</h3>
-                    <p data-i18n="features.f2.desc">Claude AI が口語の「えーと」「あの」等を除去し、自然な書き言葉に変換します。</p>
+                    <h3 data-i18n="features.f2.title">v2.5 Prompt Engine</h3>
+                    <p data-i18n="features.f2.desc">逐字入力・翻訳・Email・技術文書などの指示を構造化し、選択テキスト内の指示文に引きずられにくい安全な後処理に改善しました。</p>
                 </div>
                 <div class="feature-card">
                     <div class="feature-icon">
@@ -331,8 +331,8 @@
                             <line x1="12" y1="17" x2="12" y2="21" />
                         </svg>
                     </div>
-                    <h3 data-i18n="features.f4.title">ハイブリッドモード</h3>
-                    <p data-i18n="features.f4.desc">短い文はローカルAI、長文はクラウドAIへ自動振り分け。コスト最適化。</p>
+                    <h3 data-i18n="features.f4.title">高速フェイルオーバー</h3>
+                    <p data-i18n="features.f4.desc">STT / LLM のタイムアウトとリトライを見直し、混雑時も次の候補へ素早く切り替えます。</p>
                 </div>
                 <div class="feature-card">
                     <div class="feature-icon">
@@ -341,8 +341,8 @@
                             <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
                         </svg>
                     </div>
-                    <h3 data-i18n="features.f5.title">カスタム辞書</h3>
-                    <p data-i18n="features.f5.desc">専門用語・固有名詞を登録して認識精度を大幅に向上。</p>
+                    <h3 data-i18n="features.f5.title">辞書・置換ルールの安全化</h3>
+                    <p data-i18n="features.f5.desc">カスタム辞書、スマート置換、固有名詞補正の保存処理を堅牢化。</p>
                 </div>
                 <div class="feature-card">
                     <div class="feature-icon">
@@ -350,8 +350,8 @@
                             <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
                         </svg>
                     </div>
-                    <h3 data-i18n="features.f9.title">止まらない、マルチクラウド</h3>
-                    <p data-i18n="features.f9.desc">Groq と OpenRouter を統合。一つのサービスが混雑していても、最適なモデルへ自動で切り替えます。</p>
+                    <h3 data-i18n="features.f9.title">連続録音の安定性向上</h3>
+                    <p data-i18n="features.f9.desc">pre-roll、最終セグメント flush、マイク切断時の復旧を改善。</p>
                 </div>
             </div>
         </div>
@@ -508,8 +508,8 @@
                         </svg>
                     </div>
                     <h3>macOS</h3>
-                    <p class="download-desc" data-i18n="download.macDesc">Apple Silicon & Intel</p>
-                    <a href="https://github.com/linchichuan/sgh-voice/releases/download/v2.4.0/SGH.Voice-2.4.0-apple-silicon.dmg"
+                    <p class="download-desc" data-i18n="download.macDesc">v2.5.0 インストーラ公開中 · Apple Silicon 版（Intel は別途配布予定）</p>
+                    <a href="https://github.com/linchichuan/sgh-voice/releases/download/v2.5.0/SGH.Voice-2.5.0-apple-silicon.dmg"
                         class="btn btn-primary download-btn">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18"
                             height="18">
@@ -517,9 +517,9 @@
                             <polyline points="7 10 12 15 17 10" />
                             <line x1="12" y1="15" x2="12" y2="3" />
                         </svg>
-                        <span data-i18n="download.macCta">Apple Silicon (v2.4.0)</span>
+                        <span data-i18n="download.macCta">Apple Silicon</span>
                     </a>
-                    <a href="https://github.com/linchichuan/sgh-voice/releases/tag/v2.4.0"
+                    <a href="https://github.com/linchichuan/sgh-voice/releases/tag/v2.5.0"
                         class="btn btn-outline download-btn" style="margin-top: 8px;">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18"
                             height="18">
@@ -527,7 +527,7 @@
                             <polyline points="7 10 12 15 17 10" />
                             <line x1="12" y1="15" x2="12" y2="3" />
                         </svg>
-                        <span data-i18n="download.macIntel">Intel Mac</span>
+                        <span data-i18n="download.macIntelCta">Intel 版（要件確認）</span>
                     </a>
                 </div>
                 <div class="download-card">
@@ -538,7 +538,7 @@
                     </div>
                     <h3>iOS</h3>
                     <p class="download-desc" data-i18n="download.iosDesc">iPhone / iPad (iOS 16+)</p>
-                    <a href="https://github.com/linchichuan/sgh-voice/releases/tag/v2.4.0"
+                    <a href="https://github.com/linchichuan/sgh-voice/releases"
                         class="btn btn-outline download-btn" data-i18n="download.iosCta">リリースページ</a>
                 </div>
                 <div class="download-card">
@@ -551,7 +551,7 @@
                     </div>
                     <h3>Android</h3>
                     <p class="download-desc" data-i18n="download.androidDesc">Android 8.0+ (Google Play 審査中)</p>
-                    <a href="https://github.com/linchichuan/sgh-voice/releases/tag/v2.4.0"
+                    <a href="https://github.com/linchichuan/sgh-voice/releases"
                         class="btn btn-outline download-btn" data-i18n="download.androidCta">リリースページ</a>
                 </div>
             </div>

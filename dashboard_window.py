@@ -1,13 +1,31 @@
 import sys
 import os
 import webview
+import pathlib
 
 
 def set_dock_icon():
     """設定 Dock 圖示為自訂 icon（取代 Python 火箭圖示）"""
     try:
         from AppKit import NSApplication, NSImage
-        icon_path = os.path.join(os.path.dirname(__file__), "resources", "icon.icns")
+
+        # 先嘗試 module 目錄，通常為 source 版；若為 PyInstaller 打包版則 fallback 到 bundle Resources
+        icon_path_candidates = [
+            pathlib.Path(__file__).resolve().parent / "resources" / "icon.icns",
+        ]
+        if hasattr(sys, "frozen") and sys.executable:
+            exe_dir = pathlib.Path(sys.executable).resolve().parent
+            icon_path_candidates.append(exe_dir.parent / "Resources" / "icon.icns")
+
+        icon_path = next((p for p in icon_path_candidates if p.exists()), None)
+        if icon_path is None and getattr(sys, "_MEIPASS", None):
+            icon_path_candidates.append(pathlib.Path(sys._MEIPASS) / "resources" / "icon.icns")
+            icon_path = next((p for p in icon_path_candidates if p.exists()), None)
+
+        if icon_path is None:
+            return
+
+        icon_path = str(icon_path)
         if os.path.exists(icon_path):
             app = NSApplication.sharedApplication()
             icon = NSImage.alloc().initWithContentsOfFile_(icon_path)

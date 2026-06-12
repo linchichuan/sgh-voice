@@ -1,4 +1,4 @@
-# 🎙 SGH Voice — 讓想法流動，不再卡在鍵盤上 (v2.1.0)
+# 🎙 SGH Voice — 讓想法流動，不再卡在鍵盤上 (v2.5.0)
 
 **[English](README.en.md) | [日本語](README.ja.md) | 繁體中文**
 
@@ -7,11 +7,11 @@
 [![macOS](https://img.shields.io/badge/macOS-Apple_Silicon-black?logo=apple)](https://github.com/linchichuan/sgh-voice/releases)
 [![iOS](https://img.shields.io/badge/iOS-17.0+-blue?logo=apple)](https://github.com/linchichuan/sgh-voice/releases)
 [![Android](https://img.shields.io/badge/Android-8.0+-green?logo=android)](https://github.com/linchichuan/sgh-voice/releases)
-[![Version](https://img.shields.io/badge/Version-2.1.0-green)]()
+[![Version](https://img.shields.io/badge/Version-2.5.0-green)]()
 
 ---
 
-## 🌟 v2.1.0 重大更新：個人化與生產力升級
+## 🌟 v2.5.0 重大更新：品質與穩定性更新
 
 本次新增個人化 few-shot 後處理、全域 Quick-Rewrite 熱鍵、連續錄音模式與 VAD 自動分段，讓語音輸入更貼近個人寫作習慣，也更適合長時間工作流。
 

@@ -25,9 +25,16 @@ class Recorder:
         self._start_time = None
         self._segment_lock = threading.Lock()
         self._pending_segments = 0
+        # 最近一次串流錯誤（stream 開失敗 / read 中斷）。engine 在 stop 時讀取，
+        # 用來把「為什麼沒錄到音訊」回報給使用者，而不是靜默丟棄。
+        self.last_error = None
+        self._on_error = None
+        self._on_done = None
 
-    def start(self, on_done=None):
+    def start(self, on_done=None, on_error=None):
         """開始錄音。
+        on_error(msg)：stream 開啟失敗（重試後仍失敗）時從 recorder thread 回呼，
+        讓 engine 立刻重置狀態 + 顯示錯誤，而不是等使用者 stop 後才發現沒錄到。
         防 PortAudio deadlock：若上一段 _record_loop thread 還活著（stream 沒收完），
         會等最多 2s；超時就 raise，由 caller 決定怎麼處理（不要硬開新 stream，否則 PA
         會在 Pa_OpenStream 內 deadlock，整個 audio 子系統就鎖死）。"""
@@ -50,6 +57,8 @@ class Recorder:
         self.audio_data = []
         self._stop_event.clear()
         self._on_done = on_done
+        self._on_error = on_error
+        self.last_error = None
         self._start_time = time.time()
 
         self._thread = threading.Thread(target=self._record_loop, daemon=True, name="recorder")
@@ -95,15 +104,29 @@ class Recorder:
         has_voice = False
 
         try:
+            stream = self._open_input_stream(sr, chunk)
+        except Exception as e:
+            # 開 stream 失敗（含重新初始化後重試仍失敗）→ 立刻通知 engine，
+            # 否則 engine 的 is_recording 卡 True、使用者 stop 後音訊是空的且毫無提示。
+            self.last_error = f"麥克風串流開啟失敗: {e}"
+            print(f" ⚠️ {self.last_error}")
+            self.is_recording = False
+            if self._on_error:
+                try: self._on_error(self.last_error)
+                except Exception: pass
+            return
+
+        stream_error = None
+        try:
             # blocksize=chunk 讓 read 的 block 跟我們 loop 對齊，
             # 不會 buffer 太大導致 stop 後還要消化 1+s 殘留
-            with sd.InputStream(samplerate=sr, channels=1, dtype="float32",
-                                blocksize=chunk) as stream:
+            with stream:
                 while not self._stop_event.is_set() and total < max_chunks:
                     try:
                         data, _ = stream.read(chunk)
                     except sd.PortAudioError as e:
                         print(f" ⚠️ PortAudio read error: {e}")
+                        stream_error = e
                         break
                     self.audio_data.append(data.copy())
                     total += 1
@@ -120,17 +143,50 @@ class Recorder:
                         break
         except sd.PortAudioError as e:
             print(f" ⚠️ PortAudio stream error: {e}")
+            stream_error = e
         except Exception as e:
             print(f" Recording error: {e}")
+            stream_error = e
         finally:
             # 確保旗標被重置，即使 stream 開失敗 / read 拋 exception 也一樣
             self.is_recording = False
+            if stream_error is not None:
+                self.last_error = f"音訊串流中斷: {stream_error}"
+                # 串流死在半路通常是裝置被切換/拔除 — 刷新 PortAudio，
+                # 讓「下一段」錄音能正常開啟，不用重啟 App。
+                self._reinit_portaudio()
 
         if self._on_done and self.audio_data:
             filepath = self._save()
             duration = time.time() - self._start_time if self._start_time else 0
             if filepath:
                 self._on_done(filepath, duration)
+
+    def _open_input_stream(self, sr, chunk):
+        """開啟 InputStream；失敗時重新初始化 PortAudio 後重試一次。
+        macOS 睡眠喚醒或切換輸入裝置（AirPods / 外接麥克風拔插）後，
+        PortAudio 內部的裝置清單會過期 — 之後每次 Pa_OpenStream 都失敗且
+        永遠不會自癒，唯一解法是 Pa_Terminate + Pa_Initialize 刷新。
+        2026-06-13 實際案例：app 長跑 + 凌晨裝置變更後，每段錄音都收到
+        0 個 chunk，使用者只看到「錄音中…」之後毫無下文。"""
+        kwargs = dict(samplerate=sr, channels=1, dtype="float32", blocksize=chunk)
+        try:
+            return sd.InputStream(**kwargs)
+        except sd.PortAudioError as e:
+            print(f" ⚠️ InputStream 開啟失敗（{e}），重新初始化 PortAudio 後重試…")
+            self._reinit_portaudio()
+            return sd.InputStream(**kwargs)
+
+    def _reinit_portaudio(self):
+        """刷新 PortAudio 裝置清單。只能在沒有任何 stream 開著時呼叫
+        （Pa_Terminate 會強制關閉所有 stream）— 本 class 同時間只有一個
+        錄音 thread，呼叫點都在 stream 已關閉/開啟失敗之後，安全。"""
+        try:
+            sd._terminate()
+            sd._initialize()
+            print(" 🔄 PortAudio 已重新初始化（音訊裝置清單已刷新）")
+        except Exception as e:
+            print(f" ⚠️ PortAudio 重新初始化失敗: {e}")
 
     def _save(self, audio_array=None):
         """儲存音訊檔（供 fallback 和 SSD 備份使用）。
@@ -165,6 +221,7 @@ class Recorder:
             raise RuntimeError("請安裝 sounddevice: pip install sounddevice soundfile")
         self.is_recording = True
         self._stop_event.clear()
+        self.last_error = None
         self._start_time = time.time()
         self._thread = threading.Thread(
             target=self._continuous_loop,
@@ -232,8 +289,7 @@ class Recorder:
             ).start()
 
         try:
-            with sd.InputStream(samplerate=sr, channels=1, dtype="float32",
-                                blocksize=chunk) as stream:
+            with self._open_input_stream(sr, chunk) as stream:
                 while not self._stop_event.is_set():
                     data, _ = stream.read(chunk)
                     rms = float(np.sqrt(np.mean(data ** 2)))
@@ -277,6 +333,9 @@ class Recorder:
                     _flush_segment(has_trailing_silence=False)
         except Exception as e:
             print(f"Continuous recording error: {e}")
+            self.last_error = f"連續錄音串流中斷: {e}"
+            # 同 _record_loop：串流死亡多半是裝置變更，刷新讓下一次能重開
+            self._reinit_portaudio()
         finally:
             self.is_recording = False
             # 通知 engine：loop 已結束（正常 stop 或例外死亡都要通知，

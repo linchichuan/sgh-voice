@@ -12,15 +12,77 @@ R='\033[0;31m'
 C='\033[0;36m'
 N='\033[0m'
 
-VERSION="2.4.0"
 APP_NAME="SGH Voice"
 DMG_APP_NAME="SGH.Voice"
 ARCH=$(uname -m)
-if [ "$ARCH" = "arm64" ]; then
+VERSION=""
+RELEASE=false
+RELEASE_TAG=""
+TARGET_ARCH=""
+
+# ── 參數支援：可自定版本與是否直接上傳 Release
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --version)
+            VERSION="$2"
+            shift 2
+            ;;
+        --tag)
+            RELEASE_TAG="$2"
+            shift 2
+            ;;
+        --arch)
+            TARGET_ARCH="$2"
+            shift 2
+            ;;
+        --release)
+            RELEASE=true
+            shift
+            ;;
+        -h|--help)
+            echo "用法: ./build.sh [--version <version>] [--tag <tag>] [--release]"
+            echo "範例: ./build.sh --version 2.5.0 --release --tag v2.5.0"
+            exit 0
+            ;;
+        *)
+            if [[ -z "$VERSION" ]]; then
+                VERSION="$1"
+                shift
+            else
+                echo -e "${R}❌ 未知參數: $1${N}"
+                exit 1
+            fi
+            ;;
+    esac
+done
+
+if [ -z "$VERSION" ]; then
+    # 預設改用 app.py 內部版本，避免硬編碼遺漏
+    VERSION="$(sed -n 's/.*self.version = "\([^"]*\)"/\1/p' app.py | head -n 1)"
+fi
+
+if [ -z "$VERSION" ]; then
+    echo -e "${R}❌ 無法自動取得版本，請用 --version 指定${N}"
+    exit 1
+fi
+
+ARCH=${TARGET_ARCH:-$ARCH}
+if [ "$ARCH" = "x86_64" ] || [ "$ARCH" = "intel" ]; then
+    PYI_TARGET_ARCH="x86_64"
+    DMG_NAME="${DMG_APP_NAME}-${VERSION}-intel"
+elif [ "$ARCH" = "universal2" ]; then
+    PYI_TARGET_ARCH="universal2"
+    DMG_NAME="${DMG_APP_NAME}-${VERSION}-universal2"
+elif [ "$ARCH" = "arm64" ] || [ "$ARCH" = "apple-silicon" ] || [ "$ARCH" = "apple_silicon" ]; then
+    PYI_TARGET_ARCH="arm64"
     DMG_NAME="${DMG_APP_NAME}-${VERSION}-apple-silicon"
 else
-    DMG_NAME="${DMG_APP_NAME}-${VERSION}-intel"
+    PYI_TARGET_ARCH="auto"
+    DMG_NAME="${DMG_APP_NAME}-${VERSION}-${ARCH}"
 fi
+
+# Normalized architecture label used for status output
+ARCH_LABEL="$ARCH"
 
 echo ""
 echo -e "${C}🎙 Voice Input — Build DMG${N}"
@@ -70,7 +132,13 @@ echo -e "${G}✓${N} 清理完成"
 # ── Step 2: PyInstaller 打包 ──
 echo ""
 echo -e "${Y}[2/4] PyInstaller 打包中（需要幾分鐘）...${N}"
-pyinstaller voiceinput.spec --noconfirm 2>&1 | while IFS= read -r line; do
+if [ "$PYI_TARGET_ARCH" = "x86_64" ]; then
+    PYI_CMD="arch -x86_64 pyinstaller"
+else
+    PYI_CMD="pyinstaller"
+fi
+
+eval "${PYI_CMD} voiceinput.spec --noconfirm" 2>&1 | while IFS= read -r line; do
     # 只顯示關鍵訊息
     if echo "$line" | grep -qE "(ERROR|WARNING|Building|Completed)"; then
         echo "   $line"
@@ -135,6 +203,22 @@ echo -e "${G}✅ 打包完成！${N}"
 echo ""
 echo -e "   📦 App:  dist/${APP_NAME}.app (${APP_SIZE})"
 echo -e "   💿 DMG:  dist/${DMG_NAME}.dmg (${DMG_SIZE})"
+if [ "$RELEASE" = true ]; then
+    RELEASE_TAG_CLEAN="${RELEASE_TAG:-v${VERSION}}"
+    if [[ "${RELEASE_TAG_CLEAN}" != v* ]]; then
+        RELEASE_TAG_CLEAN="v${RELEASE_TAG_CLEAN}"
+    fi
+    echo -e "${Y}[6/6] 上傳 DMG 到 GitHub Release ${RELEASE_TAG_CLEAN}...${N}"
+    if ! command -v gh &> /dev/null; then
+        echo -e "${R}❌ 缺少 gh CLI，請先安裝或先行手動上傳${N}"
+        exit 1
+    fi
+    if ! gh release view "${RELEASE_TAG_CLEAN}" >/dev/null 2>&1; then
+        gh release create "${RELEASE_TAG_CLEAN}" --title "SGH Voice ${VERSION}" --notes "Release ${VERSION}"
+    fi
+    gh release upload "${RELEASE_TAG_CLEAN}" "dist/${DMG_NAME}.dmg" --clobber
+    echo -e "${G}✅ Release 已更新：${RELEASE_TAG_CLEAN}${N}"
+fi
 echo ""
 echo -e "${C}安裝方式：${N}"
 echo "   1. 雙擊 .dmg 檔案"
