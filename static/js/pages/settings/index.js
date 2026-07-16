@@ -86,10 +86,16 @@ export default async function mount(slot) {
       saveBtn.disabled = true;
       savedHint.textContent = '…';
       try {
-        await api.saveConfig(payload);
-        dirty.commit();
+        const result = await api.saveConfig(payload);
+        const normalizedHotkeys = result?.normalized_hotkeys || {};
+        const savedPayload = { ...payload, ...normalizedHotkeys };
+        for (const [key, value] of Object.entries(normalizedHotkeys)) {
+          const input = document.getElementById(`hotkey-input-${key}`);
+          if (input) input.value = value;
+        }
+        dirty.commit(savedPayload);
         // refresh cfg snapshot so subsequent dirty tracking compares against new baseline
-        Object.assign(cfg, payload);
+        Object.assign(cfg, savedPayload);
         Toast({ message: t('settings.saved.notice'), type: 'success' });
         savedHint.textContent = '';
       } catch (err) {

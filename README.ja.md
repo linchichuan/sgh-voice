@@ -1,4 +1,4 @@
-# 🎙 SGH Voice — AI 音声入力ツール (v2.5.3)
+# 🎙 SGH Voice — AI 音声入力ツール (v2.5.4)
 
 **[English](README.en.md)** | **日本語** | **[繁體中文](README.md)**
 
@@ -7,9 +7,18 @@
 [![macOS](https://img.shields.io/badge/macOS-Apple_Silicon-black?logo=apple)](https://github.com/linchichuan/sgh-voice/releases)
 [![iOS](https://img.shields.io/badge/iOS-17.0+-blue?logo=apple)](https://github.com/linchichuan/sgh-voice/releases)
 [![Android](https://img.shields.io/badge/Android-8.0+-green?logo=android)](https://github.com/linchichuan/sgh-voice/releases)
-[![Version](https://img.shields.io/badge/Version-2.5.3-green)]()
+[![Version](https://img.shields.io/badge/Version-2.5.4-green)]()
 
 ---
+
+## 🌟 v2.5.4 の新機能
+
+| 機能 | 詳細 |
+|------|------|
+| **Fn／地球儀キー対応** | 録音キーに `fn+right_shift` を設定できます。`right_fn+right_shift` と `Right Fn + Right Shift` も受け付けます。 |
+| **macOS ネイティブ監視** | keycode 63 と SecondaryFn flag を処理し、押下で開始・解放で停止します。 |
+| **ワンクリック設定** | 設定画面に「Fn／地球儀 + 右 Shift」を追加し、保存後は正規化された値を表示します。 |
+| **ハードウェア制限を明記** | macOS は Fn の左右を区別しません。外付けキーボード内だけで動作する Fn は検出できません。 |
 
 ## 🌟 v2.5.3 の新機能
 

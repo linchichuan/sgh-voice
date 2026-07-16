@@ -1,4 +1,4 @@
-# 🎙 SGH Voice — AI Voice Input Tool (v2.5.3)
+# 🎙 SGH Voice — AI Voice Input Tool (v2.5.4)
 
 **English** | **[日本語](README.ja.md)** | **[繁體中文](README.md)**
 
@@ -7,9 +7,18 @@
 [![macOS](https://img.shields.io/badge/macOS-Apple_Silicon-black?logo=apple)](https://github.com/linchichuan/sgh-voice/releases)
 [![iOS](https://img.shields.io/badge/iOS-17.0+-blue?logo=apple)](https://github.com/linchichuan/sgh-voice/releases)
 [![Android](https://img.shields.io/badge/Android-8.0+-green?logo=android)](https://github.com/linchichuan/sgh-voice/releases)
-[![Version](https://img.shields.io/badge/Version-2.5.3-green)]()
+[![Version](https://img.shields.io/badge/Version-2.5.4-green)]()
 
 ---
+
+## 🌟 What's New in v2.5.4
+
+| Feature | Details |
+|---------|---------|
+| **Fn/Globe shortcuts** | Recording can use `fn+right_shift`; `right_fn+right_shift` and `Right Fn + Right Shift` are accepted aliases. |
+| **Native macOS events** | Handles keycode 63 and the SecondaryFn flag for reliable press-to-start and release-to-stop behavior. |
+| **One-click preset** | Settings now includes an “Fn/Globe + Right Shift” preset and displays the normalized value after saving. |
+| **Honest hardware limits** | macOS does not expose Fn side identity; hardware-only Fn keys on some external keyboards cannot be detected. |
 
 ## 🌟 What's New in v2.5.3
 

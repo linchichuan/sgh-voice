@@ -8,6 +8,7 @@ import { h, classes, Stat, Toast } from '../lib/components.js';
 
 const REDUCE_MOTION = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const HOTKEY_LABELS = {
+  fn: 'Fn/Globe', right_fn: 'Fn/Globe',
   cmd: 'Left ⌘', right_cmd: 'Right ⌘',
   option: 'Left ⌥', right_option: 'Right ⌥',
   ctrl: 'Left ⌃', right_ctrl: 'Right ⌃',

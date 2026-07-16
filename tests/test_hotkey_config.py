@@ -8,6 +8,9 @@ import types
 import pytest
 
 from hotkey_config import (
+    FN_KEYCODE,
+    FN_MODIFIER_MASK,
+    FN_RECORD_HOTKEY,
     HotkeyValidationError,
     MODIFIER_TOKENS,
     RECOMMENDED_ACTION_HOTKEYS,
@@ -24,6 +27,23 @@ def test_recommended_hotkey_is_modifier_only_and_normalized():
     assert spec.normalized == RECOMMENDED_RECORD_HOTKEY
     assert spec.tokens == ("right_option", "right_shift")
     assert spec.keycodes == frozenset({61, 60})
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "right_fn+right_shift",
+        "Right Fn + Right Shift",
+        "globe+right_shift",
+        "function_key+right_shift",
+    ],
+)
+def test_fn_aliases_are_accepted_and_normalized(value):
+    spec = parse_hotkey(value)
+
+    assert spec.normalized == FN_RECORD_HOTKEY
+    assert spec.tokens == ("fn", "right_shift")
+    assert spec.keycodes == frozenset({FN_KEYCODE, 60})
 
 
 def test_auxiliary_hotkey_can_be_disabled():
@@ -138,6 +158,11 @@ def test_modifier_side_detection_keeps_right_and_left_distinct():
     assert modifier_is_pressed(61, generic_option)  # KVM/generic fallback
 
 
+def test_fn_modifier_uses_the_macos_secondary_fn_flag():
+    assert modifier_is_pressed(FN_KEYCODE, FN_MODIFIER_MASK)
+    assert not modifier_is_pressed(FN_KEYCODE, 0)
+
+
 class _FakeEvent:
     def __init__(self, event_type, keycode, flags=0, repeat=False):
         self._event_type = event_type
@@ -246,6 +271,46 @@ def test_native_recording_listener_ignores_right_cmd_and_reloads_live(monkeypatc
     handle(_FakeEvent(12, 62, ctrl_flags))
     handle(_FakeEvent(12, 60, ctrl_shift_flags))
     assert engine.starts == 2
+
+
+def test_native_recording_listener_supports_fn_and_right_shift(monkeypatch):
+    import app
+
+    handlers = _install_fake_appkit(monkeypatch)
+    monkeypatch.setattr(app.threading, "Thread", _ImmediateThread)
+
+    class Engine:
+        config = {
+            "hotkey": "right_fn+right_shift",
+            "hotkey_mode": "push_to_talk",
+        }
+        is_recording = False
+        starts = 0
+        stops = 0
+        _on_hotkey_reset = None
+
+        def start_recording(self, from_hotkey=False):
+            assert from_hotkey is True
+            self.is_recording = True
+            self.starts += 1
+
+        def stop_and_process(self):
+            self.is_recording = False
+            self.stops += 1
+
+    engine = Engine()
+    app.setup_hotkey(engine)
+    handle = handlers["global"]
+
+    handle(_FakeEvent(12, FN_KEYCODE, FN_MODIFIER_MASK))
+    both_flags = FN_MODIFIER_MASK | 0x20000 | 0x4
+    handle(_FakeEvent(12, 60, both_flags))
+    assert engine.starts == 1
+    assert engine.is_recording is True
+
+    handle(_FakeEvent(12, 60, FN_MODIFIER_MASK))
+    assert engine.stops == 1
+    assert engine.is_recording is False
 
 
 def test_native_recording_listener_ignores_ptt_while_continuous(monkeypatch):
@@ -1324,6 +1389,36 @@ def test_config_api_validates_normalizes_and_live_reloads(monkeypatch):
     assert len(saves) == 1
 
 
+def test_config_api_accepts_human_readable_right_fn_alias(monkeypatch):
+    import config
+    import dashboard
+
+    stored = dict(config.DEFAULT_CONFIG)
+
+    class Engine:
+        reloads = 0
+
+        def reload_config(self):
+            self.reloads += 1
+
+    engine = Engine()
+    monkeypatch.setattr(dashboard, "_engine", engine)
+    monkeypatch.setattr(dashboard, "load_config", lambda: dict(stored))
+    monkeypatch.setattr(dashboard, "save_config", lambda value: stored.update(value))
+
+    response = dashboard.app.test_client().post(
+        "/api/config", json={"hotkey": "Right Fn + Right Shift"}
+    )
+
+    assert response.status_code == 200
+    assert response.get_json()["hotkeys_applied"] is True
+    assert response.get_json()["normalized_hotkeys"] == {
+        "hotkey": FN_RECORD_HOTKEY
+    }
+    assert stored["hotkey"] == FN_RECORD_HOTKEY
+    assert engine.reloads == 1
+
+
 def test_config_api_requires_legacy_main_to_move_off_conflicting_family(monkeypatch):
     import config
     import dashboard
@@ -1386,4 +1481,6 @@ def test_hotkey_settings_render_editable_fields_and_conflict_guidance():
     assert "type: 'text'" in source
     assert "dirty.set(row.key" in source
     assert RECOMMENDED_RECORD_HOTKEY in source
+    assert FN_RECORD_HOTKEY in source
+    assert "settings.hotkeys.apply.fn" in source
     assert "settings.hotkeys.conflict.right_cmd" in source

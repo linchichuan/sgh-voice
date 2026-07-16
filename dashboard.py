@@ -296,6 +296,7 @@ def api_save_config():
     # 未知 token、系統保留鍵、重複或 prefix collision 一律拒絕；不可像舊版
     # 一樣默默忽略部分 token，最後 fallback 回正好與 Codex 衝突的 right_cmd。
     changed_hotkey_fields = set(data).intersection(HOTKEY_FIELDS)
+    normalized_changed_hotkeys = {}
     hotkey_behavior_changed = bool(changed_hotkey_fields) or "hotkey_mode" in data
     if "hotkey_mode" in data:
         try:
@@ -325,6 +326,7 @@ def api_save_config():
             }), 400
         for field in changed_hotkey_fields:
             data[field] = normalized_hotkeys[field]
+            normalized_changed_hotkeys[field] = normalized_hotkeys[field]
         if normalized_hotkeys["hotkey"] == "right_cmd":
             warnings.append(
                 "right_cmd may conflict with Codex voice input; "
@@ -348,6 +350,7 @@ def api_save_config():
         "ok": True,
         "warnings": warnings,
         "hotkeys_applied": hotkeys_applied,
+        "normalized_hotkeys": normalized_changed_hotkeys,
     })
 
 

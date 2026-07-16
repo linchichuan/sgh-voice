@@ -27,6 +27,7 @@ from multilingual import (
     resolve_output_language_hint,
 )
 from hotkey_config import (
+    FN_KEYCODE,
     HOTKEY_FIELDS,
     MODIFIER_KEYCODES,
     RECOMMENDED_RECORD_HOTKEY,
@@ -502,7 +503,7 @@ class VoiceEngine:
     """語音輸入核心引擎，被 CLI / MenuBar / Dashboard 共用"""
 
     def __init__(self):
-        self.version = "2.5.3"
+        self.version = "2.5.4"
         self.config = load_config()
         self.memory = Memory()
         self.transcriber = Transcriber(self.config, self.memory)
@@ -2070,6 +2071,7 @@ def _setup_hotkey_pynput(engine):
     from pynput import keyboard
 
     special_names = {
+        "fn": ("fn",),
         "cmd": ("cmd_l", "cmd"),
         "right_cmd": ("cmd_r",),
         "option": ("alt_l", "alt"),
@@ -2085,6 +2087,8 @@ def _setup_hotkey_pynput(engine):
         special_names[f"f{number}"] = (f"f{number}",)
 
     def _token_for_key(key):
+        if getattr(key, "vk", None) == FN_KEYCODE:
+            return "fn"
         for token, names in special_names.items():
             for name in names:
                 candidate = getattr(keyboard.Key, name, None)

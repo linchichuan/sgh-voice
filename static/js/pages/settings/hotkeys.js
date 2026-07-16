@@ -3,9 +3,10 @@ import { h, classes, Card, Badge, Button } from '../../lib/components.js';
 import { t } from '../../lib/i18n.js';
 
 const RECOMMENDED_RECORD_HOTKEY = 'right_option+right_shift';
+const FN_RECORD_HOTKEY = 'fn+right_shift';
 
 const ROWS = [
-  { key: 'hotkey',            labelKey: 'settings.hotkeys.record', recommended: true },
+  { key: 'hotkey',            labelKey: 'settings.hotkeys.record', recommended: true, fnPreset: true },
   { key: 'rewrite_hotkey',    labelKey: 'settings.hotkeys.rewrite', optional: true },
   { key: 'retry_hotkey',      labelKey: 'settings.hotkeys.retry', optional: true },
   { key: 'cancel_hotkey',     labelKey: 'settings.hotkeys.cancel', optional: true },
@@ -47,9 +48,8 @@ function hotkeyRow(row, cfg, dirty, syntaxHintId) {
   input.addEventListener('input', syncValue);
   conflict.hidden = !usesRightCommand(input.value);
 
-  const field = h('div', { class: 'min-w-0' },
-    h('div', { class: 'flex flex-col gap-2 sm:flex-row sm:items-center' },
-      input,
+  const presetButtons = row.recommended || row.fnPreset
+    ? h('div', { class: 'flex flex-col gap-2 sm:flex-row sm:justify-end' },
       row.recommended ? Button({
         variant: 'outline',
         icon: 'keyboard',
@@ -60,6 +60,23 @@ function hotkeyRow(row, cfg, dirty, syntaxHintId) {
           input.focus();
         },
       }) : null,
+      row.fnPreset ? Button({
+        variant: 'outline',
+        icon: 'globe-2',
+        label: t('settings.hotkeys.apply.fn'),
+        onClick: () => {
+          input.value = FN_RECORD_HOTKEY;
+          syncValue();
+          input.focus();
+        },
+      }) : null,
+    )
+    : null;
+
+  const field = h('div', { class: 'min-w-0' },
+    h('div', { class: 'space-y-2' },
+      input,
+      presetButtons,
     ),
     conflict,
   );
@@ -94,6 +111,10 @@ export function mountHotkeysTab(container, cfg, dirty) {
     id: syntaxHintId,
     class: 'text-xs leading-5 text-[var(--text-3)]',
   }, t('settings.hotkeys.syntax'));
+  const fnHint = h('p', {
+    class: 'text-xs leading-5 text-[var(--text-3)]',
+    role: 'note',
+  }, t('settings.hotkeys.fn.note'));
 
   const list = h('div', { class: 'divide-y divide-[var(--border)] overflow-hidden rounded-lg border border-[var(--border)]' });
   ROWS.forEach((row) => {
@@ -113,6 +134,7 @@ export function mountHotkeysTab(container, cfg, dirty) {
         select,
       ),
       syntaxHint,
+      fnHint,
       list,
       notice,
     ),

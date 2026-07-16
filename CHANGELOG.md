@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.5.4 (2026-07-16) — Fn/Globe Hotkey Support
+
+- 錄音快捷鍵新增 macOS Fn／Globe 支援，正確處理 keycode 63 與 `kCGEventFlagMaskSecondaryFn`。
+- 接受 `fn+right_shift`、`right_fn+right_shift`、`globe+right_shift` 與 `Right Fn + Right Shift`，並統一正規化為 `fn+right_shift`。
+- Dashboard 新增「Fn／地球鍵 + 右 Shift」快速套用，API 回傳正規化結果，避免畫面顯示與 runtime 設定不同步。
+- 設定頁以繁中、日文、英文說明 macOS 不區分 Fn 左右；硬體層 Fn 若不送出 macOS 事件則無法監聽。
+- pynput fallback 支援 `Key.fn` 與 virtual key 63；新增 parser、native press/release、API normalization 回歸測試。
+
 ## v2.5.3 (2026-07-15) — Editable, Conflict-Safe Hotkeys
 
 - 錄音熱鍵預設改為 `right_option+right_shift`，避開 Codex 使用的 `right_cmd`，且純 modifier 組合不會在游標位置輸入額外字元。

@@ -30,8 +30,10 @@ export function createDirty(initialCfg) {
       return out;
     },
     /** Update initial snapshot after a successful save. */
-    commit() {
-      for (const [k, v] of dirty.entries()) initial[k] = v;
+    commit(savedValues = {}) {
+      for (const [k, v] of dirty.entries()) {
+        initial[k] = Object.prototype.hasOwnProperty.call(savedValues, k) ? savedValues[k] : v;
+      }
       dirty.clear();
     },
   };

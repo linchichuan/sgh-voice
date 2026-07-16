@@ -1,4 +1,4 @@
-# 🎙 SGH Voice — 讓想法流動，不再卡在鍵盤上 (v2.5.3)
+# 🎙 SGH Voice — 讓想法流動，不再卡在鍵盤上 (v2.5.4)
 
 **[English](README.en.md) | [日本語](README.ja.md) | 繁體中文**
 
@@ -7,9 +7,18 @@
 [![macOS](https://img.shields.io/badge/macOS-Apple_Silicon-black?logo=apple)](https://github.com/linchichuan/sgh-voice/releases)
 [![iOS](https://img.shields.io/badge/iOS-17.0+-blue?logo=apple)](https://github.com/linchichuan/sgh-voice/releases)
 [![Android](https://img.shields.io/badge/Android-8.0+-green?logo=android)](https://github.com/linchichuan/sgh-voice/releases)
-[![Version](https://img.shields.io/badge/Version-2.5.3-green)]()
+[![Version](https://img.shields.io/badge/Version-2.5.4-green)]()
 
 ---
+
+## 🌟 v2.5.4：Fn／地球鍵快捷鍵修正
+
+| 重點修復 | 說明 |
+|------|------|
+| **支援 Fn／地球鍵** | 錄音鍵可設為 `fn+right_shift`；也接受 `right_fn+right_shift` 與 `Right Fn + Right Shift`。 |
+| **macOS 原生監聽** | 正確處理 keycode 63 與 SecondaryFn flag，按下開始、放開停止。 |
+| **設定頁快速套用** | 新增「Fn／地球鍵 + 右 Shift」按鈕，儲存後顯示正規化結果並立即套用。 |
+| **清楚的硬體限制** | macOS 不區分左右 Fn；部分外接鍵盤的硬體 Fn 若不送出系統事件，App 無法偵測。 |
 
 ## 🌟 v2.5.3：可編輯、免重啟的快捷鍵
 

@@ -22,6 +22,7 @@ HOTKEY_FIELDS = (
 )
 
 RECOMMENDED_RECORD_HOTKEY = "right_option+right_shift"
+FN_RECORD_HOTKEY = "fn+right_shift"
 RECOMMENDED_ACTION_HOTKEYS = {
     # Use only keys present on Apple's compact keyboards.  Keeping the action
     # chords on the left side also makes them disjoint from the right-side PTT
@@ -60,6 +61,13 @@ LEGACY_DEFAULT_HOTKEYS = {
 }
 HOTKEY_MODES = frozenset({"push_to_talk", "toggle"})
 
+# macOS exposes Fn/Globe as one system modifier (kVK_Function / the
+# SecondaryFn flag).  It does not expose a left/right identity, even when an
+# external keyboard physically places the key on the right.  ``right_fn`` is
+# therefore accepted as a user-facing alias and normalized to ``fn``.
+FN_KEYCODE = 63
+FN_MODIFIER_MASK = 0x800000
+
 
 KEY_CODES = {
     "cmd": 55,
@@ -70,6 +78,7 @@ KEY_CODES = {
     "right_ctrl": 62,
     "shift": 56,
     "right_shift": 60,
+    "fn": FN_KEYCODE,
     "space": 49,
     "escape": 53,
     "f1": 122,
@@ -139,6 +148,12 @@ ALIASES = {
     "left_control": "ctrl",
     "right_control": "right_ctrl",
     "left_shift": "shift",
+    "function": "fn",
+    "function_key": "fn",
+    "globe": "fn",
+    "globe_key": "fn",
+    "left_fn": "fn",
+    "right_fn": "fn",
     "esc": "escape",
 }
 
@@ -152,6 +167,7 @@ MODIFIER_TOKENS = frozenset(
         "right_ctrl",
         "shift",
         "right_shift",
+        "fn",
     }
 )
 MODIFIER_KEYCODES = frozenset(KEY_CODES[token] for token in MODIFIER_TOKENS)
@@ -165,6 +181,7 @@ _TOKEN_ORDER = {
             "right_ctrl",
             "option",
             "right_option",
+            "fn",
             "shift",
             "right_shift",
             "cmd",
@@ -189,6 +206,7 @@ _RESERVED_MODIFIER_FAMILY = {
     "right_ctrl": "ctrl",
     "right_option": "option",
     "right_shift": "shift",
+    "fn": "fn",
 }
 _MODIFIER_FAMILY = {
     "cmd": "cmd",
@@ -199,6 +217,7 @@ _MODIFIER_FAMILY = {
     "right_option": "option",
     "shift": "shift",
     "right_shift": "shift",
+    "fn": "fn",
 }
 _RESERVED_BY_SET = {
     frozenset(item.split("+")): reason
@@ -286,7 +305,18 @@ def parse_hotkey(
             raise HotkeyValidationError("recording hotkey cannot be empty", field=field)
         return HotkeySpec(field, raw, "", (), frozenset())
 
-    source_tokens = [part for part in re.split(r"[+\s]+", raw) if part]
+    # With an explicit ``+``, allow human-readable labels such as
+    # ``Right Fn + Right Shift`` in addition to config-style underscores.
+    # Without ``+`` keep the original whitespace-separated grammar so
+    # existing inputs like ``ctrl option`` remain valid.
+    if "+" in raw:
+        source_tokens = [
+            re.sub(r"[\s-]+", "_", part.strip())
+            for part in raw.split("+")
+            if part.strip()
+        ]
+    else:
+        source_tokens = [part for part in re.split(r"\s+", raw) if part]
     tokens = [_canonical_token(part) for part in source_tokens]
     unknown = [token for token in tokens if token not in KEY_CODES]
     if unknown:
@@ -430,6 +460,9 @@ def validate_hotkey_mode(value) -> str:
 
 def modifier_is_pressed(keycode: int, flags: int) -> bool:
     """Interpret an NSEvent modifier flag while preserving left/right sides."""
+
+    if int(keycode) == FN_KEYCODE:
+        return bool(int(flags) & FN_MODIFIER_MASK)
 
     device_mask = _DEVICE_MASK_BY_KEYCODE.get(int(keycode), 0)
     generic_mask = _GENERIC_MASK_BY_KEYCODE.get(int(keycode), 0)
