@@ -30,7 +30,8 @@ def test_echoes_fewshot_detects_exact_replay(mock_transcriber):
     mock_transcriber.config["enable_fewshot"] = True
     # populated_memory 的 edited 範例之一：final="Claude Code 真的很強。"
     leaked_final = "Claude Code 真的很強。"
-    current_raw = "今天有點累想休息"
+    # script profile 必須和被注入的範例一致（Han + Latin），否則該範例根本不會送出。
+    current_raw = "今天想用 GitHub 處理工作"
     assert mock_transcriber._echoes_fewshot(leaked_final, current_raw) is True
 
 

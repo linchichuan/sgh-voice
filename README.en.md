@@ -1,4 +1,4 @@
-# 🎙 SGH Voice — AI Voice Input Tool (v2.5.0)
+# 🎙 SGH Voice — AI Voice Input Tool (v2.5.3)
 
 **English** | **[日本語](README.ja.md)** | **[繁體中文](README.md)**
 
@@ -7,19 +7,38 @@
 [![macOS](https://img.shields.io/badge/macOS-Apple_Silicon-black?logo=apple)](https://github.com/linchichuan/sgh-voice/releases)
 [![iOS](https://img.shields.io/badge/iOS-17.0+-blue?logo=apple)](https://github.com/linchichuan/sgh-voice/releases)
 [![Android](https://img.shields.io/badge/Android-8.0+-green?logo=android)](https://github.com/linchichuan/sgh-voice/releases)
-[![Version](https://img.shields.io/badge/Version-2.5.0-green)]()
+[![Version](https://img.shields.io/badge/Version-2.5.3-green)]()
 
 ---
 
-## 🌟 What's New in v2.1.0
+## 🌟 What's New in v2.5.3
 
 | Feature | Details |
 |---------|---------|
-| **🧠 Personalized Few-Shot Post-Processing** | The latest 3 `whisper_raw → final_text` examples are injected into LLM messages so all 5 engines follow your punctuation, wording, and style. |
-| **🎯 Dictionary Learning from History** | New CLI and Dashboard endpoint promote high-frequency corrections from history with dry-run / apply safeguards. |
-| **✏️ Global Quick-Rewrite Hotkey** | Select text in any app, press `right_option+r`, and SGH Voice rewrites it with LLM fallback before pasting it back. |
-| **🎙 Continuous Voice Mode** | VAD auto-segmentation detects voice/silence boundaries, clips trailing silence, and protects minimum/maximum segment length. |
-| **💾 External Audio Backup** | Audio backups now default to `/Volumes/Satechi_SSD/voice-input/audio_backup`; backup is skipped automatically when the SSD is not mounted. |
+| **No Codex conflict** | The recording shortcut now defaults to `Right Option + Right Shift` instead of Codex's `Right Cmd`. |
+| **Editable hotkeys** | Recording, Quick Rewrite, Retry, Cancel, and Continuous Mode shortcuts are editable in Settings. |
+| **Applies immediately** | Saving updates the active listener without restarting the App or registering duplicate monitors. |
+| **No text corruption** | Rewrite, Retry, and Cancel now use modifier-only chords instead of Option-letter or Fn-dependent shortcuts. |
+| **Conflict validation** | Single modifiers, unsupported keys, reserved macOS shortcuts, and prefix collisions are rejected before saving. |
+
+## 🌟 What's New in v2.5.2
+
+| Feature | Details |
+|---------|---------|
+| **Clipboard-free insertion** | Supported controls now use macOS `AXSelectedText` to insert directly at the caret. |
+| **Complete clipboard restoration** | Terminal-style fallbacks borrow the pasteboard briefly and restore text, images, files, HTML, RTF, and other formats. |
+| **Stable permissions** | Builds prefer a stable Apple signing identity and no longer reset Accessibility permission automatically. |
+| **New icon system** | Replaced the blue-framed App icon and emoji status item with polished App and adaptive monochrome menu-bar icons. |
+
+## What's New in v2.5.1
+
+| Feature | Details |
+|---------|---------|
+| **Japanese Script Protection** | Clause-aware OpenCC conversion preserves Japanese forms such as `画像`, `動画`, `来週`, and `参考`. |
+| **Code-Switch Guard** | The LLM may no longer translate or transliterate retained Latin and kana spans. |
+| **Technical Vocabulary** | Added canonical SEO/AEO/GEO, contact-form, kana, JSON-LD, and hreflang spellings. |
+| **Verified Personalization** | Few-shot uses only user-edited examples with the same Han/Kana/Latin script profile. |
+| **Reliable Local History** | Each history item is written atomically; paste diagnostics store metadata only. |
 
 ---
 
@@ -28,7 +47,7 @@
 | Feature | Description |
 |---------|-------------|
 | **Trilingual Mixing** | Freely switch between Traditional Chinese, Japanese, and English within the same sentence |
-| **Traditional Chinese Triple Protection** | Whisper prompt → Claude system prompt → OpenCC s2twp |
+| **Traditional Chinese Triple Protection** | Whisper prompt → LLM contract → clause-aware OpenCC s2twp |
 | **Hybrid Smart Routing** | Short audio → local mlx-whisper, long audio → OpenAI Cloud |
 | **AI Post-Processing** | Remove filler words (um, uh, えーと), self-correction detection, punctuation |
 | **Personal Dictionary Learning** | Automatically accumulate correction rules, improving accuracy over time |
@@ -37,7 +56,7 @@
 | **🏥 Medical Scene Mode** | Japanese medical terminology, drug names, biotech glossary (v1.2) |
 | **🩺 Medical Consultation** | Automatically condenses doctor-patient dialogue into a professional SOAP note format |
 | **📋 Clipboard Auto-Learn** | Select and copy manually corrected text, and the system automatically learns the corrections for your personal dictionary |
-| **Push-to-Talk / Toggle** | Hold Right Cmd to dictate, or tap once to start/stop |
+| **Push-to-Talk / Toggle** | Hold Right Option + Right Shift to dictate, or tap once to start/stop |
 | **Cross-Application** | System-level voice input, auto-paste to cursor position |
 | **Web Dashboard** | Usage stats, history, dictionary management, settings |
 | **Android IME** | Android keyboard IME, voice input in any app |
@@ -79,10 +98,10 @@ This tool offers maximum flexibility — run entirely locally for free, or use p
 
 ### Installation
 
-1. Download `SGH.Voice-2.5.0-apple-silicon.dmg` from [Releases](https://github.com/linchichuan/sgh-voice/releases)
+1. Download the latest Apple Silicon DMG from [Releases](https://github.com/linchichuan/sgh-voice/releases)
 2. Drag **Voice Input** to Applications
 3. First launch: Right-click → **Open** (allow macOS Gatekeeper once)
-4. Menu bar shows 🎙 icon → click **Open Dashboard**
+4. When the SGH Voice microphone icon appears in the menu bar, click **Open Dashboard**
 5. Configure API keys or enable **Hybrid Mode** in Dashboard settings
 
 ### macOS Permissions
@@ -144,13 +163,13 @@ Download the APK from [Releases](https://github.com/linchichuan/sgh-voice/releas
 
 ### Push-to-Talk (Default)
 
-1. Menu bar shows 🎙
-2. **Hold Right Cmd (⌘)** to start recording
+1. The SGH Voice microphone icon appears in the menu bar
+2. **Hold Right Option (⌥) + Right Shift (⇧)** to start recording
 3. **Release** to stop — auto-transcribes and pastes to cursor
 
 ### Dashboard
 
-Click menu bar 🎙 → **Open Dashboard**, or visit `http://localhost:7865`
+Click the SGH Voice menu-bar icon → **Open Dashboard**, or visit `http://localhost:7865`
 
 - **Overview**: Time saved, cost estimates, usage stats
 - **History**: Search, copy, rewrite all transcription results

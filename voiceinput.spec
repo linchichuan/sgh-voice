@@ -34,10 +34,11 @@ a = Analysis(
     binaries=mlx_bins + mlx_nn_bins + whisper_bins + sd_bins + sf_bins + rumps_bins + tiktoken_bins,
     datas=[
         ('static', 'static'),
+        ('resources/menubar', 'resources/menubar'),
     ] + mlx_datas + mlx_nn_datas + whisper_datas + sd_datas + sf_datas + opencc_datas + rumps_datas + tiktoken_datas,
     hiddenimports=[
         # App 核心
-        'app', 'config', 'memory', 'transcriber', 'recorder', 'dashboard', 'overlay', 'voiceprint',
+        'app', 'config', 'memory', 'multilingual', 'text_insertion', 'transcriber', 'recorder', 'dashboard', 'overlay', 'voiceprint',
         # GUI / 系統
         'rumps',
         'pynput', 'pynput.keyboard', 'pynput.keyboard._darwin',
@@ -107,8 +108,8 @@ app = BUNDLE(
     info_plist={
         'CFBundleName': 'SGH Voice',
         'CFBundleDisplayName': 'SGH Voice',
-        'CFBundleVersion': '2.5.0',
-        'CFBundleShortVersionString': '2.5.0',
+        'CFBundleVersion': '2.5.3',
+        'CFBundleShortVersionString': '2.5.3',
         'LSMinimumSystemVersion': '13.0',
         'LSUIElement': True,  # 選單列 App，不顯示 Dock 圖示
         'NSMicrophoneUsageDescription': 'SGH Voice 需要麥克風權限來錄製語音並轉為文字。',

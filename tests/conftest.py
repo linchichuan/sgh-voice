@@ -38,6 +38,9 @@ def isolated_data_dir(tmp_path, monkeypatch):
     monkeypatch.setattr(cfg, "STATS_FILE", str(data_dir / "stats.json"))
     monkeypatch.setattr(cfg, "SMART_REPLACE_FILE", str(data_dir / "smart_replace.json"))
     monkeypatch.setattr(cfg, "AUDIT_LOG_FILE", str(data_dir / "audit.log"))
+    # 一般單元測試不得讀寫使用者的真實 macOS Keychain；Keychain 專屬測試
+    # 另有 isolated in-memory backend。
+    monkeypatch.setattr(cfg, "_keychain_available", lambda: False)
 
     # event_ledger 也吃 ~/.voice-input/events.jsonl
     try:
@@ -56,6 +59,7 @@ def mock_config():
         "enable_fewshot": True,
         "fewshot_count": 3,
         "fewshot_min_input_chars": 8,
+        "fewshot_verified_only": True,
         "enable_voice_commands": True,
         "enable_app_awareness": False,
         "enable_filler_removal": True,

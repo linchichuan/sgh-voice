@@ -73,7 +73,9 @@ def test_corrections_word_boundary_protects_cloudflare(populated_memory):
 
 def test_corrections_word_boundary_still_fixes_standalone(populated_memory):
     out = populated_memory.apply_corrections("我請 cloud 幫我寫程式")
-    assert "Claude" in out
+    # 單獨 cloud 可能是 Cloud Run / cloud storage，不再做無條件語意替換。
+    assert "cloud" in out
+    assert "Claude" not in out
 
 
 def test_corrections_long_rule_still_applies(populated_memory):
@@ -154,8 +156,11 @@ def test_scene_edit_directive_switches_to_edit_mode(mock_transcriber, monkeypatc
     mock_transcriber.config["enable_hybrid_mode"] = True
 
     result = mock_transcriber._transcribe_impl(
-        np.ones(16000, dtype=np.float32), 1.0, "dictate", "", None
+        np.ones(16000, dtype=np.float32), 1.0, "dictate", "", None,
+        history_mode="continuous",
     )
     assert captured["mode"] == "edit"
     assert "SOAP" in captured["edit_context"] or "[S]" in captured["edit_context"]
     assert result["final"].startswith("[S]")
+    assert mock_transcriber.memory.history[-1]["mode"] == "edit"
+    assert mock_transcriber.memory.history[-1]["pipeline_mode"] == "edit"

@@ -9,7 +9,9 @@ from datetime import datetime
 from config import (
     load_dictionary, save_dictionary, load_history, save_history,
     BASE_CUSTOM_WORDS, BASE_CORRECTIONS, CASE_INSENSITIVE_CORRECTIONS,
+    PROTECTED_CANONICAL_TERMS_BY_CASEFOLD,
 )
+from multilingual import language_profile
 
 
 class Memory:
@@ -86,6 +88,11 @@ class Memory:
         result = text
         # 長詞優先，避免短詞先匹配破壞長詞
         for wrong, right in sorted(merged.items(), key=lambda x: -len(x[0])):
+            # 舊版自動學習可能留下 LINE→line、Cloud→Claude 這類破壞正確品牌／
+            # 技術詞的規則。canonical term 已經正確時，不允許任何層覆寫。
+            canonical = PROTECTED_CANONICAL_TERMS_BY_CASEFOLD.get(wrong.casefold())
+            if canonical is not None and right != canonical:
+                continue
             if CASE_INSENSITIVE_CORRECTIONS:
                 # 不分大小寫替換：用正則 re.IGNORECASE
                 pattern = re.escape(wrong)
@@ -402,14 +409,23 @@ class Memory:
     # ─── History ─────────────────────────────────────────
 
     def add_to_history(self, entry):
-        """新增歷史紀錄（threading-safe，每 10 次完整寫入一次磁碟）"""
+        """新增歷史紀錄並立即原子落盤。
+
+        history 是 verified few-shot 與人工修正的來源，不能再因常駐 App 未正常關閉而
+        落後最多 9 筆。檔案只保留 2000 筆，逐筆寫入的 IO 成本可控。
+        """
         with self._history_lock:
             self.history.append(entry)
-            self._history_write_count += 1
-            # 每 10 次完整寫入，減少大量 IO
-            if self._history_write_count >= 10:
+            if len(self.history) > 2000:
+                self.history = self.history[-2000:]
+            try:
                 save_history(self.history)
                 self._history_write_count = 0
+                return True
+            except OSError:
+                # 保留 RAM 內容並讓 shutdown flush 再試；history 寫入失敗不應拖垮轉寫。
+                self._history_write_count += 1
+                return False
 
     def flush_history(self):
         """強制寫入 history 到磁碟（程式結束前呼叫）"""
@@ -424,24 +440,47 @@ class Memory:
             recent = self.history[-n:] if self.history else []
         return [h.get("final_text", "") for h in recent]
 
-    def get_few_shot_examples(self, n=3, min_chars=12, max_chars=240):
+    def get_few_shot_examples(
+        self,
+        n=3,
+        min_chars=12,
+        max_chars=240,
+        current_text=None,
+        verified_only=False,
+    ):
         """取得個人化 few-shot 範例：whisper_raw → final_text。
         優先使用者手動編輯過的（edited=True），不足時 fallback 到 LLM 自動處理過的隱性正例對。
-        範例會被當成 user/assistant 訊息對注入 LLM 的 messages 陣列。"""
+        範例會被當成 user/assistant 訊息對注入 LLM 的 messages 陣列。
+
+        ``current_text`` 有值時只選相同語言 profile，避免把中文
+        範例注入日文，或把 English/Kana code-switch 範例注入純中文。
+        ``verified_only=True`` 時只使用者明確編輯過的範例，禁止模型用自己的未驗證
+        輸出自我強化。"""
         with self._history_lock:
             items = list(reversed(self.history))  # 新→舊
 
         examples = []
         seen_raw = set()
+        target_profile = language_profile(current_text) if current_text else None
 
         def _try_add(h):
             raw = (h.get("whisper_raw") or "").strip()
             fin = (h.get("final_text") or "").strip()
+            # 只有逐字聽寫可當逐字聽寫範例；translate/edit/Email/SOAP/retry 的輸出本來
+            # 就允許改寫，注入 dictate 會教模型翻譯或重組內容。
+            if h.get("mode") not in {"dictate", "continuous"}:
+                return False
             if not raw or not fin or raw == fin:
                 return False
             if len(raw) < min_chars or len(raw) > max_chars:
                 return False
             if len(fin) > max_chars:
+                return False
+            if target_profile is not None and language_profile(raw) != target_profile:
+                return False
+            # 即使 edited=True，raw→final 若跨語言（例如中譯英）也不可當 transcoder 範例。
+            # 日文內部 Kana→Kanji 校正仍屬同一 profile，可安全保留。
+            if language_profile(fin) != language_profile(raw):
                 return False
             if raw in seen_raw:
                 return False
@@ -457,7 +496,10 @@ class Memory:
             if len(examples) >= n:
                 return examples
 
-        # Pass 2: LLM 自動處理過、使用者未編輯（隱性正例）
+        if verified_only:
+            return examples
+
+        # Pass 2: LLM 自動處理過、使用者未編輯（隱性正例；僅 legacy opt-in）
         for h in items:
             if h.get("edited"):
                 continue

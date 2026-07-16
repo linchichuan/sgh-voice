@@ -1,4 +1,4 @@
-# 🎙 SGH Voice — 讓想法流動，不再卡在鍵盤上 (v2.5.0)
+# 🎙 SGH Voice — 讓想法流動，不再卡在鍵盤上 (v2.5.3)
 
 **[English](README.en.md) | [日本語](README.ja.md) | 繁體中文**
 
@@ -7,29 +7,48 @@
 [![macOS](https://img.shields.io/badge/macOS-Apple_Silicon-black?logo=apple)](https://github.com/linchichuan/sgh-voice/releases)
 [![iOS](https://img.shields.io/badge/iOS-17.0+-blue?logo=apple)](https://github.com/linchichuan/sgh-voice/releases)
 [![Android](https://img.shields.io/badge/Android-8.0+-green?logo=android)](https://github.com/linchichuan/sgh-voice/releases)
-[![Version](https://img.shields.io/badge/Version-2.5.0-green)]()
+[![Version](https://img.shields.io/badge/Version-2.5.3-green)]()
 
 ---
 
-## 🌟 v2.5.0 重大更新：品質與穩定性更新
-
-本次新增個人化 few-shot 後處理、全域 Quick-Rewrite 熱鍵、連續錄音模式與 VAD 自動分段，讓語音輸入更貼近個人寫作習慣，也更適合長時間工作流。
+## 🌟 v2.5.3：可編輯、免重啟的快捷鍵
 
 | 重點修復 | 說明 |
 |------|------|
-| **🧠 個人化 Few-shot 後處理** | 最近 3 筆 `whisper_raw → final_text` 歷史會自動注入 LLM messages，讓 5 個引擎沿用使用者標點、語氣與用詞習慣。 |
-| **🎯 Dictionary 從歷史學習** | 新增 CLI 與 Dashboard endpoint，可從歷史修正中提取高頻詞典候選，支援 dry-run / apply 兩段式流程。 |
-| **✏️ 全域 Quick-Rewrite 熱鍵** | 選取任意 App 文字後按 `right_option+r`，LLM 會改寫並自動貼回，支援 concise/formal/casual/email/technical/translate 等風格。 |
-| **🎙 連續錄音模式** | 新增 VAD 自動分段，支援 voice/silence 邊界偵測、最短/最長片段保護與尾端靜音裁切。 |
-| **💾 錄音檔外移** | 音檔備份預設移至 `/Volumes/Satechi_SSD/voice-input/audio_backup`，SSD 未掛載時自動略過備份。 |
+| **避開 Codex 衝突** | 預設錄音鍵改為 `Right Option + Right Shift`，不再占用 Codex 使用的 `Right Cmd`。 |
+| **五組快捷鍵可編輯** | 錄音、Quick-Rewrite、重試、取消與連續錄音都能在 Dashboard 直接修改。 |
+| **儲存後立即生效** | Listener 會讀取最新設定，不必重開 App，也不會累積重複的背景監聽器。 |
+| **不破壞前景文字** | Rewrite／Retry／Cancel 改用純修飾鍵組合，不再把 Option 字元送進編輯欄位，也不依賴 Fn 功能鍵模式。 |
+| **衝突與格式守門** | 單一修飾鍵、未知按鍵、macOS 保留組合及快捷鍵前綴衝突會在儲存時明確阻擋。 |
+
+## 🌟 v2.5.2：直接輸入與原剪貼簿保護
+
+| 重點修復 | 說明 |
+|------|------|
+| **無剪貼簿直接輸入** | 支援的文字欄位改用 macOS `AXSelectedText` 在游標處插入，不再先覆蓋 Clipboard。 |
+| **完整 Clipboard transaction** | Terminal 等不支援直接插入的 App，僅短暫借用 pasteboard，完成後還原文字、圖片、檔案、HTML、RTF 等所有格式。 |
+| **穩定系統授權** | Build 優先使用固定 Apple signing identity，不再於每次打包自動重置 Accessibility 權限。 |
+| **全新圖示** | App icon 改為暖黑／米白雙色，無藍框、無螢光、無漸層；選單列改為適應淺色／深色模式的單色狀態圖示。 |
+
+## v2.5.1：中日英混用準確度修正
+
+本次依實際歷史與音檔重新檢視 macOS 全管線，優先修正「STT 已辨識正確、後處理卻把語系改壞」的問題。
+
+| 重點修復 | 說明 |
+|------|------|
+| **日文字體保護** | OpenCC 改為 clause-aware；含假名的日文句段不再把 `画像／動画／来週／参考` 轉成中文異體。 |
+| **Code-switch 守門** | LLM 不得把 `supplier` 音譯為片假名、把 `mini` 翻成中文，亦不得切換平假名／片假名。 |
+| **三語技術詞庫** | 新增 `SEO / AEO / GEO / contact form / お問い合わせフォーム / カタカナ / ひらがな / JSON-LD / hreflang` 與真實誤辨別名。 |
+| **可信個人化** | Few-shot 僅使用 History 中人工編輯確認、且 script profile 相符的範例；不再拿模型自己的輸出自我強化。 |
+| **可靠性與隱私** | History 每筆原子落盤；paste debug 改為 metadata-only；Ghostty 與 Codex Desktop 納入 App context。 |
 
 ---
 
 ## 🚀 30 秒快速開始 (macOS)
 
 1.  **安裝**: 從 [Releases](https://github.com/linchichuan/sgh-voice/releases) 下載 `.dmg` 拖入應用程式。
-2.  **設定**: 打開 Dashboard 選項，首選 ASR 建議選擇 **Qwen3-ASR**。
-3.  **說話**: 按住快捷鍵，無論是日文、英文或中文，都能精準轉錄並保持原語。
+2.  **設定**: 打開 Dashboard；日常中日英混用建議先用 **Groq Whisper large-v3-turbo**，需要離線時再選本地 Whisper。
+3.  **說話**: 按住 `Right Option + Right Shift`，無論是日文、英文或中文，都能精準轉錄並保持原語。
 
 ---
 

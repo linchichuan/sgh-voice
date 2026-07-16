@@ -42,6 +42,16 @@ def test_build_whisper_prompt_empty_returns_empty_string(empty_memory):
     assert isinstance(prompt, str)
 
 
+def test_whisper_prompt_keeps_multilingual_and_core_terms_balanced(empty_memory):
+    custom = [f"custom-{index}" for index in range(10)]
+    prompt = empty_memory.build_whisper_prompt(custom)
+    for term in (
+        "SEO", "GEO", "contact form", "お問い合わせフォーム", "カタカナ",
+        "Shingihou", "新義豊", "Supabase", "Twilio", "Claude",
+    ):
+        assert term in prompt
+
+
 # ───── apply_corrections ───────────────────────────────────
 
 def test_apply_corrections_user_overrides_scene_and_base(empty_memory):
@@ -54,13 +64,17 @@ def test_apply_corrections_user_overrides_scene_and_base(empty_memory):
 
 
 def test_apply_corrections_scene_overrides_base(empty_memory):
-    """scene_corrections 傳入時，覆蓋 BASE_CORRECTIONS（但被使用者全域覆蓋）。"""
-    # BASE: 'cloud' → 'Claude'；scene: 'cloud' → 'Cloud-X'
+    """scene_corrections 傳入時可覆蓋一般規則（但被使用者全域覆蓋）。"""
     result = empty_memory.apply_corrections(
-        "use cloud today",
-        scene_corrections={"cloud": "Cloud-X"},
+        "use ultra vox today",
+        scene_corrections={"ultra vox": "Ultravox-X"},
     )
-    assert "Cloud-X" in result
+    assert "Ultravox-X" in result
+
+
+def test_canonical_case_normalization_is_allowed(empty_memory):
+    empty_memory.dictionary["corrections"] = {"IOS": "iOS", "N8N": "n8n"}
+    assert empty_memory.apply_corrections("IOS app with N8N") == "iOS app with n8n"
 
 
 def test_apply_corrections_does_nothing_when_no_match(empty_memory):
@@ -122,3 +136,43 @@ def test_get_few_shot_respects_n(populated_memory):
     """n=1 → 最多回 1 筆。"""
     examples = populated_memory.get_few_shot_examples(n=1)
     assert len(examples) <= 1
+
+
+def test_verified_few_shot_excludes_edit_and_cross_script(populated_memory):
+    populated_memory.history.extend([
+        {
+            "whisper_raw": "請翻譯這段內容",
+            "final_text": "Please translate this text.",
+            "mode": "edit",
+            "edited": True,
+        },
+        {
+            "whisper_raw": "今天需要處理文件",
+            "final_text": "Handle the document today.",
+            "mode": "dictate",
+            "edited": True,
+        },
+    ])
+    examples = populated_memory.get_few_shot_examples(
+        n=20,
+        current_text="今天需要確認設定",
+        verified_only=True,
+    )
+    raws = {raw for raw, _ in examples}
+    assert "請翻譯這段內容" not in raws
+    assert "今天需要處理文件" not in raws
+
+
+def test_history_is_persisted_immediately(empty_memory, isolated_data_dir):
+    import json
+
+    entry = {
+        "timestamp": "2026-07-14T12:00:00",
+        "whisper_raw": "測試內容",
+        "final_text": "測試內容。",
+        "mode": "dictate",
+    }
+    assert empty_memory.add_to_history(entry) is True
+    with open(isolated_data_dir / "history.json", "r", encoding="utf-8") as handle:
+        saved = json.load(handle)
+    assert saved[-1] == entry

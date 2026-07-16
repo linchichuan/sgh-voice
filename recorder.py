@@ -39,7 +39,7 @@ class Recorder:
         會等最多 2s；超時就 raise，由 caller 決定怎麼處理（不要硬開新 stream，否則 PA
         會在 Pa_OpenStream 內 deadlock，整個 audio 子系統就鎖死）。"""
         if self.is_recording:
-            return
+            return False
         if sd is None:
             raise RuntimeError("請安裝 sounddevice: pip install sounddevice soundfile")
 
@@ -62,7 +62,17 @@ class Recorder:
         self._start_time = time.time()
 
         self._thread = threading.Thread(target=self._record_loop, daemon=True, name="recorder")
-        self._thread.start()
+        try:
+            self._thread.start()
+        except Exception:
+            # Thread never became a usable stream.  Roll back Recorder itself
+            # so Engine cleanup does not inherit a false busy state.
+            self.is_recording = False
+            self._start_time = None
+            self._thread = None
+            self.audio_data = []
+            raise
+        return True
 
     def stop(self):
         """停止錄音，回傳 (音訊數據, 音訊檔路徑, 錄音秒數)。
@@ -228,7 +238,13 @@ class Recorder:
             args=(on_segment, on_voice_change, on_stopped),
             daemon=True,
         )
-        self._thread.start()
+        try:
+            self._thread.start()
+        except Exception:
+            self.is_recording = False
+            self._start_time = None
+            self._thread = None
+            raise
         return True
 
     def _continuous_loop(self, on_segment, on_voice_change, on_stopped=None):

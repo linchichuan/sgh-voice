@@ -5,12 +5,26 @@ config.py — 設定與資料持久化層
 import json
 import os
 import platform
+import stat
 import threading
 import time
 from datetime import datetime, date
 
+from hotkey_config import (
+    INTERIM_V4_ACTION_HOTKEYS,
+    LEGACY_DEFAULT_HOTKEYS,
+    PREVIOUS_V1_ACTION_HOTKEYS,
+    PREVIOUS_V2_ACTION_HOTKEYS,
+    RECOMMENDED_ACTION_HOTKEYS,
+    RECOMMENDED_RECORD_HOTKEY,
+)
+
 # 跨 thread 序列化 stats.json 的 read-modify-write，避免 update_stats 與 _track_usage race
 _STATS_LOCK = threading.RLock()
+
+
+class ConfigSaveError(RuntimeError):
+    """A requested config update could not be persisted safely."""
 
 
 def _ensure_data_dir():
@@ -58,17 +72,28 @@ _ensure_data_dir()
 _IS_APPLE_SILICON = platform.system() == "Darwin" and platform.machine() == "arm64"
 
 # ─── 內部基礎詞庫（不在 Dashboard UI 顯示，但辨識時使用）────────
+MULTILINGUAL_CANONICAL_WORDS = [
+    "SEO", "AEO", "GEO", "contact form", "お問い合わせフォーム",
+    "問い合わせフォーム", "カタカナ", "ひらがな", "JSON-LD", "hreflang",
+]
+
 BASE_CUSTOM_WORDS = [
     # ⚠️ 順序即優先級！build_whisper_prompt 只取前 20 詞/200 字元注入 Whisper。
     # 前段放 Whisper 最容易聽錯/不認得的冷門技術名、品牌名、公司名。
     # 後段放 Whisper 通常認得的常見詞（API / GitHub / Docker / 中日大字）作為 fallback。
 
-    # 第一優先：公司・產品（高頻、Whisper 完全不認得）
-    "Shingihou", "新義豊", "KusuriJapan", "Medical Supporter", "SGH Phone",
-    # 第二優先：冷門平台與 SDK（高頻技術詞）
-    "Supabase", "Zeabur", "Ultravox", "Twilio", "SendGrid", "n8n",
-    # 第三優先：AI 模型 / 工具（部分 Whisper 不穩）
-    "Claude", "Anthropic", "OpenRouter", "Groq", "Ollama",
+    # 第一優先採「多語詞 + 既有核心品牌」交錯，避免使用者已有 10 個 custom words 時，
+    # 新增的一整組多語詞吃滿剩餘 10 格，反而把 Shingihou / Supabase / Twilio 擠掉。
+    "SEO", "GEO", "contact form", "お問い合わせフォーム", "カタカナ",
+    "Shingihou", "新義豊", "Supabase", "Twilio", "Claude",
+
+    # 第二優先：其餘多語 canonical 與公司・產品
+    "AEO", "問い合わせフォーム", "ひらがな", "JSON-LD", "hreflang",
+    "KusuriJapan", "Medical Supporter", "SGH Phone",
+    # 第三優先：冷門平台與 SDK（高頻技術詞）
+    "Zeabur", "Ultravox", "SendGrid", "n8n",
+    # 第四優先：AI 模型 / 工具（部分 Whisper 不穩）
+    "Anthropic", "OpenRouter", "Groq", "Ollama",
     "Breeze-ASR-25", "OpenCC", "MLX",
 
     # ── 以下通常不會進入 Whisper prompt（前 20 已滿），但保留供 corrections 後處理參照 ──
@@ -92,10 +117,39 @@ BASE_CORRECTIONS = {
     "cloud opus": "Claude Opus",
     "cloud API": "Claude API",
     "cloud desktop": "Claude Desktop",
-    "cloud": "Claude",  # 最後匹配，長詞優先
+    # 不做單獨 cloud→Claude：Cloud Run / cloud storage 是合法技術詞，必須靠上面的
+    # phrase-level 規則或 LLM context 判斷。
+    # 多語／開發常見 ASR 誤辨（取自 2026-05～06 去識別化使用紀錄）
+    "content form": "contact form",
+    "contact from": "contact form",
+    "toyoase form": "お問い合わせフォーム",
+    "toiawase form": "お問い合わせフォーム",
+    "問い合わせ form": "問い合わせフォーム",
+    "Kana-Kana": "カタカナ",
+    "Cata-cana": "カタカナ",
+    "卡那卡那": "カタカナ",
+    "卡他卡那": "カタカナ",
+    "SEO、GO": "SEO、GEO",
+    "SEO, GO": "SEO, GEO",
+    "SEO GO": "SEO GEO",
+    "SEO 和 GO": "SEO 和 GEO",
+    "SEO 跟 GO": "SEO 跟 GEO",
+    "Twilo": "Twilio",
+    "Twillo": "Twilio",
+    "といあわせ": "問い合わせ",
+    "とよあせ": "問い合わせ",
     # 繁簡常見錯誤
     "繁体中文": "繁體中文",
     "简体中文": "簡體中文",
+}
+
+# 即使舊版自動學習曾寫入錯誤規則，也不可把已正確的品牌／技術縮寫降格或翻譯。
+# 例：runtime dictionary 曾有 LINE→line、Cloud→Claude，會破壞 LINE Bot / Cloud Run。
+PROTECTED_CANONICAL_TERMS = {
+    "LINE", "Cloud", "SEO", "AEO", "GEO", "API", "JSON-LD", "iOS", "n8n",
+}
+PROTECTED_CANONICAL_TERMS_BY_CASEFOLD = {
+    term.casefold(): term for term in PROTECTED_CANONICAL_TERMS
 }
 
 # 不分大小寫的修正規則（key 全部小寫，匹配時做 case-insensitive 替換）
@@ -252,6 +306,7 @@ DEFAULT_APP_STYLES = {
             "dev.warp.Warp-Stable",
             "com.googlecode.iterm2",
             "com.apple.Terminal",
+            "com.mitchellh.ghostty",           # Ghostty
         ],
         "prompt": (
             "開發環境：保留所有技術用語原始寫法（Repo, API, GitHub, Claude, REPL, Docker 等），"
@@ -262,6 +317,7 @@ DEFAULT_APP_STYLES = {
         "label": "AI 對話 ✨",
         "apps": [
             "com.openai.chat",                # ChatGPT
+            "com.openai.codex",               # Codex desktop / current ChatGPT bundle
             "com.anthropic.claudefordesktop",  # Claude Desktop
         ],
         "prompt": f"AI 對話視窗：講者口述的是要送給 AI 的問題或指示，逐字保留原文，"
@@ -439,7 +495,8 @@ DEFAULT_CONFIG = {
     "whisper_model": "whisper-1",
     "claude_model": "claude-haiku-4-5-20251001",
     "hotkey_mode": "push_to_talk",          # push_to_talk | toggle
-    "hotkey": "right_cmd",                  # right_cmd, ctrl+shift+space, etc.
+    "hotkey": RECOMMENDED_RECORD_HOTKEY,    # 預設避開 Codex right_cmd；可在 Dashboard 即時修改
+    "hotkey_config_version": 3,             # 獨立於 Keychain schema，確保舊熱鍵可先安全遷移
     "language": "auto",                     # auto, zh, ja, en
     "ui_language": "auto",                  # Dashboard UI 語言：auto / ja / en / zh-TW
     "target_language": "",                  # 翻譯目標語言（空 = 不翻譯）
@@ -450,20 +507,21 @@ DEFAULT_CONFIG = {
     # v2.4.0 合規修正：few-shot 預設改 False。原本預設 True 會把過去 3 段 raw→final
     # 對話默默送雲端 LLM，使用者預期只送當下這句 → APPI Art. 27 / GDPR Art. 13 disclosure 風險。
     # 使用者要享受個人化效果可在 Dashboard 手動開啟（會同時提示 privacy 影響）。
-    "enable_fewshot": False,                # 個人化 few-shot：把最近的 raw→final 範例餵給 LLM（預設關閉，opt-in）
+    "enable_fewshot": False,                # 個人化 few-shot：只把人工確認 raw→final 範例餵給 LLM（預設關閉，opt-in）
     "fewshot_count": 3,                     # 注入的範例數（0=關閉，建議 2~5；越多越貼但 token 成本越高）
     "fewshot_min_input_chars": 8,           # 當前 raw 短於此字數時不注入 few-shot，防 LLM 退化複誦上一段（v2.1.1）
+    "fewshot_verified_only": True,          # 只用使用者在 History 明確編輯確認過的範例，避免模型自我強化錯誤
     # v2.4.0：app awareness 預設關閉。把前景 App bundle id 注入 system prompt 等同
     # 把使用者的工作上下文外洩給 LLM provider。Dashboard 可手動開啟。
     "enable_app_awareness": False,          # 是否把前景 App 識別資訊注入 LLM system prompt
     # v2.4.0：Cost & Audit 頁的月度預算
     "monthly_budget_jpy": 0,                # 月度預算（JPY）；0=不限制
     "enable_budget_cutoff": False,          # 超過預算時是否硬切斷雲端 LLM（避免超支）
-    "rewrite_hotkey": "right_option+r",     # Quick-Rewrite 全域熱鍵（空字串=關閉）；選取文字後按下，LLM 改寫並貼回
+    "rewrite_hotkey": RECOMMENDED_ACTION_HOTKEYS["rewrite_hotkey"],  # 不產生文字的 Quick-Rewrite 全域熱鍵
     "default_rewrite_style": "concise",     # Quick-Rewrite 預設風格（concise/formal/casual/email/technical/translate_en/translate_ja/translate_zh）
-    "retry_hotkey": "right_option+y",       # Retry 全域熱鍵（空字串=關閉）；用最後一次的 raw STT 重跑 LLM，省 1.5s 不用重錄
-    "cancel_hotkey": "right_option+x",      # Cancel 全域熱鍵（空字串=關閉）；錄音中按下=丟棄；處理中按下=跳過 paste
-    "continuous_hotkey": "",                # 連續錄音 toggle 熱鍵（空字串=關閉）；按一次開麥克風長監聽，再按一次關
+    "retry_hotkey": RECOMMENDED_ACTION_HOTKEYS["retry_hotkey"],  # 用最後一次 raw STT 重跑 LLM
+    "cancel_hotkey": RECOMMENDED_ACTION_HOTKEYS["cancel_hotkey"],  # 錄音中丟棄；處理中跳過 paste
+    "continuous_hotkey": RECOMMENDED_ACTION_HOTKEYS["continuous_hotkey"],  # 空字串=關閉
     "continuous_silence_duration": 1.5,     # 連續模式：偵測到此秒數靜音即切片送 ASR
     "continuous_min_segment_duration": 0.6, # 連續模式：低於此秒數的片段直接丟棄（防止單音/咳嗽觸發）
     "continuous_max_segment_duration": 30.0,# 連續模式：超過此秒數強制切片（避免 Whisper 吃太重）
@@ -481,7 +539,7 @@ DEFAULT_CONFIG = {
     "enable_model_warmup": False,           # 啟動後預熱本地 STT/LLM；速度較快但 idle 記憶體較高，預設關閉
     "hybrid_audio_threshold": 15,           # 錄音小於 15 秒用 Local Whisper
     "hybrid_text_threshold": 30,            # 句子小於 30 字用 Local LLM (Qwen)
-    "stt_engine": "mlx-whisper" if _IS_APPLE_SILICON else "cloud-only",  # mlx-whisper | qwen3-asr | cloud-only
+    "stt_engine": "mlx-whisper" if _IS_APPLE_SILICON else "cloud-only",  # mlx-whisper | groq | cloud-only
     "local_whisper_model": "breeze-asr-25-4bit",           # 本地 Whisper 模型（Breeze-ASR-25 繁中最強）
     "local_llm_model": "qwen3:latest",      # Ollama 上的本地模型名稱（v2.4.0 修正：qwen3.5/3.6 為不存在的版本，會無聲 fallback 到 regex 後處理）
     "groq_model": "llama-3.3-70b-versatile",      # Groq LLM 模型 (目前的旗艦穩定版)
@@ -515,9 +573,13 @@ DEFAULT_CONFIG = {
 
 def _ensure_dir():
     os.makedirs(DATA_DIR, exist_ok=True)
-    # 確保資料目錄權限為 700（僅本人可存取）
+    # 確保資料目錄權限為 700（僅本人可存取）。若目錄已經安全，
+    # 不要每次啟動都對外接磁碟重複 chmod：macOS 可能因可移除磁碟
+    # 權限檢查讓 GUI app 的 metadata write 長時間阻塞。
     try:
-        os.chmod(DATA_DIR, 0o700)
+        current_mode = stat.S_IMODE(os.stat(DATA_DIR).st_mode)
+        if current_mode != 0o700:
+            os.chmod(DATA_DIR, 0o700)
     except OSError:
         pass
 
@@ -530,8 +592,12 @@ def _ensure_dir():
 #   2 = v2.4.0：enable_fewshot / enable_app_awareness 預設改 False
 #       + 修正 qwen 不存在的模型名
 #   3 = v2.4.0 Keychain Integration：API key 從 config.json 搬到 macOS Keychain
+#   4 = v2.5.3 build candidate：短暫使用 F9/F10/F11 action chord
+#   5 = v2.5.3 final：純 modifier action chord + 獨立 hotkey migration marker
+# HOTKEY_CONFIG_VERSION 3：Cancel 改用 ctrl+cmd，避開 PTT 的 Option/Shift family
 # 升級流程：load_config 時若偵測舊版 schema，套用對應 migration，再覆寫 config_version。
-CONFIG_VERSION = 3
+CONFIG_VERSION = 5
+HOTKEY_CONFIG_VERSION = 3
 
 def _migrate_config(saved):
     """套用版本之間的 migration。回傳 (migrated_dict, did_migrate: bool)。"""
@@ -583,6 +649,62 @@ def _migrate_to_keychain(saved):
     return saved, bool(moved) or bool(failed)
 
 
+def _migrate_hotkeys_v5(saved):
+    """安全遷移已知舊預設；v1/v2 即使無 Keychain 也先完成熱鍵更新。
+
+    `hotkey_config_version` 與主 schema 分離，避免為了熱鍵先把 v2 bump 到
+    v5，反而讓後續 API key Keychain migration 被略過。
+    """
+
+    try:
+        version = int(saved.get("config_version", 1))
+    except (TypeError, ValueError):
+        version = 1
+    try:
+        hotkey_version = int(saved.get("hotkey_config_version", 0))
+    except (TypeError, ValueError):
+        hotkey_version = 0
+
+    did_migrate = False
+    if hotkey_version < HOTKEY_CONFIG_VERSION:
+        legacy_candidates = {
+            "hotkey": {LEGACY_DEFAULT_HOTKEYS["hotkey"]},
+            "rewrite_hotkey": {
+                LEGACY_DEFAULT_HOTKEYS["rewrite_hotkey"],
+                INTERIM_V4_ACTION_HOTKEYS["rewrite_hotkey"],
+                PREVIOUS_V1_ACTION_HOTKEYS["rewrite_hotkey"],
+                PREVIOUS_V2_ACTION_HOTKEYS["rewrite_hotkey"],
+            },
+            "retry_hotkey": {
+                LEGACY_DEFAULT_HOTKEYS["retry_hotkey"],
+                INTERIM_V4_ACTION_HOTKEYS["retry_hotkey"],
+                PREVIOUS_V1_ACTION_HOTKEYS["retry_hotkey"],
+                PREVIOUS_V2_ACTION_HOTKEYS["retry_hotkey"],
+            },
+            "cancel_hotkey": {
+                LEGACY_DEFAULT_HOTKEYS["cancel_hotkey"],
+                INTERIM_V4_ACTION_HOTKEYS["cancel_hotkey"],
+                PREVIOUS_V1_ACTION_HOTKEYS["cancel_hotkey"],
+                PREVIOUS_V2_ACTION_HOTKEYS["cancel_hotkey"],
+            },
+        }
+        replacements = {
+            "hotkey": RECOMMENDED_RECORD_HOTKEY,
+            **RECOMMENDED_ACTION_HOTKEYS,
+        }
+        for field, old_values in legacy_candidates.items():
+            if saved.get(field) in old_values:
+                saved[field] = replacements[field]
+        saved["hotkey_config_version"] = HOTKEY_CONFIG_VERSION
+        did_migrate = True
+
+    # Keychain migration 已完成才推進主 schema；v1/v2 保留原版號等待重試。
+    if 3 <= version < CONFIG_VERSION:
+        saved["config_version"] = CONFIG_VERSION
+        did_migrate = True
+    return saved, did_migrate
+
+
 def load_config():
     _ensure_dir()
     if os.path.exists(CONFIG_FILE):
@@ -595,6 +717,10 @@ def load_config():
         if _keychain_available():
             saved, migrated_kc = _migrate_to_keychain(saved)
 
+        # 熱鍵本身可在 v1/v2 先安全遷移；主 schema 只有在 Keychain migration
+        # 完成後才會推進到最新版。
+        saved, migrated_hotkeys = _migrate_hotkeys_v5(saved)
+
         # 把 Keychain 中的 key 填回 dict（key 名不變，下游無感）
         if _keychain_available():
             for key_name in KEYCHAIN_KEYS.keys():
@@ -606,14 +732,18 @@ def load_config():
         merged = {**DEFAULT_CONFIG, **saved}
 
         # 若有 migration 發生（任一種），把新版立刻寫回，避免 crash 時遺失
-        if migrated_basic or migrated_kc:
+        if migrated_basic or migrated_kc or migrated_hotkeys:
             try:
                 # 寫回 JSON 時用 _strip_keychain_keys_for_json 把已搬到 Keychain 的 key 從明文剝離
                 to_write = _strip_keychain_keys_for_json(merged)
                 with open(CONFIG_FILE, "w", encoding="utf-8") as f:
                     json.dump(to_write, f, ensure_ascii=False, indent=2)
                 os.chmod(CONFIG_FILE, 0o600)
-                print(f" ⚙️ config.json migrated to v{CONFIG_VERSION}")
+                print(
+                    " ⚙️ config.json migrated "
+                    f"(schema v{saved.get('config_version', 1)}, "
+                    f"hotkey v{saved.get('hotkey_config_version', 0)})"
+                )
             except OSError:
                 pass
         return merged
@@ -639,17 +769,47 @@ def _strip_keychain_keys_for_json(config):
 
 def save_config(config):
     _ensure_dir()
-    # 確保 config_version 被寫入
-    config = {**config, "config_version": CONFIG_VERSION}
+    keychain_available = _keychain_available()
+    config = dict(config)
+    try:
+        pre_save_version = int(config.get("config_version", CONFIG_VERSION))
+    except (TypeError, ValueError):
+        pre_save_version = 1
+
+    # 若這份舊 config 尚未完成 v2→v3，save 也必須先嘗試搬 Keychain；
+    # 失敗時保留舊版號，讓下次 load 能重試，不能直接標成最新版。
+    if keychain_available and pre_save_version < 3:
+        config, _ = _migrate_to_keychain(config)
+    try:
+        current_version = int(config.get("config_version", CONFIG_VERSION))
+    except (TypeError, ValueError):
+        current_version = 1
+    persisted_version = (
+        CONFIG_VERSION if current_version >= 3 else current_version
+    )
+    config = {
+        **config,
+        "config_version": persisted_version,
+        "hotkey_config_version": HOTKEY_CONFIG_VERSION,
+    }
 
     # API key 處理：能進 Keychain 的進 Keychain；空字串 = 維持現狀（沿用既有遮罩語意）
-    if _keychain_available():
+    if keychain_available:
         for key_name in KEYCHAIN_KEYS.keys():
             val = config.get(key_name, "")
             # 空字串或遮罩 → 不動 Keychain（保留既有值）
             if not val or "..." in str(val):
                 continue
-            _keychain_set(key_name, val)
+            existing = _keychain_get(key_name)
+            if existing == val:
+                continue
+            if not _keychain_set(key_name, val):
+                # Fail closed.  If an old Keychain entry exists, continuing
+                # would let _strip_keychain_keys_for_json remove the new value
+                # and silently keep using the old credential.
+                raise ConfigSaveError(
+                    f"failed to update {key_name} in macOS Keychain"
+                )
         # 寫 JSON 前先剝離 keychain key（不寫明文）
         to_write = _strip_keychain_keys_for_json(config)
     else:
@@ -711,10 +871,13 @@ def load_history():
 def save_history(history):
     _ensure_dir()
     history = history[-2000:]  # 保留最近 2000 筆
-    tmp = HISTORY_FILE + ".tmp"
+    # Capture once：測試／runtime config reload 可能在背景寫入期間切換全域 path；
+    # tmp 與 destination 必須永遠位於同一 filesystem 才能原子 os.replace。
+    history_file = HISTORY_FILE
+    tmp = history_file + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(history, f, ensure_ascii=False, indent=2)
-    os.replace(tmp, HISTORY_FILE)
+    os.replace(tmp, history_file)
 
 
 # ─── Stats ───────────────────────────────────────────────
@@ -810,12 +973,18 @@ def update_stats(text, audio_duration, config):
     typing_time = (chars / typing_speed_cpm) * 60 if typing_speed_cpm > 0 else 0
     time_saved = max(0, typing_time - audio_duration)
 
+    # 只記 script 類型，不做內容持久化；讓之後能分開量測 zh / ja / en / mixed 品質。
+    from multilingual import script_bucket
+    language_bucket = script_bucket(text)
+
     def _mutate(stats):
         stats["total_dictations"] = stats.get("total_dictations", 0) + 1
         stats["total_words"] = stats.get("total_words", 0) + words
         stats["total_characters"] = stats.get("total_characters", 0) + chars
         stats["total_seconds_saved"] = stats.get("total_seconds_saved", 0) + time_saved
         stats["total_audio_seconds"] = stats.get("total_audio_seconds", 0) + audio_duration
+        languages = stats.setdefault("languages_detected", {})
+        languages[language_bucket] = languages.get(language_bucket, 0) + 1
 
         daily = stats.setdefault("daily", {})
         if today not in daily:

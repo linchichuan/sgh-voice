@@ -1,5 +1,44 @@
 # Changelog
 
+## v2.5.3 (2026-07-15) — Editable, Conflict-Safe Hotkeys
+
+- 錄音熱鍵預設改為 `right_option+right_shift`，避開 Codex 使用的 `right_cmd`，且純 modifier 組合不會在游標位置輸入額外字元。
+- Dashboard 的錄音、Quick-Rewrite、Retry、Cancel、Continuous Mode 五組快捷鍵改為可編輯欄位，並提供一鍵套用推薦鍵。
+- Hotkey 與 hotkey mode 儲存後由既有 NSEvent listener 即時載入，不需重開 App，也不會重複註冊 monitor。
+- Dashboard API、native NSEvent 與 pynput fallback 共用同一 parser；拒絕未知 token、系統保留鍵、重複鍵與 prefix collision。
+- Rewrite／Retry／Cancel 預設改為 `ctrl+option`、`ctrl+shift`、`ctrl+cmd`，標準 MacBook／Apple compact keyboard 都能操作；Cancel 避開 PTT 的 Option／Shift family，在 generic-only KVM 也能可靠辨識。
+- 動作快捷鍵由共用 arbiter 在放開組合鍵時觸發；若手勢中加入第三鍵便取消，避免撞到 VoiceOver／一般 App 快捷鍵前綴，且一次手勢最多執行一個動作。
+- Cancel 會在事件當下綁定錄音 token；即使與 PTT 幾乎同時放開，仍會在 STT／paste 前攔截該段，不受 background thread 排程順序影響。
+- Recorder 的 start／stop／cancel／continuous transition 改為共用序列鎖；快速放開再重按時會先等舊 audio stream 完整釋放，但不會阻塞已開始的 STT。多段轉寫並行時，Cancel 只標記最新一段，不會由其他 pipeline 誤吞。
+- Continuous Cancel 使用獨立 session marker，會攔截 stop-time final flush 與已在辨識中的 segment；Continuous 啟用期間也不再把一般 PTT 放鍵誤判為停止串流。
+- 新設定拒絕單一 modifier；舊 `right_cmd` 只允許 runtime 載入。獨立 hotkey migration 會在 v1/v2 Keychain 暫不可用時先安全替換已知舊預設，並保留其他自訂鍵。
+- `hotkey_mode` 限定為 `push_to_talk`／`toggle`；左右側 Cmd／Ctrl 都會套用 macOS 保留快捷鍵檢查。
+- Keychain 拒絕更新 API key 時，Dashboard 會回報儲存失敗並保留原設定，不再靜默沿用舊 key。
+- 新增 parser、左右 modifier、Codex 衝突隔離、live reload、API validation 與可編輯 UI 回歸測試。
+
+## v2.5.2 (2026-07-14) — Direct Text Insertion & Icon Refresh
+
+- 一般文字欄位優先透過 `AXSelectedText` 直接插入游標位置，不接觸使用者 Clipboard。
+- 不支援 Accessibility direct insertion 的 App 改用 250ms transactional pasteboard，完整保存並還原文字、圖片、檔案、HTML、RTF 等 representation。
+- 使用者在 transaction 期間自行 copy/cut 時，以新的 Clipboard 為準，不會被 SGH Voice 覆蓋。
+- 送出 synthetic Cmd+V 前再次比對 pasteboard `changeCount`；若使用者剛 copy/cut，取消本次輸入，不會貼錯內容。
+- 自動貼上失敗時立即還原原 Clipboard，顯示權限提示，不再把轉錄內容長期占用 Clipboard。
+- Build 優先使用固定 Apple signing identity，移除每次 build 自動 `tccutil reset` 的行為。
+- 重做為暖黑／米白雙色 App icon，無藍色外框、無螢光與漸層；並新增 light/dark mode 自適應的 menu bar template icons。
+- 資料目錄已是安全權限時不再重複 `chmod`，避免 macOS GUI App 在外接 SSD 權限檢查上卡住。
+- 新增 Clipboard representation、使用者競態、Accessibility direct insertion 與權限失效回歸測試。
+
+## v2.5.1 (2026-07-14) — Multilingual Accuracy Hardening
+
+- OpenCC 改為日文 clause-aware 正規化，保留 `画像／動画／来週／参考／台風` 等日本語新字體。
+- Dictate validator 保護 Latin 與 kana spans，拒絕翻譯、音譯、script switching。
+- 三語技術詞庫新增 SEO/AEO/GEO、contact form、お問い合わせフォーム、カタカナ、ひらがな、JSON-LD、hreflang 與實際誤辨別名。
+- Few-shot 僅注入人工編輯確認且 Han/Kana/Latin profile 相符的歷史範例。
+- 移除高風險 `Cloud→Claude`、`LINE→line` runtime 規則；新增 canonical term 防護。
+- History 改為逐筆原子落盤；paste debug 不再記錄逐字稿節錄。
+- 新增 Ghostty / Codex Desktop app mapping、語系 telemetry 與多語回歸測試。
+
+
 ## v2.4.0 (2026-06-01) — Hardening & Dashboard Reimagined
 
 **最大規模 release**：全 Dashboard 從 1453 行 monolithic HTML 重寫成 modular SPA、補 macOS Keychain 整合、零測試覆蓋變 55 個 pytest baseline + GitHub Actions CI、完成 APPI / GDPR / PIPL 三重合規 disclosure 重寫。**+9801 / -1561 lines** across 60 files。

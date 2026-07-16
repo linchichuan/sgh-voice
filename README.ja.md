@@ -1,4 +1,4 @@
-# 🎙 SGH Voice — AI 音声入力ツール (v2.5.0)
+# 🎙 SGH Voice — AI 音声入力ツール (v2.5.3)
 
 **[English](README.en.md)** | **日本語** | **[繁體中文](README.md)**
 
@@ -7,19 +7,38 @@
 [![macOS](https://img.shields.io/badge/macOS-Apple_Silicon-black?logo=apple)](https://github.com/linchichuan/sgh-voice/releases)
 [![iOS](https://img.shields.io/badge/iOS-17.0+-blue?logo=apple)](https://github.com/linchichuan/sgh-voice/releases)
 [![Android](https://img.shields.io/badge/Android-8.0+-green?logo=android)](https://github.com/linchichuan/sgh-voice/releases)
-[![Version](https://img.shields.io/badge/Version-2.5.0-green)]()
+[![Version](https://img.shields.io/badge/Version-2.5.3-green)]()
 
 ---
 
-## 🌟 v2.1.0 の新機能
+## 🌟 v2.5.3 の新機能
 
 | 機能 | 詳細 |
 |------|------|
-| **🧠 パーソナライズ Few-shot 後処理** | 最新 3 件の `whisper_raw → final_text` 例を LLM messages に注入し、5 つのエンジンが句読点・語調・用語の癖を学習します。 |
-| **🎯 履歴から辞書候補を学習** | CLI と Dashboard endpoint を追加し、履歴の高頻度修正から辞書候補を dry-run / apply で安全に反映できます。 |
-| **✏️ グローバル Quick-Rewrite ホットキー** | 任意の App で文字を選択して `right_option+r` を押すと、LLM が書き換えて自動で貼り戻します。 |
-| **🎙 連続録音モード** | VAD 自動分割で voice/silence 境界を検出し、末尾無音の切り詰めと最短/最長セグメント保護を行います。 |
-| **💾 音声バックアップ先を外部 SSD へ移動** | 既定の保存先を `/Volumes/Satechi_SSD/voice-input/audio_backup` に変更し、SSD 未マウント時は自動でスキップします。 |
+| **Codex との競合を回避** | 録音ホットキーを Codex が使用する `Right Cmd` から `Right Option + Right Shift` へ変更しました。 |
+| **5種類のホットキーを編集可能** | 録音、Quick-Rewrite、リトライ、キャンセル、連続録音を設定画面で変更できます。 |
+| **保存後すぐに反映** | App の再起動や monitor の重複登録なしで、実行中の listener が新設定へ切り替わります。 |
+| **入力中の文字を保護** | Rewrite／Retry／Cancel は修飾キーだけの組み合わせを使用し、Option 文字の入力や Fn 設定への依存をなくしました。 |
+| **競合チェック** | 単独の修飾キー、未対応キー、macOS の予約ショートカット、前方一致による競合を保存前に検出します。 |
+
+## 🌟 v2.5.2 の新機能
+
+| 機能 | 詳細 |
+|------|------|
+| **クリップボード不要の直接入力** | 対応する入力欄では macOS `AXSelectedText` を使用し、カーソル位置へ直接入力します。 |
+| **クリップボードの完全復元** | Terminal などでは pasteboard を一時利用しますが、テキスト・画像・ファイル・HTML・RTF を含む元の内容を復元します。 |
+| **安定した権限管理** | 固定 Apple signing identity を優先し、ビルドのたびにアクセシビリティ権限をリセットしない構成に変更しました。 |
+| **新しいアイコン** | 青い外枠と欠けた文字を廃止し、メニューバーもライト／ダークモード対応の単色アイコンに変更しました。 |
+
+## v2.5.1 の新機能
+
+| 機能 | 詳細 |
+|------|------|
+| **日本語表記の保護** | OpenCC を文節単位にし、`画像／動画／来週／参考` などの日本語字体を保持します。 |
+| **コードスイッチ保護** | LLM が英単語を翻訳・音訳したり、ひらがな／カタカナを切り替えたりした出力を破棄します。 |
+| **技術用語辞書** | SEO/AEO/GEO、contact form、お問い合わせフォーム、JSON-LD、hreflang などを追加しました。 |
+| **確認済み Few-shot** | History でユーザーが編集した、同一 script profile の例だけを個人化に利用します。 |
+| **履歴とプライバシー** | History を毎回原子的に保存し、貼り付けログから本文を除外しました。 |
 
 ---
 
@@ -28,7 +47,7 @@
 | 機能 | 説明 |
 |------|------|
 | **3言語混在認識** | 同一文内で繁体中国語・日本語・英語を自由に切り替え可能 |
-| **繁体中国語3層防御** | Whisper prompt → Claude system prompt → OpenCC s2twp |
+| **繁体中国語3層防御** | Whisper prompt → LLM contract → 文節対応 OpenCC s2twp |
 | **Hybrid スマートルーティング** | 短い音声 → ローカル mlx-whisper、長い音声 → OpenAI Cloud |
 | **AI 後処理** | フィラー除去（えーと、あの、um、嗯）、自己修正検出、句読点整形 |
 | **個人辞書学習** | 修正ルールを自動蓄積し、使うほど認識精度が向上 |
@@ -37,7 +56,7 @@
 | **🏥 医療シーンモード** | 日本語医療用語・薬品名・バイオテク用語の専用辞書（v1.2） |
 | **🩺 医療診察記録** | 医師と患者の会話から専門的なSOAP形式のカルテ概要を自動生成 |
 | **📋 自動学習 (Auto-Learn)** | 入力枠で修正後、Cmd+Cでコピーするだけでシステムが自動的に修正ルールを学習 |
-| **Push-to-Talk / Toggle** | Right Cmd 長押しで録音、またはワンタップで開始/停止 |
+| **Push-to-Talk / Toggle** | Right Option + Right Shift 長押しで録音、またはワンタップで開始/停止 |
 | **クロスアプリケーション** | システムレベルの音声入力、認識後カーソル位置に自動貼り付け |
 | **Web ダッシュボード** | 使用統計、履歴、辞書管理、設定 |
 | **Android IME** | Android キーボード入力方式、どのアプリでも音声入力可能 |
@@ -79,10 +98,10 @@
 
 ### インストール手順
 
-1. [Releases](https://github.com/linchichuan/sgh-voice/releases) から `SGH.Voice-2.5.0-apple-silicon.dmg` をダウンロード
+1. [Releases](https://github.com/linchichuan/sgh-voice/releases) から最新の Apple Silicon 用 DMG をダウンロード
 2. DMG を開き、**Voice Input** を Applications フォルダへドラッグ
 3. 初回起動：右クリック → **開く**（macOS Gatekeeper を一度許可）
-4. メニューバーに 🎙 アイコンが表示されたら **Open Dashboard** をクリック
+4. メニューバーに SGH Voice のマイクアイコンが表示されたら **Open Dashboard** をクリック
 5. ダッシュボード設定で API キーを入力、または **Hybrid モード** を有効化
 
 ### macOS 権限設定
@@ -144,13 +163,13 @@
 
 ### Push-to-Talk（デフォルト）
 
-1. メニューバーに 🎙 が表示
-2. **Right Cmd（⌘）を長押し** して録音開始
+1. メニューバーに SGH Voice のマイクアイコンが表示
+2. **Right Option（⌥）+ Right Shift（⇧）を長押し** して録音開始
 3. **離す** と停止 → 自動認識してカーソル位置に貼り付け
 
 ### ダッシュボード
 
-メニューバー 🎙 → **Open Dashboard**、またはブラウザで `http://localhost:7865`
+メニューバーの SGH Voice アイコン → **Open Dashboard**、またはブラウザで `http://localhost:7865`
 
 - **概要**：節約時間、月額費用見積もり、使用統計
 - **履歴**：検索、コピー、全認識結果のリライト

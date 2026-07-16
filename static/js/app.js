@@ -206,7 +206,7 @@ function refreshIcons() {
 }
 
 function highlightActiveNav() {
-  const hash = location.hash || '#/';
+  const hash = (location.hash || '#/').split('?')[0];
   document.querySelectorAll('[data-route]').forEach((a) => {
     if (a.getAttribute('data-route') === hash) {
       a.setAttribute('aria-current', 'page');
@@ -217,7 +217,10 @@ function highlightActiveNav() {
 }
 
 async function mount() {
-  const hash = location.hash || '#/';
+  // Settings/history tabs keep their state in the hash query. Route matching
+  // must use only the path portion or a refresh of #/settings?tab=hotkeys
+  // silently falls back to the Dashboard.
+  const hash = (location.hash || '#/').split('?')[0];
   const slot = document.getElementById('page-slot');
   if (!slot) return;
   slot.innerHTML = '';

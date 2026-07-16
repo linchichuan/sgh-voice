@@ -6,8 +6,18 @@ import os
 import sys
 import json
 from flask import Flask, request, jsonify, send_from_directory, Response
-from config import load_config, save_config, load_stats, update_stats, load_smart_replace, save_smart_replace, DEFAULT_APP_STYLES, BASE_CORRECTIONS as BASE_CORRECTIONS_REF, KEYCHAIN_KEYS, _keychain_available, _keychain_delete
+from config import ConfigSaveError, load_config, save_config, load_stats, update_stats, load_smart_replace, save_smart_replace, DEFAULT_APP_STYLES, BASE_CORRECTIONS as BASE_CORRECTIONS_REF, KEYCHAIN_KEYS, _keychain_available, _keychain_delete
 from memory import Memory
+from multilingual import (
+    convert_traditional_preserving_japanese,
+    resolve_output_language_hint,
+)
+from hotkey_config import (
+    HOTKEY_FIELDS,
+    HotkeyValidationError,
+    validate_hotkey_config,
+    validate_hotkey_mode,
+)
 import anthropic
 
 
@@ -281,12 +291,64 @@ def api_save_config():
         prefix, min_len = _API_KEY_FORMATS[key]
         if not str(val).startswith(prefix) or len(val) < min_len:
             warnings.append(f"{key} 格式可能有誤（應以 {prefix} 開頭）")
+
+    # Hotkey 由 Dashboard 與所有 runtime listener 共用同一套 parser。
+    # 未知 token、系統保留鍵、重複或 prefix collision 一律拒絕；不可像舊版
+    # 一樣默默忽略部分 token，最後 fallback 回正好與 Codex 衝突的 right_cmd。
+    changed_hotkey_fields = set(data).intersection(HOTKEY_FIELDS)
+    hotkey_behavior_changed = bool(changed_hotkey_fields) or "hotkey_mode" in data
+    if "hotkey_mode" in data:
+        try:
+            data["hotkey_mode"] = validate_hotkey_mode(data["hotkey_mode"])
+        except HotkeyValidationError as exc:
+            return jsonify({
+                "error": str(exc),
+                "field": exc.field,
+                "code": "invalid_hotkey_mode",
+            }), 400
+    if changed_hotkey_fields:
+        candidate = {**config, **data}
+        try:
+            normalized_hotkeys = validate_hotkey_config(
+                candidate,
+                allow_legacy_recording=(
+                    config.get("hotkey")
+                    if "hotkey" not in changed_hotkey_fields
+                    else None
+                ),
+            )
+        except HotkeyValidationError as exc:
+            return jsonify({
+                "error": str(exc),
+                "field": exc.field,
+                "code": "invalid_hotkey",
+            }), 400
+        for field in changed_hotkey_fields:
+            data[field] = normalized_hotkeys[field]
+        if normalized_hotkeys["hotkey"] == "right_cmd":
+            warnings.append(
+                "right_cmd may conflict with Codex voice input; "
+                "right_option+right_shift is recommended"
+            )
+
     config.update(data)
-    save_config(config)
+    try:
+        save_config(config)
+    except ConfigSaveError as exc:
+        return jsonify({
+            "error": str(exc),
+            "code": "config_save_failed",
+        }), 503
     # 即時重新載入設定到引擎（免重啟）
+    hotkeys_applied = False
     if _engine and hasattr(_engine, 'reload_config'):
         _engine.reload_config()
-    return jsonify({"ok": True, "warnings": warnings})
+        hotkeys_applied = hotkey_behavior_changed
+    return jsonify({
+        "ok": True,
+        "warnings": warnings,
+        "hotkeys_applied": hotkeys_applied,
+    })
 
 
 @app.route("/api/history")
@@ -618,11 +680,17 @@ def api_rewrite():
             messages=[{"role": "user", "content": f"<command>{directive}</command>\n<text>{text}</text>"}],
         )
         result = resp.content[0].text.strip()
-        # 繁中終層防護（translate_ja 豁免：s2twp 會錯誤轉換日文新字體 国→國）
+        # 繁中終層防護；多語 helper 會保留日文新字體與假名 clause。
         if style != "translate_ja":
             try:
                 from opencc import OpenCC
-                result = OpenCC("s2twp").convert(result)
+                result = convert_traditional_preserving_japanese(
+                    result,
+                    OpenCC("s2twp"),
+                    language_hint=resolve_output_language_hint(
+                        style, config.get("language"),
+                    ),
+                )
             except Exception:
                 pass
         # 追蹤 token 用量

@@ -22,9 +22,41 @@ import locale
 import signal
 import atexit
 import event_ledger
+from multilingual import (
+    convert_traditional_preserving_japanese,
+    resolve_output_language_hint,
+)
+from hotkey_config import (
+    HOTKEY_FIELDS,
+    MODIFIER_KEYCODES,
+    RECOMMENDED_RECORD_HOTKEY,
+    HotkeyValidationError,
+    modifier_is_pressed,
+    parse_hotkey,
+)
+from text_insertion import (
+    accessibility_is_trusted,
+    capture_pasteboard,
+    insert_text_via_accessibility,
+    pasteboard_change_count_matches,
+    request_accessibility_prompt,
+    restore_pasteboard,
+    schedule_pasteboard_restore,
+    stage_text_on_pasteboard,
+)
 
 
 _active_engines = []
+_ACTION_HOTKEY_FIELDS = tuple(
+    field for field in HOTKEY_FIELDS if field != "hotkey"
+)
+
+
+def _resource_path(*parts):
+    """Resolve bundled PyInstaller resources and source-tree assets uniformly."""
+
+    base = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(base, *parts)
 
 
 def _register_engine_for_cleanup(engine):
@@ -33,8 +65,7 @@ def _register_engine_for_cleanup(engine):
 
 
 def _graceful_shutdown(signum=None, frame=None):
-    """Ctrl+C / SIGTERM 時把錄音串流乾淨收掉、刷出 memory pending writes，
-    避免 PortAudio 留下半開的麥克風 + 最多 9 筆 history 因 batch write 而 lost。"""
+    """Ctrl+C / SIGTERM 時把錄音串流乾淨收掉並刷出 memory pending writes。"""
     for engine in _active_engines:
         try:
             rec = getattr(engine, "recorder", None)
@@ -46,7 +77,7 @@ def _graceful_shutdown(signum=None, frame=None):
                     thr.join(timeout=2)
         except Exception:
             pass
-        # v2.4.0：flush memory pending writes（每 10 筆才寫一次，shutdown 不 flush 就 lost）
+        # 防禦性 flush：正常路徑已逐筆原子落盤，這裡涵蓋未來可能的批次寫入。
         try:
             mem = getattr(engine, "memory", None)
             if mem and hasattr(mem, "flush_history"):
@@ -260,66 +291,96 @@ def _wait_clipboard_change(old_value, max_wait=0.2, poll_interval=0.01):
 
 
 def paste_text(text):
-    """複製到剪貼簿 + Cmd+V 貼上，完成後還原原有剪貼簿內容"""
-    if not text:
-        return
+    """將文字插入游標位置，優先完全不碰使用者的剪貼簿。
 
-    try:
-        import pyperclip
-    except ImportError:
-        _paste_log("pyperclip not available")
-        return
+    一般文字欄位使用 AXSelectedText 直接插入。Terminal／Canvas 等不支援該
+    attribute 的 App 才短暫交換 pasteboard，送出 Cmd+V 後 250ms 內完整還原
+    所有原始格式（不只 plain text）。
+    """
+    if not text:
+        return False
 
     # 記錄當前前景 App (協助除錯)
+    target_pid = None
+    curr_app = None
     try:
         from AppKit import NSWorkspace
         curr_app = NSWorkspace.sharedWorkspace().frontmostApplication()
         app_info = f"{curr_app.localizedName()} ({curr_app.bundleIdentifier()})"
+        target_pid = int(curr_app.processIdentifier())
     except Exception:
         app_info = "Unknown"
 
-    # 保存原有剪貼簿內容
-    old_clipboard = None
-    try:
-        old_clipboard = pyperclip.paste()
-    except Exception:
-        pass
-
-    try:
-        pyperclip.copy(text)
-        _paste_log(f"已複製到剪貼簿 [{app_info}]: {text[:50]}...")
-    except Exception as e:
-        _paste_log(f"Clipboard copy error: {e}")
-        return
-
-    # ★ 立刻 sample changeCount，鎖定「剛複製完當下」的版本號。
-    # 之後 modifier wait / paste fallback 期間若 user 動剪貼簿，changeCount 會跳，
-    # 後面 _restore 才能正確偵測「期間使用者改過剪貼簿 → 不要覆蓋」。
-    baseline_change_count = None
-    try:
-        from AppKit import NSPasteboard
-        baseline_change_count = NSPasteboard.generalPasteboard().changeCount()
-    except Exception:
-        pass
-
-    # ★ 動態 polling 等修飾鍵放開（取代固定 sleep(0.6)，典型 50-150ms 即可解除）
-    _wait_modifiers_released(max_wait=0.6)
-
-    pasted = False
-
     # 檢查輔助使用權限
-    is_trusted = False
-    try:
-        import ApplicationServices
-        is_trusted = ApplicationServices.AXIsProcessTrusted()
-    except Exception:
-        is_trusted = None
+    is_trusted = accessibility_is_trusted()
     _paste_log(f"AXIsProcessTrusted={is_trusted}, app={app_info}")
 
-    # 方法 1: Quartz CGEvent (最原生可靠，如果已授權)
-    paste_method_used = None
-    if is_trusted:
+    # 方法 1：直接寫入目前 selection/caret，完全不使用剪貼簿。
+    if is_trusted and insert_text_via_accessibility(text, target_pid):
+        _paste_log(f"AXSelectedText 直接插入成功 [{app_info}], chars={len(text)}")
         try:
+            bundle_id = curr_app.bundleIdentifier() if curr_app else None
+        except Exception:
+            bundle_id = None
+        event_ledger.paste_method(
+            method="accessibility",
+            success=True,
+            text_len=len(text),
+            app_id=bundle_id,
+        )
+        return True
+
+    # 方法 2：不支援 AXSelectedText 的 App 使用 transactional pasteboard。
+    # snapshot 保存所有格式（文字／圖片／檔案／RTF／HTML），不是只存 plain text。
+    snapshot = None
+    fallback_old_text = None
+    baseline_change_count = None
+    try:
+        snapshot = capture_pasteboard()
+        baseline_change_count = stage_text_on_pasteboard(text)
+        _paste_log(f"暫存文字至 pasteboard [{app_info}], chars={len(text)}")
+    except Exception as e:
+        _paste_log(f"Pasteboard transaction unavailable: {e}")
+        try:
+            import pyperclip
+
+            fallback_old_text = pyperclip.paste()
+            pyperclip.copy(text)
+        except Exception as fallback_error:
+            _paste_log(f"Clipboard fallback error: {fallback_error}")
+            return False
+
+    # 動態 polling 等修飾鍵放開，避免使用者的 Cmd/Shift 與 synthetic Cmd+V 打架。
+    _wait_modifiers_released(max_wait=0.6)
+
+    clipboard_changed_before_paste = False
+
+    def _transaction_is_current():
+        if snapshot is not None and baseline_change_count is not None:
+            return pasteboard_change_count_matches(baseline_change_count)
+        if fallback_old_text is not None:
+            try:
+                import pyperclip
+
+                return pyperclip.paste() == text
+            except Exception:
+                return False
+        return False
+
+    # 使用者可能在等待修飾鍵放開的 0.6 秒內又做了 copy/cut。
+    # 這時必須取消本次 Cmd+V，否則會把使用者剛複製的內容貼進文稿。
+    if not _transaction_is_current():
+        clipboard_changed_before_paste = True
+        _paste_log("偵測到使用者新的 copy/cut，取消本次 synthetic paste")
+
+    pasted = False
+    paste_method_used = None
+    if is_trusted and not clipboard_changed_before_paste:
+        try:
+            # 儘可能貼近事件送出時再檢查一次，縮小 copy/paste 競態窗口。
+            if not _transaction_is_current():
+                clipboard_changed_before_paste = True
+                raise RuntimeError("pasteboard changed before Quartz Cmd+V")
             from Quartz import (
                 CGEventCreateKeyboardEvent, CGEventPost, kCGSessionEventTap,
                 CGEventSetFlags, kCGEventFlagMaskCommand
@@ -338,9 +399,12 @@ def paste_text(text):
         except Exception as e:
             _paste_log(f"CGEvent exception: {e}")
 
-    # 方法 2: osascript System Events keystroke（Quartz 失敗才用）
-    if not pasted:
+    # 方法 3：Quartz 不可用時才走 System Events。
+    if not pasted and not clipboard_changed_before_paste:
         try:
+            if not _transaction_is_current():
+                clipboard_changed_before_paste = True
+                raise RuntimeError("pasteboard changed before System Events Cmd+V")
             result = subprocess.run([
                 "osascript", "-e",
                 'tell application "System Events" to keystroke "v" using command down'
@@ -351,26 +415,6 @@ def paste_text(text):
                 paste_method_used = "osascript"
         except Exception as e:
             _paste_log(f"osascript exception: {e}")
-
-    # 方法 3: AXValue 直接插入（最後 fallback，僅在 Quartz + osascript 都失敗時）
-    # 注意：set AXValue 是「取代整個元素內容」，不是 append。所以絕對不能在 Cmd+V
-    # 已成功時又跑一次（會把現有文字 + 剛貼上的內容整個清空只留 text）。原本舊版
-    # 對 is_trusted + 長文無條件補跑 AXValue 的設計在多行編輯器會誤刪內容，已移除。
-    if not pasted:
-        try:
-            escaped = text.replace('\\', '\\\\').replace('"', '\\"').replace('\n', '\\r')
-            result = subprocess.run([
-                "osascript", "-e",
-                f'tell application "System Events" to set value of attribute "AXValue" '
-                f'of focused UI element of focused window of first application process '
-                f'whose frontmost is true to "{escaped}"'
-            ], capture_output=True, text=True, timeout=5)
-            if result.returncode == 0:
-                pasted = True
-                paste_method_used = "axvalue"
-                _paste_log("AXValue 直接插入成功")
-        except Exception as e:
-            _paste_log(f"AXValue exception: {e}")
 
     _paste_log(f"最終結果: pasted={pasted}")
     # Ledger: 哪個 paste method 真正生效（追蹤 fallback chain 觸發率）
@@ -385,29 +429,45 @@ def paste_text(text):
         app_id=bundle_id,
     )
 
-    if not pasted:
-        _paste_log("全部方法失敗，文字保留在剪貼簿")
-        notify("SGH Voice", "📋 文字已複製到剪貼簿，請手動貼上")
-    elif old_clipboard is not None:
-        # baseline_change_count 已在 copy 後立刻 sample（line ~289）
-        # 1.5s 後若 changeCount 沒變 → 表示期間沒有任何 copy/cut 操作（即使內容相同），可安全還原
-        def _restore():
-            time.sleep(1.5)
+    if snapshot is not None and baseline_change_count is not None:
+        if pasted:
+            schedule_pasteboard_restore(snapshot, baseline_change_count, delay=0.25)
+        else:
+            # 沒貼上也不能把轉錄文字留在 clipboard；立即恢復原始所有格式。
             try:
-                if baseline_change_count is not None:
-                    from AppKit import NSPasteboard
-                    current_count = NSPasteboard.generalPasteboard().changeCount()
-                    if current_count != baseline_change_count:
-                        # 使用者期間動過剪貼簿 → 別覆蓋
-                        return
-                else:
-                    # AppKit 不可用 → 退回值比對（次佳）
-                    if pyperclip.paste() != text:
-                        return
-                pyperclip.copy(old_clipboard)
+                restore_pasteboard(snapshot, baseline_change_count)
             except Exception:
                 pass
-        threading.Thread(target=_restore, daemon=True).start()
+    elif fallback_old_text is not None:
+        def _restore_plain_text():
+            if pasted:
+                time.sleep(0.25)
+            try:
+                import pyperclip
+
+                if pyperclip.paste() == text:
+                    pyperclip.copy(fallback_old_text)
+            except Exception:
+                pass
+
+        threading.Thread(target=_restore_plain_text, daemon=True).start()
+
+    if not pasted:
+        _paste_log("全部自動插入方法失敗；已保留原剪貼簿")
+        if clipboard_changed_before_paste:
+            notify(
+                "SGH Voice",
+                "為保留你剛複製的內容，本次自動輸入已取消。",
+            )
+        elif not is_trusted:
+            request_accessibility_prompt()
+            notify(
+                "SGH Voice",
+                "⚠️ 自動貼上權限未開啟；原剪貼簿已保留。請在輔助使用中啟用 SGH Voice。",
+            )
+        else:
+            notify("SGH Voice", "⚠️ 目前欄位不接受自動輸入；原剪貼簿已保留。")
+    return pasted
 
 
 def show_copy_dialog(text):
@@ -442,7 +502,7 @@ class VoiceEngine:
     """語音輸入核心引擎，被 CLI / MenuBar / Dashboard 共用"""
 
     def __init__(self):
-        self.version = "2.5.0"
+        self.version = "2.5.3"
         self.config = load_config()
         self.memory = Memory()
         self.transcriber = Transcriber(self.config, self.memory)
@@ -452,10 +512,21 @@ class VoiceEngine:
         self.is_processing = False
         self._processing_start_ts = None
         self._state_lock = threading.RLock()
+        # Recorder owns one PortAudio stream and mutable audio buffer.  Keep
+        # start/stop/cancel transitions strictly serialized while still
+        # allowing the completed audio to transcribe in parallel afterwards.
+        self._recorder_transition_lock = threading.RLock()
         self._on_status_change = None  # callback(status_str)
         self._on_hotkey_reset = None   # callback() — 讓 hotkey closure 清掉 stale press state
         self._watchdog_timer = None
         self._record_start_ts = None
+        # Recording-scoped cancellation closes the PTT-release race: a Cancel
+        # gesture marks the exact recording before its callback thread runs.
+        self._active_recording_tokens = set()
+        self._cancelled_recording_tokens = set()
+        self._stopping_recording_token = None
+        self._processing_recording_tokens = []
+        self._continuous_cancel_event = None
         # 多段轉寫並行時序列化 paste，避免剪貼簿/Cmd+V 互踩
         self._paste_lock = threading.Lock()
         self._inflight_transcriptions = 0
@@ -469,41 +540,128 @@ class VoiceEngine:
             threading.Thread(target=self.transcriber.warmup, daemon=True).start()
 
     def reload_config(self):
+        previous = self.config
         self.config = load_config()
         self.transcriber.config = self.config
         self.transcriber.reset_clients()
         self.recorder.config = self.config
+        hotkeys_changed = any(
+            previous.get(key) != self.config.get(key)
+            for key in (*HOTKEY_FIELDS, "hotkey_mode")
+        )
+        if hotkeys_changed and self._on_hotkey_reset:
+            try:
+                self._on_hotkey_reset()
+            except Exception as exc:
+                log("warn", f"hotkey reload reset failed: {exc}")
+        if (
+            hotkeys_changed
+            and self.is_recording
+            and previous.get("hotkey_mode", "push_to_talk") == "push_to_talk"
+        ):
+            # 若使用者在按住舊 PTT 時儲存新鍵，舊 key-up 不再屬於新 target。
+            # 立即正常結束本段，避免錄音一路卡到 watchdog。
+            log("warn", "錄音中修改熱鍵；正在安全結束目前錄音")
+            threading.Thread(target=self.stop_and_process, daemon=True).start()
         log("ok", "設定已即時重新載入")
+        if hotkeys_changed:
+            log("ok", f"錄音熱鍵已即時更新: {self.config.get('hotkey')}")
 
     def start_recording(self, from_hotkey=False):
         """from_hotkey=True 才會 arm push-to-talk watchdog；CLI/Dashboard/menu bar
         從外部主動呼叫時請保持 False，否則會被 60s watchdog 截掉。"""
-        with self._state_lock:
-            if self.is_recording:
-                return False
-            # is_processing 只代表「背景有轉寫在跑」，不應該阻擋新錄音。
-            # paste 由 self._paste_lock 序列化，不會互踩。
-            self.is_recording = True
-            self._record_start_ts = time.time()
-
-        try:
-            self.overlay.show("recording")
-            self._safe_status_change("recording")
-            # on_error：stream 開啟失敗（PortAudio 裝置清單過期等）時由 recorder
-            # thread 回呼。閉包鎖定本段的 start_ts，避免 callback 晚到時誤殺新錄音。
-            start_ts = self._record_start_ts
-            self.recorder.start(
-                on_error=lambda msg, _ts=start_ts: self._on_recorder_error(msg, _ts)
-            )
-            log("rec", "錄音中…")
-            self._arm_watchdog(from_hotkey=from_hotkey)
-            return True
-        except Exception:
+        # stop_and_process/cancel_current 也使用這把鎖。新一段錄音只會在
+        # 上一段 InputStream 完成 join、audio_data 已取走後才開始，避免舊 stop
+        # 清掉新錄音的 buffer / start time / stop event。
+        with self._recorder_transition_lock:
             with self._state_lock:
-                self.is_recording = False
-                self._record_start_ts = None
-            self._safe_status_change("idle")
-            raise
+                if self.is_recording:
+                    return False
+                # is_processing 只代表「背景有轉寫在跑」，不應該阻擋新錄音。
+                # paste 由 self._paste_lock 序列化，不會互踩。
+                self.is_recording = True
+                self._record_start_ts = time.time()
+                recording_token = self._record_start_ts
+                self._active_recording_tokens.add(recording_token)
+
+            recorder_started = False
+            try:
+                # on_error：stream 開啟失敗（PortAudio 裝置清單過期等）時由 recorder
+                # thread 回呼。閉包鎖定本段 token，避免 callback 晚到時誤殺新錄音。
+                started = self.recorder.start(
+                    on_error=lambda msg, _ts=recording_token: self._on_recorder_error(msg, _ts)
+                )
+                if started is False:
+                    with self._state_lock:
+                        if self._record_start_ts == recording_token:
+                            self.is_recording = False
+                            self._record_start_ts = None
+                        self._active_recording_tokens.discard(recording_token)
+                        self._cancelled_recording_tokens.discard(recording_token)
+                    log("warn", "recorder 尚未釋放，略過本次錄音啟動")
+                    self._safe_status_change("idle")
+                    return False
+                recorder_started = True
+
+                # Recorder thread 可能在 start() 返回前就回報開流失敗；只有本段
+                # token 仍有效時才顯示 recording/arm watchdog，避免 ghost recording。
+                with self._state_lock:
+                    still_active = (
+                        self.is_recording
+                        and self._record_start_ts == recording_token
+                    )
+                if not still_active:
+                    return False
+
+                try:
+                    self.overlay.show("recording")
+                except Exception as exc:
+                    # Overlay is cosmetic.  A rendering failure must not turn a
+                    # healthy microphone stream into a failed start.
+                    log("warn", f"recording overlay: {exc}")
+                self._safe_status_change("recording")
+                log("rec", "錄音中…")
+                self._arm_watchdog(from_hotkey=from_hotkey)
+
+                # Close the final check-to-UI race: the Recorder thread can
+                # report an input-stream failure after the first token check
+                # but while overlay/watchdog setup is running.  Revalidate
+                # after arming so a failed stream is never returned as a
+                # successful (ghost) recording.
+                with self._state_lock:
+                    still_active = (
+                        self.is_recording
+                        and self._record_start_ts == recording_token
+                    )
+                if not still_active:
+                    self._cancel_watchdog()
+                    try:
+                        self.overlay.show("idle")
+                    except Exception:
+                        pass
+                    self._safe_status_change("idle")
+                    return False
+                return True
+            except Exception:
+                # Once Recorder.start succeeded, every later failure must fully
+                # join/discard that stream before Engine reports idle.  Merely
+                # rolling back Engine state would leave an orphan microphone.
+                self._cancel_watchdog()
+                if recorder_started or getattr(self.recorder, "is_recording", False):
+                    try:
+                        _audio, failed_filepath, _duration = self.recorder.stop()
+                        if failed_filepath and os.path.exists(failed_filepath):
+                            os.remove(failed_filepath)
+                    except Exception as stop_exc:
+                        log("warn", f"failed start cleanup: {stop_exc}")
+                with self._state_lock:
+                    if self._record_start_ts == recording_token:
+                        self.is_recording = False
+                        self._record_start_ts = None
+                    self._active_recording_tokens.discard(recording_token)
+                    self._cancelled_recording_tokens.discard(recording_token)
+                self._safe_status_change("idle")
+                raise
 
     def _on_recorder_error(self, msg, armed_for_ts):
         """recorder thread 回報「麥克風串流開啟失敗」：重置 engine 狀態 + 明確告知使用者。
@@ -514,6 +672,8 @@ class VoiceEngine:
                 return  # 已經是新的一段錄音，別動
             self.is_recording = False
             self._record_start_ts = None
+            self._active_recording_tokens.discard(armed_for_ts)
+            self._cancelled_recording_tokens.discard(armed_for_ts)
         self._cancel_watchdog()
         log("error", f"🎙 {msg}")
         log("warn", "已重新初始化音訊系統，請再按一次熱鍵重試；若仍失敗請檢查 系統設定→隱私權與安全性→麥克風，或重啟 App")
@@ -603,22 +763,113 @@ class VoiceEngine:
         except Exception as e:
             print(f"Status change error (non-fatal): {e}")
 
+    def mark_cancel_intent(self, recording_token):
+        """Atomically mark one still-active recording as cancelled.
+
+        This is intentionally synchronous and cheap so the NSEvent arbiter can
+        call it before scheduling the user-facing Cancel callback.  The marker
+        survives the gap where ``stop_and_process`` has cleared is_recording
+        but has not yet entered the processing phase.
+        """
+
+        if recording_token is None:
+            return False
+        with self._state_lock:
+            if recording_token not in self._active_recording_tokens:
+                return False
+            self._cancelled_recording_tokens.add(recording_token)
+            return True
+
+    def _recording_token_is_cancelled(self, recording_token):
+        if recording_token is None:
+            return False
+        with self._state_lock:
+            return recording_token in self._cancelled_recording_tokens
+
+    def _finish_recording_token(self, recording_token):
+        if recording_token is None:
+            return
+        with self._state_lock:
+            self._active_recording_tokens.discard(recording_token)
+            self._cancelled_recording_tokens.discard(recording_token)
+            self._processing_recording_tokens = [
+                token
+                for token in self._processing_recording_tokens
+                if token != recording_token
+            ]
+            if self._stopping_recording_token == recording_token:
+                self._stopping_recording_token = None
+
+    def latest_cancellable_recording_token(self):
+        """Return the newest exact recording pipeline Cancel should target."""
+
+        with self._state_lock:
+            # Continuous mode is one live stream rather than a tokenized PTT
+            # pipeline.  A generic Cancel must stop that stream, not an older
+            # PTT result that happens to still be processing.
+            if getattr(self, "_continuous_active", False):
+                return None
+            if self._record_start_ts is not None:
+                return self._record_start_ts
+            if self._stopping_recording_token is not None:
+                return self._stopping_recording_token
+            if self._processing_recording_tokens:
+                return max(self._processing_recording_tokens)
+            return None
+
+    def _discard_cancelled_recording(self, recording_token, filepath=None):
+        """Drop a cancelled recording before STT and clean its temp audio."""
+
+        if not self._recording_token_is_cancelled(recording_token):
+            return False
+        self._finish_recording_token(recording_token)
+        if filepath:
+            try:
+                if os.path.exists(filepath):
+                    os.remove(filepath)
+            except OSError:
+                pass
+        log("warn", "🚫 錄音已取消，略過轉寫與貼上")
+        with self._state_lock:
+            pending = self._inflight_transcriptions
+            still_recording = self.is_recording
+        if pending == 0 and not still_recording:
+            try:
+                self.overlay.show("idle")
+            except Exception:
+                pass
+            self._safe_status_change("idle")
+        return True
+
     def stop_and_process(self, mode="dictate", edit_context="", sync=False):
         """停止錄音 → 立刻釋放 engine（可開新錄音）→ 轉寫/貼上在背景跑。
         sync=True 時改為同步等待轉寫結果（CLI/REPL 用）。"""
-        with self._state_lock:
-            if not self.is_recording:
+        # Claim engine state and fully release the old PortAudio stream as one
+        # serialized recorder transition.  STT starts only after this lock is
+        # released, so it remains safe for later recordings to overlap STT.
+        with self._recorder_transition_lock:
+            with self._state_lock:
+                if getattr(self, "_continuous_active", False):
+                    log("warn", "連續模式中忽略一般錄音停止要求")
+                    return None
+                if not self.is_recording:
+                    return None
+                recording_token = self._record_start_ts
+                self.is_recording = False
+                self._record_start_ts = None
+                self._stopping_recording_token = recording_token
+
+            self._cancel_watchdog()
+
+            try:
+                audio_array, filepath, duration = self.recorder.stop()
+            except Exception as e:
+                log("error", f"recorder.stop 錯誤: {e}")
+                self._finish_recording_token(recording_token)
+                self._safe_status_change("idle")
                 return None
-            self.is_recording = False
 
-        self._cancel_watchdog()
-        self._record_start_ts = None
-
-        try:
-            audio_array, filepath, duration = self.recorder.stop()
-        except Exception as e:
-            log("error", f"recorder.stop 錯誤: {e}")
-            self._safe_status_change("idle")
+        if self._discard_cancelled_recording(recording_token, filepath):
             return None
 
         if (audio_array is None or (hasattr(audio_array, '__len__') and len(audio_array) == 0)) and not filepath:
@@ -632,27 +883,64 @@ class VoiceEngine:
                 log("warn", "未錄到任何音訊（錄音過短，或麥克風沒有輸入）")
             with self._state_lock:
                 pending = self._inflight_transcriptions
-            if pending == 0:
+                still_recording = self.is_recording
+            if pending == 0 and not still_recording:
                 self.overlay.show("idle")
                 self._safe_status_change("idle")
+            self._finish_recording_token(recording_token)
             return None
 
         if self.config.get("target_language") and mode == "dictate":
-            mode = "translate"
+            target = str(self.config.get("target_language", "")).lower()
+            edit_context = {
+                "ja": "translate_ja", "japanese": "translate_ja",
+                "zh": "translate_zh", "zh-tw": "translate_zh", "chinese": "translate_zh",
+                "en": "translate_en", "english": "translate_en",
+            }.get(target, "")
+            if edit_context:
+                mode = "edit"
 
         if sync:
-            return self._transcribe_and_paste(audio_array, filepath, duration, mode, edit_context)
+            return self._transcribe_and_paste(
+                audio_array,
+                filepath,
+                duration,
+                mode,
+                edit_context,
+                recording_token,
+            )
 
         threading.Thread(
             target=self._transcribe_and_paste,
-            args=(audio_array, filepath, duration, mode, edit_context),
+            args=(
+                audio_array,
+                filepath,
+                duration,
+                mode,
+                edit_context,
+                recording_token,
+            ),
             daemon=True,
         ).start()
         return None
 
-    def _transcribe_and_paste(self, audio_array, filepath, duration, mode, edit_context):
+    def _transcribe_and_paste(
+        self,
+        audio_array,
+        filepath,
+        duration,
+        mode,
+        edit_context,
+        recording_token=None,
+    ):
         """背景跑：Whisper → 後處理 → 自動貼上。paste 用 lock 序列化。"""
+        if self._discard_cancelled_recording(recording_token, filepath):
+            return None
         with self._state_lock:
+            if self._stopping_recording_token == recording_token:
+                self._stopping_recording_token = None
+            if recording_token is not None:
+                self._processing_recording_tokens.append(recording_token)
             self._inflight_transcriptions += 1
             self.is_processing = True
             if self._processing_start_ts is None:
@@ -679,6 +967,7 @@ class VoiceEngine:
             except Exception: pass
 
         result = None
+        cancelled_output = False
         try:
             audio_input = (
                 {"array": audio_array, "path": filepath}
@@ -701,20 +990,52 @@ class VoiceEngine:
                 except Exception as e:
                     log("warn", f"Stats update: {e}")
 
-                if getattr(self, "_cancel_inflight", False):
+                with self._state_lock:
+                    token_cancelled = (
+                        recording_token in self._cancelled_recording_tokens
+                        if recording_token is not None
+                        else False
+                    )
+                    legacy_cancelled = (
+                        self._cancel_inflight
+                        if recording_token is None
+                        else False
+                    )
+                    if legacy_cancelled:
+                        self._cancel_inflight = False
+                cancelled_output = token_cancelled or legacy_cancelled
+                if cancelled_output:
                     log("warn", "🚫 已取消，跳過 paste")
-                    self._cancel_inflight = False
                 elif self.config.get("auto_paste") and final:
                     _on_stage("paste")
                     with self._paste_lock:
-                        try:
-                            paste_text(final)
-                        except Exception as e:
-                            log("warn", f"Paste: {e}")
+                        # Cancel may arrive while the LLM result is returning;
+                        # check once more immediately before insertion.
+                        with self._state_lock:
+                            token_cancelled = (
+                                recording_token in self._cancelled_recording_tokens
+                                if recording_token is not None
+                                else False
+                            )
+                            legacy_cancelled = (
+                                self._cancel_inflight
+                                if recording_token is None
+                                else False
+                            )
+                            if legacy_cancelled:
+                                self._cancel_inflight = False
+                        cancelled_output = token_cancelled or legacy_cancelled
+                        if cancelled_output:
+                            log("warn", "🚫 已取消，略過最後 paste")
+                        else:
+                            try:
+                                paste_text(final)
+                            except Exception as e:
+                                log("warn", f"Paste: {e}")
 
                 with self._state_lock:
                     other_inflight = self._inflight_transcriptions > 1 or self.is_recording
-                if not other_inflight:
+                if not other_inflight and not cancelled_output:
                     if self.config.get("enable_transcript_overlay", True):
                         try: self.overlay.show_transcript(final, duration=2.5)
                         except Exception:
@@ -733,8 +1054,16 @@ class VoiceEngine:
                     except Exception: pass
 
             if filepath:
-                def _backup():
+                discard_file = cancelled_output or self._recording_token_is_cancelled(
+                    recording_token
+                )
+
+                def _backup(discard=discard_file):
                     try:
+                        if discard:
+                            if os.path.exists(filepath):
+                                os.remove(filepath)
+                            return
                         audio_dir = self.config.get("backup_audio_dir", "")
                         if audio_dir and os.path.isdir(os.path.dirname(audio_dir)):
                             os.makedirs(audio_dir, exist_ok=True)
@@ -755,6 +1084,12 @@ class VoiceEngine:
             traceback.print_exc()
         finally:
             with self._state_lock:
+                if recording_token is not None:
+                    self._processing_recording_tokens = [
+                        token
+                        for token in self._processing_recording_tokens
+                        if token != recording_token
+                    ]
                 self._inflight_transcriptions = max(0, self._inflight_transcriptions - 1)
                 if self._inflight_transcriptions == 0:
                     self.is_processing = False
@@ -766,6 +1101,7 @@ class VoiceEngine:
                     self._cancel_inflight = False
                 else:
                     going_idle = False
+            self._finish_recording_token(recording_token)
             if going_idle:
                 self._safe_status_change("idle")
         return result
@@ -816,53 +1152,107 @@ class VoiceEngine:
                 res = fn(text, mode="edit", edit_context=style)
                 if res:
                     res = res.strip()
-                    # 繁中終層防護：Quick-Rewrite 不走 _transcribe_impl 的 OpenCC，
-                    # 這裡補上（Groq Llama / qwen free 模型中文輸出偏簡體）。
-                    # translate_ja 豁免：s2twp 會把日文新字體錯誤轉換（国→國）。
+                    # 繁中終層防護：Quick-Rewrite 不走 _transcribe_impl 的 OpenCC。
+                    # 多語 helper 只繁化中文 clause，保留日文新字體（国／画像／来週）。
                     opencc = getattr(self.transcriber, "_opencc", None)
                     if opencc and style != "translate_ja":
-                        try:
-                            res = opencc.convert(res)
-                        except Exception:
-                            pass
+                        res = convert_traditional_preserving_japanese(
+                            res,
+                            opencc,
+                            language_hint=resolve_output_language_hint(
+                                style, self.config.get("language"),
+                            ),
+                        )
                     return res
             except Exception as e:
                 log("warn", f"rewrite {fn_name} error: {e}")
         return None
 
     # ─── Cancel (中止當前錄音或處理中的轉寫) ─────────────
-    def cancel_current(self):
+    def cancel_current(self, recording_token=None):
         """Cancel hotkey：
         - 錄音中 → 立刻停止 recorder + 丟棄音訊（不轉寫）
         - 處理中 → 設 _cancel_inflight flag，後續 paste 階段檢查跳過
         UI 立刻回 idle，給使用者「控制感」。"""
-        with self._state_lock:
-            was_recording = self.is_recording
-            was_processing = self.is_processing
-        if not was_recording and not was_processing:
+        if recording_token is None:
+            recording_token = self.latest_cancellable_recording_token()
+
+        token_active = False
+        if recording_token is not None:
+            token_active = self.mark_cancel_intent(recording_token)
+        # Use the same recorder transition lock as normal stop/start.  Cancel
+        # must wait for the stream thread to finish before a new PTT start can
+        # reuse Recorder.audio_data/_stop_event.
+        with self._recorder_transition_lock:
+            with self._state_lock:
+                current_token = self._record_start_ts
+                was_recording = self.is_recording and (
+                    recording_token is None or recording_token == current_token
+                )
+                if was_recording:
+                    # Atomically claim the recording before stop_and_process can
+                    # claim it.  Whichever path gets the transition lock first
+                    # owns Recorder; the other observes is_recording=False.
+                    self.is_recording = False
+                    self._record_start_ts = None
+                was_processing = self.is_processing
+                if recording_token is not None:
+                    token_active = (
+                        recording_token in self._active_recording_tokens
+                    )
+
+            cancelled_filepath = None
+            continuous_cancelled = False
+            if was_recording and not getattr(self, "_continuous_active", False):
+                try:
+                    _audio, cancelled_filepath, _duration = self.recorder.stop()
+                except Exception as exc:
+                    log("warn", f"cancel recorder.stop: {exc}")
+            elif was_recording:
+                # RLock allows this helper to reuse the exact same transition
+                # lock; do not expose a gap where PTT could start before the
+                # continuous stream has actually joined.
+                continuous_cancelled = bool(
+                    self.stop_continuous_mode(cancel=True)
+                )
+
+        if continuous_cancelled:
+            event_ledger.user_action("cancel", phase="recording")
+            return
+        if not was_recording and not was_processing and not token_active:
             log("warn", "目前沒有可取消的錄音/處理")
             event_ledger.user_action("cancel", phase="idle")
             return
         event_ledger.user_action(
             "cancel",
-            phase="recording" if was_recording else "processing",
+            phase=(
+                "recording"
+                if was_recording
+                else ("processing" if was_processing else "stopping")
+            ),
         )
         try:
             if was_recording:
                 # 純錄音中：直接停 recorder + 重置 engine 狀態，不會進入 _transcribe_and_paste。
                 # 不設 _cancel_inflight（否則 flag 會殘留到下一次正常錄音的 paste 階段被誤吞）。
-                try: self.recorder._stop_event.set()
-                except Exception: pass
-                self.recorder.is_recording = False
                 self._cancel_watchdog()
-                with self._state_lock:
-                    self.is_recording = False
-                    self._record_start_ts = None
+                if cancelled_filepath:
+                    try:
+                        if os.path.exists(cancelled_filepath):
+                            os.remove(cancelled_filepath)
+                    except OSError:
+                        pass
+                self._finish_recording_token(current_token)
                 log("warn", "🚫 錄音已取消")
             if was_processing:
                 # 處理中：pipeline 已經跑起來，無法 abort LLM call，只能標記讓 paste 階段跳過
-                self._cancel_inflight = True
+                # 有 recording_token 時用 token-specific marker，避免誤吞另一個
+                # 同時處理中的錄音；無 token 的一般 Cancel 沿用全域 fallback。
+                if recording_token is None:
+                    self._cancel_inflight = True
                 log("warn", "🚫 處理中的轉寫已標記取消（paste 階段會跳過）")
+            elif token_active and not was_recording:
+                log("warn", "🚫 錄音停止中，取消意圖已鎖定")
             try: self.overlay.show("idle")
             except Exception: pass
             self._safe_status_change("idle")
@@ -944,28 +1334,9 @@ class VoiceEngine:
         # 之前 is_recording / _continuous_active 寫入完全沒鎖，且繞過 Recorder.start 的 thread-alive
         # 檢查 → 若上一段 push-to-talk 的 _record_loop 還在收尾就硬開連續 stream，會 deadlock
         # 在 Pa_OpenStream。把守門集中到 start_continuous_mode 入口處。
-        with self._state_lock:
-            if self.is_recording:
-                log("warn", "已在錄音中，無法啟動連續模式")
-                return
-            # 防 PortAudio deadlock：等上一段 recorder thread 完全結束
-            prev_thread = getattr(self.recorder, "_thread", None)
-            if prev_thread is not None and prev_thread.is_alive():
-                log("warn", "上一段錄音 thread 尚未結束，等 2s…")
-                prev_thread.join(timeout=2.0)
-                if prev_thread.is_alive():
-                    log("error", "audio stream 未釋放，拒絕啟動連續模式")
-                    return
-            self._continuous_active = True
-            self.is_recording = True
-        try: self.overlay.show("recording")
-        except Exception: pass
-        self._safe_status_change("recording")
-        log("rec", "連續模式啟動 — 持續監聽中…")
-
         def _on_segment(audio_array, duration):
             try:
-                if duration < 0.4:
+                if duration < 0.4 or cancel_event.is_set():
                     return
                 # history_mode="continuous"：由 transcriber 內部寫一筆正確標記的歷史。
                 # 原本這裡再手動 add_to_history 一次 → 每段切片寫兩筆重複歷史，
@@ -973,7 +1344,7 @@ class VoiceEngine:
                 result = self.transcriber.transcribe(
                     audio_array, audio_duration=duration, history_mode="continuous"
                 )
-                if not result:
+                if not result or cancel_event.is_set():
                     return
                 final = (result.get("final") or "").strip()
                 if not final:
@@ -983,8 +1354,12 @@ class VoiceEngine:
                     # _paste_lock 序列化（與 _transcribe_and_paste 同一把鎖），
                     # 否則剪貼簿互相覆蓋、Cmd+V 打架、文字貼錯段
                     with self._paste_lock:
+                        if cancel_event.is_set():
+                            return
                         try: paste_text(final)
                         except Exception as e: log("warn", f"continuous paste: {e}")
+                if cancel_event.is_set():
+                    return
                 try: self.overlay.show_transcript(final, duration=2.5)
                 except Exception: pass
                 log("ok", f"[continuous] {final[:60]}")
@@ -992,6 +1367,8 @@ class VoiceEngine:
                 log("error", f"continuous segment: {e}")
 
         def _on_voice(is_voice):
+            if cancel_event.is_set():
+                return
             try:
                 self.overlay.show("recording" if is_voice else "idle")
             except Exception:
@@ -1002,47 +1379,126 @@ class VoiceEngine:
             # 沒有這個 callback 的話 _continuous_active / is_recording 永久卡 True，
             # 之後所有 push-to-talk 都被擋掉且無提示。
             with self._state_lock:
+                if self._continuous_cancel_event is not cancel_event:
+                    return  # 舊 session callback，不得清除新 session
                 was_active = getattr(self, "_continuous_active", False)
                 if not was_active:
                     return  # 正常 stop_continuous_mode 路徑已自行收尾
                 self._continuous_active = False
                 self.is_recording = False
+                self._continuous_cancel_event = None
             log("warn", "連續模式 stream 已結束（裝置中斷？），狀態已自動重置")
             try: self.overlay.show("idle")
             except Exception: pass
             self._safe_status_change("idle")
 
-        self.recorder.start_continuous(
-            on_segment=_on_segment, on_voice_change=_on_voice, on_stopped=_on_stopped
-        )
+        with self._recorder_transition_lock:
+            with self._state_lock:
+                if self.is_recording:
+                    log("warn", "已在錄音中，無法啟動連續模式")
+                    return False
 
-    def stop_continuous_mode(self):
+            # 防 PortAudio deadlock：等上一段 recorder thread 完全結束。
+            # join 時不持有 _state_lock，因舊 recorder callback 也會取該鎖。
+            prev_thread = getattr(self.recorder, "_thread", None)
+            if prev_thread is not None and prev_thread.is_alive():
+                log("warn", "上一段錄音 thread 尚未結束，等 2s…")
+                prev_thread.join(timeout=2.0)
+                if prev_thread.is_alive():
+                    log("error", "audio stream 未釋放，拒絕啟動連續模式")
+                    return False
+
+            with self._state_lock:
+                self._continuous_active = True
+                self.is_recording = True
+                cancel_event = threading.Event()
+                self._continuous_cancel_event = cancel_event
+            try:
+                started = self.recorder.start_continuous(
+                    on_segment=_on_segment,
+                    on_voice_change=_on_voice,
+                    on_stopped=_on_stopped,
+                )
+            except Exception:
+                with self._state_lock:
+                    self._continuous_active = False
+                    self.is_recording = False
+                    if self._continuous_cancel_event is cancel_event:
+                        self._continuous_cancel_event = None
+                raise
+            if started is False:
+                with self._state_lock:
+                    self._continuous_active = False
+                    self.is_recording = False
+                    if self._continuous_cancel_event is cancel_event:
+                        self._continuous_cancel_event = None
+                log("warn", "recorder 尚未釋放，無法啟動連續模式")
+                return False
+
+            # The stream thread may fail immediately and invoke _on_stopped
+            # before start_continuous() returns.  Do not paint a stale
+            # recording state over that recovery callback.
+            with self._state_lock:
+                still_active = (
+                    self._continuous_active
+                    and self.is_recording
+                    and self._continuous_cancel_event is cancel_event
+                )
+            if not still_active:
+                return False
+
+            try: self.overlay.show("recording")
+            except Exception: pass
+            self._safe_status_change("recording")
+            log("rec", "連續模式啟動 — 持續監聽中…")
+            return True
+
+    def stop_continuous_mode(self, cancel=False):
         # v2.4.0：補 _state_lock 保護 + 等 thread 真的 join 結束。原本只 set stop_event 然後
         # 立刻把 is_recording 翻 False，但 recorder thread 還在 InputStream 收尾 → 下次 start
         # 又會撞上 thread alive 守門被 reject。改成 join with timeout，並把狀態翻轉收進 lock。
-        with self._state_lock:
-            if not getattr(self, "_continuous_active", False):
-                return
-            # 先翻 False 再 set stop_event：讓 recorder 的 on_stopped callback
-            # 能辨別「正常關閉」（不觸發裝置中斷警告路徑）
-            self._continuous_active = False
-            self.recorder._stop_event.set()
-        # 鎖外 join（避免 join 期間擋住其他 lock 取得者）
-        thread = getattr(self.recorder, "_thread", None)
-        if thread is not None:
-            thread.join(timeout=5)
-            if thread.is_alive():
-                log("warn", "continuous recorder thread 5s 未結束（PortAudio 可能 stuck）")
-        with self._state_lock:
-            self._continuous_active = False
-            self.is_recording = False
+        with self._recorder_transition_lock:
+            with self._state_lock:
+                if not getattr(self, "_continuous_active", False):
+                    return False
+                cancel_event = self._continuous_cancel_event
+                if cancel and cancel_event is not None:
+                    # Set before stopping Recorder: the loop may flush its
+                    # current buffer immediately after seeing _stop_event.
+                    cancel_event.set()
+                # 先翻 False 再 set stop_event：讓 recorder 的 on_stopped callback
+                # 能辨別「正常關閉」（不觸發裝置中斷警告路徑）
+                self._continuous_active = False
+                self.recorder._stop_event.set()
+            # transition lock 阻擋新 stream；join 時不持有 _state_lock。
+            thread = getattr(self.recorder, "_thread", None)
+            if thread is not None:
+                thread.join(timeout=5)
+                if thread.is_alive():
+                    log("warn", "continuous recorder thread 5s 未結束（PortAudio 可能 stuck）")
+            with self._state_lock:
+                self._continuous_active = False
+                self.is_recording = False
+                if self._continuous_cancel_event is cancel_event:
+                    self._continuous_cancel_event = None
+        if cancel:
+            # Synchronize with a segment that had already entered the paste
+            # critical section.  After this barrier returns, no cancelled
+            # session can paste later and contradict the visible Cancel state.
+            with self._paste_lock:
+                pass
         try: self.overlay.show("idle")
         except Exception: pass
         self._safe_status_change("idle")
-        log("ok", "連續模式關閉")
+        log("ok", "連續模式已取消" if cancel else "連續模式關閉")
+        return True
 
     def rewrite_selection(self, style=None):
         """全域快捷鍵入口：複製選取文字 → LLM 改寫 → 貼回。"""
+        with self._state_lock:
+            if self.is_recording:
+                log("warn", "錄音中，已略過 Quick-Rewrite")
+                return
         if getattr(self, "_rewrite_in_progress", False):
             return
         self._rewrite_in_progress = True
@@ -1103,43 +1559,27 @@ def setup_hotkey(engine):
     """設定全域快捷鍵 (Native macOS NSEvent implementation to avoid pynput crash)"""
     try:
         from AppKit import NSEvent, NSKeyDown, NSKeyUp, NSFlagsChanged
-        from Quartz import CGEventTapCreate, kCGSessionEventTap, kCGHeadInsertEventTap, kCGEventTapOptionListenOnly, CGEventTapEnable, CFMachPortCreateRunLoopSource, CFRunLoopAddSource, CFRunLoopGetCurrent, kCFRunLoopCommonModes
     except ImportError:
         # Fallback to pynput if PyObjC is not available (e.g. CLI mode without rumps)
         return _setup_hotkey_pynput(engine)
 
     config = engine.config
-    hotkey_str = config.get("hotkey", "right_cmd")
+    hotkey_source = str(config.get("hotkey", RECOMMENDED_RECORD_HOTKEY) or "")
     mode = config.get("hotkey_mode", "push_to_talk")
-    
-    # Key Code Mapping for macOS
-    # https://github.com/phracker/MacOSX-SDKs/blob/master/MacOSX10.6.sdk/System/Library/Frameworks/Carbon.framework/Versions/A/Frameworks/HIToolbox.framework/Versions/A/Headers/Events.h
-    KEY_MAP = {
-        'right_cmd': 54,
-        'cmd': 55, 'command': 55, 'cmd_l': 55, 'right_command': 54,
-        'right_alt': 61, 'right_option': 61,
-        'alt': 58, 'option': 58, 'alt_l': 58,
-        'ctrl': 59, 'control': 59,
-        'shift': 56, 'right_shift': 60,
-        'space': 49,
-        'f1': 122, 'f2': 120, 'f3': 99, 'f4': 118, 'f5': 96, 'f6': 97, 'f7': 98, 'f8': 100,
-        'a': 0, 'b': 11, 'c': 8, 'd': 2, 'e': 14, 'f': 3, 'g': 5, 'h': 4, 'i': 34, 'j': 38,
-        'k': 40, 'l': 37, 'm': 46, 'n': 45, 'o': 31, 'p': 35, 'q': 12, 'r': 15, 's': 1,
-        't': 17, 'u': 32, 'v': 9, 'w': 13, 'x': 7, 'y': 16, 'z': 6
-    }
-    
-    # Parse target keys
-    target_keys = set()
-    parts = hotkey_str.lower().replace("+", " ").split()
-    for p in parts:
-        if p in KEY_MAP:
-            target_keys.add(KEY_MAP[p])
-        elif len(p) == 1 and p in KEY_MAP: # chars
-             target_keys.add(KEY_MAP[p])
-
-    if not target_keys:
-        print(f"⚠️ Unknown hotkey: {hotkey_str}, fallback to right_cmd")
-        target_keys = {54}
+    try:
+        initial_spec = parse_hotkey(
+            hotkey_source,
+            field="hotkey",
+            allow_legacy_single_modifier=True,
+        )
+    except HotkeyValidationError as exc:
+        log(
+            "warn",
+            f"Invalid recording hotkey ({exc}); using {RECOMMENDED_RECORD_HOTKEY}",
+        )
+        initial_spec = parse_hotkey(RECOMMENDED_RECORD_HOTKEY, field="hotkey")
+    hotkey_str = initial_spec.normalized
+    target_keys = set(initial_spec.keycodes)
 
     # Tracking state
     currently_pressed = set()
@@ -1150,7 +1590,33 @@ def setup_hotkey(engine):
 
     def _process_event(event):
         """Core event processing logic (shared by global and local monitors)"""
-        nonlocal currently_pressed
+        nonlocal currently_pressed, hotkey_source, hotkey_str, mode, target_keys
+
+        # Dashboard save 會即時 reload engine.config。Listener 不需重複註冊
+        # NSEvent monitor；下一個鍵盤事件到來時直接切換 target。
+        next_source = str(
+            engine.config.get("hotkey", RECOMMENDED_RECORD_HOTKEY) or ""
+        )
+        next_mode = engine.config.get("hotkey_mode", "push_to_talk")
+        if next_source != hotkey_source or next_mode != mode:
+            hotkey_source = next_source
+            mode = next_mode
+            try:
+                next_spec = parse_hotkey(
+                    hotkey_source,
+                    field="hotkey",
+                    allow_legacy_single_modifier=True,
+                )
+                hotkey_str = next_spec.normalized
+                target_keys = set(next_spec.keycodes)
+            except HotkeyValidationError as exc:
+                log("warn", f"Invalid runtime recording hotkey: {exc}")
+                target_keys = set()
+            currently_pressed.clear()
+            _process_event.last_active = False
+
+        if not target_keys:
+            return
         try:
             etype = event.type()
             vk = event.keyCode()
@@ -1169,46 +1635,14 @@ def setup_hotkey(engine):
 
         # Update state
         if etype == NSKeyDown:
-            currently_pressed.add(vk)
+            if vk in target_keys:
+                currently_pressed.add(vk)
         elif etype == NSKeyUp:
             currently_pressed.discard(vk)
         elif etype == NSFlagsChanged:
             flags = event.modifierFlags()
             if vk in target_keys:
-                # 用 device-dependent bits 區分左右修飾鍵，避免另一邊也按住時誤判
-                # 參考 IOKit/hidsystem/IOLLEvent.h (NX_DEVICE*KEYMASK)
-                # 例：right_cmd 釋放時，若 left_cmd 仍按住，generic Cmd bit 仍會是 1，
-                #     必須用 RCMD bit 才能正確判斷 right_cmd 的真實狀態
-                MASK_BY_VK = {
-                    55: 0x8,     # Left Cmd
-                    54: 0x10,    # Right Cmd
-                    58: 0x20,    # Left Alt
-                    61: 0x40,    # Right Alt
-                    59: 0x1,     # Left Ctrl
-                    62: 0x2000,  # Right Ctrl
-                    56: 0x2,     # Left Shift
-                    60: 0x4,     # Right Shift
-                }
-                # generic fallback：若 device-dependent bit 不可用（罕見：軟體鍵盤 / KVM）
-                GENERIC_BY_VK = {
-                    54: 0x100000, 55: 0x100000,  # Cmd
-                    58: 0x80000,  61: 0x80000,   # Alt
-                    59: 0x40000,  62: 0x40000,   # Ctrl
-                    56: 0x20000,  60: 0x20000,   # Shift
-                }
-                bit = MASK_BY_VK.get(vk, 0)
-                generic_bit = GENERIC_BY_VK.get(vk, 0)
-                if bit and (flags & bit):
-                    is_pressed = True
-                elif bit and not (flags & generic_bit):
-                    # device bit 沒亮、generic 也沒亮 → 確定釋放
-                    is_pressed = False
-                else:
-                    # device bit 沒亮但 generic 還亮：可能是另一邊還按著，
-                    # 此鍵已經釋放；但保險起見不誤判，視為釋放
-                    is_pressed = False
-
-                if is_pressed:
+                if modifier_is_pressed(vk, flags):
                     currently_pressed.add(vk)
                 else:
                     currently_pressed.discard(vk)
@@ -1217,6 +1651,12 @@ def setup_hotkey(engine):
         if len(target_keys) == 1:
             list_target = list(target_keys)[0]
             is_active = (list_target in currently_pressed)
+            if getattr(engine, "_continuous_active", False):
+                # Continuous mode owns Recorder until its own toggle/cancel.
+                # Track the physical chord but never reinterpret its release
+                # as a PTT stop for the continuous stream.
+                _process_event.last_active = is_active
+                return
             
             if is_active:
                  if not getattr(_process_event, 'last_active', False):  # Rising Edge
@@ -1239,6 +1679,9 @@ def setup_hotkey(engine):
         else:
             # Combo Mode
             is_active = target_keys.issubset(currently_pressed)
+            if getattr(engine, "_continuous_active", False):
+                _process_event.last_active = is_active
+                return
 
             if is_active and not getattr(_process_event, 'last_active', False):
                 if mode == "push_to_talk":
@@ -1286,6 +1729,9 @@ def setup_hotkey(engine):
     def _reset_hotkey_state():
         currently_pressed.clear()
         _process_event.last_active = False
+        action_reset = getattr(engine, "_on_action_hotkey_reset", None)
+        if action_reset:
+            action_reset()
     engine._on_hotkey_reset = _reset_hotkey_state
 
     # NOTE: 曾經在這裡放過 _key_state_reconciler（polling thread + CGEventSourceKeyState /
@@ -1296,271 +1742,446 @@ def setup_hotkey(engine):
     # 想要更嚴格 cap 可在 config 設 pushtotalk_max_seconds。
 
 
-def setup_continuous_hotkey(engine):
-    """連續模式 toggle 熱鍵（按一次開、按一次關）。預設 right_option+l（long-form）。"""
+def _setup_dynamic_action_hotkey(engine, config_key, action_callback, label):
+    """Register an action in the shared, release-triggered NSEvent arbiter.
+
+    Modifier-only action chords are prefixes of many normal shortcuts.  Firing
+    on key-down would make ``ctrl+option+k`` invoke Quick-Rewrite before ``k``
+    arrives.  The shared arbiter therefore arms one exact chord, invalidates it
+    if any extra key joins the gesture, and invokes it only when the chord is
+    released.  One latch is shared by every action, so modifier rollover cannot
+    invoke a second action in the same gesture.
+    """
+
     try:
-        from AppKit import NSEvent, NSKeyDown, NSKeyUp, NSFlagsChanged
+        from AppKit import NSEvent, NSFlagsChanged, NSKeyDown, NSKeyUp
     except ImportError:
-        return
+        return None
 
-    config = engine.config
-    hotkey_str = config.get("continuous_hotkey", "")
-    if not hotkey_str:
-        return
+    registry = getattr(engine, "_action_hotkey_registry", None)
+    if registry is None:
+        registry = {}
+        engine._action_hotkey_registry = registry
+    registry[config_key] = (action_callback, label)
 
-    KEY_MAP = {
-        'right_cmd': 54, 'cmd': 55, 'command': 55, 'cmd_l': 55, 'right_command': 54,
-        'right_alt': 61, 'right_option': 61, 'alt': 58, 'option': 58, 'alt_l': 58,
-        'ctrl': 59, 'control': 59, 'shift': 56, 'right_shift': 60, 'space': 49,
-        'f1': 122, 'f2': 120, 'f3': 99, 'f4': 118, 'f5': 96, 'f6': 97, 'f7': 98, 'f8': 100,
-        'a': 0, 'b': 11, 'c': 8, 'd': 2, 'e': 14, 'f': 3, 'g': 5, 'h': 4, 'i': 34, 'j': 38,
-        'k': 40, 'l': 37, 'm': 46, 'n': 45, 'o': 31, 'p': 35, 'q': 12, 'r': 15, 's': 1,
-        't': 17, 'u': 32, 'v': 9, 'w': 13, 'x': 7, 'y': 16, 'z': 6,
-    }
-    target_keys = set()
-    for p in hotkey_str.lower().replace("+", " ").split():
-        if p in KEY_MAP:
-            target_keys.add(KEY_MAP[p])
-    if not target_keys:
-        log("warn", f"Unknown continuous_hotkey: {hotkey_str}")
-        return
+    existing_monitors = getattr(engine, "_action_hotkey_monitors", None)
+    if existing_monitors is not None:
+        own_source = str(engine.config.get(config_key, "") or "").strip()
+        if own_source:
+            log("ok", f"{label} hotkey: {own_source}")
+        return existing_monitors
 
+    hotkey_sources = None
+    action_specs = {}
+    relevant_keys = set()
+    recording_keys = set()
     currently_pressed = set()
-    KEY_EVENT_MASK = (1 << 10) | (1 << 11) | (1 << 12)
+    foreign_pressed = set()
+    armed_field = None
+    armed_keys = set()
+    armed_while_recording = False
+    armed_recording_token = None
+    gesture_blocked = False
+    gesture_latched = False
+    key_event_mask = (1 << 10) | (1 << 11) | (1 << 12)
+
+    def _refresh_targets():
+        nonlocal hotkey_sources, action_specs, relevant_keys, recording_keys
+        nonlocal armed_field, armed_keys, armed_while_recording
+        nonlocal armed_recording_token
+        nonlocal gesture_blocked, gesture_latched
+        action_sources = tuple(
+            str(engine.config.get(field, "") or "").strip()
+            for field in _ACTION_HOTKEY_FIELDS
+        )
+        recording_source = str(
+            engine.config.get("hotkey", RECOMMENDED_RECORD_HOTKEY) or ""
+        ).strip()
+        next_sources = (recording_source, *action_sources)
+        if next_sources == hotkey_sources:
+            return
+        hotkey_sources = next_sources
+        currently_pressed.clear()
+        foreign_pressed.clear()
+        armed_field = None
+        armed_keys = set()
+        armed_while_recording = False
+        armed_recording_token = None
+        gesture_blocked = False
+        gesture_latched = False
+        action_specs = {}
+        relevant_keys = set()
+        recording_keys = set()
+        try:
+            recording_keys = set(
+                parse_hotkey(
+                    recording_source,
+                    field="hotkey",
+                    allow_legacy_single_modifier=True,
+                ).keycodes
+            )
+        except HotkeyValidationError as exc:
+            log("warn", f"Invalid hotkey: {exc}")
+        for field, source in zip(_ACTION_HOTKEY_FIELDS, action_sources):
+            try:
+                parsed_keys = set(parse_hotkey(source, field=field).keycodes)
+            except HotkeyValidationError as exc:
+                log("warn", f"Invalid {field}: {exc}")
+                continue
+            action_specs[field] = parsed_keys
+            relevant_keys.update(parsed_keys)
 
     def _on_event(event):
-        nonlocal currently_pressed
+        nonlocal armed_field, armed_keys, armed_while_recording
+        nonlocal armed_recording_token
+        nonlocal gesture_blocked, gesture_latched
+        _refresh_targets()
         try:
-            etype = event.type(); vk = event.keyCode()
+            event_type = event.type()
+            keycode = event.keyCode()
         except Exception:
             return
-        if etype == NSKeyDown:   currently_pressed.add(vk)
-        elif etype == NSKeyUp:   currently_pressed.discard(vk)
-        elif etype == NSFlagsChanged:
+
+        pressed_now = False
+        if event_type == NSKeyDown:
+            try:
+                if event.isARepeat():
+                    return
+            except Exception:
+                pass
+            if keycode in relevant_keys:
+                currently_pressed.add(keycode)
+                pressed_now = True
+            elif keycode not in recording_keys:
+                foreign_pressed.add(keycode)
+                pressed_now = True
+        elif event_type == NSKeyUp:
+            currently_pressed.discard(keycode)
+            foreign_pressed.discard(keycode)
+        elif event_type == NSFlagsChanged and keycode in relevant_keys:
+            if modifier_is_pressed(keycode, event.modifierFlags()):
+                currently_pressed.add(keycode)
+                pressed_now = True
+            else:
+                currently_pressed.discard(keycode)
+        elif event_type == NSFlagsChanged and keycode in recording_keys:
+            # PTT is deliberately disjoint from action chords.  Ignore its
+            # held modifiers so Cancel remains available during recording.
+            # On generic-only KVMs, however, releasing a left-side action key
+            # while its right-side PTT sibling remains held cannot be observed.
+            # A recording-key event may safely *remove* action modifiers whose
+            # generic family flag is now off; it must never add them here.
             flags = event.modifierFlags()
-            if vk in target_keys:
-                pressed = False
-                if vk in (54, 55):   pressed = (flags & 0x100000) > 0
-                elif vk in (58, 61): pressed = (flags & 0x80000) > 0
-                elif vk in (59, 62): pressed = (flags & 0x40000) > 0
-                elif vk in (56, 60): pressed = (flags & 0x20000) > 0
-                if pressed: currently_pressed.add(vk)
-                else: currently_pressed.discard(vk)
+            for action_key in relevant_keys & MODIFIER_KEYCODES:
+                if not modifier_is_pressed(action_key, flags):
+                    currently_pressed.discard(action_key)
+        elif event_type == NSFlagsChanged and keycode in MODIFIER_KEYCODES:
+            if modifier_is_pressed(keycode, event.modifierFlags()):
+                foreign_pressed.add(keycode)
+                pressed_now = True
+            else:
+                foreign_pressed.discard(keycode)
+        else:
+            return
 
-        is_active = target_keys.issubset(currently_pressed)
-        if is_active and not getattr(_on_event, "last_active", False):
-            threading.Thread(target=engine.toggle_continuous_mode, daemon=True).start()
-        _on_event.last_active = is_active
+        if pressed_now and foreign_pressed and currently_pressed:
+            gesture_blocked = True
 
-    def _global(ev):
-        try: _on_event(ev)
-        except Exception as e: log("warn", f"continuous global: {e}")
-    def _local(ev):
-        try: _on_event(ev)
-        except Exception as e: log("warn", f"continuous local: {e}")
-        return ev
+        if gesture_latched:
+            if not currently_pressed:
+                gesture_latched = False
+                gesture_blocked = False
+                foreign_pressed.clear()
+            return
 
-    NSEvent.addGlobalMonitorForEventsMatchingMask_handler_(KEY_EVENT_MASK, _global)
-    NSEvent.addLocalMonitorForEventsMatchingMask_handler_(KEY_EVENT_MASK, _local)
-    log("ok", f"Continuous-mode hotkey: {hotkey_str}")
+        if armed_field is not None:
+            if (currently_pressed - armed_keys) or foreign_pressed:
+                gesture_blocked = True
+            if armed_keys.issubset(currently_pressed):
+                return
+
+            callback_entry = registry.get(armed_field)
+            should_run = not gesture_blocked and callback_entry is not None
+            recording_now = bool(getattr(engine, "is_recording", False))
+            if armed_while_recording or recording_now:
+                should_run = should_run and (
+                    armed_field == "cancel_hotkey"
+                    or (
+                        armed_field == "continuous_hotkey"
+                        and bool(getattr(engine, "_continuous_active", False))
+                    )
+                )
+
+            if should_run:
+                callback, _callback_label = callback_entry
+                callback_target = callback
+                if (
+                    armed_field == "cancel_hotkey"
+                    and armed_recording_token is not None
+                ):
+                    marker = getattr(engine, "mark_cancel_intent", None)
+                    if marker is not None:
+                        if marker(armed_recording_token):
+                            token = armed_recording_token
+                            callback_target = (
+                                lambda cb=callback, tok=token: cb(
+                                    recording_token=tok
+                                )
+                            )
+                        else:
+                            should_run = False
+                if should_run:
+                    threading.Thread(
+                        target=callback_target,
+                        daemon=True,
+                    ).start()
+
+            armed_field = None
+            armed_keys = set()
+            armed_while_recording = False
+            armed_recording_token = None
+            gesture_latched = True
+            if not currently_pressed:
+                gesture_latched = False
+                gesture_blocked = False
+                foreign_pressed.clear()
+            return
+
+        if gesture_blocked or foreign_pressed or not currently_pressed:
+            if not currently_pressed:
+                gesture_blocked = False
+                foreign_pressed.clear()
+            return
+
+        exact_matches = [
+            field
+            for field, keys in action_specs.items()
+            if keys and keys == currently_pressed and field in registry
+        ]
+        if len(exact_matches) == 1:
+            armed_field = exact_matches[0]
+            armed_keys = set(currently_pressed)
+            armed_while_recording = bool(getattr(engine, "is_recording", False))
+            if armed_field == "cancel_hotkey":
+                token_getter = getattr(
+                    engine, "latest_cancellable_recording_token", None
+                )
+                if callable(token_getter):
+                    armed_recording_token = token_getter()
+                else:
+                    armed_recording_token = (
+                        getattr(engine, "_record_start_ts", None)
+                        if armed_while_recording
+                        else getattr(engine, "_stopping_recording_token", None)
+                    )
+            else:
+                armed_recording_token = None
+        elif len(exact_matches) > 1:
+            # Validation normally makes this impossible; fail closed if a
+            # hand-edited legacy config bypasses the Dashboard API.
+            gesture_blocked = True
+
+    def _global(event):
+        try:
+            _on_event(event)
+        except Exception as exc:
+            log("warn", f"{label} global handler: {exc}")
+
+    def _local(event):
+        try:
+            _on_event(event)
+        except Exception as exc:
+            log("warn", f"{label} local handler: {exc}")
+        return event
+
+    _refresh_targets()
+    global_monitor = NSEvent.addGlobalMonitorForEventsMatchingMask_handler_(
+        key_event_mask, _global
+    )
+    local_monitor = NSEvent.addLocalMonitorForEventsMatchingMask_handler_(
+        key_event_mask, _local
+    )
+    monitors = (global_monitor, local_monitor)
+    engine._action_hotkey_monitors = monitors
+
+    def _reset_action_hotkey_state():
+        nonlocal armed_field, armed_keys, armed_while_recording
+        nonlocal armed_recording_token, gesture_blocked, gesture_latched
+        currently_pressed.clear()
+        foreign_pressed.clear()
+        armed_field = None
+        armed_keys = set()
+        armed_while_recording = False
+        armed_recording_token = None
+        gesture_blocked = False
+        gesture_latched = False
+
+    engine._on_action_hotkey_reset = _reset_action_hotkey_state
+    own_source = str(engine.config.get(config_key, "") or "").strip()
+    if own_source:
+        log("ok", f"{label} hotkey: {own_source}")
+    return monitors
+
+
+def setup_continuous_hotkey(engine):
+    """連續模式 toggle 熱鍵（空字串=關閉）。"""
+    return _setup_dynamic_action_hotkey(
+        engine,
+        "continuous_hotkey",
+        engine.toggle_continuous_mode,
+        "Continuous-mode",
+    )
 
 
 def setup_rewrite_hotkey(engine):
     """Quick-Rewrite 全域熱鍵：選取文字 → 觸發 → LLM 改寫 → 貼回。
-    與錄音熱鍵共用 NSEvent 機制但獨立監聽，預設 right_option+r。"""
-    try:
-        from AppKit import NSEvent, NSKeyDown, NSKeyUp, NSFlagsChanged
-    except ImportError:
-        return
-
-    config = engine.config
-    hotkey_str = config.get("rewrite_hotkey", "")
-    if not hotkey_str:
-        return  # 空字串=關閉功能
-
-    KEY_MAP = {
-        'right_cmd': 54, 'cmd': 55, 'command': 55, 'cmd_l': 55, 'right_command': 54,
-        'right_alt': 61, 'right_option': 61, 'alt': 58, 'option': 58, 'alt_l': 58,
-        'ctrl': 59, 'control': 59, 'shift': 56, 'right_shift': 60, 'space': 49,
-        'f1': 122, 'f2': 120, 'f3': 99, 'f4': 118, 'f5': 96, 'f6': 97, 'f7': 98, 'f8': 100,
-        'a': 0, 'b': 11, 'c': 8, 'd': 2, 'e': 14, 'f': 3, 'g': 5, 'h': 4, 'i': 34, 'j': 38,
-        'k': 40, 'l': 37, 'm': 46, 'n': 45, 'o': 31, 'p': 35, 'q': 12, 'r': 15, 's': 1,
-        't': 17, 'u': 32, 'v': 9, 'w': 13, 'x': 7, 'y': 16, 'z': 6,
-    }
-    target_keys = set()
-    for p in hotkey_str.lower().replace("+", " ").split():
-        if p in KEY_MAP:
-            target_keys.add(KEY_MAP[p])
-    if not target_keys:
-        log("warn", f"Unknown rewrite_hotkey: {hotkey_str}")
-        return
-
-    currently_pressed = set()
-    KEY_EVENT_MASK = (1 << 10) | (1 << 11) | (1 << 12)
-
-    def _on_event(event):
-        nonlocal currently_pressed
-        try:
-            etype = event.type()
-            vk = event.keyCode()
-        except Exception:
-            return
-        if etype == NSKeyDown:
-            currently_pressed.add(vk)
-        elif etype == NSKeyUp:
-            currently_pressed.discard(vk)
-        elif etype == NSFlagsChanged:
-            flags = event.modifierFlags()
-            if vk in target_keys:
-                pressed = False
-                if vk in (54, 55):   pressed = (flags & 0x100000) > 0  # Cmd
-                elif vk in (58, 61): pressed = (flags & 0x80000) > 0   # Alt/Option
-                elif vk in (59, 62): pressed = (flags & 0x40000) > 0   # Ctrl
-                elif vk in (56, 60): pressed = (flags & 0x20000) > 0   # Shift
-                if pressed:
-                    currently_pressed.add(vk)
-                else:
-                    currently_pressed.discard(vk)
-
-        is_active = target_keys.issubset(currently_pressed)
-        if is_active and not getattr(_on_event, "last_active", False):
-            # Rising edge → 觸發改寫（背景執行避免阻塞 event loop）
-            threading.Thread(target=engine.rewrite_selection, daemon=True).start()
-        _on_event.last_active = is_active
-
-    def _global(ev):
-        try: _on_event(ev)
-        except Exception as e: log("warn", f"rewrite global handler: {e}")
-
-    def _local(ev):
-        try: _on_event(ev)
-        except Exception as e: log("warn", f"rewrite local handler: {e}")
-        return ev
-
-    NSEvent.addGlobalMonitorForEventsMatchingMask_handler_(KEY_EVENT_MASK, _global)
-    NSEvent.addLocalMonitorForEventsMatchingMask_handler_(KEY_EVENT_MASK, _local)
-    log("ok", f"Quick-Rewrite hotkey: {hotkey_str}")
+    與其他 action 共用 NSEvent arbiter，預設 ctrl+option。"""
+    return _setup_dynamic_action_hotkey(
+        engine,
+        "rewrite_hotkey",
+        engine.rewrite_selection,
+        "Quick-Rewrite",
+    )
 
 
 def _setup_action_hotkey(engine, config_key, action_callback, label):
-    """共用：建立全域熱鍵監聽，rising-edge 觸發 action_callback（背景 thread）。
+    """共用：註冊全域 action，安全放開組合鍵後在背景執行 callback。
     config_key 為 None 或空字串時直接 noop（功能關閉）。"""
-    try:
-        from AppKit import NSEvent, NSKeyDown, NSKeyUp, NSFlagsChanged
-    except ImportError:
-        return
-
-    hotkey_str = engine.config.get(config_key, "")
-    if not hotkey_str:
-        return
-
-    KEY_MAP = {
-        'right_cmd': 54, 'cmd': 55, 'command': 55, 'cmd_l': 55, 'right_command': 54,
-        'right_alt': 61, 'right_option': 61, 'alt': 58, 'option': 58, 'alt_l': 58,
-        'ctrl': 59, 'control': 59, 'shift': 56, 'right_shift': 60, 'space': 49,
-        'f1': 122, 'f2': 120, 'f3': 99, 'f4': 118, 'f5': 96, 'f6': 97, 'f7': 98, 'f8': 100,
-        'a': 0, 'b': 11, 'c': 8, 'd': 2, 'e': 14, 'f': 3, 'g': 5, 'h': 4, 'i': 34, 'j': 38,
-        'k': 40, 'l': 37, 'm': 46, 'n': 45, 'o': 31, 'p': 35, 'q': 12, 'r': 15, 's': 1,
-        't': 17, 'u': 32, 'v': 9, 'w': 13, 'x': 7, 'y': 16, 'z': 6,
-        'escape': 53, 'esc': 53,
-    }
-    target_keys = set()
-    for p in hotkey_str.lower().replace("+", " ").split():
-        if p in KEY_MAP:
-            target_keys.add(KEY_MAP[p])
-    if not target_keys:
-        log("warn", f"Unknown {config_key}: {hotkey_str}")
-        return
-
-    currently_pressed = set()
-    KEY_EVENT_MASK = (1 << 10) | (1 << 11) | (1 << 12)
-
-    def _on_event(event):
-        try:
-            etype = event.type()
-            vk = event.keyCode()
-        except Exception:
-            return
-        if etype == NSKeyDown:
-            currently_pressed.add(vk)
-        elif etype == NSKeyUp:
-            currently_pressed.discard(vk)
-        elif etype == NSFlagsChanged:
-            flags = event.modifierFlags()
-            if vk in target_keys:
-                pressed = False
-                if vk in (54, 55):   pressed = (flags & 0x100000) > 0
-                elif vk in (58, 61): pressed = (flags & 0x80000) > 0
-                elif vk in (59, 62): pressed = (flags & 0x40000) > 0
-                elif vk in (56, 60): pressed = (flags & 0x20000) > 0
-                if pressed: currently_pressed.add(vk)
-                else: currently_pressed.discard(vk)
-
-        is_active = target_keys.issubset(currently_pressed)
-        if is_active and not getattr(_on_event, "last_active", False):
-            threading.Thread(target=action_callback, daemon=True).start()
-        _on_event.last_active = is_active
-
-    def _global(ev):
-        try: _on_event(ev)
-        except Exception as e: log("warn", f"{label} global handler: {e}")
-
-    def _local(ev):
-        try: _on_event(ev)
-        except Exception as e: log("warn", f"{label} local handler: {e}")
-        return ev
-
-    NSEvent.addGlobalMonitorForEventsMatchingMask_handler_(KEY_EVENT_MASK, _global)
-    NSEvent.addLocalMonitorForEventsMatchingMask_handler_(KEY_EVENT_MASK, _local)
-    log("ok", f"{label} hotkey: {hotkey_str}")
+    return _setup_dynamic_action_hotkey(
+        engine,
+        config_key,
+        action_callback,
+        label,
+    )
 
 
 def setup_retry_hotkey(engine):
-    """Retry hotkey：跳過 STT 重跑 LLM，貼上新版。預設 right_option+y。"""
+    """Retry hotkey：跳過 STT 重跑 LLM，貼上新版。預設 ctrl+shift。"""
     _setup_action_hotkey(engine, "retry_hotkey", engine.retry_last_transcription, "Retry")
 
 
 def setup_cancel_hotkey(engine):
-    """Cancel hotkey：錄音中或處理中按下 → 丟棄並回 idle。預設 right_option+x。"""
+    """Cancel hotkey：錄音中或處理中按下 → 丟棄並回 idle。預設 ctrl+cmd。"""
     _setup_action_hotkey(engine, "cancel_hotkey", engine.cancel_current, "Cancel")
 
 
 def _setup_hotkey_pynput(engine):
-    """Fallback: use pynput (standard implementation)"""
+    """Dynamic pynput fallback using the same grammar as native NSEvent."""
     from pynput import keyboard
-    config = engine.config
-    hotkey_str = config.get("hotkey", "right_cmd")
-    mode = config.get("hotkey_mode", "push_to_talk")
 
-    # ... (Original pynput logic for fallback) ...
-    # Minimal replication of original logic to save space and complexity if fallback needed
-    # Only mapping right_cmd/right_alt specifically as requested
-    if hotkey_str == "right_cmd":
-        target = keyboard.Key.cmd_r
-    elif hotkey_str == "right_alt":
-        target = keyboard.Key.alt_r
-    else:
-        # Simple fallback for unknown keys in CLI mode: Cmd_R
-        target = keyboard.Key.cmd_r
+    special_names = {
+        "cmd": ("cmd_l", "cmd"),
+        "right_cmd": ("cmd_r",),
+        "option": ("alt_l", "alt"),
+        "right_option": ("alt_r", "alt_gr"),
+        "ctrl": ("ctrl_l", "ctrl"),
+        "right_ctrl": ("ctrl_r",),
+        "shift": ("shift_l", "shift"),
+        "right_shift": ("shift_r",),
+        "space": ("space",),
+        "escape": ("esc",),
+    }
+    for number in range(1, 13):
+        special_names[f"f{number}"] = (f"f{number}",)
 
-    def on_press(key):
-        if key == target:
+    def _token_for_key(key):
+        for token, names in special_names.items():
+            for name in names:
+                candidate = getattr(keyboard.Key, name, None)
+                if candidate is not None and key == candidate:
+                    return token
+        char = getattr(key, "char", None)
+        if isinstance(char, str) and len(char) == 1:
+            return char.lower()
+        return None
+
+    hotkey_source = None
+    target_tokens = set()
+    currently_pressed = set()
+    last_active = False
+
+    def _refresh_target():
+        nonlocal hotkey_source, target_tokens, last_active
+        next_source = str(
+            engine.config.get("hotkey", RECOMMENDED_RECORD_HOTKEY) or ""
+        )
+        if next_source == hotkey_source:
+            return
+        hotkey_source = next_source
+        currently_pressed.clear()
+        last_active = False
+        try:
+            target_tokens = set(
+                parse_hotkey(
+                    hotkey_source,
+                    field="hotkey",
+                    allow_legacy_single_modifier=True,
+                ).tokens
+            )
+        except HotkeyValidationError as exc:
+            log(
+                "warn",
+                f"Invalid pynput hotkey ({exc}); using "
+                f"{RECOMMENDED_RECORD_HOTKEY}",
+            )
+            target_tokens = set(
+                parse_hotkey(RECOMMENDED_RECORD_HOTKEY, field="hotkey").tokens
+            )
+
+    def _apply_active_state():
+        nonlocal last_active
+        is_active = bool(target_tokens) and target_tokens.issubset(
+            currently_pressed
+        )
+        if getattr(engine, "_continuous_active", False):
+            last_active = is_active
+            return
+        mode = engine.config.get("hotkey_mode", "push_to_talk")
+        if is_active and not last_active:
             if mode == "push_to_talk":
                 if not engine.is_recording:
                     engine.start_recording(from_hotkey=True)
+            elif engine.is_recording:
+                threading.Thread(
+                    target=engine.stop_and_process, daemon=True
+                ).start()
             else:
-                if engine.is_recording:
-                    threading.Thread(target=engine.stop_and_process, daemon=True).start()
-                else:
-                    engine.start_recording(from_hotkey=True)
+                engine.start_recording(from_hotkey=True)
+        elif not is_active and last_active:
+            if mode == "push_to_talk" and engine.is_recording:
+                threading.Thread(
+                    target=engine.stop_and_process, daemon=True
+                ).start()
+        last_active = is_active
+
+    def on_press(key):
+        _refresh_target()
+        token = _token_for_key(key)
+        if token in target_tokens:
+            currently_pressed.add(token)
+        _apply_active_state()
 
     def on_release(key):
-        if key == target and mode == "push_to_talk" and engine.is_recording:
-            threading.Thread(target=engine.stop_and_process, daemon=True).start()
+        _refresh_target()
+        token = _token_for_key(key)
+        if token:
+            currently_pressed.discard(token)
+        _apply_active_state()
 
+    _refresh_target()
     listener = keyboard.Listener(on_press=on_press, on_release=on_release)
     listener.daemon = True
     listener.start()
+
+    def _reset_hotkey_state():
+        nonlocal last_active
+        currently_pressed.clear()
+        last_active = False
+        action_reset = getattr(engine, "_on_action_hotkey_reset", None)
+        if action_reset:
+            action_reset()
+
+    engine._on_hotkey_reset = _reset_hotkey_state
     return listener
 
 
@@ -1741,8 +2362,7 @@ def run_menubar():
 
     # 啟動時檢查輔助使用權限（自動貼上必需）
     try:
-        from ApplicationServices import AXIsProcessTrusted
-        if not AXIsProcessTrusted():
+        if not request_accessibility_prompt():
             alert_body = get_i18n("alert_body")
             alert_btn = get_i18n("alert_btn")
             alert_title = get_i18n("alert_title")
@@ -1761,7 +2381,23 @@ def run_menubar():
 
     class App(rumps.App):
         def __init__(self):
-            super().__init__("🎙", quit_button=None)
+            self._menubar_icons = {
+                "idle": _resource_path("resources", "menubar", "idleTemplate.png"),
+                "recording": _resource_path(
+                    "resources", "menubar", "recordingTemplate.png"
+                ),
+                "processing": _resource_path(
+                    "resources", "menubar", "processingTemplate.png"
+                ),
+            }
+            idle_icon = self._menubar_icons["idle"]
+            super().__init__(
+                "SGH Voice",
+                title=None if os.path.exists(idle_icon) else "🎙",
+                icon=idle_icon if os.path.exists(idle_icon) else None,
+                template=True,
+                quit_button=None,
+            )
             self.record_item = rumps.MenuItem(get_i18n("menu_record"), callback=self.toggle_rec)
             self._status_lock = threading.Lock()
             self._pending_status = "idle"
@@ -1829,14 +2465,25 @@ def run_menubar():
         def _status(self, s):
             self._current_status = s
             if s == "recording":
-                self.title = "🔴"
+                icon_key = "recording"
                 self.record_item.title = get_i18n("menu_stop")
             elif s == "processing":
-                self.title = "⏳"
+                icon_key = "processing"
                 self.record_item.title = get_i18n("menu_processing")
             else:
-                self.title = "🎙"
+                icon_key = "idle"
                 self.record_item.title = get_i18n("menu_record")
+            icon_path = self._menubar_icons.get(icon_key)
+            if icon_path and os.path.exists(icon_path):
+                self.icon = icon_path
+                self.title = None
+            else:
+                self.icon = None
+                self.title = {
+                    "recording": "●",
+                    "processing": "…",
+                    "idle": "🎙",
+                }[icon_key]
 
         def toggle_rec(self, sender):
             if engine.is_recording:

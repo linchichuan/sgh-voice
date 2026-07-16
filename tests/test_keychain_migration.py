@@ -124,7 +124,7 @@ def test_legacy_config_migrates_to_keychain(isolated_config, fake_keychain):
     assert config["anthropic_api_key"] == "sk-ant-abc123def456ghi789jkl"
     assert config["openai_api_key"] == "sk-proj-realkeyvalue1234567890"
     assert config["groq_api_key"] == "gsk_fakegroqkey1234567890"
-    assert config["config_version"] == 3
+    assert config["config_version"] == cfg_mod.CONFIG_VERSION == 5
 
     # And they should be GONE from config.json on disk
     with open(config_file) as f:
@@ -132,7 +132,7 @@ def test_legacy_config_migrates_to_keychain(isolated_config, fake_keychain):
     assert disk["anthropic_api_key"] == ""
     assert disk["openai_api_key"] == ""
     assert disk["groq_api_key"] == ""
-    assert disk["config_version"] == 3
+    assert disk["config_version"] == cfg_mod.CONFIG_VERSION == 5
 
     # And they should be in the fake keychain
     assert fake_keychain.get_password(cfg_mod.KEYCHAIN_SERVICE, "anthropic") == "sk-ant-abc123def456ghi789jkl"
@@ -153,7 +153,7 @@ def test_migration_is_idempotent(isolated_config, fake_keychain):
     assert cfg1["anthropic_api_key"] == "sk-ant-aaaaaaaaaaaaaaaaaaaa"
     cfg2 = cfg_mod.load_config()
     assert cfg2["anthropic_api_key"] == "sk-ant-aaaaaaaaaaaaaaaaaaaa"
-    assert cfg2["config_version"] == 3
+    assert cfg2["config_version"] == cfg_mod.CONFIG_VERSION == 5
 
 
 def test_legacy_config_without_keyring_fallback(isolated_config, no_keychain):
@@ -212,6 +212,33 @@ def test_save_config_writes_new_key_to_keychain_not_json(isolated_config, fake_k
         disk = json.load(f)
     assert disk["anthropic_api_key"] == ""
     assert disk["claude_model"] == "claude-haiku-4-5-20251001"
+
+
+def test_save_config_fails_closed_when_keychain_rejects_new_value(
+    isolated_config, fake_keychain, monkeypatch
+):
+    """A stale Keychain value must never make a rejected replacement look saved."""
+    cfg_mod, config_file = isolated_config
+    old_value = "sk-ant-existing-key-1234567890"
+    cfg_mod.save_config({"anthropic_api_key": old_value, "language": "ja"})
+    with open(config_file) as handle:
+        disk_before = json.load(handle)
+
+    monkeypatch.setattr(cfg_mod, "_keychain_set", lambda key, value: False)
+    with pytest.raises(cfg_mod.ConfigSaveError, match="anthropic_api_key"):
+        cfg_mod.save_config(
+            {
+                "anthropic_api_key": "sk-ant-replacement-key-1234567890",
+                "language": "en",
+            }
+        )
+
+    assert (
+        fake_keychain.get_password(cfg_mod.KEYCHAIN_SERVICE, "anthropic")
+        == old_value
+    )
+    with open(config_file) as handle:
+        assert json.load(handle) == disk_before
 
 
 def test_save_config_empty_string_skipped(isolated_config, fake_keychain):

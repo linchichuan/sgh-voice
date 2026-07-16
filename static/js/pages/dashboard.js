@@ -7,6 +7,22 @@ import { t } from '../lib/i18n.js';
 import { h, classes, Stat, Toast } from '../lib/components.js';
 
 const REDUCE_MOTION = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const HOTKEY_LABELS = {
+  cmd: 'Left ⌘', right_cmd: 'Right ⌘',
+  option: 'Left ⌥', right_option: 'Right ⌥',
+  ctrl: 'Left ⌃', right_ctrl: 'Right ⌃',
+  shift: 'Left ⇧', right_shift: 'Right ⇧',
+  space: 'Space', escape: 'Esc',
+};
+
+function formatHotkey(value) {
+  return String(value || '')
+    .trim()
+    .split(/[+\s]+/)
+    .filter(Boolean)
+    .map((token) => HOTKEY_LABELS[token.toLowerCase()] || token.toUpperCase())
+    .join(' + ');
+}
 
 // ---------- Formatters ----------
 const fmtNumber = (n) => new Intl.NumberFormat().format(Math.round(Number(n) || 0));
@@ -83,10 +99,12 @@ const REC_VARIANTS = {
   idle:       { lblKey: 'dash.cta.start',      cls: 'bg-[var(--brand-blue)] hover:bg-blue-700 focus-visible:ring-blue-300', ic: 'mic' },
 };
 
-function RecordCta({ initialState, lastIso, onToggle }) {
+function RecordCta({ initialState, lastIso, hotkey, onToggle }) {
   const stateLabel = h('div', { class: 'text-xs uppercase tracking-wider text-[var(--text-3)]' }, t('dash.cta.title'));
   const button = h('button', { type: 'button', class: '', 'aria-label': '', onClick: () => onToggle && onToggle() });
-  const hint = h('div', { class: 'text-sm text-[var(--text-2)]' }, t('dash.cta.hint'));
+  const hotkeyLabel = formatHotkey(hotkey) || formatHotkey('right_option+right_shift');
+  const hintText = t('dash.cta.hint', { hotkey: hotkeyLabel });
+  const hint = h('div', { class: 'text-sm text-[var(--text-2)]' }, hintText);
   const last = h('div', { class: 'text-xs text-[var(--text-3)] mono' });
 
   const setLastIso = (iso) => { last.textContent = t('dash.cta.last', { time: relTime(iso) }); };
@@ -96,7 +114,7 @@ function RecordCta({ initialState, lastIso, onToggle }) {
     const label = t(v.lblKey);
     button.className = `w-28 h-28 rounded-full text-white shadow-lg transition flex items-center justify-center focus-visible:ring-4 disabled:opacity-60 disabled:cursor-not-allowed ${v.cls}` +
       (state === 'recording' && !REDUCE_MOTION ? ' animate-pulse' : '');
-    button.setAttribute('aria-label', `${label} — ${t('dash.cta.hint')}`);
+    button.setAttribute('aria-label', `${label} — ${hintText}`);
     button.disabled = state === 'processing';
     button.replaceChildren(h('i', { 'data-lucide': v.ic, class: 'w-10 h-10' }));
     stateLabel.textContent = label;
@@ -283,10 +301,11 @@ export default async function mount(slot) {
   const grid = h('div', { class: 'grid grid-cols-12 gap-4 p-6 max-w-7xl mx-auto' });
   slot.appendChild(grid);
 
-  const [statsRes, recRes, histRes] = await Promise.allSettled([
+  const [statsRes, recRes, histRes, configRes] = await Promise.allSettled([
     api.getStats(),
     api.getRecordingStatus(),
     api.getHistory({ n: 5 }),
+    api.getConfig(),
   ]);
 
   const statsPayload   = statsRes.status === 'fulfilled' ? (statsRes.value || {}) : {};
@@ -298,6 +317,7 @@ export default async function mount(slot) {
   const initialRecState = (recRes.status === 'fulfilled' && recRes.value && recRes.value.state) || 'idle';
   const history        = histRes.status === 'fulfilled' && Array.isArray(histRes.value) ? histRes.value : [];
   const lastIso        = history.length ? (history[history.length - 1].timestamp || null) : null;
+  const hotkey         = configRes.status === 'fulfilled' ? configRes.value?.hotkey : '';
 
   let currentState = initialRecState;
   let cta;
@@ -324,7 +344,7 @@ export default async function mount(slot) {
     }
   };
 
-  cta = RecordCta({ initialState: initialRecState, lastIso, onToggle });
+  cta = RecordCta({ initialState: initialRecState, lastIso, hotkey, onToggle });
 
   grid.appendChild(cta);
   grid.appendChild(HeroToday(stats));

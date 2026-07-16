@@ -119,5 +119,36 @@ def test_start_resets_last_error(monkeypatch):
         rec_mod.threading, "Thread",
         lambda *a, **k: type("T", (), {"start": lambda self: None, "is_alive": lambda self: False})(),
     )
-    r.start()
+    assert r.start() is True
     assert r.last_error is None
+
+
+def test_start_reports_busy_without_mutating_active_recording():
+    r = _make_recorder()
+    r.is_recording = True
+    r.audio_data = ["existing"]
+
+    assert r.start() is False
+    assert r.is_recording is True
+    assert r.audio_data == ["existing"]
+
+
+def test_thread_start_failure_rolls_back_recorder_state(monkeypatch):
+    r = _make_recorder()
+
+    class BrokenThread:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def start(self):
+            raise RuntimeError("thread unavailable")
+
+    monkeypatch.setattr(rec_mod.threading, "Thread", BrokenThread)
+
+    with pytest.raises(RuntimeError, match="thread unavailable"):
+        r.start()
+
+    assert r.is_recording is False
+    assert r._start_time is None
+    assert r._thread is None
+    assert r.audio_data == []

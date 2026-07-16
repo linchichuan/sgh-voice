@@ -75,8 +75,17 @@ png/
 512/
 1024/
 
-# 資源目錄（macOS 版 icon）
-resources/
+# macOS runtime/build 資產必須能由 fresh clone 重建；只忽略舊的重複 iconset。
+resources/*
+!resources/entitlements.plist
+!resources/icon.icns
+!resources/icon-master-v3.svg
+!resources/icon-master-v3.png
+!resources/icon.iconset/
+!resources/icon.iconset/*.png
+!resources/menubar/
+!resources/menubar/*.svg
+!resources/menubar/*.png
 
 # Android Studio 產物（在 android/SGHVoice/.gitignore 管理）
 android/SGHVoice/.gradle/
