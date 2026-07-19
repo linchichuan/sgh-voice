@@ -227,6 +227,69 @@ def log(level, msg):
 def log_sep(char="─", width=56):
     print(_c("gray", char * width))
 
+
+# Pasteboard generations created by SGH Voice must never be interpreted as a
+# user-verified correction.  The transactional insertion path stages the
+# transcript and then restores the original multi-format clipboard payload;
+# both operations increment NSPasteboard.changeCount().
+_INTERNAL_PASTEBOARD_LOCK = threading.RLock()
+_INTERNAL_PASTEBOARD_GENERATIONS = {}
+_INTERNAL_PASTEBOARD_TTL_SEC = 30.0
+
+
+def _current_pasteboard_generation():
+    try:
+        from AppKit import NSPasteboard
+        return int(NSPasteboard.generalPasteboard().changeCount())
+    except Exception:
+        return None
+
+
+def _remember_internal_pasteboard_generation(change_count=None):
+    """Register one exact app-generated pasteboard generation for the observer."""
+    if change_count is None:
+        change_count = _current_pasteboard_generation()
+    if change_count is None:
+        return
+    now = time.monotonic()
+    with _INTERNAL_PASTEBOARD_LOCK:
+        expired = [
+            generation for generation, expiry in _INTERNAL_PASTEBOARD_GENERATIONS.items()
+            if expiry <= now
+        ]
+        for generation in expired:
+            _INTERNAL_PASTEBOARD_GENERATIONS.pop(generation, None)
+        _INTERNAL_PASTEBOARD_GENERATIONS[int(change_count)] = (
+            now + _INTERNAL_PASTEBOARD_TTL_SEC
+        )
+
+
+def _consume_internal_pasteboard_generation(change_count):
+    """Return True once for an app-generated generation, then forget it."""
+    now = time.monotonic()
+    try:
+        generation = int(change_count)
+    except (TypeError, ValueError):
+        return False
+    with _INTERNAL_PASTEBOARD_LOCK:
+        expired = [
+            item for item, expiry in _INTERNAL_PASTEBOARD_GENERATIONS.items()
+            if expiry <= now
+        ]
+        for item in expired:
+            _INTERNAL_PASTEBOARD_GENERATIONS.pop(item, None)
+        return _INTERNAL_PASTEBOARD_GENERATIONS.pop(generation, None) is not None
+
+
+def _restore_pasteboard_and_mark(snapshot, expected_change_count):
+    """Restore atomically relative to the observer and mark the resulting generation."""
+    with _INTERNAL_PASTEBOARD_LOCK:
+        restored = restore_pasteboard(snapshot, expected_change_count)
+        if restored:
+            _remember_internal_pasteboard_generation()
+        return restored
+
+
 # ─── Utility ─────────────────────────────────────────────
 
 def _paste_log(msg):
@@ -337,16 +400,20 @@ def paste_text(text):
     fallback_old_text = None
     baseline_change_count = None
     try:
-        snapshot = capture_pasteboard()
-        baseline_change_count = stage_text_on_pasteboard(text)
+        with _INTERNAL_PASTEBOARD_LOCK:
+            snapshot = capture_pasteboard()
+            baseline_change_count = stage_text_on_pasteboard(text)
+            _remember_internal_pasteboard_generation(baseline_change_count)
         _paste_log(f"暫存文字至 pasteboard [{app_info}], chars={len(text)}")
     except Exception as e:
         _paste_log(f"Pasteboard transaction unavailable: {e}")
         try:
             import pyperclip
 
-            fallback_old_text = pyperclip.paste()
-            pyperclip.copy(text)
+            with _INTERNAL_PASTEBOARD_LOCK:
+                fallback_old_text = pyperclip.paste()
+                pyperclip.copy(text)
+                _remember_internal_pasteboard_generation()
         except Exception as fallback_error:
             _paste_log(f"Clipboard fallback error: {fallback_error}")
             return False
@@ -432,11 +499,16 @@ def paste_text(text):
 
     if snapshot is not None and baseline_change_count is not None:
         if pasted:
-            schedule_pasteboard_restore(snapshot, baseline_change_count, delay=0.25)
+            schedule_pasteboard_restore(
+                snapshot,
+                baseline_change_count,
+                delay=0.25,
+                restore=_restore_pasteboard_and_mark,
+            )
         else:
             # 沒貼上也不能把轉錄文字留在 clipboard；立即恢復原始所有格式。
             try:
-                restore_pasteboard(snapshot, baseline_change_count)
+                _restore_pasteboard_and_mark(snapshot, baseline_change_count)
             except Exception:
                 pass
     elif fallback_old_text is not None:
@@ -446,8 +518,10 @@ def paste_text(text):
             try:
                 import pyperclip
 
-                if pyperclip.paste() == text:
-                    pyperclip.copy(fallback_old_text)
+                with _INTERNAL_PASTEBOARD_LOCK:
+                    if pyperclip.paste() == text:
+                        pyperclip.copy(fallback_old_text)
+                        _remember_internal_pasteboard_generation()
             except Exception:
                 pass
 
@@ -503,7 +577,7 @@ class VoiceEngine:
     """語音輸入核心引擎，被 CLI / MenuBar / Dashboard 共用"""
 
     def __init__(self):
-        self.version = "2.5.4"
+        self.version = "2.6.0"
         self.config = load_config()
         self.memory = Memory()
         self.transcriber = Transcriber(self.config, self.memory)
@@ -969,6 +1043,7 @@ class VoiceEngine:
 
         result = None
         cancelled_output = False
+        paste_succeeded = None
         try:
             audio_input = (
                 {"array": audio_array, "path": filepath}
@@ -1030,14 +1105,19 @@ class VoiceEngine:
                             log("warn", "🚫 已取消，略過最後 paste")
                         else:
                             try:
-                                paste_text(final)
+                                paste_succeeded = paste_text(final)
                             except Exception as e:
+                                paste_succeeded = False
                                 log("warn", f"Paste: {e}")
 
                 with self._state_lock:
                     other_inflight = self._inflight_transcriptions > 1 or self.is_recording
                 if not other_inflight and not cancelled_output:
-                    if self.config.get("enable_transcript_overlay", True):
+                    if paste_succeeded is False:
+                        log("warn", "轉寫已完成，但自動輸入失敗；結果保留於 History")
+                        try: self.overlay.show("paste_failed")
+                        except Exception: pass
+                    elif self.config.get("enable_transcript_overlay", True):
                         try: self.overlay.show_transcript(final, duration=2.5)
                         except Exception:
                             try: self.overlay.show("done")
@@ -1307,17 +1387,25 @@ class VoiceEngine:
                 self._safe_status_change("idle")
                 return
 
+            paste_succeeded = None
             if self.config.get("auto_paste", True):
                 _retry_on_stage("paste")
                 with self._paste_lock:
-                    try: paste_text(final)
-                    except Exception as e: log("warn", f"Retry paste: {e}")
+                    try: paste_succeeded = paste_text(final)
+                    except Exception as e:
+                        paste_succeeded = False
+                        log("warn", f"Retry paste: {e}")
 
             log("ok", f"Retry 完成 ({len(final)} 字)")
-            try: self.overlay.show_transcript(final, duration=2.5)
-            except Exception:
-                try: self.overlay.show("done")
+            if paste_succeeded is False:
+                log("warn", "Retry 轉寫完成，但自動輸入失敗；結果保留於 History")
+                try: self.overlay.show("paste_failed")
                 except Exception: pass
+            else:
+                try: self.overlay.show_transcript(final, duration=2.5)
+                except Exception:
+                    try: self.overlay.show("done")
+                    except Exception: pass
             self._safe_status_change("idle")
         finally:
             self._retry_in_progress = False
@@ -1350,6 +1438,7 @@ class VoiceEngine:
                 final = (result.get("final") or "").strip()
                 if not final:
                     return
+                paste_succeeded = None
                 if self.config.get("auto_paste", True):
                     # max_pending_segments=2 允許兩段並行處理 → paste 必須拿
                     # _paste_lock 序列化（與 _transcribe_and_paste 同一把鎖），
@@ -1357,12 +1446,18 @@ class VoiceEngine:
                     with self._paste_lock:
                         if cancel_event.is_set():
                             return
-                        try: paste_text(final)
-                        except Exception as e: log("warn", f"continuous paste: {e}")
+                        try: paste_succeeded = paste_text(final)
+                        except Exception as e:
+                            paste_succeeded = False
+                            log("warn", f"continuous paste: {e}")
                 if cancel_event.is_set():
                     return
-                try: self.overlay.show_transcript(final, duration=2.5)
-                except Exception: pass
+                if paste_succeeded is False:
+                    try: self.overlay.show("paste_failed")
+                    except Exception: pass
+                else:
+                    try: self.overlay.show_transcript(final, duration=2.5)
+                    except Exception: pass
                 log("ok", f"[continuous] {final[:60]}")
             except Exception as e:
                 log("error", f"continuous segment: {e}")
@@ -2276,20 +2371,37 @@ def start_clipboard_observer(engine):
         from datetime import datetime
         while True:
             time.sleep(1.5)
+
+            # Consume the pasteboard generation first, even while learning is disabled
+            # or recording is active.  Otherwise an old copy event is processed later
+            # as if it were a correction to a newer dictation.
+            current_count = pb.changeCount()
+            if current_count == last_count:
+                continue
+            last_count = current_count
+
+            # Transactional insertion stages and restores the pasteboard itself.
+            # Those exact generations are bookkeeping, not evidence that the user
+            # edited and copied a transcript.  A later real copy has a new generation
+            # and remains eligible for learning.
+            if _consume_internal_pasteboard_generation(current_count):
+                continue
+
             if not engine.config.get("enable_auto_learn", True):
                 continue
             # 檢查有無新語音紀錄
             if getattr(engine, "is_recording", False):
                 continue
-            
+
             # 使用者最近一次的語音紀錄（含時間戳記）
-            if not engine.memory.history:
+            recent = engine.memory.get_history(n=1)
+            if not recent:
                 continue
-            
-            last_item = engine.memory.history[-1]
+
+            last_item = recent[0]
             last_dictated = last_item.get("final_text", "")
             last_ts_str = last_item.get("timestamp", "")
-            
+
             if not last_dictated or len(last_dictated) < 4 or not last_ts_str:
                 continue
 
@@ -2301,49 +2413,47 @@ def start_clipboard_observer(engine):
             except Exception:
                 continue
 
-            current_count = pb.changeCount()
-            if current_count != last_count:
-                last_count = current_count
-                
-                # 讀取剪貼簿文字
-                items = pb.pasteboardItems()
-                if not items:
-                    continue
-                copied_text = pb.stringForType_("public.utf8-plain-text")
-                if not copied_text or not copied_text.strip():
-                    continue
-                
-                copied_text = copied_text.strip()
-                
-                # 若完全相同或差太多，不處理
-                if copied_text == last_dictated:
-                    continue
+            # 讀取剪貼簿文字
+            items = pb.pasteboardItems()
+            if not items:
+                continue
+            copied_text = pb.stringForType_("public.utf8-plain-text")
+            if not copied_text or not copied_text.strip():
+                continue
 
-                # 若只是標點差異，不視為修正（例如只是加了逗號）
-                import re
-                punc_pattern = r'[^\w\s]'
-                c1 = re.sub(punc_pattern, '', last_dictated).strip()
-                c2 = re.sub(punc_pattern, '', copied_text).strip()
-                if c1 == c2:
+            copied_text = copied_text.strip()
+
+            # 若完全相同或差太多，不處理
+            if copied_text == last_dictated:
+                continue
+
+            # 若只是標點差異，不視為修正（例如只是加了逗號）
+            import re
+            punc_pattern = r'[^\w\s]'
+            c1 = re.sub(punc_pattern, '', last_dictated).strip()
+            c2 = re.sub(punc_pattern, '', copied_text).strip()
+            if c1 == c2:
+                continue
+
+            import difflib
+            ratio = difflib.SequenceMatcher(None, last_dictated, copied_text).ratio()
+            length_gap = abs(len(copied_text) - len(last_dictated)) / max(len(last_dictated), 1)
+
+            # 只接受高度相似且長度接近的內容，避免把別段文字誤學成詞庫
+            if 0.72 < ratio < 0.98 and length_gap <= 0.40:
+                # Persist the verified correction first.  v2.5.4 only mutated the
+                # in-memory last item, so edited=True was never written and few-shot
+                # personalization always had zero trusted examples after restart.
+                old_text = engine.memory.update_history_item(
+                    last_ts_str, copied_text, source="clipboard",
+                )
+                if old_text is None:
                     continue
-                
-                import difflib
-                ratio = difflib.SequenceMatcher(None, last_dictated, copied_text).ratio()
-                length_gap = abs(len(copied_text) - len(last_dictated)) / max(len(last_dictated), 1)
-                
-                # 只接受高度相似且長度接近的內容，避免把別段文字誤學成詞庫
-                if 0.72 < ratio < 0.98 and length_gap <= 0.40:
-                    learned = engine.memory.learn_correction(last_dictated, copied_text, source="clipboard")
-                    if learned:
-                        updates = ", ".join([f"{item['wrong']}→{item['right']}" for item in learned])
-                        print(f" 📚 由剪貼簿自動學習：{updates}")
-                        notify(get_i18n("notif_learn_title"), f"{get_i18n('notif_learn_body')}{updates}")
-                        
-                        # 把歷史紀錄更新成正確版，避免重複學習與提供更好的上下文
-                        for h in reversed(engine.memory.history):
-                            if h.get("final_text") == last_dictated:
-                                h["final_text"] = copied_text
-                                break
+                learned = engine.memory.learn_correction(old_text, copied_text, source="clipboard")
+                if learned:
+                    updates = ", ".join([f"{item['wrong']}→{item['right']}" for item in learned])
+                    print(f" 📚 由剪貼簿自動學習：{updates}")
+                    notify(get_i18n("notif_learn_title"), f"{get_i18n('notif_learn_body')}{updates}")
 
     t = threading.Thread(target=_observer, daemon=True)
     t.start()

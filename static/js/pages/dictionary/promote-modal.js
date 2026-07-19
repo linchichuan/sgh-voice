@@ -30,9 +30,9 @@ export function openPromoteModal(onApplied) {
     class: classes.input + ' w-24',
   });
   const sourceSel = h('select', { id: sourceId, class: classes.input + ' w-40' },
-    h('option', { value: 'both', selected: '' }, t('dict.promote.source.both')),
-    h('option', { value: 'edited' }, t('dict.promote.source.edited')),
+    h('option', { value: 'edited', selected: '' }, t('dict.promote.source.edited')),
     h('option', { value: 'auto' }, t('dict.promote.source.auto')),
+    h('option', { value: 'both' }, t('dict.promote.source.both')),
   );
 
   const resultHost = h('div', { class: 'mt-4 min-h-[6rem]' });
@@ -40,6 +40,7 @@ export function openPromoteModal(onApplied) {
 
   let lastPromoted = []; // [{wrong, right, freq}]
   let selected = new Set();
+  const pairKey = (p) => `${p.wrong}\u0000${p.right}`;
 
   const previewBtn = Button({
     variant: 'primary', icon: 'search', label: t('dict.promote.preview'),
@@ -52,7 +53,7 @@ export function openPromoteModal(onApplied) {
           apply: false,
         });
         lastPromoted = Array.isArray(res?.promoted) ? res.promoted : [];
-        selected = new Set(lastPromoted.map((p) => p.wrong));
+        selected = new Set(lastPromoted.map(pairKey));
         renderPromoted(res);
       } catch (e) { toastErr(e.message); }
     },
@@ -61,16 +62,18 @@ export function openPromoteModal(onApplied) {
   const applyBtn = Button({
     variant: 'primary', icon: 'check', label: t('dict.promote.apply'), disabled: true,
     onClick: async () => {
-      const items = lastPromoted.filter((p) => selected.has(p.wrong));
+      const items = lastPromoted.filter((p) => selected.has(pairKey(p)));
       if (!items.length) return;
       try {
         // Backend's apply path re-derives from history; we still pass min_freq to keep the same threshold.
-        await api.promoteFromHistory({
+        const res = await api.promoteFromHistory({
           min_freq: Math.max(1, parseInt(minFreq.value, 10) || 5),
           source: sourceSel.value,
           apply: true,
+          selected: items.map(({ wrong, right }) => ({ wrong, right })),
         });
-        toastOk(t('dict.promote.applied', { n: items.length }));
+        const appliedCount = Array.isArray(res?.promoted) ? res.promoted.length : 0;
+        toastOk(t('dict.promote.applied', { n: appliedCount }));
         close();
         if (onApplied) onApplied();
       } catch (e) { toastErr(e.message); }
@@ -83,7 +86,7 @@ export function openPromoteModal(onApplied) {
     const totalSkipped = Object.values(skippedCounts).reduce((a, b) => a + b, 0);
     summary.textContent = t('dict.promote.summary', { n: lastPromoted.length, skipped: totalSkipped });
 
-    applyBtn.disabled = lastPromoted.length === 0;
+    applyBtn.disabled = lastPromoted.length === 0 || sourceSel.value !== 'edited';
 
     if (!lastPromoted.length) {
       resultHost.appendChild(h('div', { class: 'text-sm text-[var(--text-3)] text-center py-6' }, t('dict.promote.none')));
@@ -106,8 +109,8 @@ export function openPromoteModal(onApplied) {
         id: cbId, type: 'checkbox', checked: '', class: 'h-4 w-4 accent-[var(--brand-blue)]',
       });
       cb.addEventListener('change', () => {
-        if (cb.checked) selected.add(p.wrong); else selected.delete(p.wrong);
-        applyBtn.disabled = selected.size === 0;
+        if (cb.checked) selected.add(pairKey(p)); else selected.delete(pairKey(p));
+        applyBtn.disabled = selected.size === 0 || sourceSel.value !== 'edited';
       });
       body.appendChild(h('tr', { class: 'border-t border-[var(--border)]' },
         h('td', { class: 'py-2 pr-3' }, h('label', { for: cbId, class: 'sr-only' }, `${t('dict.promote.apply')} ${p.wrong}`), cb),
@@ -121,6 +124,11 @@ export function openPromoteModal(onApplied) {
     ));
     if (window.lucide) window.lucide.createIcons();
   };
+
+  sourceSel.addEventListener('change', () => {
+    // auto/both 是舊資料分析模式，只允許 preview，不能寫回詞庫。
+    applyBtn.disabled = sourceSel.value !== 'edited' || selected.size === 0;
+  });
 
   const dialog = h('div', {
     class: 'bg-[var(--surface)] rounded-2xl shadow-2xl max-w-2xl w-full p-6 border border-[var(--border)]',

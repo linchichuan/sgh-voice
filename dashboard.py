@@ -253,6 +253,9 @@ def api_get_config():
     # 隱藏 API key 的中間部分
     safe = config.copy()
     safe["app_styles"] = config.get("app_styles", DEFAULT_APP_STYLES)
+    # Read-only truth signal for Settings: enabling few-shot with zero verified
+    # History edits does not personalize anything, so the UI must not imply it does.
+    safe["personalization_verified_count"] = memory.get_verified_example_count()
     for key in ["openai_api_key", "anthropic_api_key", "elevenlabs_api_key", "groq_api_key", "openrouter_api_key"]:
         v = safe.get(key, "")
         if len(v) > 12:
@@ -281,6 +284,12 @@ def api_save_config():
     from config import DEFAULT_CONFIG
     allowed_keys = set(DEFAULT_CONFIG.keys())
     data = {k: v for k, v in data.items() if k in allowed_keys}
+    if "language" in data and data["language"] not in {"auto", "zh", "ja", "en"}:
+        return jsonify({
+            "error": "language must be one of auto, zh, ja, en",
+            "field": "language",
+            "code": "invalid_language_profile",
+        }), 400
     # 只更新非空的 API key（避免覆蓋隱藏的 key）
     warnings = []
     for key in list(_API_KEY_FORMATS.keys()):
@@ -364,7 +373,7 @@ def api_history():
 
 @app.route("/api/history/<path:timestamp>", methods=["PATCH"])
 def api_update_history(timestamp):
-    """更新歷史紀錄的 final_text，並自動學習修正規則"""
+    """更新歷史紀錄；僅在自動學習啟用時寫入修正規則。"""
     data = request.json
     new_text = data.get("final_text", "")
     old_text = memory.update_history_item(timestamp, new_text)
@@ -373,7 +382,8 @@ def api_update_history(timestamp):
 
     # 自動學習：比對修改前後的差異
     learned = []
-    if old_text != new_text:
+    auto_learn_enabled = bool(load_config().get("enable_auto_learn", True))
+    if auto_learn_enabled and old_text != new_text:
         learned = memory.learn_correction(old_text, new_text, source="manual")
 
     return jsonify({"ok": True, "learned": learned})
@@ -559,14 +569,48 @@ def api_regenerate_style_profile():
 @app.route("/api/dictionary/promote_from_history", methods=["POST"])
 def api_promote_from_history():
     """從歷史 raw→final 高頻差異中升級 dictionary 規則。
-    body: {min_freq?: int=5, source?: "auto"|"edited"|"both"=both, apply?: bool=false}
+    body: {min_freq?: int=5, source?: "auto"|"edited"|"both"="edited",
+           apply?: bool=false, selected?: [{wrong, right}]}
+
+    ``auto`` / ``both`` 僅供 legacy 資料分析預覽。實際套用一律只允許
+    ``edited=True`` 的使用者驗證資料，並只寫入前端明確選取的 exact pair。
     回傳：{promoted: [{wrong, right, freq}], skipped: {...}}（apply=False 為預覽）"""
     from collections import Counter
     import difflib, re
     body = request.get_json(force=True, silent=True) or {}
-    min_freq = int(body.get("min_freq", 5))
-    source = body.get("source", "both")
+    try:
+        min_freq = max(1, int(body.get("min_freq", 5)))
+    except (TypeError, ValueError):
+        return jsonify({"ok": False, "error": "min_freq must be an integer"}), 400
+    source = body.get("source", "edited")
     do_apply = bool(body.get("apply", False))
+    if source not in {"auto", "edited", "both"}:
+        return jsonify({"ok": False, "error": "invalid source"}), 400
+    if do_apply and source != "edited":
+        return jsonify({
+            "ok": False,
+            "error": "legacy auto/both sources are preview-only; apply requires source=edited",
+        }), 400
+
+    selected_pairs = None
+    if do_apply:
+        selected = body.get("selected")
+        if not isinstance(selected, list):
+            return jsonify({
+                "ok": False,
+                "error": "apply requires an explicit selected pair list",
+            }), 400
+        selected_pairs = {
+            (item.get("wrong", ""), item.get("right", ""))
+            for item in selected[:100]
+            if isinstance(item, dict)
+            and isinstance(item.get("wrong"), str)
+            and isinstance(item.get("right"), str)
+            and item.get("wrong")
+            and item.get("right")
+        }
+        if not selected_pairs:
+            return jsonify({"ok": False, "error": "no valid selected pairs"}), 400
 
     try:
         from opencc import OpenCC
@@ -623,6 +667,18 @@ def api_promote_from_history():
             sk_filter.append({"wrong": w, "right": r, "freq": f}); continue
         promoted.append({"wrong": w, "right": r, "freq": f})
 
+    candidate_count = len(promoted)
+    if do_apply:
+        # 不信任前端傳來的 replacement/frequency；只保留從 edited history
+        # 重新推導、通過既有守門員，且 exact-match 使用者選取的候選。
+        promoted = [
+            p for p in promoted
+            if (p["wrong"], p["right"]) in selected_pairs
+            and memory._is_meaningful_correction(
+                p["wrong"], p["right"], source="verified-promote"
+            )
+        ]
+
     if do_apply and promoted:
         corr = memory.dictionary.setdefault("corrections", {})
         freq_d = memory.dictionary.setdefault("frequency", {})
@@ -638,6 +694,10 @@ def api_promote_from_history():
         "min_freq": min_freq,
         "source": source,
         "edited_count": sum(1 for h in memory.history if h.get("edited")),
+        "candidate_count": candidate_count,
+        "selected_ignored": (
+            len(selected_pairs) - len(promoted) if selected_pairs is not None else 0
+        ),
         "promoted": promoted,
         "skipped": {
             "existing": sk_base[:30],
@@ -918,7 +978,7 @@ def api_model_status(model_key):
     """檢查模型是否已下載 — 支援 HF cache 與本機路徑兩種來源。"""
     from config import LOCAL_MODEL_PATHS
     # 先檢查本機路徑（Breeze 等）
-    if model_key in LOCAL_MODEL_PATHS:
+    if model_key in LOCAL_MODEL_PATHS and os.path.isabs(LOCAL_MODEL_PATHS[model_key]):
         path = LOCAL_MODEL_PATHS[model_key]
         downloaded = os.path.isdir(path) and os.listdir(path)
         size = _model_disk_size(path) if downloaded else 0

@@ -1,4 +1,4 @@
-# 🎙 SGH Voice — 讓想法流動，不再卡在鍵盤上 (v2.5.4)
+# 🎙 SGH Voice — 讓想法流動，不再卡在鍵盤上 (v2.6.0)
 
 **[English](README.en.md) | [日本語](README.ja.md) | 繁體中文**
 
@@ -7,9 +7,20 @@
 [![macOS](https://img.shields.io/badge/macOS-Apple_Silicon-black?logo=apple)](https://github.com/linchichuan/sgh-voice/releases)
 [![iOS](https://img.shields.io/badge/iOS-17.0+-blue?logo=apple)](https://github.com/linchichuan/sgh-voice/releases)
 [![Android](https://img.shields.io/badge/Android-8.0+-green?logo=android)](https://github.com/linchichuan/sgh-voice/releases)
-[![Version](https://img.shields.io/badge/Version-2.5.4-green)]()
+[![Version](https://img.shields.io/badge/Version-2.6.0-green)]()
 
 ---
+
+## 🌟 v2.6.0：可信的中日英混講個人化
+
+| 重點改進 | 說明 |
+|------|------|
+| **詞庫真正接通辨識** | Dashboard 手動詞彙現在同時進入 STT 與 LLM prompt；舊詞庫格式會安全遷移，不再只是 UI 看得到。 |
+| **只從人工修正學習** | Clipboard／History 修正會持久化為 verified examples；模型自己的輸出禁止自動反餵詞庫，0 筆學習資料會如實顯示。 |
+| **中日英 routing 可控** | 新增混合 Auto、中文、日文、英文模式；Local／Groq／OpenAI primary 與 Hybrid 長度門檻皆按設定執行。 |
+| **不可變片段保護** | 英文縮寫、單字母、假名、數字、日期、金額、版本、URL、Email、路徑不會被 LLM 擅自翻譯或改值。 |
+| **可量測的多語基準** | Benchmark 依音檔語言執行，不再硬鎖中文，並輸出 CER、script 保留率、術語保留率與延遲。 |
+| **失敗狀態誠實呈現** | 自動輸入失敗不再顯示完整成功；逐字稿仍保留於 History，可修正並成為可信學習資料。 |
 
 ## 🌟 v2.5.4：Fn／地球鍵快捷鍵修正
 

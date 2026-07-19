@@ -48,6 +48,8 @@ tts/**/*.out
 .claude/
 .kiro/
 docs/
+.playwright-cli/
+output/playwright/
 
 # Local data（個人設定，不進 git）
 config.json

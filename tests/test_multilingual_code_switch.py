@@ -214,6 +214,26 @@ def test_validator_preserves_latin_and_kana_spans(mock_transcriber):
     ) is False
 
 
+def test_validator_preserves_single_letter_numbers_urls_and_paths(mock_transcriber):
+    assert mock_transcriber._code_switch_spans_preserved(
+        "R で v2.5.4 を確認、費用は ¥1,200 です",
+        "R で v2.5.4 を確認、費用は ¥1,200 です。",
+    ) is True
+    assert mock_transcriber._code_switch_spans_preserved(
+        "R で v2.5.4 を確認", "v2.5.4 を確認"
+    ) is False
+    assert mock_transcriber._code_switch_spans_preserved(
+        "版本是 2.5.4，日期 2026-07-20", "版本是 2.5.3，日期 2026-07-20。"
+    ) is False
+    assert mock_transcriber._code_switch_spans_preserved(
+        "看 https://example.com/a?id=42", "看 https://example.com/a?id=43。"
+    ) is False
+    assert mock_transcriber._code_switch_spans_preserved(
+        "寄到 dev@example.com，檔案 /Users/lin/app-v2.ts",
+        "寄到 dev@example.com，檔案 /Users/lin/app-v3.ts。",
+    ) is False
+
+
 def test_validator_discards_code_switch_translation(mock_transcriber):
     raw = "来週 supplier と確認します"
     status, result = mock_transcriber._validate_llm_result(
@@ -330,3 +350,24 @@ def test_dictate_prompt_contains_multilingual_contract(mock_transcriber):
         "問い合わせフォーム", "カタカナ", "ひらがな", "JSON-LD", "hreflang",
     ):
         assert term in prompt
+
+
+def test_dictate_prompt_uses_asr_language_as_non_translation_hint(mock_transcriber):
+    prompt = mock_transcriber._get_system_prompt(language_hint="ja")
+    assert "ASR source-language signal: ja" in prompt
+    assert "not a translation request" in prompt
+    assert "Preserve every other language" in prompt
+
+
+def test_stt_prompt_instruction_matches_fixed_language_profile(mock_transcriber):
+    mock_transcriber.config["language"] = "ja"
+    assert mock_transcriber._build_stt_prompt().startswith("以下は日本語")
+    assert "関連語彙" in mock_transcriber._build_stt_prompt()
+
+    mock_transcriber.config["language"] = "en"
+    assert mock_transcriber._build_stt_prompt().startswith("The following is an English")
+    assert "Relevant vocabulary" in mock_transcriber._build_stt_prompt()
+
+    mock_transcriber.config["language"] = "auto"
+    auto_prompt = mock_transcriber._build_stt_prompt()
+    assert "繁體中文、日本語、English 混用" in auto_prompt

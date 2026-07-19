@@ -56,7 +56,10 @@ function applyFilters() {
   const q = state.search.trim().toLowerCase();
   state.filtered = state.all.filter((e) => {
     if (state.scene && (e.scene || '') !== state.scene) return false;
-    if (state.app && (e.app_id || e.app || '') !== state.app) return false;
+    if (state.app) {
+      const appValues = [e.bundle_id, e.app_name, e.app_id, e.app].filter(Boolean);
+      if (!appValues.includes(state.app)) return false;
+    }
     if (q) {
       const hay = `${e.final_text || ''}\n${e.whisper_raw || ''}`.toLowerCase();
       if (!hay.includes(q)) return false;
@@ -234,9 +237,8 @@ export default async function mount(slot) {
   }
 
   const scenes = uniqueValues(state.all, 'scene');
-  const appsA = uniqueValues(state.all, 'app_id');
-  const appsB = uniqueValues(state.all, 'app');
-  const apps = Array.from(new Set([...appsA, ...appsB])).sort();
+  const appFields = ['bundle_id', 'app_name', 'app_id', 'app'];
+  const apps = Array.from(new Set(appFields.flatMap((field) => uniqueValues(state.all, field)))).sort();
 
   applyFilters();
 

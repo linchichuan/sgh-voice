@@ -213,6 +213,8 @@ def test_successful_quartz_fallback_schedules_full_restore(monkeypatch):
     snapshot = text_insertion.PasteboardSnapshot(())
     posted_events = []
     scheduled = []
+    with app._INTERNAL_PASTEBOARD_LOCK:
+        app._INTERNAL_PASTEBOARD_GENERATIONS.clear()
     quartz = types.ModuleType("Quartz")
     quartz.kCGSessionEventTap = "session"
     quartz.kCGEventFlagMaskCommand = "command"
@@ -237,10 +239,19 @@ def test_successful_quartz_fallback_schedules_full_restore(monkeypatch):
     )
     monkeypatch.setattr(app, "_wait_modifiers_released", lambda **kwargs: None)
     monkeypatch.setattr(app.time, "sleep", lambda delay: None)
+    monkeypatch.setattr(app, "restore_pasteboard", lambda value, count: True)
+    current_generation = {"value": 45}
+    monkeypatch.setattr(
+        app,
+        "_current_pasteboard_generation",
+        lambda: current_generation["value"],
+    )
     monkeypatch.setattr(
         app,
         "schedule_pasteboard_restore",
-        lambda value, count, delay: scheduled.append((value, count, delay)),
+        lambda value, count, delay, restore: scheduled.append(
+            (value, count, delay, restore)
+        ),
     )
     monkeypatch.setattr(
         app.subprocess,
@@ -253,7 +264,16 @@ def test_successful_quartz_fallback_schedules_full_restore(monkeypatch):
 
     assert app.paste_text("交易式 clipboard fallback") is True
     assert [event[1]["is_down"] for event in posted_events] == [True, False]
-    assert scheduled == [(snapshot, 44, 0.25)]
+    assert [(value, count, delay) for value, count, delay, _ in scheduled] == [
+        (snapshot, 44, 0.25)
+    ]
+
+    # Observer must ignore both the staged transcript and the app's restoration,
+    # but a later real user copy receives a new generation and remains learnable.
+    assert app._consume_internal_pasteboard_generation(44) is True
+    assert scheduled[0][3](snapshot, 44) is True
+    assert app._consume_internal_pasteboard_generation(45) is True
+    assert app._consume_internal_pasteboard_generation(46) is False
 
 
 def test_user_copy_during_modifier_wait_cancels_cmd_v(monkeypatch):

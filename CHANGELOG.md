@@ -1,5 +1,17 @@
 # Changelog
 
+## v2.6.0 (2026-07-20) — Verified Multilingual Personalization
+
+- Dashboard 手動新增詞彙現在真正進入 STT 與 LLM 共用 vocabulary prompt；統一並自動遷移 `manual_added`／`auto_added` 詞庫 schema，避免 UI 有詞、辨識管線卻沒使用。
+- Clipboard correction observer 會把人工修正原子寫回 History，標記 `edited=True`／來源／時間，讓 verified few-shot 在重啟後仍能生效；同時排除 SGH Voice transactional paste／還原所產生的內部 pasteboard generation，避免把舊剪貼簿誤學成修正。設定頁會如實顯示已驗證範例數，0 筆時不再暗示已個人化。
+- Dictionary promotion 與 pipeline health 預設只使用人工編輯紀錄；模型自己的 LLM output 僅可 legacy preview，禁止套用，並修正 UI 勾選項目未被 backend 尊重的問題。
+- 重寫 STT routing：Groq、OpenAI Cloud、本地引擎各自尊重 primary 選擇；Hybrid 秒數門檻真正生效；長音訊 cloud 失敗仍可回到 local，不再由型別判斷或固定 30 秒規則暗中覆寫。
+- Settings 新增中日英混合 Auto／中文／日文／英文語言模式，以及 OpenAI `whisper-1`、`gpt-4o-transcribe`、`gpt-4o-mini-transcribe` 選擇；固定語言時 STT prompt instruction 改用相同語言。
+- Dictate validator 新增單字母技術詞、數字、日期、金額、版本號、URL、Email 與檔案路徑保護，避免後處理把 `R`、`v2.5.4`、網址或金額改壞。
+- Whisper Turbo 的 Settings／Models／backend ID 統一為 `whisper-turbo`，並遷移舊 ID；已知失效 OpenRouter fallback ID 只針對舊值安全遷移。
+- 多語 benchmark 不再硬編碼中文；依 `zh_`／`ja_`／`en_` 檔名選語言，mixed 保持 auto，新增 CLI override、script 保留率與術語保留率。
+- History UI 改讀實際 `bundle_id`、`stt_source`、`llm_source`、`audio_duration` 與 scene；自動輸入失敗會明確顯示「已轉寫，輸入失敗」，結果仍保留於 History。
+
 ## v2.5.4 (2026-07-16) — Fn/Globe Hotkey Support
 
 - 錄音快捷鍵新增 macOS Fn／Globe 支援，正確處理 keycode 63 與 `kCGEventFlagMaskSecondaryFn`。

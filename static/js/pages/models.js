@@ -60,7 +60,7 @@ for (const lang of Object.keys(I18N)) Object.assign(STRINGS[lang], I18N[lang]);
 
 // Mirrors config.py LOCAL_MODEL_PATHS + default turbo model
 const MODELS = [
-  { key: 'mlx-community/whisper-turbo', name: 'Whisper Turbo', descKey: 'models.desc.turbo', sizeBytes: 1610612736 },
+  { key: 'whisper-turbo', name: 'Whisper Turbo', descKey: 'models.desc.turbo', sizeBytes: 1610612736 },
   { key: 'breeze-asr-25-4bit', name: 'Breeze ASR 25 (4-bit)', descKey: 'models.desc.breeze4bit', sizeBytes: 880803840 },
   { key: 'breeze-asr-25', name: 'Breeze ASR 25 (fp16)', descKey: 'models.desc.breezefp16', sizeBytes: 3082277683 },
 ];

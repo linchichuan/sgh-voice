@@ -173,6 +173,16 @@ export function mountLlmTab(container, cfg, dirty) {
       setSliderDisabled(true);
     },
   });
+  const verifiedCount = Number(cfg.personalization_verified_count || 0);
+  const fewshotStatus = h('div', {
+    class: `rounded-lg border p-3 text-sm ${verifiedCount > 0 ? 'border-emerald-300 bg-emerald-50 text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-100' : 'border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100'}`,
+  },
+    h('div', { class: 'font-medium' }, verifiedCount > 0
+      ? t('settings.llm.fewshot.ready', { n: verifiedCount })
+      : t('settings.llm.fewshot.empty')),
+    h('a', { href: '#/history', class: 'inline-block mt-1 underline underline-offset-2' },
+      t('settings.llm.fewshot.history.link')),
+  );
 
   container.appendChild(Card({
     title: t('settings.llm.engine'),
@@ -186,6 +196,7 @@ export function mountLlmTab(container, cfg, dirty) {
       h('div', { class: 'space-y-4 pt-2 border-t border-[var(--border)]' },
         fewshotToggle.node,
         fewshotCountSlider.node,
+        fewshotStatus,
       ),
     ),
   }));

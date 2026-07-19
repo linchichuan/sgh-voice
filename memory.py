@@ -20,13 +20,80 @@ class Memory:
         self.history = load_history()
         self._history_lock = threading.Lock()
         self._history_write_count = 0
+        self._normalize_dictionary_schema()
         # 自動清理不合規的詞庫規則（避免壞規則堆積）
         self.cleanup_bad_corrections()
 
     def reload(self):
         self.dictionary = load_dictionary()
         self.history = load_history()
+        self._normalize_dictionary_schema()
         self.cleanup_bad_corrections()
+
+    def _normalize_dictionary_schema(self):
+        """Migrate every historical custom-word shape into one flat schema.
+
+        Previous versions alternated between top-level lists, a nested object, and a
+        standalone ``custom_words`` list written by the promotion script.  Merge them
+        without losing ordering, then persist once so all runtime/UI paths agree.
+        """
+        if not isinstance(self.dictionary, dict):
+            self.dictionary = {}
+        changed = False
+        legacy = self.dictionary.pop("custom_words", None)
+        if legacy is not None:
+            changed = True
+
+        manual = self.dictionary.get("manual_added", [])
+        auto = self.dictionary.get("auto_added", [])
+        if not isinstance(manual, list):
+            manual = []
+            changed = True
+        if not isinstance(auto, list):
+            auto = []
+            changed = True
+
+        legacy_manual = []
+        legacy_auto = []
+        if isinstance(legacy, dict):
+            legacy_manual = legacy.get("manual_added", [])
+            legacy_auto = legacy.get("auto_added", [])
+        elif isinstance(legacy, list):
+            legacy_manual = legacy
+
+        def _merge_words(primary, extra):
+            values = []
+            seen = set()
+            for word in [*primary, *(extra if isinstance(extra, list) else [])]:
+                if not isinstance(word, str):
+                    continue
+                word = word.strip()
+                if not word or word in seen:
+                    continue
+                seen.add(word)
+                values.append(word)
+            return values
+
+        normalized_manual = _merge_words(manual, legacy_manual)
+        normalized_auto = _merge_words(auto, legacy_auto)
+        if normalized_manual != manual or normalized_auto != auto:
+            changed = True
+        self.dictionary["manual_added"] = normalized_manual
+        self.dictionary["auto_added"] = normalized_auto
+        for key, default in (
+            ("corrections", {}),
+            ("frequency", {}),
+            ("corrections_by_scene", {}),
+            ("corrections_by_app", {}),
+        ):
+            if not isinstance(self.dictionary.get(key), dict):
+                self.dictionary[key] = default
+                changed = True
+            elif key not in self.dictionary:
+                self.dictionary[key] = default
+                changed = True
+        if changed:
+            save_dictionary(self.dictionary)
 
     def clear_all_in_memory(self):
         """v2.4.0：wipe_all GDPR Art. 17 後呼叫 — 把 process 內快取的 history / dictionary
@@ -36,33 +103,57 @@ class Memory:
             self.history = []
             self._history_write_count = 0
         # dictionary 重置為空骨架，使用者下次 add 從零開始
-        self.dictionary = {"custom_words": {"manual_added": [], "auto_added": []},
-                           "corrections": {}, "corrections_by_scene": {}, "corrections_by_app": {}}
+        # Dictionary runtime schema is intentionally flat.  Older wipe code created a
+        # nested ``custom_words`` object even though every add/remove/UI path reads the
+        # top-level lists, so words added after a wipe could silently disappear from the
+        # active vocabulary.
+        self.dictionary = {
+            "manual_added": [],
+            "auto_added": [],
+            "corrections": {},
+            "frequency": {},
+            "corrections_by_scene": {},
+            "corrections_by_app": {},
+        }
 
     # ─── Whisper Prompt ──────────────────────────────────
 
     def build_whisper_prompt(self, custom_words, scene_words=None):
-        """合併 custom_words + scene_words + BASE_CUSTOM_WORDS 去重後注入 Whisper prompt。
+        """合併 config + 個人詞庫 + scene + BASE 詞彙後注入 Whisper prompt。
         ⚠️ 嚴格限制數量（≤20 詞）和長度（≤200 字元），
         否則 Whisper 會在短音訊/低音量時幻覺出字典詞彙。
-        優先順序：使用者 config 詞彙 > 場景詞彙 > 基礎詞庫。
+        優先順序：使用者 config 詞彙 > 個人手動詞彙 > 場景詞彙 > 基礎詞庫。
         auto_added（73+ 個人名地名）不再注入 prompt，改由 corrections 機制處理。"""
         MAX_TERMS = 20   # 超過 20 個就容易讓 Whisper 過度「腦補」
         MAX_CHARS = 200  # prompt 太長 Whisper 會把 prompt 內容當成辨識結果
-        # 優先順序：使用者自訂 > 場景 > 基礎（不含 auto_added）
+        # Dashboard 的「手動新增詞彙」存於 dictionary.manual_added。舊版只讀
+        # config.custom_words，造成 UI 看得到、STT/LLM 卻完全沒使用。
+        manual_words = self.dictionary.get("manual_added", [])
+        if not isinstance(manual_words, list):
+            manual_words = []
+
+        # 優先順序：config > 個人手動 > 場景 > 基礎（不含 auto_added）
         seen = set()
         terms = []
-        all_words = list(custom_words) + (scene_words or []) + BASE_CUSTOM_WORDS
+        all_words = list(custom_words or []) + manual_words + (scene_words or []) + BASE_CUSTOM_WORDS
         for w in all_words:
-            if w not in seen:
-                seen.add(w)
-                terms.append(w)
+            if not isinstance(w, str):
+                continue
+            w = w.strip()
+            if not w or w in seen:
+                continue
+            candidate = ", ".join([*terms, w])
+            # Never slice a term in half: a truncated brand/name is a particularly
+            # harmful ASR bias.  Stop before the next complete term exceeds the cap.
+            if len(candidate) > MAX_CHARS:
+                continue
+            seen.add(w)
+            terms.append(w)
             if len(terms) >= MAX_TERMS:
                 break
         if not terms:
             return ""
-        prompt = ", ".join(terms)
-        return prompt[:MAX_CHARS]
+        return ", ".join(terms)
 
     # ─── Apply Corrections ───────────────────────────────
 
@@ -520,17 +611,34 @@ class Memory:
                      or search in h.get("whisper_raw", "").lower()]
         return list(reversed(items[-n:]))
 
-    def update_history_item(self, timestamp, new_final_text):
-        """更新歷史紀錄的 final_text，並回傳原始文字（供 learn_correction 使用）"""
+    def update_history_item(self, timestamp, new_final_text, source="manual"):
+        """持久化使用者確認過的修正，並回傳修改前文字。
+
+        ``edited=True`` 是 verified few-shot 與安全 promotion 的唯一信任邊界；
+        clipboard observer 也必須走這個方法，不能只改 RAM。
+        """
         with self._history_lock:
             for h in self.history:
                 if h.get("timestamp") == timestamp:
                     old_text = h.get("final_text", "")
                     h["final_text"] = new_final_text
                     h["edited"] = True
+                    h["correction_source"] = str(source or "manual")
+                    h["edited_at"] = datetime.now().isoformat()
                     save_history(self.history)
+                    self._history_write_count = 0
                     return old_text
         return None
+
+    def get_verified_example_count(self):
+        """回傳可供個人化使用的人工確認逐字聽寫數量（不含 edit/translate）。"""
+        with self._history_lock:
+            return sum(
+                1 for h in self.history
+                if h.get("edited") and h.get("mode") in {"dictate", "continuous"}
+                and (h.get("whisper_raw") or "").strip()
+                and (h.get("final_text") or "").strip()
+            )
 
     def delete_history_item(self, timestamp):
         """刪除單一歷史紀錄"""

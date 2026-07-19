@@ -24,6 +24,44 @@ def test_build_whisper_prompt_deduplicates(empty_memory):
     assert "UniqueB" in prompt
 
 
+def test_manual_dictionary_words_are_injected_before_scene_and_base(empty_memory):
+    """Dashboard 手動詞彙必須真的進入 STT/LLM 共用 vocabulary prompt。"""
+    empty_memory.dictionary["manual_added"] = ["Typeless", "豊洲フォーム"]
+    prompt = empty_memory.build_whisper_prompt(
+        ["ConfigPriority"],
+        scene_words=["ScenePriority"],
+    )
+    parts = [part.strip() for part in prompt.split(",")]
+    assert parts[:4] == ["ConfigPriority", "Typeless", "豊洲フォーム", "ScenePriority"]
+
+
+def test_dictionary_schema_migration_merges_legacy_custom_words(empty_memory):
+    empty_memory.dictionary = {
+        "manual_added": ["Existing"],
+        "custom_words": {
+            "manual_added": ["Existing", "NestedManual"],
+            "auto_added": ["NestedAuto"],
+        },
+        "corrections": {},
+    }
+    empty_memory._normalize_dictionary_schema()
+    assert "custom_words" not in empty_memory.dictionary
+    assert empty_memory.dictionary["manual_added"] == ["Existing", "NestedManual"]
+    assert empty_memory.dictionary["auto_added"] == ["NestedAuto"]
+
+    empty_memory.dictionary["custom_words"] = ["PromotedTech"]
+    empty_memory._normalize_dictionary_schema()
+    assert "PromotedTech" in empty_memory.dictionary["manual_added"]
+
+
+def test_whisper_prompt_never_truncates_a_term(empty_memory):
+    empty_memory.dictionary["manual_added"] = ["M" * 250, "SafeTerm"]
+    prompt = empty_memory.build_whisper_prompt([])
+    assert "M" * 199 not in prompt
+    assert "SafeTerm" in prompt
+    assert len(prompt) <= 200
+
+
 def test_build_whisper_prompt_respects_limits(empty_memory):
     """≤ 20 詞 / ≤ 200 字元（memory.py 實作的硬上限）。"""
     huge_list = [f"Term{i:03d}" for i in range(100)]
@@ -97,6 +135,17 @@ def test_update_history_item_marks_edited(populated_memory):
     found = next(h for h in populated_memory.history if h.get("timestamp") == ts)
     assert found["final_text"] == new_text
     assert found["edited"] is True
+    assert found["correction_source"] == "manual"
+    assert found["edited_at"]
+
+
+def test_clipboard_history_update_becomes_verified_example(populated_memory):
+    ts = "2026-01-01T10:00:00"
+    populated_memory.update_history_item(ts, "今天天氣很好，我們去散步。", source="clipboard")
+    found = next(h for h in populated_memory.history if h.get("timestamp") == ts)
+    assert found["edited"] is True
+    assert found["correction_source"] == "clipboard"
+    assert populated_memory.get_verified_example_count() >= 1
 
 
 def test_update_history_item_returns_none_for_unknown_timestamp(populated_memory):

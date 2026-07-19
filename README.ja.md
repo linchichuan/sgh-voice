@@ -1,4 +1,4 @@
-# 🎙 SGH Voice — AI 音声入力ツール (v2.5.4)
+# 🎙 SGH Voice — AI 音声入力ツール (v2.6.0)
 
 **[English](README.en.md)** | **日本語** | **[繁體中文](README.md)**
 
@@ -7,9 +7,20 @@
 [![macOS](https://img.shields.io/badge/macOS-Apple_Silicon-black?logo=apple)](https://github.com/linchichuan/sgh-voice/releases)
 [![iOS](https://img.shields.io/badge/iOS-17.0+-blue?logo=apple)](https://github.com/linchichuan/sgh-voice/releases)
 [![Android](https://img.shields.io/badge/Android-8.0+-green?logo=android)](https://github.com/linchichuan/sgh-voice/releases)
-[![Version](https://img.shields.io/badge/Version-2.5.4-green)]()
+[![Version](https://img.shields.io/badge/Version-2.6.0-green)]()
 
 ---
+
+## 🌟 v2.6.0 の新機能
+
+| 機能 | 詳細 |
+|------|------|
+| **個人辞書を認識経路へ接続** | Dashboard で追加した単語を STT と LLM の両方へ反映し、旧辞書形式も安全に移行します。 |
+| **確認済み修正だけを学習** | Clipboard／History の修正を確認済み例として永続化し、モデル自身の未確認出力は辞書へ反映しません。 |
+| **3言語ルーティングを明確化** | 中日英混在 Auto、中国語、日本語、英語 profile を追加し、Local／Groq／OpenAI／Hybrid の選択を正しく適用します。 |
+| **重要 span の保護** | 略語、1文字の技術語、かな、数値、日付、金額、version、URL、Email、path を後処理による改変から保護します。 |
+| **再現可能な評価** | Benchmark の中国語固定を廃止し、CER、script 保持率、用語保持率、latency を言語別に出力します。 |
+| **入力失敗を正しく表示** | 自動入力に失敗した場合は完了表示にせず、文字起こし結果をローカル History に保持します。 |
 
 ## 🌟 v2.5.4 の新機能
 

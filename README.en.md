@@ -1,4 +1,4 @@
-# 🎙 SGH Voice — AI Voice Input Tool (v2.5.4)
+# 🎙 SGH Voice — AI Voice Input Tool (v2.6.0)
 
 **English** | **[日本語](README.ja.md)** | **[繁體中文](README.md)**
 
@@ -7,9 +7,20 @@
 [![macOS](https://img.shields.io/badge/macOS-Apple_Silicon-black?logo=apple)](https://github.com/linchichuan/sgh-voice/releases)
 [![iOS](https://img.shields.io/badge/iOS-17.0+-blue?logo=apple)](https://github.com/linchichuan/sgh-voice/releases)
 [![Android](https://img.shields.io/badge/Android-8.0+-green?logo=android)](https://github.com/linchichuan/sgh-voice/releases)
-[![Version](https://img.shields.io/badge/Version-2.5.4-green)]()
+[![Version](https://img.shields.io/badge/Version-2.6.0-green)]()
 
 ---
+
+## 🌟 What's New in v2.6.0
+
+| Feature | Details |
+|---------|---------|
+| **Dictionary connected end-to-end** | Words added in Dashboard now bias both STT and LLM vocabulary; legacy dictionary shapes migrate safely. |
+| **Verified learning only** | Clipboard and History corrections persist as trusted examples; unedited model output cannot be promoted back into the dictionary. |
+| **Controllable trilingual routing** | Added Auto mixed, Chinese, Japanese, and English profiles; Local, Groq, OpenAI, and Hybrid thresholds now follow the selected route. |
+| **Immutable span protection** | Acronyms, single letters, kana, numbers, dates, prices, versions, URLs, email addresses, and paths are protected from semantic cleanup. |
+| **Measurable evaluation** | The benchmark no longer forces Chinese and reports CER, script preservation, protected-term recall, and latency per language profile. |
+| **Honest insertion status** | A failed insertion is no longer shown as complete; the transcript remains recoverable in local History. |
 
 ## 🌟 What's New in v2.5.4
 

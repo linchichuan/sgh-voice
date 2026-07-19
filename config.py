@@ -479,6 +479,8 @@ AUDIT_LOG_FILE = os.path.join(DATA_DIR, "audit.log")
 
 # ─── 本地模型路徑映射（短名稱 → 實際路徑）────────────────
 LOCAL_MODEL_PATHS = {
+    # Keep one canonical short id across Settings, Models API and transcriber.
+    "whisper-turbo": "mlx-community/whisper-turbo",
     "breeze-asr-25-4bit": "/Volumes/Satechi_SSD/huggingface/hub/breeze-asr-25-mlx-4bit",
     "breeze-asr-25": "/Volumes/Satechi_SSD/huggingface/hub/breeze-asr-25-mlx",
 }
@@ -705,6 +707,32 @@ def _migrate_hotkeys_v5(saved):
     return saved, did_migrate
 
 
+def _normalize_known_stale_model_ids(saved):
+    """Normalize only model ids that this project previously wrote and are unusable.
+
+    This runs independently of the schema version because v2.4/v2.5 already marked
+    some affected configs as current before the bad ids were discovered. User-chosen
+    unknown models are left untouched.
+    """
+    replacements = {
+        "local_whisper_model": {
+            "mlx-community/whisper-turbo": "whisper-turbo",
+        },
+        "openrouter_model": {
+            "qwen/qwen3.6-plus": DEFAULT_CONFIG["openrouter_model"],
+            "qwen/qwen3.6": DEFAULT_CONFIG["openrouter_model"],
+            "qwen/qwen3.6-plus-preview:free": DEFAULT_CONFIG["openrouter_model"],
+        },
+    }
+    did_migrate = False
+    for field, known_ids in replacements.items():
+        old_value = saved.get(field)
+        if old_value in known_ids:
+            saved[field] = known_ids[old_value]
+            did_migrate = True
+    return saved, did_migrate
+
+
 def load_config():
     _ensure_dir()
     if os.path.exists(CONFIG_FILE):
@@ -720,6 +748,7 @@ def load_config():
         # 熱鍵本身可在 v1/v2 先安全遷移；主 schema 只有在 Keychain migration
         # 完成後才會推進到最新版。
         saved, migrated_hotkeys = _migrate_hotkeys_v5(saved)
+        saved, migrated_model_ids = _normalize_known_stale_model_ids(saved)
 
         # 把 Keychain 中的 key 填回 dict（key 名不變，下游無感）
         if _keychain_available():
@@ -732,7 +761,7 @@ def load_config():
         merged = {**DEFAULT_CONFIG, **saved}
 
         # 若有 migration 發生（任一種），把新版立刻寫回，避免 crash 時遺失
-        if migrated_basic or migrated_kc or migrated_hotkeys:
+        if migrated_basic or migrated_kc or migrated_hotkeys or migrated_model_ids:
             try:
                 # 寫回 JSON 時用 _strip_keychain_keys_for_json 把已搬到 Keychain 的 key 從明文剝離
                 to_write = _strip_keychain_keys_for_json(merged)
@@ -832,7 +861,14 @@ def load_dictionary():
     if os.path.exists(DICTIONARY_FILE):
         with open(DICTIONARY_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
-    return {"corrections": {}, "frequency": {}, "auto_added": []}
+    return {
+        "corrections": {},
+        "frequency": {},
+        "manual_added": [],
+        "auto_added": [],
+        "corrections_by_scene": {},
+        "corrections_by_app": {},
+    }
 
 
 def save_dictionary(d):

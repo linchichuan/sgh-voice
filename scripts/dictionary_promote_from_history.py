@@ -6,7 +6,8 @@
 - 用 difflib 做 token 級 diff（與 memory.learn_correction 同款 tokenize）。
 - 套用 memory._is_meaningful_correction 守門員，與互動學習完全一致。
 - 跳過 BASE_CORRECTIONS 已有的、dictionary 已有的。
-- 預設 --dry-run 不寫入；確認後再 --apply。
+- 預設只分析 edited=True 的使用者驗證資料，且 --dry-run 不寫入。
+- auto / both 僅供 legacy 分析；不得搭配 --apply，避免模型輸出反餵污染詞庫。
 
 用法：
   python3 scripts/dictionary_promote_from_history.py              # dry-run
@@ -107,10 +108,13 @@ def main():
     parser.add_argument("--min-freq", type=int, default=5, help="最低頻次（一般詞，預設 5）")
     parser.add_argument("--tech-min-freq", type=int, default=2,
                         help="ASCII 技術詞/品牌名最低頻次（預設 2，因為這類錯誤通常少量出現但必須抓）")
-    parser.add_argument("--source", choices=["auto", "edited", "both"], default="both",
-                        help="auto=LLM 隱性正例、edited=使用者編輯過、both=兩者皆採用（預設）")
+    parser.add_argument("--source", choices=["auto", "edited", "both"], default="edited",
+                        help="edited=使用者驗證資料（預設）；auto/both 僅供 legacy dry-run 分析")
     parser.add_argument("--top", type=int, default=50, help="最多列印 N 條（預設 50）")
     args = parser.parse_args()
+
+    if args.apply and args.source != "edited":
+        parser.error("--apply 只允許 --source edited；auto/both 僅供 legacy dry-run 分析")
 
     if not os.path.exists(HISTORY_FILE):
         print(f"❌ 找不到 {HISTORY_FILE}")
@@ -156,7 +160,10 @@ def main():
     skipped_lowfreq = [] # 頻次未達門檻（依 tech / 一般 分層）
 
     # 既有 custom_words（用於去重，避免重複加入）
-    existing_words_lower = {w.lower() for w in mem.dictionary.get("custom_words", [])}
+    existing_words_lower = {
+        w.lower() for w in mem.dictionary.get("manual_added", [])
+        if isinstance(w, str)
+    }
 
     for (wrong, right), freq in counter.most_common():
         is_tech = _is_tech_term(right)
@@ -217,7 +224,9 @@ def main():
     # 寫入
     corr = mem.dictionary.setdefault("corrections", {})
     freq_dict = mem.dictionary.setdefault("frequency", {})
-    words = mem.dictionary.setdefault("custom_words", [])
+    # Runtime/UI/STT share the flat manual_added list.  The old script wrote a
+    # separate dictionary.custom_words list that no runtime path ever consumed.
+    words = mem.dictionary.setdefault("manual_added", [])
     n_words_added = 0
     for w, r, f, is_tech in promoted:
         corr[w] = r

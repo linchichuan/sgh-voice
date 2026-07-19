@@ -101,6 +101,39 @@ def test_migrate_config_is_idempotent_on_v2(isolated_data_dir):
     assert migrated["local_llm_model"] == "qwen3:latest"
 
 
+def test_normalize_known_stale_model_ids_without_touching_custom_values():
+    import config as cfg
+
+    saved = {
+        "config_version": cfg.CONFIG_VERSION,
+        "local_whisper_model": "mlx-community/whisper-turbo",
+        "openrouter_model": "qwen/qwen3.6-plus-preview:free",
+        "groq_model": "user-chosen-model",
+    }
+    normalized, did = cfg._normalize_known_stale_model_ids(saved)
+    assert did is True
+    assert normalized["local_whisper_model"] == "whisper-turbo"
+    assert normalized["openrouter_model"] == "qwen/qwen3-30b-a3b:free"
+    assert normalized["groq_model"] == "user-chosen-model"
+
+    unchanged, did = cfg._normalize_known_stale_model_ids({
+        "openrouter_model": "vendor/custom-current-model",
+    })
+    assert did is False
+    assert unchanged["openrouter_model"] == "vendor/custom-current-model"
+
+
+def test_dashboard_rejects_unknown_stt_language_profile(monkeypatch):
+    import dashboard
+
+    monkeypatch.setattr(dashboard, "load_config", lambda: {})
+    response = dashboard.app.test_client().post(
+        "/api/config", json={"language": "mixed-magic"},
+    )
+    assert response.status_code == 400
+    assert response.get_json()["code"] == "invalid_language_profile"
+
+
 def test_migrate_hotkeys_v5_replaces_only_known_legacy_defaults():
     import config as cfg
     from hotkey_config import (

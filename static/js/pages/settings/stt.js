@@ -14,6 +14,19 @@ const LOCAL_MODELS = [
   { id: 'breeze-asr-25',        label: 'Breeze-ASR-25 fp16 (2.87GB, 繁中最強)' },
 ];
 
+const LANGUAGE_PROFILES = [
+  { id: 'auto', labelKey: 'settings.stt.language.auto' },
+  { id: 'zh',   labelKey: 'settings.stt.language.zh' },
+  { id: 'ja',   labelKey: 'settings.stt.language.ja' },
+  { id: 'en',   labelKey: 'settings.stt.language.en' },
+];
+
+const OPENAI_STT_MODELS = [
+  { id: 'whisper-1', label: 'whisper-1 (stable)' },
+  { id: 'gpt-4o-transcribe', label: 'gpt-4o-transcribe' },
+  { id: 'gpt-4o-mini-transcribe', label: 'gpt-4o-mini-transcribe' },
+];
+
 function radioGroup({ name, options, value, onChange, ariaLabel }) {
   const group = h('div', { class: 'space-y-2', role: 'radiogroup', 'aria-label': ariaLabel });
   options.forEach((opt) => {
@@ -79,10 +92,32 @@ export function mountSttTab(container, cfg, dirty) {
   }, LOCAL_MODELS.map((m) => h('option', { value: m.id, selected: cfg.local_whisper_model === m.id ? '' : null }, m.label)));
   modelSelect.addEventListener('change', () => dirty.set('local_whisper_model', modelSelect.value));
 
+  const cloudModelSelectId = 'openai-stt-model';
+  const cloudModelSelect = h('select', {
+    id: cloudModelSelectId,
+    class: classes.input,
+    'aria-label': t('settings.stt.cloud.model'),
+  }, OPENAI_STT_MODELS.map((model) => h('option', {
+    value: model.id,
+    selected: (cfg.whisper_model || 'whisper-1') === model.id ? '' : null,
+  }, model.label)));
+  cloudModelSelect.addEventListener('change', () => dirty.set('whisper_model', cloudModelSelect.value));
+
   const modelLink = h('a', {
     href: '#/models',
     class: 'text-sm text-[var(--brand-blue)] hover:underline inline-flex items-center gap-1',
   }, t('settings.stt.model.link'), ' →');
+
+  const languageSelectId = 'stt-language-profile';
+  const languageSelect = h('select', {
+    id: languageSelectId,
+    class: classes.input,
+    'aria-label': t('settings.stt.language'),
+  }, LANGUAGE_PROFILES.map((profile) => h('option', {
+    value: profile.id,
+    selected: (cfg.language || 'auto') === profile.id ? '' : null,
+  }, t(profile.labelKey))));
+  languageSelect.addEventListener('change', () => dirty.set('language', languageSelect.value));
 
   // Hybrid + audio gate switches
   const hybridSwitch = Switch({
@@ -110,14 +145,25 @@ export function mountSttTab(container, cfg, dirty) {
     title: t('settings.stt.engine'),
     children: h('div', { class: 'space-y-6' },
       enginePicker,
+      h('div', { class: 'space-y-1.5 pt-2 border-t border-[var(--border)]' },
+        h('label', { class: classes.label, for: languageSelectId }, t('settings.stt.language')),
+        languageSelect,
+        h('p', { class: 'text-xs text-[var(--text-3)]' }, t('settings.stt.language.hint')),
+      ),
       h('div', { class: 'space-y-2 pt-2 border-t border-[var(--border)]' },
         h('label', { class: classes.label, for: modelSelectId }, t('settings.stt.local.model')),
         modelSelect,
         modelLink,
       ),
+      h('div', { class: 'space-y-1.5 pt-2 border-t border-[var(--border)]' },
+        h('label', { class: classes.label, for: cloudModelSelectId }, t('settings.stt.cloud.model')),
+        cloudModelSelect,
+        h('p', { class: 'text-xs text-[var(--text-3)]' }, t('settings.stt.cloud.model.hint')),
+      ),
       h('div', { class: 'space-y-4 pt-2 border-t border-[var(--border)]' },
         hybridSwitch,
         hybridThreshold,
+        h('p', { class: 'text-xs text-[var(--text-3)]' }, t('settings.stt.hybrid.hint')),
         gateSwitch,
       ),
     ),

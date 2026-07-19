@@ -28,10 +28,10 @@ export function Row(entry, ctx) {
   const ts = entry.timestamp || entry.ts || '';
   const finalText = entry.final_text || entry.text || '';
   const rawText = entry.whisper_raw || entry.raw || '';
-  const app = entry.app_id || entry.app || '';
+  const app = entry.app_name || entry.bundle_id || entry.app_id || entry.app || '';
   const scene = entry.scene || '';
-  const stt = entry.stt_engine || entry.stt || '';
-  const llm = entry.llm_engine || entry.llm || '';
+  const stt = entry.stt_source || entry.stt_engine || entry.stt || '';
+  const llm = entry.llm_source || entry.llm_engine || entry.llm || '';
 
   if (ctx.editing) return EditRow(entry, ctx);
 
@@ -81,7 +81,8 @@ export function Row(entry, ctx) {
 
 function ExpandedDetails({ rawText, entry, scene, stt, llm }) {
   const meta = [];
-  if (entry.duration !== undefined) meta.push([t('history.row.duration'), fmtDuration(entry.duration)]);
+  const duration = entry.audio_duration ?? entry.duration;
+  if (duration !== undefined) meta.push([t('history.row.duration'), fmtDuration(duration)]);
   if (scene) meta.push([t('history.row.scene'), scene]);
   if (stt) meta.push([t('history.row.stt'), stt]);
   if (llm) meta.push([t('history.row.llm'), llm]);

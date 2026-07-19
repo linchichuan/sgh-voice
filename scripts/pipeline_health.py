@@ -70,6 +70,13 @@ def similarity_ratio(a, b):
     return difflib.SequenceMatcher(None, a, b).ratio()
 
 
+def is_meaningful_correction(wrong, right, source="pipeline-health-verified"):
+    """重用 Memory 的純文字守門規則，但不初始化或讀寫任何使用者資料。"""
+    from memory import Memory
+    guard = Memory.__new__(Memory)
+    return guard._is_meaningful_correction(wrong, right, source=source)
+
+
 # ─── 模組 1: 修正規則品質審計 ─────────────────────────────
 
 def audit_corrections(history, dictionary, auto_fix=False):
@@ -189,8 +196,10 @@ def audit_corrections(history, dictionary, auto_fix=False):
 
 def mine_error_patterns(history, dictionary):
     """
-    分析 whisper_raw → corrected/final_text 的差異，
+    僅分析 edited=True 的 whisper_raw → 使用者修正版差異，
     找出 Whisper 重複犯的錯誤（尚未被 corrections 覆蓋的）。
+
+    未編輯的 final_text 是模型自己的輸出，不能當成 ground truth 反餵詞庫。
     """
     corrections = dictionary.get("corrections", {})
     error_counter = Counter()  # {(wrong, right): count}
@@ -201,7 +210,8 @@ def mine_error_patterns(history, dictionary):
     def tokenize(text):
         return re.findall(r'[a-zA-Z0-9_\'-]+|\s+|[^\sa-zA-Z0-9_\'-]', text)
 
-    for h in history:
+    verified_history = [h for h in history if h.get("edited") is True]
+    for h in verified_history:
         raw = h.get("whisper_raw", "")
         final = h.get("final_text", "")
         ts = h.get("timestamp", "")
@@ -247,9 +257,12 @@ def mine_error_patterns(history, dictionary):
         # 排除只是標點差異
         if re.sub(r'[，。！？、：；]', '', item["wrong"]) == re.sub(r'[，。！？、：；]', '', item["right"]):
             continue
+        if not is_meaningful_correction(item["wrong"], item["right"]):
+            continue
         suggested_rules.append(item)
 
     return {
+        "verified_records": len(verified_history),
         "total_patterns": len(error_counter),
         "recurring_errors": len([c for c in error_counter.values() if c >= 2]),
         "already_covered": len(already_covered),
@@ -531,7 +544,7 @@ def generate_report(results, auto_fix=False, history_count=0):
 
     issue_count_1 = len(r1.get("issues", []))
     lines.append(f"| 修正規則審計 | {'⚠️' if issue_count_1 > 0 else '✅'} | {r1.get('total_rules', 0)} 條規則，{issue_count_1} 個問題 |")
-    lines.append(f"| 錯誤模式挖掘 | {'⚠️' if r2.get('uncovered') else '✅'} | {r2.get('recurring_errors', 0)} 個重複錯誤，{len(r2.get('uncovered', []))} 個未覆蓋 |")
+    lines.append(f"| 錯誤模式挖掘 | {'⚠️' if r2.get('uncovered') else '✅'} | {r2.get('verified_records', 0)} 筆已驗證紀錄，{r2.get('recurring_errors', 0)} 個重複錯誤，{len(r2.get('uncovered', []))} 個未覆蓋 |")
     lines.append(f"| LLM 品質 | {'⚠️' if r3.get('hallucinations', 0) > 3 else '✅'} | 幻覺 {r3.get('hallucinations', 0)}，過度刪減 {r3.get('over_trims', 0)} |")
     lines.append(f"| Prompt 最佳化 | {'⚠️' if r4.get('never_used_count', 0) > 10 else '✅'} | {r4.get('never_used_count', 0)} 個從未使用的詞 |")
     lines.append(f"| 處理速度 | {'⚠️' if r5.get('anomalies', 0) > 3 else '✅'} | P50={r5.get('p50', 0)}s，P95={r5.get('p95', 0)}s，異常 {r5.get('anomalies', 0)} 筆 |")
@@ -564,6 +577,8 @@ def generate_report(results, auto_fix=False, history_count=0):
     # 模組 2
     lines.append("---")
     lines.append("## 2️⃣ Whisper 錯誤模式挖掘")
+    lines.append("")
+    lines.append(f"> 僅使用 edited=True 的使用者驗證紀錄：{r2.get('verified_records', 0)} 筆")
     lines.append("")
     if r2.get("uncovered"):
         lines.append("**建議新增的修正規則：**")
@@ -724,7 +739,7 @@ def generate_report(results, auto_fix=False, history_count=0):
 # ─── Auto-fix: 自動套用建議的修正規則 ──────────────────────
 
 def auto_apply_corrections(error_patterns, dictionary):
-    """將模組 2 挖掘出的高頻錯誤自動加入 corrections"""
+    """將模組 2 的已驗證高頻錯誤加入 corrections（再次套用守門員）。"""
     uncovered = error_patterns.get("uncovered", [])
     if not uncovered:
         return 0
@@ -736,7 +751,13 @@ def auto_apply_corrections(error_patterns, dictionary):
         right = item["right"]
         count = item["count"]
         # 只自動加入出現 ≥3 次的（更保守）
-        if count >= 3 and wrong not in corrections:
+        if (
+            count >= 3
+            and wrong not in corrections
+            and is_meaningful_correction(
+                wrong, right, source="pipeline-health-auto-fix-verified"
+            )
+        ):
             corrections[wrong] = right
             added += 1
 

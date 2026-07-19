@@ -217,9 +217,20 @@ class Transcriber:
         "If unsure whether to edit: DON'T. Output verbatim with punctuation only."
     )
 
-    def _get_system_prompt(self, app_info=None):
+    def _get_system_prompt(self, app_info=None, language_hint=None):
         """建構最終 Prompt，合併：基礎指令 + App 風格 + 個人風格 + 場景指令"""
         base = self.config.get("claude_system_prompt") or self._DICTATE_SYSTEM
+
+        # STT providers usually return one dominant language even for code-switched
+        # speech.  Treat it only as a source hint: it helps preserve Japanese-only
+        # Kanji clauses, but must never become a translation instruction or erase the
+        # other scripts in a mixed sentence.
+        hint = str(language_hint or "").strip().lower()
+        language_prompt = (
+            f"\n[ASR source-language signal: {hint}. This is not a translation request. "
+            "Preserve every other language and script span exactly.]"
+            if hint else ""
+        )
 
         # 1. App 感知風格
         # v2.4.0：尊重 enable_app_awareness 預設 False。若關閉，不把前景 App 識別碼
@@ -258,7 +269,7 @@ class Transcriber:
             f"{vocabulary}" if vocabulary else ""
         )
 
-        return f"{base}{app_prompt}{personal_prompt}{scene_prompt}{vocabulary_prompt}".strip()
+        return f"{base}{language_prompt}{app_prompt}{personal_prompt}{scene_prompt}{vocabulary_prompt}".strip()
 
     def transcribe(self, audio_source, audio_duration=0, mode="dictate", edit_context="", on_stage=None, history_mode=None):
         """on_stage: callable(stage_name: 'stt'|'llm'|'paste') 用來通知 UI 階段切換。
@@ -345,19 +356,27 @@ class Transcriber:
         raw = None
         stt_engine = self.config.get("stt_engine", "mlx-whisper")
 
-        # 進化 5: 資源管理 - 長音訊 (>30s) 優先走 Groq 以節省本地資源
-        if audio_duration > 30 and self.config.get("groq_api_key"):
+        # Respect the selected primary route.  Hybrid mode means: for the local
+        # profile, short clips use local first while longer clips may use cloud first;
+        # it must not be defeated by an always-true input-type check.  With Hybrid
+        # disabled, choosing local always starts locally regardless of clip length.
+        hybrid_threshold = float(self.config.get("hybrid_audio_threshold", 15))
+        prefer_local = (
+            stt_engine == "mlx-whisper"
+            and (not is_hybrid or audio_duration <= hybrid_threshold)
+        )
+        if stt_engine == "groq":
             raw = _try_stt("groq", self._groq_stt, stt_input, duration=audio_duration)
             if raw: stt_source = "groq"
-
-        if not raw:
-            if stt_engine == "groq":
-                raw = _try_stt("groq", self._groq_stt, stt_input, duration=audio_duration)
-                if raw: stt_source = "groq"
-            elif stt_engine != "cloud-only" and is_hybrid:
-                if isinstance(stt_input, (np.ndarray, str)) or audio_duration <= self.config.get("hybrid_audio_threshold", 15):
-                    raw = _try_stt("local", self._local_stt, stt_input)
-                    if raw: stt_source = "local"
+        elif stt_engine == "cloud-only" and self.config.get("openai_api_key"):
+            raw = _try_stt(
+                "openai_whisper", self._whisper_api_fallback,
+                stt_input, duration=audio_duration,
+            )
+            if raw: stt_source = "cloud"
+        elif prefer_local:
+            raw = _try_stt("local", self._local_stt, stt_input)
+            if raw: stt_source = "local"
 
         if not raw and self.config.get("groq_api_key"):
             raw = _try_stt("groq", self._groq_stt, stt_input, duration=audio_duration)
@@ -366,6 +385,13 @@ class Transcriber:
         if not raw and self.config.get("openai_api_key"):
             raw = _try_stt("openai_whisper", self._whisper_api_fallback, stt_input, duration=audio_duration)
             if raw: stt_source = "cloud"
+
+        # A long Hybrid clip tries cloud first, but local remains the final offline
+        # fallback.  This avoids returning an empty result when cloud keys are absent
+        # or temporarily unavailable.
+        if not raw and stt_engine == "mlx-whisper" and "local" not in _stt_attempted:
+            raw = _try_stt("local", self._local_stt, stt_input)
+            if raw: stt_source = "local"
 
         if not raw or not raw.strip():
             event_ledger.log("stt_all_failed", audio_sec=round(float(audio_duration), 2))
@@ -421,7 +447,7 @@ class Transcriber:
         final = None
         
         # 進化 1: App Awareness Prompt
-        system_prompt = self._get_system_prompt(app_info)
+        system_prompt = self._get_system_prompt(app_info, detected_language)
 
         if mode == "dictate" and self._should_skip_llm(corrected):
             final, llm_source = corrected, "skip"
@@ -517,6 +543,8 @@ class Transcriber:
             "stt_time": round(t_stt, 2), "llm_time": round(t_llm, 2),
             "stt_source": stt_source, "llm_source": llm_source,
             "detected_language": detected_language,
+            "audio_duration": round(float(audio_duration or 0), 2),
+            "scene": scene_key,
             "app_name": app_info.get("app_name"), "bundle_id": app_id
         }
         # history 是 verified few-shot 的資料來源；逐筆原子寫入通常只需數毫秒，
@@ -566,7 +594,7 @@ class Transcriber:
 
         # ── LLM 階段（同 transcribe 主路徑邏輯，但用 temperature=0.3 讓結果有差異） ──
         final = None
-        system_prompt = self._get_system_prompt(app_info)
+        system_prompt = self._get_system_prompt(app_info, cache.get("detected_language"))
         llm_source = "none"
 
         if mode == "dictate" and self._should_skip_llm(corrected):
@@ -658,6 +686,8 @@ class Transcriber:
                 "stt_source": cache.get("stt_source", "cache"),
                 "llm_source": llm_source,
                 "detected_language": cache.get("detected_language"),
+                "audio_duration": round(float(cache.get("audio_duration") or 0), 2),
+                "scene": scene_key,
                 "app_name": app_info.get("app_name"),
                 "bundle_id": app_id,
             }
@@ -692,7 +722,7 @@ class Transcriber:
         if not api_key: return None
         try:
             client = self._get_openai_client("openrouter_llm", base_url="https://openrouter.ai/api/v1", api_key=api_key, timeout=self._llm_timeout())
-            model = self.config.get("openrouter_model", "qwen/qwen3.6-plus")
+            model = self.config.get("openrouter_model", "qwen/qwen3-30b-a3b:free")
             system = self._EDIT_SYSTEM if mode == "edit" else (system_prompt or self._get_system_prompt())
             t0 = time.time()
             messages = [{"role": "system", "content": system}, *self._few_shot_pairs(mode, current_text=text), {"role": "user", "content": self._wrap_edit_text(text, edit_context) if mode == "edit" else text}]
@@ -869,7 +899,12 @@ class Transcriber:
     # 舊版的「Keep original language.」「Vocabulary:」這類英文指令詞不但無效，
     # 還把 decoder 往英文 style 偏置（對繁中輸出是反效果）。
     # 改用繁中敘述句 — 看起來像「前一段逐字稿」，同時做繁體字形 biasing。
-    _LANG_HINT = "以下為繁體中文、日本語、English 混用的口述逐字稿。"
+    _LANG_HINTS = {
+        "auto": "以下為繁體中文、日本語、English 混用的口述逐字稿。",
+        "zh": "以下為繁體中文口述逐字稿，可能包含日本語或 English 專有詞。",
+        "ja": "以下は日本語の音声書き起こしです。繁体字中国語や English の固有名詞を含む場合があります。",
+        "en": "The following is an English transcript and may contain Traditional Chinese or Japanese proper nouns.",
+    }
 
     def _build_stt_prompt(self):
         """注入 custom_words + 當前場景詞彙 + BASE_CUSTOM_WORDS（去重，≤20 詞 / ≤200 字）。"""
@@ -880,7 +915,15 @@ class Transcriber:
             vocab = self.memory.build_whisper_prompt(custom, scene_words)
         except Exception:
             vocab = ""
-        return f"{self._LANG_HINT}相關詞彙：{vocab}。" if vocab else self._LANG_HINT
+        language = str(self.config.get("language", "auto") or "auto").lower()
+        language_hint = self._LANG_HINTS.get(language, self._LANG_HINTS["auto"])
+        if not vocab:
+            return language_hint
+        if language == "ja":
+            return f"{language_hint} 関連語彙：{vocab}。"
+        if language == "en":
+            return f"{language_hint} Relevant vocabulary: {vocab}."
+        return f"{language_hint}相關詞彙：{vocab}。"
 
     # ─── Whisper 重複幻覺 sanitizer ─────────────────────
     _REP_PATTERN = re.compile(r'(.{1,15}?)\1{4,}')
@@ -1081,6 +1124,13 @@ class Transcriber:
     _SKIP_CHARS = set('，。、！？；：「」『』（）【】〈〉《》 \t\n\r　,.!?;:()[]{}"\'')
     _LATIN_TOKEN_RE = re.compile(r"[A-Za-z][A-Za-z0-9_.+\-/]*")
     _KANA_TOKEN_RE = re.compile(r"[\u3040-\u30ff\u31f0-\u31ff]+")
+    _STRUCTURED_SPAN_RE = re.compile(
+        r"(?:https?://|www\.)[^\s<>\"']+"
+        r"|[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}"
+        r"|(?:(?:~?/)|(?:[A-Za-z0-9_.\-]+/))[A-Za-z0-9_./~+\-]+"
+        r"|(?<![A-Za-z0-9_])[$¥€£]?\d(?:[\d,]*\d)?(?:\.\d+)*(?:%|[A-Za-z]{1,4})?(?![A-Za-z0-9_])"
+    )
+    _STRUCTURED_TRAILING_PUNCT = ".,!?;:，。！？；：)]}）】〉》」』"
 
     def _code_switch_spans_preserved(self, original_text, result):
         """dictate mode 的硬守門：Latin token 不可被刪除／翻譯，Kana 不可整段消失。
@@ -1110,13 +1160,27 @@ class Transcriber:
 
         original_tokens = [
             _latin_token(token) for token in self._LATIN_TOKEN_RE.findall(original)
-            if len(_latin_token(token)) > 1 and _latin_token(token) not in fillers
+            if _latin_token(token) and _latin_token(token) not in fillers
         ]
         output_tokens = [
             _latin_token(token) for token in self._LATIN_TOKEN_RE.findall(output)
-            if len(_latin_token(token)) > 1 and _latin_token(token) not in fillers
+            if _latin_token(token) and _latin_token(token) not in fillers
         ]
         if original_tokens != output_tokens:
+            return False
+
+        # Latin-token comparison catches most English brands, but numeric-only values,
+        # URLs with numeric query parameters, dates, prices and filesystem paths could
+        # still be silently "polished" into a different value.  Preserve their ordered
+        # literal spans; only sentence-final punctuation may be added/removed.
+        def _structured_spans(text):
+            return [
+                match.group(0).rstrip(self._STRUCTURED_TRAILING_PUNCT)
+                for match in self._STRUCTURED_SPAN_RE.finditer(text)
+                if match.group(0).rstrip(self._STRUCTURED_TRAILING_PUNCT)
+            ]
+
+        if _structured_spans(original) != _structured_spans(output):
             return False
 
         # 先移除允許刪除的 filler，再串接所有 kana run 比較；句讀可自由插入，
