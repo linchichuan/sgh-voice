@@ -1,42 +1,53 @@
 # SGH Voice
 
-> AI-powered voice input tool for macOS, iOS, and Android. Trilingual (Japanese / Traditional Chinese / English) speech recognition with on-device processing options. BYOK (Bring Your Own Key) model — users supply their own API keys to AI providers; the app itself is free.
+> A macOS voice-input tool designed for people who mix Traditional Chinese, Japanese, and English while they work. SGH Voice turns speech into edited text and inserts it at the active cursor.
 
-## Product
-- macOS app (Apple Silicon + Intel)
-- iOS app (iPhone / iPad)
-- Android app (Google Play in review)
-- Open source: https://github.com/linchichuan/sgh-voice
+## Current public release
 
-## Key Features
-- Trilingual mixed-language recognition (zh-TW / ja / en) without manual language switching
-- Optional medical-domain mode for healthcare professionals, MRs, CRAs, researchers (prescription drug names, diagnostic terms, biotech vocabulary)
-- Local-first AI: MediaTek Breeze-ASR-25 model runs on-device on Apple Silicon (3.5× faster than Whisper-turbo, 0.8GB 4-bit quantized)
-- Hybrid mode: short utterances → local AI, long utterances → cloud AI for cost optimization
-- Multiple LLM provider support: Ollama, Groq, Claude, OpenAI, OpenRouter (with automatic failover)
-- Custom dictionary for proper nouns and domain-specific terminology
-- Voiceprint verification: filters background voices and ambient noise
-- Android IME (works as keyboard in any app)
+- Version: 2.6.0
+- Platform: macOS on Apple Silicon
+- Download: https://github.com/linchichuan/sgh-voice/releases/tag/v2.6.0
+- License and source: https://github.com/linchichuan/sgh-voice
+- App price: free
+- Cloud usage: BYOK; provider charges may apply
+- Mobile status: iOS and Android are development tracks, not part of the current public macOS installer
 
-## Privacy Stance
-- All API keys stored encrypted on-device (AES-256, EncryptedSharedPreferences)
-- No audio data sent to or stored on Shingihou servers
-- Audio sent to user-configured AI provider (OpenAI / Anthropic / Groq) per their respective privacy policies
-- Custom dictionary stored locally only
+## Product capabilities
 
-## Pricing
-- Free plan: full app functionality, BYOK (user pays AI providers directly)
-- Pro plan (future): server-provided API keys, reasonable-use cap
+- Mixed Traditional Chinese, Japanese, and English dictation
+- Protection for Latin text, kana, URLs, code, numbers, and abbreviations during post-processing
+- Direct insertion at the active cursor
+- Restoration of the original clipboard after insertion
+- Custom dictionary for names and domain terminology
+- Verified personalization based on user-edited history
+- Configurable shortcuts, push-to-talk behavior, language profiles, and AI providers
+- Optional on-device speech recognition on supported Apple Silicon Macs
+- Optional cloud processing through providers configured by the user
+
+## Data handling
+
+- Dictionary and application settings are managed on the user's device
+- Local speech recognition keeps audio processing on the device
+- When a cloud engine is selected, audio or text is sent to the provider selected by the user
+- Shingihou does not store audio on an intermediate relay server
+- Cloud data handling follows the selected provider's terms and privacy policy
+
+## Important limitations
+
+- Recognition results vary with the model, dictionary, settings, microphone, and recording environment
+- Medical and technical modes are input aids; they do not replace professional judgment or guarantee accuracy
+- The current direct installer is for Apple Silicon Macs
 
 ## Company
-- Shingihou Co., Ltd. (新義豊株式会社) — Fukuoka, Japan
-- Founded 2015
-- Cross-border medical innovation and intelligent automation
+
+- Shingihou Co., Ltd. / 新義豊株式会社
+- Fukuoka, Japan
 - Contact: info@shingihou.com
 
 ## Pages
+
 - Home: https://voice.shingihou.com/
 - Privacy Policy: https://voice.shingihou.com/privacy.html
 - Terms of Service: https://voice.shingihou.com/terms.html
-- GitHub: https://github.com/linchichuan/sgh-voice
+- GitHub Releases: https://github.com/linchichuan/sgh-voice/releases
 - Company: https://shingihou.com

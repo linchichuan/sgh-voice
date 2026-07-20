@@ -1,6 +1,5 @@
 User-agent: *
 Allow: /
-Disallow: /assets/generated/
 
 # AI / LLM crawlers — explicit opt-in
 User-agent: GPTBot

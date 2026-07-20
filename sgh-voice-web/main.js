@@ -1,29 +1,43 @@
-// ===== SGH Voice Landing — main.js =====
-
-// --- Navbar scroll effect ---
 const navbar = document.getElementById("navbar");
-if (navbar) {
-    window.addEventListener("scroll", () => {
-        navbar.classList.toggle("scrolled", window.scrollY > 20);
-    }, { passive: true });
-}
-
-// --- Language dropdown toggle ---
-const langBtn = document.getElementById("langBtn");
+const langButton = document.getElementById("langBtn");
 const langDropdown = document.getElementById("langDropdown");
-if (langBtn && langDropdown) {
-    langBtn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        langDropdown.classList.toggle("open");
-    });
-    document.addEventListener("click", () => langDropdown.classList.remove("open"));
+const mobileToggle = document.getElementById("mobileToggle");
+const navLinks = document.getElementById("navLinks");
+
+function updateNavbar() {
+    if (navbar) {
+        navbar.classList.toggle("scrolled", window.scrollY > 12);
+    }
 }
 
-// --- Mobile menu toggle ---
-const mobileToggle = document.getElementById("mobileToggle");
-const navLinks = document.querySelector(".nav-links");
+updateNavbar();
+window.addEventListener("scroll", updateNavbar, { passive: true });
+
+function closeLanguageMenu() {
+    if (!langButton || !langDropdown) return;
+    langDropdown.classList.remove("open");
+    langButton.setAttribute("aria-expanded", "false");
+}
+
+if (langButton && langDropdown) {
+    langButton.addEventListener("click", (event) => {
+        event.stopPropagation();
+        const isOpen = langDropdown.classList.toggle("open");
+        langButton.setAttribute("aria-expanded", String(isOpen));
+    });
+
+    langDropdown.addEventListener("click", closeLanguageMenu);
+    document.addEventListener("click", closeLanguageMenu);
+}
+
+function closeMobileMenu() {
+    if (!mobileToggle || !navLinks) return;
+    navLinks.classList.remove("mobile-open");
+    mobileToggle.classList.remove("active");
+    mobileToggle.setAttribute("aria-expanded", "false");
+}
+
 if (mobileToggle && navLinks) {
-    if (!navLinks.id) navLinks.id = "navLinks";
     mobileToggle.addEventListener("click", () => {
         const isOpen = navLinks.classList.toggle("mobile-open");
         mobileToggle.classList.toggle("active", isOpen);
@@ -31,108 +45,31 @@ if (mobileToggle && navLinks) {
     });
 }
 
-// --- Smooth scroll for anchor links ---
-document.querySelectorAll('a[href^="#"]').forEach(link => {
-    link.addEventListener("click", (e) => {
-        const target = document.querySelector(link.getAttribute("href"));
-        if (target) {
-            e.preventDefault();
-            target.scrollIntoView({ behavior: "smooth" });
-            if (navLinks && navLinks.classList.contains("mobile-open")) {
-                navLinks.classList.remove("mobile-open");
-                mobileToggle.classList.remove("active");
-                mobileToggle.setAttribute("aria-expanded", "false");
-            }
-        }
+document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+        closeLanguageMenu();
+        closeMobileMenu();
+    }
+});
+
+document.querySelectorAll('a[href^="#"]').forEach((link) => {
+    link.addEventListener("click", (event) => {
+        const selector = link.getAttribute("href");
+        if (!selector || selector === "#") return;
+        const target = document.querySelector(selector);
+        if (!target) return;
+
+        event.preventDefault();
+        target.scrollIntoView({ behavior: "smooth", block: "start" });
+        closeMobileMenu();
     });
 });
 
-// --- Wait for Firebase to be ready ---
-function waitForFirestore(callback, retries = 20) {
-    if (window._firestore) { callback(window._firestore); return; }
-    if (retries <= 0) { console.warn("Firestore not loaded"); return; }
-    setTimeout(() => waitForFirestore(callback, retries - 1), 200);
-}
-
-// --- Subscribe form → Firestore ---
-const subscribeForm = document.getElementById("subscribeForm");
-if (subscribeForm) {
-    subscribeForm.addEventListener("submit", function (e) {
-        e.preventDefault();
-
-        // Honeypot：ボットが埋めると silently 拒否
-        const honeypot = document.getElementById("subscribeWebsite");
-        if (honeypot && honeypot.value) {
-            document.querySelector("#subscribeForm .input-group").style.display = "none";
-            document.querySelector("#subscribeForm .subscribe-note").style.display = "none";
-            document.getElementById("subscribeSuccess").style.display = "flex";
-            return;
-        }
-
-        const email = document.getElementById("emailInput").value.trim();
-        if (!email) return;
-
-        const submitBtn = this.querySelector('button[type="submit"]');
-        submitBtn.disabled = true;
-        submitBtn.style.opacity = "0.6";
-
-        waitForFirestore(async ({ db, collection, addDoc, serverTimestamp }) => {
-            try {
-                await addDoc(collection(db, "sgh-voice-subscribers"), {
-                    email: email,
-                    createdAt: serverTimestamp(),
-                    source: "landing-page",
-                    lang: document.documentElement.lang || "ja"
-                });
-                document.querySelector("#subscribeForm .input-group").style.display = "none";
-                document.querySelector("#subscribeForm .subscribe-note").style.display = "none";
-                document.getElementById("subscribeSuccess").style.display = "flex";
-            } catch (err) {
-                console.error("Subscribe error:", err);
-                submitBtn.disabled = false;
-                submitBtn.style.opacity = "1";
-                const msg = (window.SGH_I18N && window.SGH_I18N["subscribe.error"])
-                    || "エラーが発生しました。もう一度お試しください。";
-                alert(msg);
-            }
+document.querySelectorAll(".faq-list details").forEach((details) => {
+    details.addEventListener("toggle", () => {
+        if (!details.open) return;
+        document.querySelectorAll(".faq-list details").forEach((other) => {
+            if (other !== details) other.open = false;
         });
     });
-}
-
-// (NPP form handler is defined inline in index.html)
-
-// --- Intersection Observer for scroll animations ---
-// 防禦：prefers-reduced-motion 啟用、或 IntersectionObserver 不存在時，直接顯示，不做 opacity-0 隱藏
-const prefersReducedMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-const supportsObserver = typeof IntersectionObserver !== "undefined";
-
-if (!prefersReducedMotion && supportsObserver) {
-    const observerOptions = { threshold: 0.1, rootMargin: "0px 0px -40px 0px" };
-    const observer = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-            if (entry.isIntersecting) {
-                entry.target.classList.add("visible");
-                observer.unobserve(entry.target);
-            }
-        });
-    }, observerOptions);
-
-    document.querySelectorAll(".feature-card, .step-card, .pricing-card, .download-card, .contact-card").forEach(el => {
-        el.style.opacity = "0";
-        el.style.transform = "translateY(24px)";
-        el.style.transition = "opacity 0.6s ease, transform 0.6s ease";
-        observer.observe(el);
-    });
-
-    const visibleStyle = document.createElement("style");
-    visibleStyle.textContent = `.visible { opacity: 1 !important; transform: translateY(0) !important; }`;
-    document.head.appendChild(visibleStyle);
-
-    // Stagger animation delay
-    document.querySelectorAll(".features-grid .feature-card").forEach((el, i) => {
-        el.style.transitionDelay = `${i * 60}ms`;
-    });
-    document.querySelectorAll(".steps-grid .step-card").forEach((el, i) => {
-        el.style.transitionDelay = `${i * 100}ms`;
-    });
-}
+});
