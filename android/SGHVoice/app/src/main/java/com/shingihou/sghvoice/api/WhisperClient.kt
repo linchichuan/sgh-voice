@@ -48,7 +48,7 @@ class WhisperClient(private val apiConfig: ApiConfig) {
         
         val apiKey = if (useGroq) apiConfig.groqApiKey else apiConfig.openAiApiKey
         val apiUrl = if (useGroq) GROQ_API_URL else WHISPER_API_URL
-        val modelName = if (useGroq) "whisper-large-v3-turbo" else apiConfig.whisperModel
+        val modelName = if (useGroq) apiConfig.groqSttModel else apiConfig.whisperModel
 
         if (apiKey.isBlank()) {
             throw WhisperException("OpenAI or Groq API key not set")

@@ -18,7 +18,10 @@ class ApiConfig(context: Context) {
         private const val KEY_GROQ_API_KEY = "groq_api_key"
         private const val KEY_ELEVENLABS_API_KEY = "elevenlabs_api_key"
         private const val KEY_WHISPER_MODEL = "whisper_model"
+        private const val KEY_GROQ_STT_MODEL = "groq_stt_model"
         private const val KEY_CLAUDE_MODEL = "claude_model"
+        private const val KEY_OPENAI_LLM_MODEL = "openai_llm_model"
+        private const val KEY_GROQ_LLM_MODEL = "groq_llm_model"
         private const val KEY_LANGUAGE_PREF = "language_preference"
         private const val KEY_SETUP_COMPLETE = "setup_complete"
         private const val KEY_OUTPUT_STYLE = "output_style"
@@ -26,9 +29,11 @@ class ApiConfig(context: Context) {
         private const val KEY_LLM_ENGINE = "llm_engine"
 
         // 預設模型
-        const val DEFAULT_WHISPER_MODEL = "whisper-1"
-        const val DEFAULT_CLAUDE_MODEL = "claude-haiku-4-5-20251001"
-        const val DEFAULT_GROQ_LLM_MODEL = "llama-3.3-70b-versatile"
+        const val DEFAULT_WHISPER_MODEL = ApiModelCatalog.DEFAULT_OPENAI_STT_MODEL
+        const val DEFAULT_GROQ_STT_MODEL = ApiModelCatalog.DEFAULT_GROQ_STT_MODEL
+        const val DEFAULT_CLAUDE_MODEL = ApiModelCatalog.DEFAULT_CLAUDE_MODEL
+        const val DEFAULT_OPENAI_LLM_MODEL = ApiModelCatalog.DEFAULT_OPENAI_LLM_MODEL
+        const val DEFAULT_GROQ_LLM_MODEL = ApiModelCatalog.DEFAULT_GROQ_LLM_MODEL
     }
 
     private val masterKey = MasterKey.Builder(context)
@@ -78,10 +83,28 @@ class ApiConfig(context: Context) {
         get() = prefs.getString(KEY_WHISPER_MODEL, DEFAULT_WHISPER_MODEL) ?: DEFAULT_WHISPER_MODEL
         set(value) = prefs.edit().putString(KEY_WHISPER_MODEL, value).apply()
 
+    /** Groq 語音辨識模型名稱 */
+    var groqSttModel: String
+        get() = prefs.getString(KEY_GROQ_STT_MODEL, DEFAULT_GROQ_STT_MODEL)
+            ?: DEFAULT_GROQ_STT_MODEL
+        set(value) = prefs.edit().putString(KEY_GROQ_STT_MODEL, value).apply()
+
     /** Claude 模型名稱 */
     var claudeModel: String
         get() = prefs.getString(KEY_CLAUDE_MODEL, DEFAULT_CLAUDE_MODEL) ?: DEFAULT_CLAUDE_MODEL
         set(value) = prefs.edit().putString(KEY_CLAUDE_MODEL, value).apply()
+
+    /** OpenAI 後處理模型名稱 */
+    var openAiLlmModel: String
+        get() = prefs.getString(KEY_OPENAI_LLM_MODEL, DEFAULT_OPENAI_LLM_MODEL)
+            ?: DEFAULT_OPENAI_LLM_MODEL
+        set(value) = prefs.edit().putString(KEY_OPENAI_LLM_MODEL, value).apply()
+
+    /** Groq 後處理模型名稱 */
+    var groqLlmModel: String
+        get() = prefs.getString(KEY_GROQ_LLM_MODEL, DEFAULT_GROQ_LLM_MODEL)
+            ?: DEFAULT_GROQ_LLM_MODEL
+        set(value) = prefs.edit().putString(KEY_GROQ_LLM_MODEL, value).apply()
 
     /** 輸出風格 (normal / line / email) */
     var outputStyle: String

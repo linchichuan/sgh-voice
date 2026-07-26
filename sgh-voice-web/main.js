@@ -95,7 +95,7 @@ function syncDownloadState() {
 
     if (accepted) {
         apkDownloadButton.href = apkDownloadButton.dataset.downloadHref;
-        apkDownloadButton.setAttribute("download", "SGHVoice-Android-v2.4.0.apk");
+        apkDownloadButton.setAttribute("download", "SGHVoice-Android-v2.5.0.apk");
         label.textContent = translate("download.android.ctaReady", "我了解，下載 APK");
     } else {
         apkDownloadButton.removeAttribute("href");

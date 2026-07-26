@@ -2,6 +2,7 @@ package com.shingihou.sghvoice.processing
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.shingihou.sghvoice.learning.PersonalizationRepository
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -103,6 +104,7 @@ class DictionaryManager(context: Context) {
 
     private val prefs: SharedPreferences =
         context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+    private val personalization = PersonalizationRepository.getInstance(context)
 
     /** 自訂詞彙清單（用於 Whisper prompt 提升辨識率） */
     private var customWords: MutableList<String> = mutableListOf()
@@ -126,8 +128,10 @@ class DictionaryManager(context: Context) {
      * 上限 50 個（醫療術語較多）
      */
     fun buildWhisperPrompt(): String {
+        refreshFromDisk()
         val sceneWords = SCENE_PRESETS[activeScene]?.customWords ?: emptyList()
-        val allWords = (BASE_CUSTOM_WORDS + sceneWords + customWords).toSet().take(50)
+        // 使用者明確加入的詞應優先於大型場景詞庫，避免在 50 詞上限前被截掉。
+        val allWords = (customWords + sceneWords + BASE_CUSTOM_WORDS).toSet().take(50)
         if (allWords.isEmpty()) return ""
         val prompt = allWords.joinToString("、")
         return if (prompt.length > 800) prompt.take(800) else prompt
@@ -142,19 +146,20 @@ class DictionaryManager(context: Context) {
      * @return 修正後的文字
      */
     fun applyCorrections(text: String): String {
+        refreshFromDisk()
         val sceneCorrections = SCENE_PRESETS[activeScene]?.corrections ?: emptyMap()
-        // 合併修正規則：使用者自訂 > 場景 > 基底
-        val merged = BASE_CORRECTIONS + sceneCorrections + corrections
+        val learnedCorrections = linkedMapOf<String, String>().apply {
+            // Repository 已依信心、證據與最近使用排序；同一錯字只採最高順位。
+            personalization.getActiveVoiceCorrections().forEach { rule ->
+                putIfAbsent(rule.wrongText, rule.correctedText)
+            }
+        }
+        // 合併修正規則：自動學習 > 使用者自訂 > 場景 > 基底
+        val merged = BASE_CORRECTIONS + sceneCorrections + corrections + learnedCorrections
         if (merged.isEmpty()) return text
 
-        var result = text
-        // 依鍵長度排序（最長優先匹配），避免短詞誤匹配
-        val sortedCorrections = merged.entries.sortedByDescending { it.key.length }
-
-        for ((wrong, correct) in sortedCorrections) {
-            result = result.replace(wrong, correct)
-        }
-        return result
+        // 單次由左至右掃描可避免 A→B、B→C 產生非預期連鎖替換。
+        return TextCorrectionEngine.apply(text, merged)
     }
 
     /**
@@ -201,10 +206,16 @@ class DictionaryManager(context: Context) {
     }
 
     /** 取得所有自訂詞彙 */
-    fun getCustomWords(): List<String> = customWords.toList()
+    fun getCustomWords(): List<String> {
+        loadCustomWords()
+        return customWords.toList()
+    }
 
     /** 取得所有修正規則 */
-    fun getCorrections(): Map<String, String> = corrections.toMap()
+    fun getCorrections(): Map<String, String> {
+        loadCorrections()
+        return corrections.toMap()
+    }
 
     // ===== 內部方法 =====
 
@@ -248,5 +259,54 @@ class DictionaryManager(context: Context) {
         val obj = JSONObject()
         corrections.forEach { (k, v) -> obj.put(k, v) }
         prefs.edit().putString(KEY_CORRECTIONS, obj.toString()).apply()
+    }
+
+    private fun refreshFromDisk() {
+        loadCustomWords()
+        loadCorrections()
+    }
+
+}
+
+/**
+ * 單次、非連鎖的最長詞彙替換器。獨立成純 Kotlin 物件以便 JVM 測試。
+ */
+internal object TextCorrectionEngine {
+    fun apply(text: String, corrections: Map<String, String>): String {
+        val sortedCorrections = corrections.entries
+            .filter { it.key.isNotEmpty() && it.key != it.value }
+            .sortedByDescending { it.key.length }
+        if (sortedCorrections.isEmpty()) return text
+
+        return buildString(text.length) {
+            var offset = 0
+            while (offset < text.length) {
+                val match = sortedCorrections.firstOrNull { (wrong, _) ->
+                    text.regionMatches(offset, wrong, 0, wrong.length) &&
+                        hasSafeAsciiWordBoundary(text, offset, wrong)
+                }
+                if (match == null) {
+                    append(text[offset])
+                    offset += 1
+                } else {
+                    append(match.value)
+                    offset += match.key.length
+                }
+            }
+        }
+    }
+
+    /**
+     * 純 ASCII 英數詞必須落在單字邊界，避免例如 `cloud` 誤改
+     * `cloudflare`。中日文規則維持連續字串比對。
+     */
+    private fun hasSafeAsciiWordBoundary(text: String, start: Int, wrong: String): Boolean {
+        if (!wrong.all { it.code < 128 && (it.isLetterOrDigit() || it == '_') }) return true
+        val end = start + wrong.length
+        val leftSafe =
+            start == 0 || (!text[start - 1].isLetterOrDigit() && text[start - 1] != '_')
+        val rightSafe =
+            end == text.length || (!text[end].isLetterOrDigit() && text[end] != '_')
+        return leftSafe && rightSafe
     }
 }

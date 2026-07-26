@@ -4,34 +4,72 @@
     <string name="app_name">SGH Voice</string>
     <string name="ime_label">SGH Voice Input</string>
 
-    <!-- Subtype labels -->
-    <string name="subtype_label">Voice Input (Trad. Chinese)</string>
-    <string name="subtype_label_ja">Voice Input (Japanese)</string>
-    <string name="subtype_label_en">Voice Input (English)</string>
-
     <!-- Keyboard Status -->
-    <string name="status_idle">Hold Mic to speak</string>
-    <string name="status_recording">Recording... Release to stop</string>
-    <string name="status_processing">Processing...</string>
+    <string name="keyboard_brand">SGH Voice</string>
+    <string name="mode_voice">Voice</string>
+    <string name="mode_zhuyin">注</string>
+    <string name="mode_japanese">あ</string>
+    <string name="mode_english">ABC</string>
+    <string name="mode_voice_desc">Switch to voice input</string>
+    <string name="mode_zhuyin_desc">Switch to Zhuyin input</string>
+    <string name="mode_japanese_desc">Switch to Japanese romaji input</string>
+    <string name="mode_english_desc">Switch to English input</string>
+    <string name="status_idle">Tap to start speaking</string>
+    <string name="status_starting">Preparing microphone…</string>
+    <string name="status_recording">Recording — tap again to send</string>
+    <string name="status_stopping">Finishing recording…</string>
+    <string name="status_processing">Processing…</string>
     <string name="status_done">Done</string>
     <string name="status_error">Error</string>
+    <string name="status_recording_elapsed">Recording %1$s — tap again to send</string>
+    <string name="status_recording_limit">Two-minute limit reached — sending</string>
+    <string name="status_learning_saved">Learned locally: “%1$s → %2$s”</string>
+    <string name="status_learning_disabled">Personalized learning is disabled for this field</string>
+    <string name="mic_action_start">Start speaking</string>
+    <string name="mic_action_recording">Stop and convert</string>
+    <string name="mic_action_processing">Converting to text…</string>
+    <string name="voice_toggle_hint">Tap to start, then tap again when finished</string>
 
     <string name="msg_record_failed">Recording failed: </string>
     <string name="msg_record_too_short">Recording too short, try again.</string>
-    <string name="msg_recognizing">Recognizing speech...</string>
-    <string name="msg_post_processing">Recognizing done, processing...</string>
-    <string name="msg_ai_processing">AI refining text...</string>
+    <string name="msg_recognizing">Recognizing speech…</string>
+    <string name="msg_post_processing">Recognizing done, processing…</string>
+    <string name="msg_ai_processing">AI refining text…</string>
     <string name="msg_no_speech">No speech detected, try again.</string>
     <string name="msg_process_failed">Processing failed: </string>
     <string name="msg_error">Error: </string>
     <string name="msg_unknown_error">Unknown error</string>
     <string name="msg_recognize_failed">Recognition failed</string>
+    <string name="msg_missing_stt_key">Open SGH Voice and configure a speech-recognition API key first.</string>
+    <string name="msg_initializing">Initializing, please wait…</string>
+    <string name="msg_initialization_failed">Initialization failed. Reopen the keyboard.</string>
+    <string name="msg_initialization_timeout">Initialization timed out. Try again.</string>
+    <string name="msg_input_connection_lost">The input field changed, so the result was not inserted.</string>
+    <string name="msg_voice_disabled_sensitive">Cloud voice input is unavailable in this sensitive field.</string>
 
     <!-- Keyboard buttons -->
-    <string name="mic_button_desc">Voice Input Mic</string>
+    <string name="mic_button_desc">Tap to start or stop recording</string>
     <string name="key_backspace">⌫</string>
+    <string name="key_backspace_desc">Backspace</string>
     <string name="key_space">Space</string>
     <string name="key_enter">↵</string>
+    <string name="key_enter_desc">Enter or send</string>
+    <string name="key_at">@</string>
+    <string name="key_numbers">\?123</string>
+    <string name="key_letters">ABC</string>
+    <string name="key_shift_desc">Change letter case</string>
+    <string name="key_comma">,</string>
+    <string name="key_period">.</string>
+    <string name="key_next_keyboard">Next</string>
+    <string name="key_next_keyboard_desc">Switch to the next system keyboard</string>
+    <string name="zhuyin_composition_hint">Enter Zhuyin and choose a candidate</string>
+    <string name="zhuyin_no_candidates">No candidates yet</string>
+    <string name="candidate_ready_hint">Candidates and learned terms appear here</string>
+    <string name="candidate_content_description">Candidate: %1$s</string>
+    <string name="candidate_expand_desc">Show all candidates</string>
+    <string name="candidate_collapse_desc">Collapse candidates</string>
+    <string name="japanese_composition_hint">Type romaji and choose a Japanese candidate</string>
+    <string name="english_composition_hint">Type in English</string>
 
     <!-- Setup Screen Tabs -->
     <string name="tab_basic_settings">Basic Settings</string>
@@ -42,6 +80,8 @@
     <string name="step_api_keys">Setup API Keys</string>
     <string name="openai_key_label">OpenAI API Key</string>
     <string name="anthropic_key_label">Anthropic API Key</string>
+    <string name="groq_key_label">Groq API Key (Whisper)</string>
+    <string name="elevenlabs_key_label">ElevenLabs API Key (TTS)</string>
     <string name="btn_hide">Hide</string>
     <string name="btn_show">Show</string>
     <string name="btn_save_keys">Save Keys</string>
@@ -59,16 +99,66 @@
     <string name="title_corrections">Error Corrections</string>
     <string name="label_wrong_word">Original</string>
     <string name="label_correct_word">Corrected</string>
+    <string name="title_personalized_learning">On-device personalization</string>
+    <string name="label_personalized_learning">Learn candidate choices and voice corrections</string>
+    <string name="desc_personalized_learning">Only short terms, candidate counts, and correction pairs are stored. Full sentences and audio are not saved. Password fields and editors that disable personalization are excluded.</string>
+    <string name="learning_stats">%1$d candidates and %2$d corrections learned</string>
+    <string name="btn_undo_learning">Undo last learning</string>
+    <string name="btn_clear_learning">Clear learned data</string>
+    <string name="msg_learning_cleared">Personalized learning data cleared</string>
+    <string name="confirm_clear_learning">This removes learned candidate ranking and automatic corrections. Your manually entered dictionary is preserved.</string>
 
     <!-- Usage Guide -->
     <string name="usage_title">Usage Guide</string>
-    <string name="usage_step1">1. Hold the blue microphone button to speak, then release to stop recording.</string>
-    <string name="usage_step2">2. The system automatically processes mixed language (EN/JA/ZH) and removes filler words.</string>
-    <string name="usage_step3">3. Simplified Chinese will be converted to Traditional Chinese (Taiwan standard) automatically.</string>
-    <string name="usage_step4">4. Add proper nouns to the "Personal Dictionary" if they are often misrecognized.</string>
+    <string name="usage_step1">1. In Voice mode, tap once to record and tap again to stop and recognize.</string>
+    <string name="usage_step2">2. Switch between Zhuyin, Japanese romaji, and English inside the same keyboard.</string>
+    <string name="usage_step3">3. Voice mode handles mixed Chinese, Japanese, and English; Chinese output is Traditional Chinese.</string>
+    <string name="usage_step4">4. Frequently selected candidates move forward. Short voice-text corrections in the same field are learned locally.</string>
+    <string name="jmdict_attribution">Japanese common-word candidates: JMdict / EDRDG (CC BY-SA 4.0)</string>
+    <string name="btn_dictionary_license">View dictionary source and license</string>
 
     <string name="output_style_label">Output Style</string>
     <string name="style_normal">Normal Text (Default)</string>
     <string name="style_line">LINE Message (Short &amp; Casual)</string>
     <string name="style_email">Formal Email (Professional)</string>
+
+    <string name="step_engine_selection">Choose services and models</string>
+    <string name="label_stt_engine">Speech recognition (STT) service</string>
+    <string name="label_llm_engine">Text post-processing (LLM) service</string>
+    <string name="label_stt_model">Speech recognition model</string>
+    <string name="label_llm_model">Text post-processing model</string>
+    <string name="model_id_format">Actual model ID: %1$s</string>
+    <string name="model_cost_notice">Models differ in speed, accuracy, and API cost. Availability depends on your provider account.</string>
+    <string name="engine_openai">OpenAI</string>
+    <string name="engine_groq">Groq</string>
+    <string name="engine_claude">Anthropic Claude</string>
+    <string name="engine_none">None (Dictionary Corrections Only)</string>
+    <string name="model_openai_stt_mini">GPT-4o mini Transcribe (fast, lower cost)</string>
+    <string name="model_openai_stt_full">GPT-4o Transcribe (higher accuracy)</string>
+    <string name="model_openai_stt_whisper">Whisper-1 (compatibility)</string>
+    <string name="model_groq_stt_turbo">Whisper Large V3 Turbo (fast, recommended)</string>
+    <string name="model_groq_stt_large">Whisper Large V3 (higher accuracy)</string>
+    <string name="model_claude_haiku">Claude Haiku 4.5 (fast, lower cost, recommended)</string>
+    <string name="model_claude_sonnet">Claude Sonnet 5 (higher quality)</string>
+    <string name="model_claude_opus">Claude Opus 4.8 (high quality, higher cost)</string>
+    <string name="model_claude_fable">Claude Fable 5 (latest long-running model; not recommended for dictation)</string>
+    <string name="model_openai_llm_mini">GPT-4o mini (fast, lower cost)</string>
+    <string name="model_openai_llm_full">GPT-4o (higher quality)</string>
+    <string name="model_groq_llm_small">GPT OSS 20B (fast, lower cost)</string>
+    <string name="model_groq_llm_large">GPT OSS 120B (higher quality, recommended)</string>
+    <string name="price_openai_stt_mini">Per 1M tokens: US$1.25 audio input / US$5 text output</string>
+    <string name="price_openai_stt_full">Per 1M tokens: US$2.50 audio input / US$10 text output</string>
+    <string name="price_openai_stt_whisper">US$0.006 per audio minute</string>
+    <string name="price_groq_stt_turbo">US$0.04 per audio hour</string>
+    <string name="price_groq_stt_large">US$0.111 per audio hour</string>
+    <string name="price_claude_haiku">Per 1M tokens: US$1 input / US$5 output</string>
+    <string name="price_claude_sonnet">Through 2026-08-31: US$2 input / US$10 output; then US$3 / US$15</string>
+    <string name="price_claude_opus">Per 1M tokens: US$5 input / US$25 output</string>
+    <string name="price_claude_fable">Per 1M tokens: US$10 input / US$50 output</string>
+    <string name="price_openai_llm_mini">Per 1M tokens: US$0.15 input / US$0.60 output</string>
+    <string name="price_openai_llm_full">Per 1M tokens: US$2.50 input / US$10 output</string>
+    <string name="price_groq_llm_small">Per 1M tokens: US$0.075 input / US$0.30 output</string>
+    <string name="price_groq_llm_large">Per 1M tokens: US$0.15 input / US$0.60 output</string>
+    <string name="model_price_reference">Price reference: official public provider pricing checked 2026-07-26. Your provider’s current pricing and bill take precedence.</string>
+    <string name="groq_reasoning_notice">SGH Voice uses low reasoning effort for GPT OSS to limit latency and reasoning-token use during dictation cleanup.</string>
 </resources>

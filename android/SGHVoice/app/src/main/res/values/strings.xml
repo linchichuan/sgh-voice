@@ -4,34 +4,72 @@
     <string name="app_name">SGH Voice</string>
     <string name="ime_label">SGH Voice 語音輸入</string>
 
-    <!-- 輸入法子類型標籤 -->
-    <string name="subtype_label">語音輸入（繁中）</string>
-    <string name="subtype_label_ja">音声入力（日本語）</string>
-    <string name="subtype_label_en">Voice Input (English)</string>
-
     <!-- 鍵盤狀態文字 -->
-    <string name="status_idle">按住麥克風開始說話</string>
-    <string name="status_recording">錄音中…放開停止</string>
+    <string name="keyboard_brand">SGH Voice</string>
+    <string name="mode_voice">語音</string>
+    <string name="mode_zhuyin">注</string>
+    <string name="mode_japanese">あ</string>
+    <string name="mode_english">ABC</string>
+    <string name="mode_voice_desc">切換至語音輸入</string>
+    <string name="mode_zhuyin_desc">切換至注音輸入</string>
+    <string name="mode_japanese_desc">切換至日文羅馬字輸入</string>
+    <string name="mode_english_desc">切換至英文輸入</string>
+    <string name="status_idle">點一下開始說話</string>
+    <string name="status_starting">正在準備麥克風…</string>
+    <string name="status_recording">錄音中，再點一下送出</string>
+    <string name="status_stopping">正在結束錄音…</string>
     <string name="status_processing">處理中…</string>
     <string name="status_done">輸入完成</string>
     <string name="status_error">發生錯誤</string>
+    <string name="status_recording_elapsed">錄音中 %1$s，再點一下送出</string>
+    <string name="status_recording_limit">已達兩分鐘上限，正在送出</string>
+    <string name="status_learning_saved">已在本機學習「%1$s → %2$s」</string>
+    <string name="status_learning_disabled">此欄位已停用個人化學習</string>
+    <string name="mic_action_start">開始說話</string>
+    <string name="mic_action_recording">停止並轉成文字</string>
+    <string name="mic_action_processing">正在轉成文字…</string>
+    <string name="voice_toggle_hint">點一下開始，說完再點一下送出</string>
 
     <string name="msg_record_failed">錄音失敗：</string>
     <string name="msg_record_too_short">錄音時間太短，請再試一次</string>
-    <string name="msg_recognizing">語音辨識中...</string>
-    <string name="msg_post_processing">辨識完成，後處理中...</string>
-    <string name="msg_ai_processing">AI 潤稿中...</string>
+    <string name="msg_recognizing">語音辨識中…</string>
+    <string name="msg_post_processing">辨識完成，後處理中…</string>
+    <string name="msg_ai_processing">AI 潤稿中…</string>
     <string name="msg_no_speech">未偵測到語音，請再試一次</string>
     <string name="msg_process_failed">處理失敗：</string>
     <string name="msg_error">錯誤：</string>
     <string name="msg_unknown_error">未知錯誤</string>
     <string name="msg_recognize_failed">辨識失敗</string>
+    <string name="msg_missing_stt_key">請先開啟 SGH Voice App 設定語音辨識 API Key</string>
+    <string name="msg_initializing">系統初始化中，請稍候…</string>
+    <string name="msg_initialization_failed">系統初始化失敗，請重新開啟輸入法</string>
+    <string name="msg_initialization_timeout">系統初始化逾時，請再試一次</string>
+    <string name="msg_input_connection_lost">輸入欄位已切換，未送出辨識結果</string>
+    <string name="msg_voice_disabled_sensitive">為保護安全，此欄位不提供雲端語音輸入</string>
 
     <!-- 鍵盤按鍵 -->
-    <string name="mic_button_desc">語音輸入麥克風按鈕</string>
+    <string name="mic_button_desc">點一下開始或停止錄音</string>
     <string name="key_backspace">⌫</string>
+    <string name="key_backspace_desc">退格</string>
     <string name="key_space">空白</string>
     <string name="key_enter">↵</string>
+    <string name="key_enter_desc">換行或送出</string>
+    <string name="key_at">@</string>
+    <string name="key_numbers">\?123</string>
+    <string name="key_letters">ABC</string>
+    <string name="key_shift_desc">切換大小寫</string>
+    <string name="key_comma">，</string>
+    <string name="key_period">。</string>
+    <string name="key_next_keyboard">切換</string>
+    <string name="key_next_keyboard_desc">切換到下一個系統鍵盤</string>
+    <string name="zhuyin_composition_hint">輸入注音後選擇候選字</string>
+    <string name="zhuyin_no_candidates">尚無候選字</string>
+    <string name="candidate_ready_hint">候選字與常用詞會顯示在這裡</string>
+    <string name="candidate_content_description">候選字：%1$s</string>
+    <string name="candidate_expand_desc">展開全部候選字</string>
+    <string name="candidate_collapse_desc">收合候選字</string>
+    <string name="japanese_composition_hint">輸入羅馬字後選擇日文候選</string>
+    <string name="english_composition_hint">直接輸入英文</string>
 
     <!-- 設定頁面 -->
     <string name="tab_basic_settings">基本設定</string>
@@ -61,23 +99,66 @@
     <string name="title_corrections">錯誤修正規則</string>
     <string name="label_wrong_word">原字</string>
     <string name="label_correct_word">修正</string>
+    <string name="title_personalized_learning">本機個人化學習</string>
+    <string name="label_personalized_learning">自動學習候選字與語音修正</string>
+    <string name="desc_personalized_learning">只保存短詞、候選使用次數與錯字對照，不保存完整句子或音訊。密碼及禁止個人化的欄位不會學習。</string>
+    <string name="learning_stats">已學習 %1$d 個候選、%2$d 組修正</string>
+    <string name="btn_undo_learning">撤銷最近學習</string>
+    <string name="btn_clear_learning">清除學習資料</string>
+    <string name="msg_learning_cleared">個人化學習資料已清除</string>
+    <string name="confirm_clear_learning">這會刪除候選排序與自動學會的修正規則；手動詞庫不受影響。</string>
 
     <!-- 使用說明 -->
     <string name="usage_title">使用說明</string>
-    <string name="usage_step1">1. 按住藍色麥克風說話，放開即停止並開始辨識。</string>
-    <string name="usage_step2">2. 系統會自動處理中、日、英三語混合，並修正口語填充詞。</string>
-    <string name="usage_step3">3. 所有的簡體字都會在最後一步自動轉為繁體中文（台灣慣用詞）。</string>
-    <string name="usage_step4">4. 若有專有名詞辨識不準，請在「個人詞庫」中新增該詞彙。</string>
+    <string name="usage_step1">1. 語音模式點一下開始錄音，再點一下停止並送出辨識。</string>
+    <string name="usage_step2">2. 可在同一個鍵盤切換注音、日文羅馬字與英文，不必切換 Samsung 鍵盤。</string>
+    <string name="usage_step3">3. 語音會自動處理中、日、英混合，中文結果轉為繁體中文。</string>
+    <string name="usage_step4">4. 常選的字會自動提高順位；語音文字在同一欄位被短範圍修正時，也會在本機學習。</string>
+    <string name="jmdict_attribution">日文常用詞候選資料：JMdict／EDRDG（CC BY-SA 4.0）</string>
+    <string name="btn_dictionary_license">查看字典來源與授權</string>
 
     <string name="output_style_label">預設防護語氣風格</string>
     <string name="style_normal">一般文字（預設）</string>
     <string name="style_line">LINE 訊息（簡短口語）</string>
     <string name="style_email">正式 Email（嚴謹專業）</string>
 
-    <string name="label_stt_engine">語音辨識 (STT) 引擎</string>
-    <string name="label_llm_engine">後處理 (LLM) 引擎</string>
-    <string name="engine_openai">OpenAI (最精確)</string>
-    <string name="engine_groq">Groq (極速)</string>
-    <string name="engine_claude">Claude (Anthropic)</string>
+    <string name="step_engine_selection">選擇服務與模型</string>
+    <string name="label_stt_engine">語音辨識 (STT) 服務</string>
+    <string name="label_llm_engine">文字後處理 (LLM) 服務</string>
+    <string name="label_stt_model">語音辨識模型</string>
+    <string name="label_llm_model">文字後處理模型</string>
+    <string name="model_id_format">實際模型 ID：%1$s</string>
+    <string name="model_cost_notice">模型的速度、準確度與 API 費用不同；實際可用性依你的服務商帳戶而定。</string>
+    <string name="engine_openai">OpenAI</string>
+    <string name="engine_groq">Groq</string>
+    <string name="engine_claude">Anthropic Claude</string>
     <string name="engine_none">不使用 (僅詞庫修正)</string>
+    <string name="model_openai_stt_mini">GPT-4o mini Transcribe（快速省費）</string>
+    <string name="model_openai_stt_full">GPT-4o Transcribe（較高精準度）</string>
+    <string name="model_openai_stt_whisper">Whisper-1（相容模式）</string>
+    <string name="model_groq_stt_turbo">Whisper Large V3 Turbo（快速，建議）</string>
+    <string name="model_groq_stt_large">Whisper Large V3（較高精準度）</string>
+    <string name="model_claude_haiku">Claude Haiku 4.5（快速省費，建議）</string>
+    <string name="model_claude_sonnet">Claude Sonnet 5（較高品質）</string>
+    <string name="model_claude_opus">Claude Opus 4.8（高品質、較高費用）</string>
+    <string name="model_claude_fable">Claude Fable 5（最新長任務模型，語音整理不建議）</string>
+    <string name="model_openai_llm_mini">GPT-4o mini（快速省費）</string>
+    <string name="model_openai_llm_full">GPT-4o（較高品質）</string>
+    <string name="model_groq_llm_small">GPT OSS 20B（快速省費）</string>
+    <string name="model_groq_llm_large">GPT OSS 120B（較高品質，建議）</string>
+    <string name="price_openai_stt_mini">每 100 萬 token：音訊輸入 US$1.25／文字輸出 US$5</string>
+    <string name="price_openai_stt_full">每 100 萬 token：音訊輸入 US$2.50／文字輸出 US$10</string>
+    <string name="price_openai_stt_whisper">每分鐘音訊 US$0.006</string>
+    <string name="price_groq_stt_turbo">每小時音訊 US$0.04</string>
+    <string name="price_groq_stt_large">每小時音訊 US$0.111</string>
+    <string name="price_claude_haiku">每 100 萬 token：輸入 US$1／輸出 US$5</string>
+    <string name="price_claude_sonnet">至 2026-08-31：輸入 US$2／輸出 US$10；其後 US$3／US$15</string>
+    <string name="price_claude_opus">每 100 萬 token：輸入 US$5／輸出 US$25</string>
+    <string name="price_claude_fable">每 100 萬 token：輸入 US$10／輸出 US$50</string>
+    <string name="price_openai_llm_mini">每 100 萬 token：輸入 US$0.15／輸出 US$0.60</string>
+    <string name="price_openai_llm_full">每 100 萬 token：輸入 US$2.50／輸出 US$10</string>
+    <string name="price_groq_llm_small">每 100 萬 token：輸入 US$0.075／輸出 US$0.30</string>
+    <string name="price_groq_llm_large">每 100 萬 token：輸入 US$0.15／輸出 US$0.60</string>
+    <string name="model_price_reference">價格基準：2026-07-26 查核的供應商官方公開價格；實際帳單與後續調整以供應商為準。</string>
+    <string name="groq_reasoning_notice">SGH Voice 對 GPT OSS 使用 low 推理強度，降低語音整理時的延遲與推理 token 消耗。</string>
 </resources>

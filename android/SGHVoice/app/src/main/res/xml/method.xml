@@ -1,18 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 輸入法宣告設定 — 將模式改為 keyboard 以確保出現在主切換清單 -->
+<!--
+  SGH Voice 只註冊一個系統輸入法項目。
+  中／日／英語音由使用者選擇的 STT 模型辨識；語音／注音／日文／英文模式在鍵盤內切換，
+  不再用多個 system subtype 讓 Samsung 顯示重複項目。
+-->
 <input-method xmlns:android="http://schemas.android.com/apk/res/android"
     android:settingsActivity="com.shingihou.sghvoice.ui.MainActivity"
-    android:icon="@mipmap/ic_launcher">
+    android:icon="@mipmap/ic_launcher"
+    android:supportsSwitchingToNextInputMethod="true">
     <subtype
-        android:label="@string/subtype_label"
-        android:imeSubtypeLocale="zh_TW"
-        android:imeSubtypeMode="keyboard" />
-    <subtype
-        android:label="@string/subtype_label_ja"
-        android:imeSubtypeLocale="ja_JP"
-        android:imeSubtypeMode="keyboard" />
-    <subtype
-        android:label="@string/subtype_label_en"
-        android:imeSubtypeLocale="en_US"
-        android:imeSubtypeMode="keyboard" />
+        android:label="@string/ime_label"
+        android:languageTag="zh-Hant-TW"
+        android:imeSubtypeMode="keyboard"
+        android:isAuxiliary="false"
+        android:overridesImplicitlyEnabledSubtype="true" />
 </input-method>

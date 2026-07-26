@@ -1,6 +1,7 @@
 package com.shingihou.sghvoice.ui
 
 import android.content.Intent
+import android.net.Uri
 import android.provider.Settings
 import android.view.inputmethod.InputMethodManager
 import androidx.compose.foundation.layout.*
@@ -19,6 +20,8 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.shingihou.sghvoice.api.ApiConfig
+import com.shingihou.sghvoice.api.ApiModelCatalog
+import com.shingihou.sghvoice.learning.PersonalizationRepository
 import com.shingihou.sghvoice.processing.DictionaryManager
 import androidx.compose.ui.res.stringResource
 import com.shingihou.sghvoice.R
@@ -31,6 +34,7 @@ import com.shingihou.sghvoice.R
 fun SetupScreen(apiConfig: ApiConfig) {
     val context = LocalContext.current
     val dictionaryManager = remember { DictionaryManager(context) }
+    val personalization = remember { PersonalizationRepository.getInstance(context) }
     
     var selectedTab by remember { mutableIntStateOf(0) }
     val tabs = listOf(
@@ -53,13 +57,14 @@ fun SetupScreen(apiConfig: ApiConfig) {
         Box(modifier = Modifier.fillMaxSize().padding(16.dp)) {
             when (selectedTab) {
                 0 -> BasicSettingsTab(apiConfig)
-                1 -> DictionaryTab(dictionaryManager)
+                1 -> DictionaryTab(dictionaryManager, personalization)
                 2 -> UsageTab()
             }
         }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun BasicSettingsTab(apiConfig: ApiConfig) {
     val context = LocalContext.current
@@ -79,6 +84,87 @@ private fun BasicSettingsTab(apiConfig: ApiConfig) {
     var selectedStyle by remember { mutableStateOf(apiConfig.outputStyle) }
     var selectedSttEngine by remember { mutableStateOf(apiConfig.sttEngine) }
     var selectedLlmEngine by remember { mutableStateOf(apiConfig.llmEngine) }
+    var selectedOpenAiSttModel by remember { mutableStateOf(apiConfig.whisperModel) }
+    var selectedGroqSttModel by remember { mutableStateOf(apiConfig.groqSttModel) }
+    var selectedClaudeModel by remember { mutableStateOf(apiConfig.claudeModel) }
+    var selectedOpenAiLlmModel by remember { mutableStateOf(apiConfig.openAiLlmModel) }
+    var selectedGroqLlmModel by remember { mutableStateOf(apiConfig.groqLlmModel) }
+
+    val openAiSttModels = listOf(
+        UiModelOption(
+            ApiModelCatalog.OPENAI_STT_GPT_4O_MINI,
+            stringResource(R.string.model_openai_stt_mini),
+            stringResource(R.string.price_openai_stt_mini)
+        ),
+        UiModelOption(
+            ApiModelCatalog.OPENAI_STT_GPT_4O,
+            stringResource(R.string.model_openai_stt_full),
+            stringResource(R.string.price_openai_stt_full)
+        ),
+        UiModelOption(
+            ApiModelCatalog.OPENAI_STT_WHISPER,
+            stringResource(R.string.model_openai_stt_whisper),
+            stringResource(R.string.price_openai_stt_whisper)
+        )
+    )
+    val groqSttModels = listOf(
+        UiModelOption(
+            ApiModelCatalog.GROQ_STT_TURBO,
+            stringResource(R.string.model_groq_stt_turbo),
+            stringResource(R.string.price_groq_stt_turbo)
+        ),
+        UiModelOption(
+            ApiModelCatalog.GROQ_STT_LARGE,
+            stringResource(R.string.model_groq_stt_large),
+            stringResource(R.string.price_groq_stt_large)
+        )
+    )
+    val claudeModels = listOf(
+        UiModelOption(
+            ApiModelCatalog.CLAUDE_HAIKU_4_5,
+            stringResource(R.string.model_claude_haiku),
+            stringResource(R.string.price_claude_haiku)
+        ),
+        UiModelOption(
+            ApiModelCatalog.CLAUDE_SONNET_5,
+            stringResource(R.string.model_claude_sonnet),
+            stringResource(R.string.price_claude_sonnet)
+        ),
+        UiModelOption(
+            ApiModelCatalog.CLAUDE_OPUS_4_8,
+            stringResource(R.string.model_claude_opus),
+            stringResource(R.string.price_claude_opus)
+        ),
+        UiModelOption(
+            ApiModelCatalog.CLAUDE_FABLE_5,
+            stringResource(R.string.model_claude_fable),
+            stringResource(R.string.price_claude_fable)
+        )
+    )
+    val openAiLlmModels = listOf(
+        UiModelOption(
+            ApiModelCatalog.OPENAI_LLM_GPT_4O_MINI,
+            stringResource(R.string.model_openai_llm_mini),
+            stringResource(R.string.price_openai_llm_mini)
+        ),
+        UiModelOption(
+            ApiModelCatalog.OPENAI_LLM_GPT_4O,
+            stringResource(R.string.model_openai_llm_full),
+            stringResource(R.string.price_openai_llm_full)
+        )
+    )
+    val groqLlmModels = listOf(
+        UiModelOption(
+            ApiModelCatalog.GROQ_LLM_GPT_OSS_20B,
+            stringResource(R.string.model_groq_llm_small),
+            stringResource(R.string.price_groq_llm_small)
+        ),
+        UiModelOption(
+            ApiModelCatalog.GROQ_LLM_GPT_OSS_120B,
+            stringResource(R.string.model_groq_llm_large),
+            stringResource(R.string.price_groq_llm_large)
+        )
+    )
 
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(scrollState),
@@ -87,7 +173,7 @@ private fun BasicSettingsTab(apiConfig: ApiConfig) {
         Text(stringResource(R.string.title_basic_settings), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
 
         // === 步驟一：引擎選擇 ===
-        StepCard(stepNumber = 1, title = "選擇服務引擎") {
+        StepCard(stepNumber = 1, title = stringResource(R.string.step_engine_selection)) {
             Text(stringResource(R.string.label_stt_engine), fontWeight = FontWeight.SemiBold)
             val sttEngines = listOf("openai" to stringResource(R.string.engine_openai), "groq" to stringResource(R.string.engine_groq))
             sttEngines.forEach { (id, name) ->
@@ -96,13 +182,28 @@ private fun BasicSettingsTab(apiConfig: ApiConfig) {
                     Text(text = name)
                 }
             }
+
+            when (selectedSttEngine) {
+                "groq" -> ModelSelector(
+                    label = stringResource(R.string.label_stt_model),
+                    selectedModel = selectedGroqSttModel,
+                    options = groqSttModels,
+                    onModelSelected = { selectedGroqSttModel = it }
+                )
+                else -> ModelSelector(
+                    label = stringResource(R.string.label_stt_model),
+                    selectedModel = selectedOpenAiSttModel,
+                    options = openAiSttModels,
+                    onModelSelected = { selectedOpenAiSttModel = it }
+                )
+            }
             
             Spacer(modifier = Modifier.height(8.dp))
             Text(stringResource(R.string.label_llm_engine), fontWeight = FontWeight.SemiBold)
             val llmEngines = listOf(
                 "claude" to stringResource(R.string.engine_claude),
-                "openai" to "OpenAI (GPT-4o)",
-                "groq" to "Groq (Llama 3)",
+                "openai" to stringResource(R.string.engine_openai),
+                "groq" to stringResource(R.string.engine_groq),
                 "none" to stringResource(R.string.engine_none)
             )
             llmEngines.forEach { (id, name) ->
@@ -111,6 +212,45 @@ private fun BasicSettingsTab(apiConfig: ApiConfig) {
                     Text(text = name)
                 }
             }
+
+            when (selectedLlmEngine) {
+                "claude" -> ModelSelector(
+                    label = stringResource(R.string.label_llm_model),
+                    selectedModel = selectedClaudeModel,
+                    options = claudeModels,
+                    onModelSelected = { selectedClaudeModel = it }
+                )
+                "openai" -> ModelSelector(
+                    label = stringResource(R.string.label_llm_model),
+                    selectedModel = selectedOpenAiLlmModel,
+                    options = openAiLlmModels,
+                    onModelSelected = { selectedOpenAiLlmModel = it }
+                )
+                "groq" -> ModelSelector(
+                    label = stringResource(R.string.label_llm_model),
+                    selectedModel = selectedGroqLlmModel,
+                    options = groqLlmModels,
+                    onModelSelected = { selectedGroqLlmModel = it }
+                )
+            }
+
+            if (selectedLlmEngine == "groq") {
+                Text(
+                    text = stringResource(R.string.groq_reasoning_notice),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+            Text(
+                text = stringResource(R.string.model_cost_notice),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                text = stringResource(R.string.model_price_reference),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
 
         // === 步驟二：API 金鑰 ===
@@ -192,6 +332,11 @@ private fun BasicSettingsTab(apiConfig: ApiConfig) {
                     apiConfig.outputStyle = selectedStyle
                     apiConfig.sttEngine = selectedSttEngine
                     apiConfig.llmEngine = selectedLlmEngine
+                    apiConfig.whisperModel = selectedOpenAiSttModel
+                    apiConfig.groqSttModel = selectedGroqSttModel
+                    apiConfig.claudeModel = selectedClaudeModel
+                    apiConfig.openAiLlmModel = selectedOpenAiLlmModel
+                    apiConfig.groqLlmModel = selectedGroqLlmModel
                     saveMessage = msgSaved
                 },
                 modifier = Modifier.fillMaxWidth()
@@ -217,9 +362,88 @@ private fun BasicSettingsTab(apiConfig: ApiConfig) {
     }
 }
 
+private data class UiModelOption(
+    val id: String,
+    val label: String,
+    val pricing: String
+)
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ModelSelector(
+    label: String,
+    selectedModel: String,
+    options: List<UiModelOption>,
+    onModelSelected: (String) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val selectedOption = options.firstOrNull { it.id == selectedModel }
+    val selectedLabel = selectedOption?.label
+        ?: selectedModel
+
+    Spacer(modifier = Modifier.height(6.dp))
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = !expanded }
+    ) {
+        OutlinedTextField(
+            value = selectedLabel,
+            onValueChange = {},
+            readOnly = true,
+            label = { Text(label) },
+            trailingIcon = {
+                ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
+            },
+            modifier = Modifier
+                .menuAnchor()
+                .fillMaxWidth()
+        )
+        ExposedDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+            options.forEach { option ->
+                DropdownMenuItem(
+                    text = {
+                        Column {
+                            Text(option.label)
+                            Text(
+                                text = option.pricing,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    },
+                    onClick = {
+                        onModelSelected(option.id)
+                        expanded = false
+                    }
+                )
+            }
+        }
+    }
+    Text(
+        text = stringResource(R.string.model_id_format, selectedModel),
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(start = 16.dp, top = 3.dp)
+    )
+    selectedOption?.let { option ->
+        Text(
+            text = option.pricing,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(start = 16.dp, top = 2.dp)
+        )
+    }
+}
+
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
-private fun DictionaryTab(dictionaryManager: DictionaryManager) {
+private fun DictionaryTab(
+    dictionaryManager: DictionaryManager,
+    personalization: PersonalizationRepository
+) {
     val scrollState = rememberScrollState()
     var newWord by remember { mutableStateOf("") }
     var customWords by remember { mutableStateOf(dictionaryManager.getCustomWords()) }
@@ -227,12 +451,91 @@ private fun DictionaryTab(dictionaryManager: DictionaryManager) {
     var wrongText by remember { mutableStateOf("") }
     var correctText by remember { mutableStateOf("") }
     var corrections by remember { mutableStateOf(dictionaryManager.getCorrections()) }
+    var learningEnabled by remember { mutableStateOf(personalization.isEnabled()) }
+    var learningStats by remember { mutableStateOf(personalization.getStats()) }
+    var learningMessage by remember { mutableStateOf("") }
+    var showClearLearningDialog by remember { mutableStateOf(false) }
+    val learningClearedMessage = stringResource(R.string.msg_learning_cleared)
 
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(scrollState),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text(stringResource(R.string.title_dictionary_manage), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text(
+                    stringResource(R.string.title_personalized_learning),
+                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        stringResource(R.string.label_personalized_learning),
+                        modifier = Modifier.weight(1f)
+                    )
+                    Switch(
+                        checked = learningEnabled,
+                        onCheckedChange = { enabled ->
+                            personalization.setEnabled(enabled)
+                            learningEnabled = enabled
+                            learningStats = personalization.getStats()
+                            learningMessage = ""
+                        }
+                    )
+                }
+                Text(
+                    stringResource(R.string.desc_personalized_learning),
+                    style = MaterialTheme.typography.bodySmall
+                )
+                Text(
+                    stringResource(
+                        R.string.learning_stats,
+                        learningStats.candidateRecordCount,
+                        learningStats.activeCorrectionRuleCount
+                    ),
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = {
+                            if (personalization.undoLast()) {
+                                learningStats = personalization.getStats()
+                                learningMessage = ""
+                            }
+                        },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(stringResource(R.string.btn_undo_learning))
+                    }
+                    OutlinedButton(
+                        onClick = { showClearLearningDialog = true },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(stringResource(R.string.btn_clear_learning))
+                    }
+                }
+                if (learningMessage.isNotBlank()) {
+                    Text(
+                        learningMessage,
+                        color = MaterialTheme.colorScheme.primary,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            }
+        }
 
         // 自訂詞彙卡片
         Card(modifier = Modifier.fillMaxWidth()) {
@@ -324,10 +627,36 @@ private fun DictionaryTab(dictionaryManager: DictionaryManager) {
             }
         }
     }
+
+    if (showClearLearningDialog) {
+        AlertDialog(
+            onDismissRequest = { showClearLearningDialog = false },
+            title = { Text(stringResource(R.string.btn_clear_learning)) },
+            text = { Text(stringResource(R.string.confirm_clear_learning)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        personalization.clearAll()
+                        learningStats = personalization.getStats()
+                        learningMessage = learningClearedMessage
+                        showClearLearningDialog = false
+                    }
+                ) {
+                    Text(stringResource(R.string.btn_clear_learning))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearLearningDialog = false }) {
+                    Text(stringResource(android.R.string.cancel))
+                }
+            }
+        )
+    }
 }
 
 @Composable
 private fun UsageTab() {
+    val context = LocalContext.current
     val scrollState = rememberScrollState()
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(scrollState),
@@ -343,6 +672,26 @@ private fun UsageTab() {
                 Text(stringResource(R.string.usage_step3), style = MaterialTheme.typography.bodyMedium)
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(stringResource(R.string.usage_step4), style = MaterialTheme.typography.bodyMedium)
+            }
+        }
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    stringResource(R.string.jmdict_attribution),
+                    style = MaterialTheme.typography.bodySmall
+                )
+                TextButton(
+                    onClick = {
+                        context.startActivity(
+                            Intent(
+                                Intent.ACTION_VIEW,
+                                Uri.parse("https://www.edrdg.org/edrdg/licence.html")
+                            )
+                        )
+                    }
+                ) {
+                    Text(stringResource(R.string.btn_dictionary_license))
+                }
             }
         }
     }

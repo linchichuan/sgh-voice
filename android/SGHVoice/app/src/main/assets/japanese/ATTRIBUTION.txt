@@ -1,0 +1,27 @@
+SGH Voice Japanese Lexicon Attribution
+
+This package uses a filtered subset of the JMdict/EDICT dictionary files.
+These files are the property of the Electronic Dictionary Research and
+Development Group (EDRDG), and are used in conformance with the Group's
+licence.
+
+Project: https://www.edrdg.org/jmdict/j_jmdict.html
+EDRDG: https://www.edrdg.org/
+Licence statement: https://www.edrdg.org/edrdg/licence.html
+Data licence: Creative Commons Attribution-ShareAlike 4.0 International
+Full licence file: CC-BY-SA-4.0.txt
+
+Source distribution: https://www.edrdg.org/pub/Nihongo/JMdict_b.gz
+Source snapshot date: 2026-07-26
+Source SHA-256: 2e583f835dc1517f8c53718ebb74a8c98651f786f7b508c521387baaa0070d00
+Included subset: 19631 exact readings / 22819 candidates
+Priority filters: gai1, ichi1, news1, spec1
+
+The generated jmdict_common.tsv and adaptations of that data are distributed
+under CC BY-SA 4.0. The SGH Voice application code is separately licensed.
+JMdict does not endorse SGH Voice. The data is supplied without warranty.
+
+Update procedure:
+Run tools/generate_japanese_lexicon.py against the current official JMdict_b
+distribution, review the generated snapshot metadata and tests, then include
+the refreshed assets in the next APK release.

@@ -4,22 +4,27 @@
 
 ## Current Android test release
 
-- Version: 2.4.0 (version code 17)
+- Version: 2.5.0 (version code 18)
 - Platform: Android 8.0 or later
 - Distribution status: personal test build, distributed as a versioned APK from the official SGH Voice website
 - Google Play status: not currently published through Google Play Production
-- Download: https://voice.shingihou.com/downloads/SGHVoice-Android-v2.4.0.apk
-- File size: 5,728,189 bytes
-- SHA-256: 29985ffaf5ba124e199ec9035cc6b3ea75e502c5da420ba5ff75cd7704d77ce0
+- Download: https://voice.shingihou.com/downloads/SGHVoice-Android-v2.5.0.apk
+- File size: 5.51 MiB (5,776,870 bytes)
+- SHA-256: 09ef82a6b796a0047cecde607162d0cbe1536f3356b3cb54ee810f88d3c76d1a
 - App price: free
 - Cloud usage: BYOK; OpenAI or Groq usage charges may apply
 
 ### Android capabilities
 
 - Four modes in one Android input method: Voice, Zhuyin, Japanese, and English
+- SGH Voice brand and icon remain visible at the top left of the keyboard
 - Tap once to begin recording and tap again to stop and process
 - Standard Zhuyin layout without requiring Pinyin
-- Japanese romaji, kana, katakana, and common exact-reading candidates
+- Zhuyin prediction from incomplete syllables, optional tone marks, and multi-syllable candidate generation
+- Japanese romaji, kana, katakana, and reading-prefix candidate prediction
+- Up to 24 candidates with a horizontal strip and an expandable three-column, multi-row view
+- Selectable STT and LLM models with the actual provider model ID and a dated public-pricing reference shown in Android settings
+- Groq GPT OSS post-processing uses low reasoning effort to limit latency and reasoning-token consumption
 - English QWERTY input
 - On-device candidate-frequency learning and short correction rules
 - Personalization disabled in password and no-personalization fields
@@ -32,6 +37,7 @@
 - Compatibility and stability can vary by device; users should evaluate sideloading risks before installation
 - Keep Google Play Protect enabled
 - Japanese conversion is Phase 1 and does not yet provide sentence-level contextual conversion comparable to a mature Japanese IME such as Mozc
+- Google Play's 12-tester, 14-day closed-test requirement applies to personal developer accounts created after November 13, 2023 when applying for Production access; it is not a requirement for every developer account or for directly installing this APK
 
 ## Current macOS public release
 

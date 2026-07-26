@@ -1,13 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 麥克風按鈕背景 — 圓形藍色 -->
+<!-- 語音輸入主操作 -->
 <ripple xmlns:android="http://schemas.android.com/apk/res/android"
     android:color="#40FFFFFF">
     <item>
-        <shape android:shape="oval">
+        <shape android:shape="rectangle">
             <solid android:color="@color/mic_bg" />
-            <size
-                android:width="96dp"
-                android:height="96dp" />
+            <corners android:radius="18dp" />
         </shape>
     </item>
 </ripple>

@@ -1,0 +1,31 @@
+{
+  "candidateCount": 22819,
+  "candidatePairCountBeforeDeduplication": 22982,
+  "dataLicence": "CC BY-SA 4.0",
+  "formatVersion": 1,
+  "generatedAtUtc": "2026-07-26T10:12:57+00:00",
+  "legalCodeSha256": "28a9529c7d0bb4dc51f4bf5c116a3d16ef247a052f7591466768ddf563fd1cf5",
+  "legalCodeUrl": "https://creativecommons.org/licenses/by-sa/4.0/legalcode.txt",
+  "lexiconBytes": 637207,
+  "lexiconFile": "jmdict_common.tsv",
+  "lexiconSha256": "cb24ed461283976ff962b70a87370a1a78f2d75be517202a087732753c137810",
+  "licenceStatementUrl": "https://www.edrdg.org/edrdg/licence.html",
+  "maxCandidatesPerReading": 24,
+  "priorityEntryCount": 20945,
+  "priorityTags": [
+    "gai1",
+    "ichi1",
+    "news1",
+    "spec1"
+  ],
+  "readingCount": 19631,
+  "scannedEntryCount": 210855,
+  "source": "JMdict_b",
+  "sourceBytes": 10237378,
+  "sourceCreated": "2026-07-26",
+  "sourceFetchedFrom": "local-file",
+  "sourceProjectUrl": "https://www.edrdg.org/jmdict/j_jmdict.html",
+  "sourceSha256": "2e583f835dc1517f8c53718ebb74a8c98651f786f7b508c521387baaa0070d00",
+  "sourceUrl": "https://www.edrdg.org/pub/Nihongo/JMdict_b.gz",
+  "updateProcedure": "Regenerate from the current official JMdict_b distribution and ship the refreshed assets with an APK release."
+}

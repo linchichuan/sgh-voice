@@ -2,6 +2,7 @@ package com.shingihou.sghvoice.processing
 
 import com.shingihou.sghvoice.api.LlmClient
 import com.shingihou.sghvoice.api.WhisperClient
+import kotlinx.coroutines.CancellationException
 
 /**
  * 語音辨識處理管線
@@ -10,6 +11,7 @@ import com.shingihou.sghvoice.api.WhisperClient
  * 2. 詞庫修正 — 自訂詞彙替換（最長匹配優先）
  * 3. LLM 後處理 — 去填充詞、修正標點、潤稿 (支援 Claude/OpenAI/Groq)
  * 4. OpenCC s2twp — 繁體中文最終防護
+ * 5. 最終詞庫修正 — 防止 LLM／OpenCC 把已學會的專有詞改回去
  */
 class TranscriptionPipeline(
     private val whisperClient: WhisperClient,
@@ -83,13 +85,20 @@ class TranscriptionPipeline(
             val sceneExtra = dictionaryManager.getSceneSystemPromptExtra()
             val processedText = try {
                 llmClient.postProcess(correctedText, sceneExtra)
+            } catch (error: CancellationException) {
+                throw error
             } catch (e: Exception) {
                 // LLM 失敗時降級為使用詞庫修正後的結果
                 correctedText
             }
 
             // === 第四層：OpenCC 繁體中文轉換 ===
-            val finalText = openCCConverter.convert(processedText)
+            val traditionalText = openCCConverter.convert(processedText)
+
+            // === 第五層：最終詞庫修正 ===
+            // LLM 有機會重新改寫第二層已修正的詞，因此在輸出前再做一次
+            // 非連鎖、最長優先的本機規則套用。
+            val finalText = dictionaryManager.applyCorrections(traditionalText)
 
             val result = Result(
                 text = finalText,
@@ -99,6 +108,8 @@ class TranscriptionPipeline(
             callback?.onCompleted(result)
             return result
 
+        } catch (error: CancellationException) {
+            throw error
         } catch (e: Exception) {
             val errorMsg = e.message ?: "Unknown error"
             callback?.onError(errorMsg)
@@ -120,6 +131,8 @@ class TranscriptionPipeline(
             val whisperPrompt = dictionaryManager.buildWhisperPrompt()
             val rawText = whisperClient.transcribe(wavData, whisperPrompt)
             Result(text = rawText, rawText = rawText, success = true)
+        } catch (error: CancellationException) {
+            throw error
         } catch (e: Exception) {
             Result(success = false, error = e.message ?: "Transcription failed")
         }

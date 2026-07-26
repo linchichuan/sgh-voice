@@ -1,6 +1,6 @@
 package com.shingihou.sghvoice.processing
 
-import com.shingihou.sghvoice.api.ClaudeClient
+import com.shingihou.sghvoice.api.LlmClient
 import com.shingihou.sghvoice.api.WhisperClient
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -10,7 +10,6 @@ import org.mockito.Mock
 import org.mockito.Mockito.`when`
 import org.mockito.MockitoAnnotations
 import org.mockito.kotlin.any
-import org.mockito.kotlin.whenever
 
 /**
  * 處理管線單元測試
@@ -20,7 +19,7 @@ class TranscriptionPipelineTest {
     @Mock
     private lateinit var whisperClient: WhisperClient
     @Mock
-    private lateinit var claudeClient: ClaudeClient
+    private lateinit var llmClient: LlmClient
     @Mock
     private lateinit var dictionaryManager: DictionaryManager
     
@@ -31,7 +30,7 @@ class TranscriptionPipelineTest {
     fun setup() {
         MockitoAnnotations.openMocks(this)
         openCCConverter = OpenCCConverter() // 使用真實物件測試轉換邏輯
-        pipeline = TranscriptionPipeline(whisperClient, claudeClient, dictionaryManager, openCCConverter)
+        pipeline = TranscriptionPipeline(whisperClient, llmClient, dictionaryManager, openCCConverter)
     }
 
     @Test
@@ -46,9 +45,12 @@ class TranscriptionPipelineTest {
         
         // 2. 模擬詞庫修正：新义丰 -> 新義豊
         `when`(dictionaryManager.applyCorrections(whisperRawResult)).thenReturn("我的公司是新義豊，在fukuoka。")
+        `when`(dictionaryManager.applyCorrections("我的公司是新義豊，在 Fukuoka。"))
+            .thenReturn("我的公司是新義豊，在 Fukuoka。")
+        `when`(dictionaryManager.getSceneSystemPromptExtra()).thenReturn("")
         
-        // 3. 模擬 Claude 潤稿：加上標點、去填充詞
-        `when`(claudeClient.postProcess("我的公司是新義豊，在fukuoka。")).thenReturn("我的公司是新義豊，在 Fukuoka。")
+        // 3. 模擬 LLM 潤稿：加上標點、去填充詞
+        `when`(llmClient.postProcess("我的公司是新義豊，在fukuoka。", "")).thenReturn("我的公司是新義豊，在 Fukuoka。")
 
         // 執行管線
         val result = pipeline.process(rawWav)

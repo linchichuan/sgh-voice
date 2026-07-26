@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 換行鍵背景 — 圓角藍色 -->
+<!-- 換行／送出鍵背景 -->
 <ripple xmlns:android="http://schemas.android.com/apk/res/android"
     android:color="#40FFFFFF">
     <item>
         <shape android:shape="rectangle">
             <solid android:color="@color/key_enter_bg" />
-            <corners android:radius="8dp" />
+            <corners android:radius="10dp" />
         </shape>
     </item>
 </ripple>

@@ -2,6 +2,7 @@ package com.shingihou.sghvoice.api
 
 import com.github.houbb.opencc4j.util.ZhConverterUtil
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import okhttp3.Call
@@ -93,8 +94,20 @@ class LlmClient(private val apiConfig: ApiConfig) {
         val engine = apiConfig.llmEngine
         val raw = when (engine) {
             "claude" -> processClaude(text, systemPrompt)
-            "openai" -> processOpenAiLike(text, systemPrompt, OPENAI_API_URL, apiConfig.openAiApiKey, "gpt-4o")
-            "groq" -> processOpenAiLike(text, systemPrompt, GROQ_API_URL, apiConfig.groqApiKey, ApiConfig.DEFAULT_GROQ_LLM_MODEL)
+            "openai" -> processOpenAiLike(
+                text,
+                systemPrompt,
+                OPENAI_API_URL,
+                apiConfig.openAiApiKey,
+                apiConfig.openAiLlmModel
+            )
+            "groq" -> processOpenAiLike(
+                text,
+                systemPrompt,
+                GROQ_API_URL,
+                apiConfig.groqApiKey,
+                apiConfig.groqLlmModel
+            )
             else -> return text
         }
 
@@ -221,6 +234,14 @@ class LlmClient(private val apiConfig: ApiConfig) {
                     })
                 })
                 put("temperature", 0.0)
+                if (
+                    model == ApiModelCatalog.GROQ_LLM_GPT_OSS_20B ||
+                    model == ApiModelCatalog.GROQ_LLM_GPT_OSS_120B
+                ) {
+                    // Dictation cleanup is a short, focused task. Low reasoning
+                    // keeps latency and hidden reasoning-token usage bounded.
+                    put("reasoning_effort", "low")
+                }
             }
 
             val request = Request.Builder()
@@ -244,6 +265,8 @@ class LlmClient(private val apiConfig: ApiConfig) {
             val body = response.body?.string() ?: return ""
             if (!response.isSuccessful) return ""
             parser(JSONObject(body))
+        } catch (error: CancellationException) {
+            throw error
         } catch (e: Exception) {
             ""
         }
