@@ -142,19 +142,21 @@
             }
         }
     </style>
+    <link rel="stylesheet" href="legal.css?v=20260726-android">
 </head>
 
 <body>
     <div class="container">
+        <a href="/" class="back-link">← Back to SGH Voice</a>
         <header>
-            <h1>🎙 SGH Voice</h1>
+            <h1>SGH Voice</h1>
             <p>Privacy Policy / プライバシーポリシー</p>
         </header>
 
         <div class="lang-toggle">
-            <button class="active" onclick="switchLang('ja')">日本語</button>
-            <button onclick="switchLang('zh')">繁體中文</button>
-            <button onclick="switchLang('en')">English</button>
+            <button class="active" onclick="switchLang('ja', this)">日本語</button>
+            <button onclick="switchLang('zh', this)">繁體中文</button>
+            <button onclick="switchLang('en', this)">English</button>
         </div>
 
         <!-- ===== 日本語 ===== -->
@@ -162,7 +164,7 @@
             <div class="card">
                 <h2>1. はじめに</h2>
                 <p>本プライバシーポリシーは、新義豊株式会社（以下「当社」）が提供する「SGH Voice」アプリケーション（以下「本アプリ」）における個人情報の取扱いについて説明します。</p>
-                <p><strong>最終更新日：</strong>2026年6月1日（v2.4.0 改訂）</p>
+                <p><strong>最終更新日：</strong>2026年7月26日（Android v2.4.0 対応）</p>
             </div>
 
             <div class="card">
@@ -177,13 +179,13 @@
                 </ul>
 
                 <h3>2.2 API キー</h3>
-                <p>ユーザーが入力した API キー（OpenAI / Anthropic / Groq / OpenRouter / ElevenLabs）は、端末内の保護領域に保存されます。v2.4.0 以降、macOS では Keychain への移行を進めており、それ以前のバージョンでは <code>~/.voice-input/config.json</code> にファイルパーミッション 600 で保管されます。これらのキーが当社のサーバーに送信されることは一切ありません。</p>
+                <p>ユーザーが入力した API キー（OpenAI / Anthropic / Groq / OpenRouter / ElevenLabs）は、端末内の保護領域に保存されます。Android 版では EncryptedSharedPreferences、macOS v2.4.0 以降では Keychain への移行を進めており、それ以前の macOS 版では <code>~/.voice-input/config.json</code> にファイルパーミッション 600 で保管されます。これらのキーが当社のサーバーに送信されることはありません。</p>
 
                 <h3>2.3 辞書データ</h3>
-                <p>ユーザーが登録したカスタム辞書および修正ルールは、端末のローカルストレージにのみ保存されます。</p>
+                <p>ユーザーが登録したカスタム辞書、候補頻度、短い修正ルールは端末のローカルストレージにのみ保存されます。Android 版はパスワード欄およびパーソナライズ禁止欄で学習を無効にします。</p>
 
                 <h3>2.4 発話履歴</h3>
-                <p>各回の音声認識結果と最終出力テキストは <code>~/.voice-input/history.json</code> に保存され、Dashboard で参照・編集・削除できます。当社のサーバーには送信されません。13項の削除請求機能で一括消去できます。</p>
+                <p>macOS 版では、各回の音声認識結果と最終出力テキストを <code>~/.voice-input/history.json</code> に保存し、Dashboard で参照・編集・削除できます。Android v2.4.0 は完全な発話履歴ファイルを作成せず、個人化に必要な候補頻度と短い修正ルールのみを端末内に保持します。いずれも当社のサーバーには送信されません。</p>
             </div>
 
             <div class="card">
@@ -292,7 +294,7 @@
             <div class="card">
                 <h2>1. 前言</h2>
                 <p>本隱私權政策說明新義豊株式會社（以下簡稱「本公司」）所提供之「SGH Voice」應用程式（以下簡稱「本應用程式」）如何處理個人資訊。</p>
-                <p><strong>最後更新：</strong>2026 年 6 月 1 日（v2.4.0 改訂）</p>
+                <p><strong>最後更新：</strong>2026 年 7 月 26 日（Android v2.4.0 對應）</p>
             </div>
 
             <div class="card">
@@ -307,13 +309,13 @@
                 </ul>
 
                 <h3>2.2 API 金鑰</h3>
-                <p>使用者輸入的 API 金鑰（OpenAI / Anthropic / Groq / OpenRouter / ElevenLabs）儲存於裝置內保護區域。v2.4.0 起在 macOS 上將漸進遷移至 Keychain，此前版本則以檔案權限 600 儲存於 <code>~/.voice-input/config.json</code>。這些金鑰不會被傳送至本公司的伺服器。</p>
+                <p>使用者輸入的 API 金鑰（OpenAI / Anthropic / Groq / OpenRouter / ElevenLabs）儲存於裝置內保護區域。Android 版使用 EncryptedSharedPreferences；macOS v2.4.0 起逐步遷移至 Keychain，更早的 macOS 版本則以檔案權限 600 儲存於 <code>~/.voice-input/config.json</code>。這些金鑰不會被傳送至本公司的伺服器。</p>
 
                 <h3>2.3 詞庫資料</h3>
-                <p>使用者註冊的自訂詞庫及修正規則僅儲存在裝置的本機儲存空間中。</p>
+                <p>使用者註冊的自訂詞庫、候選頻率及短修正規則僅儲存在裝置的本機儲存空間中。Android 版會在密碼欄位及禁止個人化的欄位停用學習。</p>
 
                 <h3>2.4 發話歷史</h3>
-                <p>每次語音辨識結果與最終輸出文字會儲存於 <code>~/.voice-input/history.json</code>，可從 Dashboard 檢視、編輯、刪除。不會傳送至本公司伺服器。可透過第 13 項的刪除請求功能一次清除。</p>
+                <p>macOS 版會將每次語音辨識結果與最終輸出文字儲存於 <code>~/.voice-input/history.json</code>，可從 Dashboard 檢視、編輯、刪除。Android v2.4.0 不建立完整發話歷史檔案，只在裝置內保存個人化所需的候選頻率與短修正規則。上述資料皆不會傳送至本公司伺服器。</p>
             </div>
 
             <div class="card">
@@ -423,7 +425,7 @@
                 <h2>1. Introduction</h2>
                 <p>This Privacy Policy describes how Shingihou Co., Ltd. ("we", "us") handles personal information in
                     the "SGH Voice" application ("the App").</p>
-                <p><strong>Last Updated:</strong> June 1, 2026 (v2.4.0 revision)</p>
+                <p><strong>Last Updated:</strong> July 26, 2026 (Android v2.4.0 support)</p>
             </div>
 
             <div class="card">
@@ -438,13 +440,13 @@
                 </ul>
 
                 <h3>2.2 API Keys</h3>
-                <p>API keys entered by the user (OpenAI / Anthropic / Groq / OpenRouter / ElevenLabs) are stored in a protected location on the device. Starting with v2.4.0, macOS gradually migrates to Keychain; prior versions store them in <code>~/.voice-input/config.json</code> with file permissions 600. These keys are never transmitted to our servers.</p>
+                <p>API keys entered by the user (OpenAI / Anthropic / Groq / OpenRouter / ElevenLabs) are stored in a protected location on the device. Android uses EncryptedSharedPreferences. Starting with v2.4.0, macOS gradually migrates to Keychain; earlier macOS versions store keys in <code>~/.voice-input/config.json</code> with file permissions 600. These keys are never transmitted to our servers.</p>
 
                 <h3>2.3 Dictionary Data</h3>
-                <p>Custom dictionaries and correction rules registered by the user are stored only in the device's local storage.</p>
+                <p>Custom dictionaries, candidate frequency, and short correction rules are stored only in the device's local storage. Android disables learning in password and no-personalization fields.</p>
 
                 <h3>2.4 Transcription History</h3>
-                <p>Each speech-recognition result and final output text is stored locally in <code>~/.voice-input/history.json</code>. The history can be viewed, edited, and deleted from the Dashboard. It is never transmitted to our servers. Section 13 describes the one-click erasure procedure.</p>
+                <p>On macOS, each speech-recognition result and final output text is stored locally in <code>~/.voice-input/history.json</code> and can be viewed, edited, and deleted from the Dashboard. Android v2.4.0 does not create a complete dictation-history file; it stores only candidate frequency and short correction rules needed for personalization. Neither platform sends this local data to our servers.</p>
             </div>
 
             <div class="card">
@@ -540,7 +542,7 @@
             </div>
 
             <div class="card">
-                <h2>7. Contact Us</h2>
+                <h2>14. Contact Us</h2>
                 <p>For privacy-related inquiries, please contact:</p>
                 <p><strong>Shingihou Co., Ltd.</strong><br>
                     Location: Fukuoka City, Fukuoka, Japan<br>
@@ -554,12 +556,31 @@
     </div>
 
     <script>
-        function switchLang(lang) {
+        const legalHtmlLang = { ja: 'ja', zh: 'zh-Hant', en: 'en' };
+
+        function switchLang(lang, button, updateUrl = true) {
             document.querySelectorAll('.lang-section').forEach(el => el.classList.remove('active'));
             document.querySelectorAll('.lang-toggle button').forEach(el => el.classList.remove('active'));
             document.getElementById('lang-' + lang).classList.add('active');
-            event.target.classList.add('active');
+            button.classList.add('active');
+            document.documentElement.lang = legalHtmlLang[lang] || 'ja';
+            localStorage.setItem('sgh_lang', lang);
+
+            if (updateUrl) {
+                const url = new URL(window.location.href);
+                url.searchParams.set('lang', lang);
+                window.history.replaceState({}, '', url);
+            }
         }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const buttons = document.querySelectorAll('.lang-toggle button');
+            const order = { ja: 0, zh: 1, en: 2 };
+            const query = new URLSearchParams(window.location.search).get('lang');
+            const saved = localStorage.getItem('sgh_lang');
+            const initial = order[query] !== undefined ? query : (order[saved] !== undefined ? saved : 'ja');
+            switchLang(initial, buttons[order[initial]], false);
+        });
     </script>
 </body>
 

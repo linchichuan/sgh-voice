@@ -3,6 +3,10 @@ const langButton = document.getElementById("langBtn");
 const langDropdown = document.getElementById("langDropdown");
 const mobileToggle = document.getElementById("mobileToggle");
 const navLinks = document.getElementById("navLinks");
+const riskAcknowledgement = document.getElementById("riskAck");
+const apkDownloadButton = document.getElementById("apkDownloadButton");
+const copyHashButton = document.getElementById("copyHashButton");
+const apkHash = document.getElementById("apkHash");
 
 function updateNavbar() {
     if (navbar) {
@@ -35,6 +39,7 @@ function closeMobileMenu() {
     navLinks.classList.remove("mobile-open");
     mobileToggle.classList.remove("active");
     mobileToggle.setAttribute("aria-expanded", "false");
+    document.body.classList.remove("menu-open");
 }
 
 if (mobileToggle && navLinks) {
@@ -42,6 +47,7 @@ if (mobileToggle && navLinks) {
         const isOpen = navLinks.classList.toggle("mobile-open");
         mobileToggle.classList.toggle("active", isOpen);
         mobileToggle.setAttribute("aria-expanded", String(isOpen));
+        document.body.classList.toggle("menu-open", isOpen);
     });
 }
 
@@ -73,3 +79,52 @@ document.querySelectorAll(".faq-list details").forEach((details) => {
         });
     });
 });
+
+function translate(key, fallback) {
+    return (window.SGH_I18N && window.SGH_I18N[key]) || fallback;
+}
+
+function syncDownloadState() {
+    if (!riskAcknowledgement || !apkDownloadButton) return;
+
+    const accepted = riskAcknowledgement.checked;
+    const label = apkDownloadButton.querySelector("span");
+    apkDownloadButton.classList.toggle("disabled", !accepted);
+    apkDownloadButton.setAttribute("aria-disabled", String(!accepted));
+    apkDownloadButton.tabIndex = accepted ? 0 : -1;
+
+    if (accepted) {
+        apkDownloadButton.href = apkDownloadButton.dataset.downloadHref;
+        apkDownloadButton.setAttribute("download", "SGHVoice-Android-v2.4.0.apk");
+        label.textContent = translate("download.android.ctaReady", "我了解，下載 APK");
+    } else {
+        apkDownloadButton.removeAttribute("href");
+        apkDownloadButton.removeAttribute("download");
+        label.textContent = translate("download.android.cta", "勾選上方確認後下載 APK");
+    }
+}
+
+if (riskAcknowledgement && apkDownloadButton) {
+    riskAcknowledgement.addEventListener("change", syncDownloadState);
+    syncDownloadState();
+}
+
+if (copyHashButton && apkHash) {
+    copyHashButton.addEventListener("click", async () => {
+        try {
+            await navigator.clipboard.writeText(apkHash.textContent.trim());
+            copyHashButton.textContent = translate("download.hash.copied", "已複製");
+            window.setTimeout(() => {
+                copyHashButton.textContent = translate("download.hash.copy", "複製");
+            }, 1600);
+        } catch {
+            const range = document.createRange();
+            range.selectNodeContents(apkHash);
+            const selection = window.getSelection();
+            selection.removeAllRanges();
+            selection.addRange(range);
+        }
+    });
+}
+
+window.addEventListener("sgh:languagechange", syncDownloadState);

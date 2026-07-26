@@ -73,20 +73,21 @@
             .card { padding: 20px; }
         }
     </style>
+    <link rel="stylesheet" href="legal.css?v=20260726-android">
 </head>
 
 <body>
     <div class="container">
         <a href="/" class="back-link">← Back to SGH Voice</a>
         <header>
-            <h1>🎙 SGH Voice</h1>
+            <h1>SGH Voice</h1>
             <p>Terms of Service / 利用規約 / 使用條款</p>
         </header>
 
         <div class="lang-toggle">
-            <button class="active" onclick="switchLang('ja')">日本語</button>
-            <button onclick="switchLang('zh')">繁體中文</button>
-            <button onclick="switchLang('en')">English</button>
+            <button class="active" onclick="switchLang('ja', this)">日本語</button>
+            <button onclick="switchLang('zh', this)">繁體中文</button>
+            <button onclick="switchLang('en', this)">English</button>
         </div>
 
         <!-- ===== 日本語 ===== -->
@@ -94,7 +95,7 @@
             <div class="card">
                 <h2>1. はじめに</h2>
                 <p>本利用規約（以下「本規約」）は、新義豊株式会社（以下「当社」）が提供する「SGH Voice」アプリケーション及び関連するウェブサイト voice.shingihou.com（以下総称して「本サービス」）の利用条件を定めるものです。</p>
-                <p><strong>最終更新日：</strong>2026年5月25日</p>
+                <p><strong>最終更新日：</strong>2026年7月26日</p>
             </div>
 
             <div class="card">
@@ -110,6 +111,9 @@
                     <li>AI 処理に係る API 利用料金は、ユーザーが各プロバイダーへ直接支払うものとし、当社は一切関与しません。</li>
                     <li>将来的に有料プランを提供する場合は、別途その内容と料金を明示します。</li>
                 </ul>
+                <div class="notice">
+                    <strong>Android 個人テスト版：</strong>当社ウェブサイトで提供する APK は、Google Play Production の公開版ではない直接配布テスト版です。端末互換性、安定性、データ消失、第三者サービス料金、サイドロードに伴う安全上のリスクを確認し、ファイル名・バージョン・権限・SHA-256 を照合したうえで、ご自身の判断によりインストールしてください。
+                </div>
             </div>
 
             <div class="card">
@@ -180,7 +184,7 @@
             <div class="card">
                 <h2>1. 前言</h2>
                 <p>本使用條款（以下簡稱「本條款」）規範新義豊株式會社（以下簡稱「本公司」）所提供之「SGH Voice」應用程式及相關網站 voice.shingihou.com（以下統稱「本服務」）的使用條件。</p>
-                <p><strong>最後更新：</strong>2026年5月25日</p>
+                <p><strong>最後更新：</strong>2026年7月26日</p>
             </div>
 
             <div class="card">
@@ -196,6 +200,9 @@
                     <li>AI 處理所產生之 API 費用，由使用者直接支付給各服務商，本公司不參與其中。</li>
                     <li>若未來提供付費方案，將另行明示其內容與費用。</li>
                 </ul>
+                <div class="notice">
+                    <strong>Android 個人測試版：</strong>本公司網站提供的 APK 是未經 Google Play Production 公開發佈的直接下載測試版本。使用者應先了解裝置相容性、穩定性、資料遺失、第三方服務費用與側載安全風險，並確認檔名、版本、權限及 SHA-256 後，自行判斷是否安裝。
+                </div>
             </div>
 
             <div class="card">
@@ -266,7 +273,7 @@
             <div class="card">
                 <h2>1. Introduction</h2>
                 <p>These Terms of Service ("Terms") govern your use of the SGH Voice application and the website voice.shingihou.com (collectively, the "Service") provided by Shingihou Co., Ltd. ("we", "us", or "Company").</p>
-                <p><strong>Last updated:</strong> May 25, 2026</p>
+                <p><strong>Last updated:</strong> July 26, 2026</p>
             </div>
 
             <div class="card">
@@ -282,6 +289,9 @@
                     <li>API fees for AI processing are paid directly by the User to each provider; the Company is not involved.</li>
                     <li>If a paid plan is offered in the future, its content and pricing will be presented separately.</li>
                 </ul>
+                <div class="notice">
+                    <strong>Android personal test build:</strong> The APK offered on our website is a directly distributed test build, not a public Google Play Production release. Before installing, review device compatibility, stability, possible data loss, third-party service charges, and sideloading security risks, and verify the file name, version, permissions, and SHA-256.
+                </div>
             </div>
 
             <div class="card">
@@ -353,12 +363,31 @@
     </div>
 
     <script>
-        function switchLang(lang) {
+        const legalHtmlLang = { ja: 'ja', zh: 'zh-Hant', en: 'en' };
+
+        function switchLang(lang, button, updateUrl = true) {
             document.querySelectorAll('.lang-section').forEach(el => el.classList.remove('active'));
             document.querySelectorAll('.lang-toggle button').forEach(el => el.classList.remove('active'));
             document.getElementById('lang-' + lang).classList.add('active');
-            event.target.classList.add('active');
+            button.classList.add('active');
+            document.documentElement.lang = legalHtmlLang[lang] || 'ja';
+            localStorage.setItem('sgh_lang', lang);
+
+            if (updateUrl) {
+                const url = new URL(window.location.href);
+                url.searchParams.set('lang', lang);
+                window.history.replaceState({}, '', url);
+            }
         }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const buttons = document.querySelectorAll('.lang-toggle button');
+            const order = { ja: 0, zh: 1, en: 2 };
+            const query = new URLSearchParams(window.location.search).get('lang');
+            const saved = localStorage.getItem('sgh_lang');
+            const initial = order[query] !== undefined ? query : (order[saved] !== undefined ? saved : 'ja');
+            switchLang(initial, buttons[order[initial]], false);
+        });
     </script>
 </body>
 

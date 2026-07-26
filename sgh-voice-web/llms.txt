@@ -1,42 +1,64 @@
 # SGH Voice
 
-> A macOS voice-input tool designed for people who mix Traditional Chinese, Japanese, and English while they work. SGH Voice turns speech into edited text and inserts it at the active cursor.
+> A multilingual input tool by Shingihou Co., Ltd. The Android keyboard combines voice, Zhuyin, Japanese, and English input in one IME. A separate macOS app supports mixed Traditional Chinese, Japanese, and English dictation.
 
-## Current public release
+## Current Android test release
+
+- Version: 2.4.0 (version code 17)
+- Platform: Android 8.0 or later
+- Distribution status: personal test build, distributed as a versioned APK from the official SGH Voice website
+- Google Play status: not currently published through Google Play Production
+- Download: https://voice.shingihou.com/downloads/SGHVoice-Android-v2.4.0.apk
+- File size: 5,728,189 bytes
+- SHA-256: 29985ffaf5ba124e199ec9035cc6b3ea75e502c5da420ba5ff75cd7704d77ce0
+- App price: free
+- Cloud usage: BYOK; OpenAI or Groq usage charges may apply
+
+### Android capabilities
+
+- Four modes in one Android input method: Voice, Zhuyin, Japanese, and English
+- Tap once to begin recording and tap again to stop and process
+- Standard Zhuyin layout without requiring Pinyin
+- Japanese romaji, kana, katakana, and common exact-reading candidates
+- English QWERTY input
+- On-device candidate-frequency learning and short correction rules
+- Personalization disabled in password and no-personalization fields
+- Undo and clear controls for local learning
+
+### Android limitations and installation notice
+
+- This APK is a sideloaded personal test build, not a public Google Play release
+- Android requires the user to allow installation from the browser or file manager used for the download
+- Compatibility and stability can vary by device; users should evaluate sideloading risks before installation
+- Keep Google Play Protect enabled
+- Japanese conversion is Phase 1 and does not yet provide sentence-level contextual conversion comparable to a mature Japanese IME such as Mozc
+
+## Current macOS public release
 
 - Version: 2.6.0
 - Platform: macOS on Apple Silicon
 - Download: https://github.com/linchichuan/sgh-voice/releases/tag/v2.6.0
-- License and source: https://github.com/linchichuan/sgh-voice
 - App price: free
 - Cloud usage: BYOK; provider charges may apply
-- Mobile status: iOS and Android are development tracks, not part of the current public macOS installer
 
-## Product capabilities
+### macOS capabilities
 
 - Mixed Traditional Chinese, Japanese, and English dictation
 - Protection for Latin text, kana, URLs, code, numbers, and abbreviations during post-processing
 - Direct insertion at the active cursor
 - Restoration of the original clipboard after insertion
-- Custom dictionary for names and domain terminology
-- Verified personalization based on user-edited history
-- Configurable shortcuts, push-to-talk behavior, language profiles, and AI providers
+- Custom dictionary and verified personalization
+- Configurable shortcuts and AI providers
 - Optional on-device speech recognition on supported Apple Silicon Macs
-- Optional cloud processing through providers configured by the user
 
 ## Data handling
 
-- Dictionary and application settings are managed on the user's device
-- Local speech recognition keeps audio processing on the device
-- When a cloud engine is selected, audio or text is sent to the provider selected by the user
-- Shingihou does not store audio on an intermediate relay server
-- Cloud data handling follows the selected provider's terms and privacy policy
-
-## Important limitations
-
-- Recognition results vary with the model, dictionary, settings, microphone, and recording environment
-- Medical and technical modes are input aids; they do not replace professional judgment or guarantee accuracy
-- The current direct installer is for Apple Silicon Macs
+- Android API keys use encrypted on-device storage
+- Android learning data is stored locally on the device
+- Android recording begins only after the user taps the recording control
+- When cloud speech recognition is selected, audio is sent directly to the provider configured by the user
+- Shingihou does not store Android audio on an intermediate relay server
+- Third-party data handling and fees follow the selected provider's terms and privacy policy
 
 ## Company
 
@@ -46,7 +68,7 @@
 
 ## Pages
 
-- Home: https://voice.shingihou.com/
+- Home and downloads: https://voice.shingihou.com/
 - Privacy Policy: https://voice.shingihou.com/privacy.html
 - Terms of Service: https://voice.shingihou.com/terms.html
 - GitHub Releases: https://github.com/linchichuan/sgh-voice/releases
