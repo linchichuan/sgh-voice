@@ -33,12 +33,12 @@
             padding: 40px 24px;
         }
 
-        header {
+        .legal-header {
             text-align: center;
             margin-bottom: 48px;
         }
 
-        header h1 {
+        .legal-header h1 {
             font-size: 2rem;
             font-weight: 700;
             background: linear-gradient(135deg, #2563eb, #7c3aed);
@@ -47,7 +47,7 @@
             margin-bottom: 8px;
         }
 
-        header p {
+        .legal-header p {
             color: #64748b;
             font-size: 0.95rem;
         }
@@ -128,7 +128,7 @@
             display: block;
         }
 
-        footer {
+        .legal-footer {
             text-align: center;
             margin-top: 48px;
             color: #94a3b8;
@@ -140,7 +140,7 @@
                 padding: 24px 16px;
             }
 
-            header h1 {
+            .legal-header h1 {
                 font-size: 1.5rem;
             }
 
@@ -155,10 +155,10 @@
 <body>
     <div class="container">
         <a href="/" class="back-link">← Back to SGH Voice</a>
-        <header>
+        <div class="legal-header" role="banner">
             <h1>SGH Voice</h1>
             <p>Privacy Policy / プライバシーポリシー</p>
-        </header>
+        </div>
 
         <div class="lang-toggle">
             <button class="active" onclick="switchLang('ja', this)">日本語</button>
@@ -608,9 +608,9 @@
             </div>
         </div>
 
-        <footer>
+        <div class="legal-footer" role="contentinfo">
             <p>&copy; 2026 Shingihou Co., Ltd. All rights reserved.</p>
-        </footer>
+        </div>
     </div>
 
     <script>

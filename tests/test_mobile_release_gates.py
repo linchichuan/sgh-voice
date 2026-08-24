@@ -172,6 +172,19 @@ def test_web_tooling_and_emulator_logs_are_ignored():
     assert "/.firebase/" in contents
 
 
+def test_privacy_page_remains_compatible_with_macos_runner_tidy():
+    """The macOS runner still ships an HTML4-era tidy that reports HTML5
+    semantic header/footer elements as hard errors instead of warnings."""
+    privacy_html = (REPO_ROOT / "sgh-voice-web" / "privacy.html").read_text(
+        encoding="utf-8"
+    )
+
+    assert "<header" not in privacy_html
+    assert "<footer" not in privacy_html
+    assert 'class="legal-header" role="banner"' in privacy_html
+    assert 'class="legal-footer" role="contentinfo"' in privacy_html
+
+
 def test_mobile_rechecks_cloud_consent_at_the_upload_boundary():
     android_ime = (
         ANDROID_ROOT
