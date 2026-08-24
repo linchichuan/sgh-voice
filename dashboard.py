@@ -1066,7 +1066,10 @@ _download_status = {"active": False, "progress": 0, "total": 0, "message": "", "
 
 # 模型 repo 對照表
 _MODEL_REPOS = {
-    "qwen3-asr": "Qwen/Qwen3-ASR-0.6B",
+    # v2.7.0：改指向 mlx-community 的 mlx-audio 相容量化權重（原本指向 Qwen 官方
+    # 原始 PyTorch/safetensors repo，transcriber.py 的 mlx_audio.stt.load() 載不動、
+    # 下載後也無法由目前 runtime 使用）。
+    "qwen3-asr": "mlx-community/Qwen3-ASR-1.7B-4bit",
     "whisper-large-v3": "mlx-community/whisper-large-v3-mlx",
     # v2.4.0：補上 Models 頁實際展示的 mlx-whisper / Breeze 系列
     "whisper-turbo": "mlx-community/whisper-turbo",

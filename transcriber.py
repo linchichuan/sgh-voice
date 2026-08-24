@@ -14,9 +14,10 @@ import anthropic
 from config import (
     cloud_budget_guard,
     load_smart_replace, SCENE_PRESETS, DEFAULT_APP_STYLES, detect_app_style,
-    LOCAL_MODEL_PATHS, BREEZE_MODELS, EDIT_SYSTEM_PROMPT, REWRITE_STYLE_DIRECTIVES,
+    LOCAL_MODEL_PATHS, BREEZE_MODELS, QWEN3_ASR_MODELS, EDIT_SYSTEM_PROMPT, REWRITE_STYLE_DIRECTIVES,
     MULTILINGUAL_CANONICAL_WORDS,
 )
+import medical_dictionary
 from multilingual import (
     contains_kana,
     convert_traditional_preserving_japanese,
@@ -80,6 +81,37 @@ def _t(zh, ja, en):
 
 class Transcriber:
     _metal_lock = threading.Lock()
+    # mlx_audio.stt.load() 回傳的模型物件必須自己持有（不像 mlx_whisper 每次呼叫都走
+    # HF cache-backed lazy load）；跨 instance 共用同一份，避免每次聽寫都重新載入權重。
+    _qwen3_asr_model = None
+    _qwen3_asr_model_repo = None
+
+    # Qwen3-ASR 要完整語言名稱，不是 ISO 碼（mlx_audio qwen3_asr.py 的
+    # _build_prompt() 對 self.config.support_languages 做 case-insensitive 比對）。
+    _ISO_TO_QWEN3_LANG = {"zh": "chinese", "ja": "japanese", "en": "english"}
+
+    @staticmethod
+    def _llm_route_order(preferred, *, allow_cross_provider=False, include_local=False):
+        """回傳 LLM provider 嘗試順序，集中主路徑與 retry 的 privacy policy。
+
+        預設只使用所選 provider；Ollama 是裝置內處理，可在 dictate hybrid 模式
+        安全加入。只有明確開啟 allow_cross_provider 時，才會把相同逐字稿交給
+        第二個雲端 provider。
+        """
+        full_orders = {
+            "groq": ["groq", "openrouter", "claude", "openai", "ollama"],
+            "openrouter": ["openrouter", "groq", "claude", "openai", "ollama"],
+            "claude": ["claude", "groq", "openrouter", "openai", "ollama"],
+            "openai": ["openai", "groq", "openrouter", "claude", "ollama"],
+            "ollama": ["ollama", "groq", "openrouter", "claude", "openai"],
+        }
+        primary = preferred if preferred in full_orders else "ollama"
+        if allow_cross_provider:
+            return full_orders[primary]
+        order = [primary]
+        if include_local and primary != "ollama":
+            order.append("ollama")
+        return order
 
     def __init__(self, config, memory):
         self.config = config
@@ -160,6 +192,19 @@ class Transcriber:
                 with Transcriber._metal_lock: mlx_whisper.transcribe(tmp.name, **kwargs)
                 os.unlink(tmp.name)
                 print(" " + _t("✅ mlx-whisper 預熱完成", "✅ mlx-whisper 準備完了", "✅ mlx-whisper ready"))
+            except Exception: pass
+
+        def _warmup_qwen3_asr():
+            """mlx_audio 的模型物件要自己持有、沒有 mlx_whisper 那種 per-call HF-cache
+            lazy load，第一次真正聽寫前先載入權重，避免使用者第一句話卡在載入時間。"""
+            model_name = self.config.get("local_whisper_model", "whisper-turbo")
+            if model_name not in QWEN3_ASR_MODELS:
+                return
+            try:
+                import time as _time
+                _time.sleep(3)
+                self._load_qwen3_asr_model()
+                print(" " + _t("✅ Qwen3-ASR (mlx-audio) 預熱完成", "✅ Qwen3-ASR (mlx-audio) 準備完了", "✅ Qwen3-ASR (mlx-audio) ready"))
             except Exception: pass
 
         def _warmup_ollama():
@@ -245,7 +290,7 @@ class Transcriber:
             except Exception as e:
                 print(f" ⚠️  LLM 預熱跳過: {type(e).__name__}")
 
-        threading.Thread(target=lambda: (_warmup_ollama(), _warmup_whisper(), _warmup_llm_clients()), daemon=True).start()
+        threading.Thread(target=lambda: (_warmup_ollama(), _warmup_whisper(), _warmup_qwen3_asr(), _warmup_llm_clients()), daemon=True).start()
 
     # ─── LLM 核心 (Transcoder 模式：保持原語，嚴禁翻譯) ───
 
@@ -352,6 +397,9 @@ class Transcriber:
         try:
             custom = self.config.get("custom_words", []) or []
             scene_words = SCENE_PRESETS.get(scene_key, {}).get("custom_words", [])
+            # 醫療詞庫 Phase 1：scene_key == "medical" 時把 tenant/specialty/
+            # common-medical bundle 選出的少量高順位詞併入，其餘場景不受影響。
+            scene_words = medical_dictionary.augment_scene_words(scene_key, scene_words, self.config)
             prompt_vocabulary = self.memory.build_whisper_prompt(custom, scene_words)
             vocabulary = ", ".join(dict.fromkeys([
                 *MULTILINGUAL_CANONICAL_WORDS,
@@ -604,9 +652,14 @@ class Transcriber:
 
         scene_key = self.config.get("active_scene", "general")
         # 進化 3: 詞庫傳播 - 套用 App-Specific Corrections
+        # 醫療詞庫 Phase 1：scene_key == "medical" 時補上 bundle 的確定性修正
+        # （只有 status=active 且 auto_replace=true 且非歧義/高風險的 alias 才會出現在這裡）。
+        scene_corrections = medical_dictionary.augment_scene_corrections(
+            scene_key, SCENE_PRESETS.get(scene_key, {}).get("corrections"), self.config
+        )
         corrected = self.memory.apply_corrections(
             raw,
-            scene_corrections=SCENE_PRESETS.get(scene_key, {}).get("corrections"),
+            scene_corrections=scene_corrections,
             scene_key=scene_key,
             app_id=app_id,
         )
@@ -694,15 +747,23 @@ class Transcriber:
                 return self._local_llm_process(corrected, system_prompt=system_prompt), "local"
 
 
-            routes_map = {
-                "groq": [try_groq, try_or, try_claude, try_openai, try_ollama],
-                "openrouter": [try_or, try_groq, try_claude, try_openai, try_ollama],
-                "claude": [try_claude, try_groq, try_or, try_openai, try_ollama],
-                "openai": [try_openai, try_groq, try_or, try_claude, try_ollama],
-                "ollama": [try_ollama, try_groq, try_or, try_claude, try_openai],
+            routes_by_name = {
+                "groq": try_groq,
+                "openrouter": try_or,
+                "claude": try_claude,
+                "openai": try_openai,
+                "ollama": try_ollama,
             }
+            route_order = self._llm_route_order(
+                pref_engine,
+                allow_cross_provider=bool(
+                    self.config.get("allow_cross_provider_llm_fallback", False)
+                ),
+                include_local=bool(is_hybrid and mode == "dictate"),
+            )
             attempt_idx = 0  # 只 count 真正嘗試過的 provider（skip 的不算 fallback depth）
-            for route in routes_map.get(pref_engine, routes_map["ollama"]):
+            for route_name in route_order:
+                route = routes_by_name[route_name]
                 if _cancelled():
                     event_ledger.log("pipeline_cancelled", phase="llm_fallback")
                     return None
@@ -883,9 +944,12 @@ class Transcriber:
                 }
 
         scene_key = self.config.get("active_scene", "general")
+        scene_corrections = medical_dictionary.augment_scene_corrections(
+            scene_key, SCENE_PRESETS.get(scene_key, {}).get("corrections"), self.config
+        )
         corrected = self.memory.apply_corrections(
             raw,
-            scene_corrections=SCENE_PRESETS.get(scene_key, {}).get("corrections"),
+            scene_corrections=scene_corrections,
             scene_key=scene_key,
             app_id=app_id,
         )
@@ -938,16 +1002,26 @@ class Transcriber:
                     return self._local_llm_process(corrected, system_prompt=system_prompt), "local"
                 return None, None
 
-            routes_map = {
-                "groq": [try_groq, try_or, try_claude, try_openai, try_ollama],
-                "openrouter": [try_or, try_groq, try_claude, try_openai, try_ollama],
-                "claude": [try_claude, try_groq, try_or, try_openai, try_ollama],
-                "openai": [try_openai, try_groq, try_or, try_claude, try_ollama],
-                "ollama": [try_ollama, try_groq, try_or, try_claude, try_openai],
+            routes_by_name = {
+                "groq": try_groq,
+                "openrouter": try_or,
+                "claude": try_claude,
+                "openai": try_openai,
+                "ollama": try_ollama,
             }
-            for idx, route in enumerate(routes_map.get(pref_engine, routes_map["ollama"])):
+            route_order = self._llm_route_order(
+                pref_engine,
+                allow_cross_provider=bool(
+                    self.config.get("allow_cross_provider_llm_fallback", False)
+                ),
+                include_local=bool(
+                    self.config.get("enable_hybrid_mode", True) and mode == "dictate"
+                ),
+            )
+            for idx, route_name in enumerate(route_order):
+                route = routes_by_name[route_name]
                 # route() 已經回 (result, source)；用 _logged 包裝可拿到 latency + 寫 ledger
-                pair = _logged(route.__name__.replace("try_", ""), route, idx)
+                pair = _logged(route_name, route, idx)
                 if pair is None:
                     continue
                 res, source = pair
@@ -1336,6 +1410,7 @@ class Transcriber:
             custom = self.config.get("custom_words", []) or []
             scene_key = self.config.get("active_scene", "general")
             scene_words = SCENE_PRESETS.get(scene_key, {}).get("custom_words", [])
+            scene_words = medical_dictionary.augment_scene_words(scene_key, scene_words, self.config)
             vocab = self.memory.build_whisper_prompt(custom, scene_words)
         except Exception:
             vocab = ""
@@ -1413,9 +1488,18 @@ class Transcriber:
             return None
 
     def _local_stt(self, audio_source):
+        """本地 STT 分流：qwen3-asr（mlx-audio，非 whisper 架構）走獨立路徑；
+        whisper-turbo / Breeze 系列（whisper-large-v2 相容架構）走 mlx_whisper。"""
+        model_name = self.config.get("local_whisper_model", "whisper-turbo")
+        if model_name in QWEN3_ASR_MODELS:
+            return self._local_stt_qwen3(audio_source)
+        return self._local_stt_whisper(audio_source)
+
+    def _local_stt_whisper(self, audio_source, model_name_override=None):
         try:
             import mlx_whisper
-            model_path = LOCAL_MODEL_PATHS.get(self.config.get("local_whisper_model"), self.config.get("local_whisper_model", "mlx-community/whisper-turbo"))
+            model_name = model_name_override if model_name_override is not None else self.config.get("local_whisper_model")
+            model_path = LOCAL_MODEL_PATHS.get(model_name, model_name or "mlx-community/whisper-turbo")
             kwargs = {"path_or_hf_repo": model_path, "temperature": 0.0, "condition_on_previous_text": False}
             if "breeze" in str(model_path).lower(): kwargs["fp16"] = True
             kwargs["initial_prompt"] = self._build_stt_prompt()
@@ -1427,6 +1511,82 @@ class Transcriber:
                 "language": result.get("language"),
             }
         except Exception: return None
+
+    def _qwen3_asr_downloaded(self, repo_id):
+        """檢查 mlx-community Qwen3-ASR 權重是否已透過 Dashboard Models 頁下載到 HF cache。
+        鏡像 dashboard.py:api_model_status() 的檢查邏輯 —— whisper-turbo/Breeze 都是明確
+        走 Dashboard 下載流程，qwen3-asr 延續同一慣例，不讓 STT pipeline 自己在使用者
+        聽寫時觸發隱性的 ~1.8GB 阻塞下載。"""
+        hf_home = os.environ.get("HF_HOME", os.path.expanduser("~/.cache/huggingface"))
+        cache_name = f"models--{repo_id.replace('/', '--')}"
+        snapshots = os.path.join(hf_home, "hub", cache_name, "snapshots")
+        try:
+            return os.path.isdir(snapshots) and len(os.listdir(snapshots)) > 0
+        except OSError:
+            return False
+
+    def _load_qwen3_asr_model(self, repo_id=None):
+        """載入（或回傳已快取的）Qwen3-ASR mlx-audio 模型物件。
+        不像 mlx_whisper.transcribe() 每次呼叫都走 HF-cache-backed lazy load，
+        mlx_audio.stt.load() 回傳的物件必須自己持有，跨 instance/呼叫共用一份。
+        呼叫端需自行處理例外（ImportError／載入失敗）。"""
+        from mlx_audio.stt import load as _load_qwen3_asr
+        repo = repo_id or LOCAL_MODEL_PATHS.get("qwen3-asr", "mlx-community/Qwen3-ASR-1.7B-4bit")
+        if Transcriber._qwen3_asr_model is None or Transcriber._qwen3_asr_model_repo != repo:
+            with Transcriber._metal_lock:
+                if Transcriber._qwen3_asr_model is None or Transcriber._qwen3_asr_model_repo != repo:
+                    Transcriber._qwen3_asr_model = _load_qwen3_asr(repo)
+                    Transcriber._qwen3_asr_model_repo = repo
+        return Transcriber._qwen3_asr_model
+
+    def _local_stt_qwen3(self, audio_source):
+        """Qwen3-ASR 本地引擎（mlx-audio + mlx-community/Qwen3-ASR-1.7B-4bit）。
+        實驗性、使用者主動選用；尚未納入可重現的正式速度／品質 benchmark。
+        非 whisper 架構，不支援
+        temperature/condition_on_previous_text，無對應項可搬。
+        initial_prompt 等價機制：mlx_audio 的 generate(system_prompt=...) 就是官方
+        對應 Whisper initial_prompt 的欄位（mlx_audio.stt.utils.merge_hotwords 文件：
+        「system_prompt for Qwen3-ASR, initial_prompt for Whisper」），沿用
+        _build_stt_prompt() 同一份詞庫/場景注入字串，是真的等價，不是退化成不支援。
+        Fail-safe：模型未下載／mlx-audio 未安裝／推論失敗，一律 fallback 到
+        whisper-turbo（不是使用者原本設定的其他 local_whisper_model 值），
+        避免聽寫整條管線掛掉。"""
+        repo = LOCAL_MODEL_PATHS.get("qwen3-asr", "mlx-community/Qwen3-ASR-1.7B-4bit")
+        if not self._qwen3_asr_downloaded(repo):
+            print(f" ⚠️  [qwen3-asr] 模型未下載（{repo}），fallback 到 whisper-turbo。請至 Dashboard → Models 頁下載。")
+            return self._local_stt_whisper(audio_source, model_name_override="whisper-turbo")
+        try:
+            model = self._load_qwen3_asr_model(repo)
+        except Exception as e:
+            print(f" ⚠️  [qwen3-asr] mlx-audio 載入失敗（{type(e).__name__}: {e}），fallback 到 whisper-turbo。")
+            return self._local_stt_whisper(audio_source, model_name_override="whisper-turbo")
+        try:
+            language = str(self.config.get("language", "auto") or "auto").lower()
+            kwargs = {"system_prompt": self._build_stt_prompt()}
+            if language and language != "auto":
+                kwargs["language"] = self._ISO_TO_QWEN3_LANG.get(language, language)
+            with Transcriber._metal_lock: result = model.generate(audio_source, **kwargs)
+            text = getattr(result, "text", "") or ""
+            return {
+                "text": self._sanitize_repetition(text),
+                "language": self._normalize_qwen3_language(getattr(result, "language", None)),
+            }
+        except Exception as e:
+            print(f" ⚠️  [qwen3-asr] 推論失敗（{type(e).__name__}: {e}），fallback 到 whisper-turbo。")
+            return self._local_stt_whisper(audio_source, model_name_override="whisper-turbo")
+
+    def _normalize_qwen3_language(self, raw):
+        """實測發現 mlx_audio 的 Qwen3-ASR STTOutput.language 有時是 list 包完整語言
+        名稱（如 ['Chinese']），跟 mlx_whisper 慣例的 2 碼 ISO（'zh'/'ja'/'en'）格式不同。
+        不正規化會讓 _get_system_prompt() 的 language_hint 被灌入 str(['chinese']) 這種
+        Python list repr 垃圾字串。"""
+        if isinstance(raw, (list, tuple)):
+            raw = raw[0] if raw else None
+        if not raw:
+            return None
+        raw = str(raw).strip().lower()
+        reverse = {v: k for k, v in self._ISO_TO_QWEN3_LANG.items()}
+        return reverse.get(raw, raw)
 
     @_budgeted_cloud("openai_stt")
     def _whisper_api_fallback(self, audio_source, duration=0):

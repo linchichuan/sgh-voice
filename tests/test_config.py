@@ -123,6 +123,43 @@ def test_normalize_known_stale_model_ids_without_touching_custom_values():
     assert unchanged["openrouter_model"] == "vendor/custom-current-model"
 
 
+def test_normalize_migrates_legacy_qwen3_asr_raw_repo_id_to_short_id():
+    """v2.7.0: dashboard.py's old _MODEL_REPOS['qwen3-asr'] pointed at the raw
+    Qwen/Qwen3-ASR-0.6B HF repo (PyTorch/safetensors, not mlx-audio compatible).
+    No Settings UI ever exposed that value, but any config.json that somehow got
+    it saved must not be stuck pointing at an unloadable repo id — mirrors the
+    whisper-turbo raw-repo-id -> short-id migration above."""
+    import config as cfg
+
+    saved = {
+        "config_version": cfg.CONFIG_VERSION,
+        "local_whisper_model": "Qwen/Qwen3-ASR-0.6B",
+    }
+    normalized, did = cfg._normalize_known_stale_model_ids(saved)
+    assert did is True
+    assert normalized["local_whisper_model"] == "qwen3-asr"
+
+
+def test_qwen3_asr_registered_in_local_model_paths_and_engine_set():
+    import config as cfg
+
+    assert cfg.LOCAL_MODEL_PATHS["qwen3-asr"] == "mlx-community/Qwen3-ASR-1.7B-4bit"
+    assert "qwen3-asr" in cfg.QWEN3_ASR_MODELS
+    # whisper-turbo / Breeze must NOT be misrouted to the mlx-audio call path.
+    assert "whisper-turbo" not in cfg.QWEN3_ASR_MODELS
+    assert not (cfg.BREEZE_MODELS & cfg.QWEN3_ASR_MODELS)
+
+
+def test_default_config_stt_engine_and_local_model_unchanged_by_qwen3_addition():
+    """Adding the opt-in qwen3-asr engine must not change what a fresh install
+    defaults to — DEFAULT_CONFIG['local_whisper_model'] / ['stt_engine'] stay
+    whatever they already were before this feature landed."""
+    import config as cfg
+
+    assert cfg.DEFAULT_CONFIG["local_whisper_model"] != "qwen3-asr"
+    assert cfg.DEFAULT_CONFIG["stt_engine"] in ("mlx-whisper", "cloud-only")
+
+
 def test_dashboard_rejects_unknown_stt_language_profile(monkeypatch):
     import dashboard
 
@@ -132,6 +169,16 @@ def test_dashboard_rejects_unknown_stt_language_profile(monkeypatch):
     )
     assert response.status_code == 400
     assert response.get_json()["code"] == "invalid_language_profile"
+
+
+def test_dashboard_model_repos_maps_qwen3_asr_to_mlx_audio_compatible_repo():
+    """v2.7.0: the Models-page download button for qwen3-asr must point at an
+    mlx-community/Qwen3-ASR-*bit repo that mlx_audio.stt.load() can actually
+    load — the old raw Qwen/Qwen3-ASR-0.6B repo (PyTorch/safetensors) cannot."""
+    import dashboard
+
+    assert dashboard._MODEL_REPOS["qwen3-asr"] == "mlx-community/Qwen3-ASR-1.7B-4bit"
+    assert dashboard._MODEL_REPOS["qwen3-asr"].startswith("mlx-community/")
 
 
 def test_migrate_hotkeys_v5_replaces_only_known_legacy_defaults():
@@ -328,6 +375,12 @@ def test_scene_presets_medical_has_required_keys():
     assert "system_prompt_extra" in med
     # custom_words 應該非空（醫療場景至少要塞一些詞）
     assert len(med["custom_words"]) > 0
+
+
+def test_cross_provider_llm_fallback_is_privacy_opt_in():
+    import config as cfg
+
+    assert cfg.DEFAULT_CONFIG["allow_cross_provider_llm_fallback"] is False
 
 
 def test_update_stats_tracks_japanese_and_mixed_separately(isolated_data_dir):

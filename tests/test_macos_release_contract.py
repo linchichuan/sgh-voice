@@ -7,6 +7,7 @@ import subprocess
 ROOT = Path(__file__).resolve().parents[1]
 BUILD_SCRIPT = ROOT / "build.sh"
 PUBLISH_SCRIPT = ROOT / "scripts" / "publish_macos_release.sh"
+PYINSTALLER_SPEC = ROOT / "voiceinput.spec"
 
 
 def _script() -> str:
@@ -67,9 +68,30 @@ def test_packaged_runtime_modules_are_explicitly_gated():
     assert "pyi-archive_viewer" in script
     assert "REQUIRED_PYTHON_MODULES" in script
     assert "translation" in script
+    assert "medical_dictionary" in script
     assert "mlx_whisper" in script
+    assert "mlx_audio" in script
+    assert "mlx_audio.stt.models.qwen3_asr.qwen3_asr" in script
     assert "mlx.core" in script
     assert 'grep -Eq "^[[:space:]]*${required_module}$" <<< "$ARCHIVE_LIST"' in script
+
+
+def test_pyinstaller_includes_medical_seed_and_qwen_runtime():
+    spec = PYINSTALLER_SPEC.read_text(encoding="utf-8")
+
+    assert "('medical_dictionary_seed', 'medical_dictionary_seed')" in spec
+    assert "'medical_dictionary'" in spec
+    assert "'mlx_audio'" in spec
+    assert "'mlx_audio.stt'" in spec
+    assert "'mlx_audio.stt.models.qwen3_asr.qwen3_asr'" in spec
+
+
+def test_build_validates_packaged_medical_seed_contents():
+    script = _script()
+
+    assert "MEDICAL_SEED_DIR" in script
+    assert "EXPECTED_MEDICAL_SEED_BUNDLES=3" in script
+    assert "EXPECTED_MEDICAL_SEED_TERMS=39" in script
 
 
 def test_locked_runtime_declares_local_whisper_for_apple_silicon():

@@ -26,6 +26,18 @@ mlx_nn_datas, mlx_nn_bins, mlx_nn_imports = [], [], []
 whisper_datas = collect_data_files('mlx_whisper')
 whisper_bins = collect_dynamic_libs('mlx_whisper')
 whisper_imports = ['mlx_whisper']
+mlx_audio_datas = collect_data_files('mlx_audio')
+mlx_audio_bins = collect_dynamic_libs('mlx_audio')
+mlx_audio_imports = [
+    'mlx_audio',
+    'mlx_audio.audio_io',
+    'mlx_audio.stt',
+    'mlx_audio.stt.utils',
+    'mlx_audio.stt.models.base',
+    'mlx_audio.stt.models.qwen3_asr',
+    'mlx_audio.stt.models.qwen3_asr.config',
+    'mlx_audio.stt.models.qwen3_asr.qwen3_asr',
+]
 sd_datas, sd_bins, sd_imports = collect_all('sounddevice')
 sf_datas, sf_bins, sf_imports = collect_all('soundfile')
 opencc_datas = collect_data_files('opencc')
@@ -36,14 +48,15 @@ tiktoken_datas, tiktoken_bins, tiktoken_imports = collect_all('tiktoken')
 a = Analysis(
     ['launcher.py'],
     pathex=[],
-    binaries=mlx_bins + mlx_nn_bins + whisper_bins + sd_bins + sf_bins + rumps_bins + tiktoken_bins,
+    binaries=mlx_bins + mlx_nn_bins + whisper_bins + mlx_audio_bins + sd_bins + sf_bins + rumps_bins + tiktoken_bins,
     datas=[
         ('static', 'static'),
         ('resources/menubar', 'resources/menubar'),
-    ] + mlx_datas + mlx_nn_datas + whisper_datas + sd_datas + sf_datas + opencc_datas + rumps_datas + tiktoken_datas,
+        ('medical_dictionary_seed', 'medical_dictionary_seed'),
+    ] + mlx_datas + mlx_nn_datas + whisper_datas + mlx_audio_datas + sd_datas + sf_datas + opencc_datas + rumps_datas + tiktoken_datas,
     hiddenimports=[
         # App 核心
-        'app', 'config', 'memory', 'multilingual', 'text_insertion', 'transcriber', 'recorder', 'dashboard', 'overlay', 'voiceprint',
+        'app', 'config', 'memory', 'medical_dictionary', 'multilingual', 'text_insertion', 'transcriber', 'recorder', 'dashboard', 'overlay', 'voiceprint',
         # GUI / 系統
         'rumps',
         'pynput', 'pynput.keyboard', 'pynput.keyboard._darwin',
@@ -52,7 +65,7 @@ a = Analysis(
         # Audio
         'sounddevice', 'soundfile',
         # ML
-        'mlx', 'mlx.core', 'mlx.nn', 'mlx_whisper',
+        'mlx', 'mlx.core', 'mlx.nn', 'mlx_whisper', 'mlx_audio', 'mlx_audio.stt',
         # Web
         'flask', 'flask.json', 'webview',
         # API
@@ -67,7 +80,7 @@ a = Analysis(
         'objc', 'PyObjCTools', 'PyObjCTools.Conversion',
         # 標準庫
         'json', 'csv', 'io', 'shutil', 'threading', 'datetime',
-    ] + mlx_imports + mlx_nn_imports + whisper_imports + sd_imports + sf_imports + rumps_imports + tiktoken_imports,
+    ] + mlx_imports + mlx_nn_imports + whisper_imports + mlx_audio_imports + sd_imports + sf_imports + rumps_imports + tiktoken_imports,
     excludes=[
         # 排除 torch（mlx-whisper 推理不需要，省 500MB+）
         'torch', 'torchvision', 'torchaudio', 'torch._C',

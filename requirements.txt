@@ -15,5 +15,7 @@ keyring>=24.0
 # these are release dependencies rather than undocumented optional packages.
 mlx>=0.30.6; sys_platform == "darwin" and platform_machine == "arm64"
 mlx-whisper>=0.4.3; sys_platform == "darwin" and platform_machine == "arm64"
-# 可選：Qwen3-ASR MLX（多語 ASR，Apple Silicon 專用）
-# pip install mlx-qwen3-asr
+# 可選：Qwen3-ASR MLX 本地 STT 引擎（mlx-audio + mlx-community/Qwen3-ASR-1.7B-4bit）
+# 本機 spike 確認 GO（RTF 0.126，比 whisper-turbo 快 4.2x，品質打平或更好）；
+# 預設引擎不變（whisper-turbo），使用者需在 Dashboard 手動選用。
+mlx-audio>=0.5.0; sys_platform == "darwin" and platform_machine == "arm64"

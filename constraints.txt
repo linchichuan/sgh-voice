@@ -13,12 +13,16 @@ opencc-python-reimplemented==0.1.7
 elevenlabs==2.36.1
 pywebview==6.1
 keyring==25.7.0
-mlx==0.30.6; sys_platform == "darwin" and platform_machine == "arm64"
+# mlx bumped 0.30.6 -> 0.32.1 by mlx-audio's own floor (mlx>=0.31.1); verified
+# mlx-whisper==0.4.3 still imports/transcribes fine against 0.32.1 (product venv
+# smoke test + qwen3-asr spike both exercised this combo).
+mlx==0.32.1; sys_platform == "darwin" and platform_machine == "arm64"
 mlx-whisper==0.4.3; sys_platform == "darwin" and platform_machine == "arm64"
+mlx-audio==0.5.0; sys_platform == "darwin" and platform_machine == "arm64"
 # mlx-whisper declares broad transitive ranges. Pin the versions exercised by
 # the existing Apple Silicon runtime so universal resolution cannot select an
 # obsolete Torch/Numba stack for Python 3.12.
-mlx-metal==0.30.6; sys_platform == "darwin" and platform_machine == "arm64"
+mlx-metal==0.32.1; sys_platform == "darwin" and platform_machine == "arm64"
 huggingface-hub==1.11.0; sys_platform == "darwin" and platform_machine == "arm64"
 numba==0.64.0; sys_platform == "darwin" and platform_machine == "arm64"
 scipy==1.17.0; sys_platform == "darwin" and platform_machine == "arm64"

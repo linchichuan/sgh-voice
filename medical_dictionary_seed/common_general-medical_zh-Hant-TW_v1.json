@@ -1,0 +1,307 @@
+{
+  "schema_version": 1,
+  "bundle_version": "2026.08.24-seed1",
+  "tenant_id": "common",
+  "specialty": "general-medical",
+  "language": "zh-Hant-TW",
+  "generated_at": "2026-08-24T00:00:00Z",
+  "source_manifest_version": "seed-manifest-2026.08.24",
+  "_provenance": "seed set, provenance: manually curated 2026-08-24, pending full list. canonical 詞彙全數取自 repo 既有 config.py SCENE_PRESETS['medical']（已隨產品出貨、非本次新造），因此已具備既有審核脈絡；alias 只使用可機械驗證、零臆測的變體來源：中文用 OpenCC t2s（簡繁轉換）、日文片假名用 NFKC 半形/全形往返驗證過的轉換、英文用大小寫變體。 沒有任何一個 alias 是猜測的『ASR 常見錯聽』——這類真正的語音誤聽對照需要實際音訊語料才能驗證，本輪沒有這類語料，因此刻意不臆造。所有 term 的 status 一律為 'staged'（非 'active'），代表只通過本模組的 schema/安全輸入檢查與作者本人的拼寫核對，尚未經過獨立語言/領域 reviewer 正式簽核（roadmap §7.2、§8.2）；staged 狀態下 medical_dictionary.py 只允許用於 ASR prompt bias（PROMPT_MIN_STATUS），任何 auto_replace 一律被 AUTO_REPLACE_MIN_STATUS='active' 擋下，不會實際套用確定性替換。term_type 的 'organization'／'anatomy' 少數用於 roadmap §4.2 六種枚舉裡沒有精確對應類別的行政/生物概念詞（如病歷、幹細胞），屬於最接近的既有分類，非新增枚舉值。",
+  "terms": [
+    {
+      "term_id": "seed-zh-001",
+      "canonical": "電腦斷層",
+      "aliases": [
+        "电脑断层"
+      ],
+      "term_type": "exam",
+      "languages": [
+        "zh-Hant-TW"
+      ],
+      "specialties": [
+        "general-medical"
+      ],
+      "priority": 60,
+      "case_sensitive": false,
+      "auto_replace": true,
+      "risk_class": "normal",
+      "status": "staged",
+      "source_ids": [
+        "repo:config.py:SCENE_PRESETS['medical'] (2026-08-24 snapshot)",
+        "mechanical:opencc-t2s-2026-08-24"
+      ],
+      "reviewed_by": [
+        "lin-chichuan-self-curated-pending-domain-reviewer"
+      ],
+      "reviewed_at": "2026-08-24T00:00:00Z"
+    },
+    {
+      "term_id": "seed-zh-002",
+      "canonical": "胃鏡",
+      "aliases": [
+        "胃镜"
+      ],
+      "term_type": "exam",
+      "languages": [
+        "zh-Hant-TW"
+      ],
+      "specialties": [
+        "general-medical"
+      ],
+      "priority": 55,
+      "case_sensitive": false,
+      "auto_replace": true,
+      "risk_class": "normal",
+      "status": "staged",
+      "source_ids": [
+        "repo:config.py:SCENE_PRESETS['medical'] (2026-08-24 snapshot)",
+        "mechanical:opencc-t2s-2026-08-24"
+      ],
+      "reviewed_by": [
+        "lin-chichuan-self-curated-pending-domain-reviewer"
+      ],
+      "reviewed_at": "2026-08-24T00:00:00Z"
+    },
+    {
+      "term_id": "seed-zh-003",
+      "canonical": "大腸鏡",
+      "aliases": [
+        "大肠镜"
+      ],
+      "term_type": "exam",
+      "languages": [
+        "zh-Hant-TW"
+      ],
+      "specialties": [
+        "general-medical"
+      ],
+      "priority": 55,
+      "case_sensitive": false,
+      "auto_replace": true,
+      "risk_class": "normal",
+      "status": "staged",
+      "source_ids": [
+        "repo:config.py:SCENE_PRESETS['medical'] (2026-08-24 snapshot)",
+        "mechanical:opencc-t2s-2026-08-24"
+      ],
+      "reviewed_by": [
+        "lin-chichuan-self-curated-pending-domain-reviewer"
+      ],
+      "reviewed_at": "2026-08-24T00:00:00Z"
+    },
+    {
+      "term_id": "seed-zh-004",
+      "canonical": "轉診單",
+      "aliases": [
+        "转诊单"
+      ],
+      "term_type": "organization",
+      "languages": [
+        "zh-Hant-TW"
+      ],
+      "specialties": [
+        "general-medical"
+      ],
+      "priority": 45,
+      "case_sensitive": false,
+      "auto_replace": true,
+      "risk_class": "normal",
+      "status": "staged",
+      "source_ids": [
+        "repo:config.py:SCENE_PRESETS['medical'] (2026-08-24 snapshot)",
+        "mechanical:opencc-t2s-2026-08-24"
+      ],
+      "reviewed_by": [
+        "lin-chichuan-self-curated-pending-domain-reviewer"
+      ],
+      "reviewed_at": "2026-08-24T00:00:00Z"
+    },
+    {
+      "term_id": "seed-zh-005",
+      "canonical": "病歷",
+      "aliases": [
+        "病历"
+      ],
+      "term_type": "organization",
+      "languages": [
+        "zh-Hant-TW"
+      ],
+      "specialties": [
+        "general-medical"
+      ],
+      "priority": 50,
+      "case_sensitive": false,
+      "auto_replace": true,
+      "risk_class": "normal",
+      "status": "staged",
+      "source_ids": [
+        "repo:config.py:SCENE_PRESETS['medical'] (2026-08-24 snapshot)",
+        "mechanical:opencc-t2s-2026-08-24"
+      ],
+      "reviewed_by": [
+        "lin-chichuan-self-curated-pending-domain-reviewer"
+      ],
+      "reviewed_at": "2026-08-24T00:00:00Z"
+    },
+    {
+      "term_id": "seed-zh-006",
+      "canonical": "掛號",
+      "aliases": [
+        "挂号"
+      ],
+      "term_type": "organization",
+      "languages": [
+        "zh-Hant-TW"
+      ],
+      "specialties": [
+        "general-medical"
+      ],
+      "priority": 50,
+      "case_sensitive": false,
+      "auto_replace": true,
+      "risk_class": "normal",
+      "status": "staged",
+      "source_ids": [
+        "repo:config.py:SCENE_PRESETS['medical'] (2026-08-24 snapshot)",
+        "mechanical:opencc-t2s-2026-08-24"
+      ],
+      "reviewed_by": [
+        "lin-chichuan-self-curated-pending-domain-reviewer"
+      ],
+      "reviewed_at": "2026-08-24T00:00:00Z"
+    },
+    {
+      "term_id": "seed-zh-007",
+      "canonical": "收縮壓",
+      "aliases": [
+        "收缩压"
+      ],
+      "term_type": "exam",
+      "languages": [
+        "zh-Hant-TW"
+      ],
+      "specialties": [
+        "general-medical"
+      ],
+      "priority": 55,
+      "case_sensitive": false,
+      "auto_replace": true,
+      "risk_class": "normal",
+      "status": "staged",
+      "source_ids": [
+        "repo:config.py:SCENE_PRESETS['medical'] (2026-08-24 snapshot)",
+        "mechanical:opencc-t2s-2026-08-24"
+      ],
+      "reviewed_by": [
+        "lin-chichuan-self-curated-pending-domain-reviewer"
+      ],
+      "reviewed_at": "2026-08-24T00:00:00Z"
+    },
+    {
+      "term_id": "seed-zh-008",
+      "canonical": "舒張壓",
+      "aliases": [
+        "舒张压"
+      ],
+      "term_type": "exam",
+      "languages": [
+        "zh-Hant-TW"
+      ],
+      "specialties": [
+        "general-medical"
+      ],
+      "priority": 55,
+      "case_sensitive": false,
+      "auto_replace": true,
+      "risk_class": "normal",
+      "status": "staged",
+      "source_ids": [
+        "repo:config.py:SCENE_PRESETS['medical'] (2026-08-24 snapshot)",
+        "mechanical:opencc-t2s-2026-08-24"
+      ],
+      "reviewed_by": [
+        "lin-chichuan-self-curated-pending-domain-reviewer"
+      ],
+      "reviewed_at": "2026-08-24T00:00:00Z"
+    },
+    {
+      "term_id": "seed-zh-009",
+      "canonical": "血氧飽和度",
+      "aliases": [
+        "血氧饱和度"
+      ],
+      "term_type": "exam",
+      "languages": [
+        "zh-Hant-TW"
+      ],
+      "specialties": [
+        "general-medical"
+      ],
+      "priority": 50,
+      "case_sensitive": false,
+      "auto_replace": true,
+      "risk_class": "normal",
+      "status": "staged",
+      "source_ids": [
+        "repo:config.py:SCENE_PRESETS['medical'] (2026-08-24 snapshot)",
+        "mechanical:opencc-t2s-2026-08-24"
+      ],
+      "reviewed_by": [
+        "lin-chichuan-self-curated-pending-domain-reviewer"
+      ],
+      "reviewed_at": "2026-08-24T00:00:00Z"
+    },
+    {
+      "term_id": "seed-zh-vetted-001",
+      "canonical": "處方箋",
+      "aliases": [
+        "处方笺"
+      ],
+      "term_type": "organization",
+      "languages": [
+        "zh-Hant-TW"
+      ],
+      "specialties": [
+        "general-medical"
+      ],
+      "priority": 55,
+      "case_sensitive": false,
+      "auto_replace": true,
+      "risk_class": "normal",
+      "status": "staged",
+      "source_ids": [
+        "repo:config.py:SCENE_PRESETS['medical']['corrections'] (2026-08-24 snapshot)"
+      ],
+      "reviewed_by": [
+        "lin-chichuan-self-curated-pending-domain-reviewer"
+      ],
+      "reviewed_at": "2026-08-24T00:00:00Z"
+    },
+    {
+      "term_id": "seed-zh-vetted-002",
+      "canonical": "幹細胞",
+      "aliases": [
+        "干细胞"
+      ],
+      "term_type": "anatomy",
+      "languages": [
+        "zh-Hant-TW"
+      ],
+      "specialties": [
+        "general-medical"
+      ],
+      "priority": 45,
+      "case_sensitive": false,
+      "auto_replace": true,
+      "risk_class": "normal",
+      "status": "staged",
+      "source_ids": [
+        "repo:config.py:SCENE_PRESETS['medical']['corrections'] (2026-08-24 snapshot)"
+      ],
+      "reviewed_by": [
+        "lin-chichuan-self-curated-pending-domain-reviewer"
+      ],
+      "reviewed_at": "2026-08-24T00:00:00Z"
+    }
+  ]
+}

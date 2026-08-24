@@ -24,6 +24,7 @@ const I18N = {
     'models.desc.turbo': '多言語対応・軽量で高速。非 CJK のデフォルト',
     'models.desc.breeze4bit': 'MediaTek Breeze ASR 25 — 繁体字中国語に最適化・0.82GB・Turbo の 3.5 倍高速・v1.4.0+',
     'models.desc.breezefp16': '4bit と同モデルだが fp16 で精度優先・2.87GB',
+    'models.desc.qwen3asr': 'mlx-audio 経由の Qwen3-ASR 1.7B 4bit — 実験的な任意選択モデル（デフォルトは Turbo のまま。速度と精度は端末・音声により異なります）',
   },
   zh: {
     'models.subtitle': '裝置端語音辨識用 Whisper 模型',
@@ -39,6 +40,7 @@ const I18N = {
     'models.desc.turbo': '多語通用、體積較小、速度快；非 CJK 預設',
     'models.desc.breeze4bit': 'MediaTek Breeze ASR 25 — 繁中專用、0.82GB、比 turbo 快 3.5×、v1.4.0+',
     'models.desc.breezefp16': '與 4bit 同模型但全精度，品質更佳、2.87GB',
+    'models.desc.qwen3asr': '透過 mlx-audio 運行的 Qwen3-ASR 1.7B 4bit — 實驗性選用模型（預設仍是 turbo；速度與準確度依裝置及音訊而異）',
   },
   en: {
     'models.subtitle': 'Local Whisper models for on-device transcription',
@@ -54,6 +56,7 @@ const I18N = {
     'models.desc.turbo': 'Multi-lingual; lighter / faster. Default for non-CJK',
     'models.desc.breeze4bit': 'MediaTek Breeze ASR 25 — Traditional Chinese specialized; 0.82GB; 3.5× faster than turbo; v1.4.0+',
     'models.desc.breezefp16': 'Same as 4bit but full precision; better quality, 2.87GB',
+    'models.desc.qwen3asr': 'Qwen3-ASR 1.7B 4-bit via mlx-audio — experimental and opt-in (turbo stays default; speed and accuracy vary by device and audio)',
   },
 };
 for (const lang of Object.keys(I18N)) Object.assign(STRINGS[lang], I18N[lang]);
@@ -63,6 +66,9 @@ const MODELS = [
   { key: 'whisper-turbo', name: 'Whisper Turbo', descKey: 'models.desc.turbo', sizeBytes: 1610612736 },
   { key: 'breeze-asr-25-4bit', name: 'Breeze ASR 25 (4-bit)', descKey: 'models.desc.breeze4bit', sizeBytes: 880803840 },
   { key: 'breeze-asr-25', name: 'Breeze ASR 25 (fp16)', descKey: 'models.desc.breezefp16', sizeBytes: 3082277683 },
+  // v2.7.0: opt-in local engine via mlx-audio, not mlx_whisper. sizeBytes verified against
+  // the live mlx-community/Qwen3-ASR-1.7B-4bit repo (huggingface_hub model_info, 2026-08-24).
+  { key: 'qwen3-asr', name: 'Qwen3-ASR (mlx-audio, 1.7B 4-bit)', descKey: 'models.desc.qwen3asr', sizeBytes: 1607633106 },
 ];
 
 function fmtBytes(n) {

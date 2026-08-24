@@ -12,6 +12,9 @@ const LOCAL_MODELS = [
   { id: 'whisper-turbo',        label: 'whisper-turbo (1.5GB, multilingual)' },
   { id: 'breeze-asr-25-4bit',   label: 'Breeze-ASR-25 4bit (0.82GB, 繁中最強)' },
   { id: 'breeze-asr-25',        label: 'Breeze-ASR-25 fp16 (2.87GB, 繁中最強)' },
+  // v2.7.0：mlx-audio 引擎，非 mlx_whisper 相容架構（見 transcriber.py:_local_stt）。
+  // 選用；預設仍是 whisper-turbo，不因新增此選項而改變。
+  { id: 'qwen3-asr',            label: 'Qwen3-ASR 1.7B 4bit (mlx-audio, 實驗性選用)' },
 ];
 
 const LANGUAGE_PROFILES = [

@@ -1,0 +1,73 @@
+{
+  "manifest_version": "seed-manifest-2026.08.24",
+  "generated_at": "2026-08-24T00:00:00Z",
+  "bundles": [
+    "common_general-medical_zh-Hant-TW_v1.json",
+    "common_general-medical_ja-JP_v1.json",
+    "common_general-medical_en_v1.json"
+  ],
+  "sources": [
+    {
+      "source_id": "repo:config.py:SCENE_PRESETS['medical'] (2026-08-24 snapshot)",
+      "description": "SGH Voice repo 既有 config.py SCENE_PRESETS['medical']['custom_words'] 靜態清單，為本產品既有、已隨 app 出貨使用的醫療場景詞庫（2026-03-01 起導入，見 CLAUDE.md 功能更新記錄）。",
+      "obtained_at": "2026-08-24",
+      "license_or_terms": "internal — first-party product source code, not third-party licensed data",
+      "allowed_use": "SGH Voice 本地/雲端 ASR prompt biasing 與 deterministic correction",
+      "owner": "Lin Chichuan / Shingihou",
+      "reviewer": [
+        "lin-chichuan-self-curated-pending-domain-reviewer"
+      ],
+      "update_cadence": "manual, on next roadmap phase"
+    },
+    {
+      "source_id": "repo:config.py:SCENE_PRESETS['medical']['corrections'] (2026-08-24 snapshot)",
+      "description": "SGH Voice repo 既有 config.py SCENE_PRESETS['medical']['corrections'] 已審核 wrong->right 對照（简繁與跨文字系統既有修正規則）。",
+      "obtained_at": "2026-08-24",
+      "license_or_terms": "internal — first-party product source code",
+      "allowed_use": "同上",
+      "owner": "Lin Chichuan / Shingihou",
+      "reviewer": [
+        "lin-chichuan-self-curated-pending-domain-reviewer"
+      ],
+      "update_cadence": "manual, on next roadmap phase"
+    },
+    {
+      "source_id": "mechanical:opencc-t2s-2026-08-24",
+      "description": "OpenCC t2s()（繁轉簡）套件輸出，機械式、可重現，非人工臆測。",
+      "obtained_at": "2026-08-24",
+      "license_or_terms": "OpenCC (Apache-2.0), already a project dependency",
+      "allowed_use": "衍生 alias 生成",
+      "owner": "n/a (deterministic transform)",
+      "reviewer": [
+        "lin-chichuan-self-curated-pending-domain-reviewer"
+      ],
+      "update_cadence": "n/a"
+    },
+    {
+      "source_id": "mechanical:nfkc-halfwidth-katakana-2026-08-24",
+      "description": "Python unicodedata NFKC 相容分解表反向推導之全形->半形片假名映射，每個轉換皆以 NFKC(half)==original 往返驗證過。",
+      "obtained_at": "2026-08-24",
+      "license_or_terms": "Unicode Consortium public compatibility mapping data",
+      "allowed_use": "衍生 alias 生成",
+      "owner": "n/a (deterministic transform)",
+      "reviewer": [
+        "lin-chichuan-self-curated-pending-domain-reviewer"
+      ],
+      "update_cadence": "n/a"
+    },
+    {
+      "source_id": "mechanical:ascii-lowercase-variant-2026-08-24",
+      "description": "純 ASCII 縮寫詞的大小寫變體，機械式生成。",
+      "obtained_at": "2026-08-24",
+      "license_or_terms": "n/a (deterministic transform)",
+      "allowed_use": "衍生 alias 生成",
+      "owner": "n/a",
+      "reviewer": [
+        "lin-chichuan-self-curated-pending-domain-reviewer"
+      ],
+      "update_cadence": "n/a"
+    }
+  ],
+  "patient_data_exclusion": "本 manifest 涵蓋的所有詞彙皆來自產品原始碼既有靜態清單與機械式文字轉換，不含任何患者資料、通話錄音、客服紀錄或第三方付費詞庫／標準術語集。",
+  "revocation_condition": "任何一個 term 被發現拼寫錯誤、造成 harmful substitution，或整包被 domain reviewer 判定不適用時，透過 medical_dictionary.BundleStore.disable_term() （單詞）或 .revoke_bundle()（整包）撤回，見 roadmap §8.3。"
+}

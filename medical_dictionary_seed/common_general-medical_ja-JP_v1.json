@@ -1,0 +1,524 @@
+{
+  "schema_version": 1,
+  "bundle_version": "2026.08.24-seed1",
+  "tenant_id": "common",
+  "specialty": "general-medical",
+  "language": "ja-JP",
+  "generated_at": "2026-08-24T00:00:00Z",
+  "source_manifest_version": "seed-manifest-2026.08.24",
+  "_provenance": "seed set, provenance: manually curated 2026-08-24, pending full list. canonical 詞彙全數取自 repo 既有 config.py SCENE_PRESETS['medical']（已隨產品出貨、非本次新造），因此已具備既有審核脈絡；alias 只使用可機械驗證、零臆測的變體來源：中文用 OpenCC t2s（簡繁轉換）、日文片假名用 NFKC 半形/全形往返驗證過的轉換、英文用大小寫變體。 沒有任何一個 alias 是猜測的『ASR 常見錯聽』——這類真正的語音誤聽對照需要實際音訊語料才能驗證，本輪沒有這類語料，因此刻意不臆造。所有 term 的 status 一律為 'staged'（非 'active'），代表只通過本模組的 schema/安全輸入檢查與作者本人的拼寫核對，尚未經過獨立語言/領域 reviewer 正式簽核（roadmap §7.2、§8.2）；staged 狀態下 medical_dictionary.py 只允許用於 ASR prompt bias（PROMPT_MIN_STATUS），任何 auto_replace 一律被 AUTO_REPLACE_MIN_STATUS='active' 擋下，不會實際套用確定性替換。term_type 的 'organization'／'anatomy' 少數用於 roadmap §4.2 六種枚舉裡沒有精確對應類別的行政/生物概念詞（如病歷、幹細胞），屬於最接近的既有分類，非新增枚舉值。",
+  "terms": [
+    {
+      "term_id": "seed-ja-med-001",
+      "canonical": "アムロジピン",
+      "aliases": [
+        "ｱﾑﾛジピﾝ"
+      ],
+      "term_type": "medication",
+      "languages": [
+        "ja-JP"
+      ],
+      "specialties": [
+        "general-medical"
+      ],
+      "priority": 50,
+      "case_sensitive": false,
+      "auto_replace": false,
+      "risk_class": "high",
+      "status": "staged",
+      "source_ids": [
+        "repo:config.py:SCENE_PRESETS['medical'] (2026-08-24 snapshot)",
+        "mechanical:nfkc-halfwidth-katakana-2026-08-24"
+      ],
+      "reviewed_by": [
+        "lin-chichuan-self-curated-pending-domain-reviewer"
+      ],
+      "reviewed_at": "2026-08-24T00:00:00Z"
+    },
+    {
+      "term_id": "seed-ja-med-002",
+      "canonical": "メトホルミン",
+      "aliases": [
+        "ﾒﾄﾎﾙﾐﾝ"
+      ],
+      "term_type": "medication",
+      "languages": [
+        "ja-JP"
+      ],
+      "specialties": [
+        "general-medical"
+      ],
+      "priority": 50,
+      "case_sensitive": false,
+      "auto_replace": false,
+      "risk_class": "high",
+      "status": "staged",
+      "source_ids": [
+        "repo:config.py:SCENE_PRESETS['medical'] (2026-08-24 snapshot)",
+        "mechanical:nfkc-halfwidth-katakana-2026-08-24"
+      ],
+      "reviewed_by": [
+        "lin-chichuan-self-curated-pending-domain-reviewer"
+      ],
+      "reviewed_at": "2026-08-24T00:00:00Z"
+    },
+    {
+      "term_id": "seed-ja-med-003",
+      "canonical": "ランソプラゾール",
+      "aliases": [
+        "ﾗﾝｿプﾗゾｰﾙ"
+      ],
+      "term_type": "medication",
+      "languages": [
+        "ja-JP"
+      ],
+      "specialties": [
+        "general-medical"
+      ],
+      "priority": 50,
+      "case_sensitive": false,
+      "auto_replace": false,
+      "risk_class": "high",
+      "status": "staged",
+      "source_ids": [
+        "repo:config.py:SCENE_PRESETS['medical'] (2026-08-24 snapshot)",
+        "mechanical:nfkc-halfwidth-katakana-2026-08-24"
+      ],
+      "reviewed_by": [
+        "lin-chichuan-self-curated-pending-domain-reviewer"
+      ],
+      "reviewed_at": "2026-08-24T00:00:00Z"
+    },
+    {
+      "term_id": "seed-ja-med-004",
+      "canonical": "ロキソニン",
+      "aliases": [
+        "ﾛｷｿﾆﾝ"
+      ],
+      "term_type": "medication",
+      "languages": [
+        "ja-JP"
+      ],
+      "specialties": [
+        "general-medical"
+      ],
+      "priority": 50,
+      "case_sensitive": false,
+      "auto_replace": false,
+      "risk_class": "high",
+      "status": "staged",
+      "source_ids": [
+        "repo:config.py:SCENE_PRESETS['medical'] (2026-08-24 snapshot)",
+        "mechanical:nfkc-halfwidth-katakana-2026-08-24"
+      ],
+      "reviewed_by": [
+        "lin-chichuan-self-curated-pending-domain-reviewer"
+      ],
+      "reviewed_at": "2026-08-24T00:00:00Z"
+    },
+    {
+      "term_id": "seed-ja-med-005",
+      "canonical": "アジスロマイシン",
+      "aliases": [
+        "ｱジｽﾛﾏｲｼﾝ"
+      ],
+      "term_type": "medication",
+      "languages": [
+        "ja-JP"
+      ],
+      "specialties": [
+        "general-medical"
+      ],
+      "priority": 45,
+      "case_sensitive": false,
+      "auto_replace": false,
+      "risk_class": "high",
+      "status": "staged",
+      "source_ids": [
+        "repo:config.py:SCENE_PRESETS['medical'] (2026-08-24 snapshot)",
+        "mechanical:nfkc-halfwidth-katakana-2026-08-24"
+      ],
+      "reviewed_by": [
+        "lin-chichuan-self-curated-pending-domain-reviewer"
+      ],
+      "reviewed_at": "2026-08-24T00:00:00Z"
+    },
+    {
+      "term_id": "seed-ja-med-006",
+      "canonical": "プレドニゾロン",
+      "aliases": [
+        "プﾚドﾆゾﾛﾝ"
+      ],
+      "term_type": "medication",
+      "languages": [
+        "ja-JP"
+      ],
+      "specialties": [
+        "general-medical"
+      ],
+      "priority": 45,
+      "case_sensitive": false,
+      "auto_replace": false,
+      "risk_class": "high",
+      "status": "staged",
+      "source_ids": [
+        "repo:config.py:SCENE_PRESETS['medical'] (2026-08-24 snapshot)",
+        "mechanical:nfkc-halfwidth-katakana-2026-08-24"
+      ],
+      "reviewed_by": [
+        "lin-chichuan-self-curated-pending-domain-reviewer"
+      ],
+      "reviewed_at": "2026-08-24T00:00:00Z"
+    },
+    {
+      "term_id": "seed-ja-med-007",
+      "canonical": "ワーファリン",
+      "aliases": [
+        "ﾜｰﾌｧﾘﾝ"
+      ],
+      "term_type": "medication",
+      "languages": [
+        "ja-JP"
+      ],
+      "specialties": [
+        "general-medical"
+      ],
+      "priority": 50,
+      "case_sensitive": false,
+      "auto_replace": false,
+      "risk_class": "high",
+      "status": "staged",
+      "source_ids": [
+        "repo:config.py:SCENE_PRESETS['medical'] (2026-08-24 snapshot)",
+        "mechanical:nfkc-halfwidth-katakana-2026-08-24"
+      ],
+      "reviewed_by": [
+        "lin-chichuan-self-curated-pending-domain-reviewer"
+      ],
+      "reviewed_at": "2026-08-24T00:00:00Z"
+    },
+    {
+      "term_id": "seed-ja-med-008",
+      "canonical": "インスリン",
+      "aliases": [
+        "ｲﾝｽﾘﾝ"
+      ],
+      "term_type": "medication",
+      "languages": [
+        "ja-JP"
+      ],
+      "specialties": [
+        "general-medical"
+      ],
+      "priority": 55,
+      "case_sensitive": false,
+      "auto_replace": false,
+      "risk_class": "high",
+      "status": "staged",
+      "source_ids": [
+        "repo:config.py:SCENE_PRESETS['medical'] (2026-08-24 snapshot)",
+        "mechanical:nfkc-halfwidth-katakana-2026-08-24"
+      ],
+      "reviewed_by": [
+        "lin-chichuan-self-curated-pending-domain-reviewer"
+      ],
+      "reviewed_at": "2026-08-24T00:00:00Z"
+    },
+    {
+      "term_id": "seed-ja-med-009",
+      "canonical": "オプジーボ",
+      "aliases": [
+        "ｵプジｰボ"
+      ],
+      "term_type": "medication",
+      "languages": [
+        "ja-JP"
+      ],
+      "specialties": [
+        "general-medical"
+      ],
+      "priority": 45,
+      "case_sensitive": false,
+      "auto_replace": false,
+      "risk_class": "high",
+      "status": "staged",
+      "source_ids": [
+        "repo:config.py:SCENE_PRESETS['medical'] (2026-08-24 snapshot)",
+        "mechanical:nfkc-halfwidth-katakana-2026-08-24"
+      ],
+      "reviewed_by": [
+        "lin-chichuan-self-curated-pending-domain-reviewer"
+      ],
+      "reviewed_at": "2026-08-24T00:00:00Z"
+    },
+    {
+      "term_id": "seed-ja-med-010",
+      "canonical": "キイトルーダ",
+      "aliases": [
+        "ｷｲﾄﾙｰダ"
+      ],
+      "term_type": "medication",
+      "languages": [
+        "ja-JP"
+      ],
+      "specialties": [
+        "general-medical"
+      ],
+      "priority": 45,
+      "case_sensitive": false,
+      "auto_replace": false,
+      "risk_class": "high",
+      "status": "staged",
+      "source_ids": [
+        "repo:config.py:SCENE_PRESETS['medical'] (2026-08-24 snapshot)",
+        "mechanical:nfkc-halfwidth-katakana-2026-08-24"
+      ],
+      "reviewed_by": [
+        "lin-chichuan-self-curated-pending-domain-reviewer"
+      ],
+      "reviewed_at": "2026-08-24T00:00:00Z"
+    },
+    {
+      "term_id": "seed-ja-med-011",
+      "canonical": "アバスチン",
+      "aliases": [
+        "ｱバｽﾁﾝ"
+      ],
+      "term_type": "medication",
+      "languages": [
+        "ja-JP"
+      ],
+      "specialties": [
+        "general-medical"
+      ],
+      "priority": 40,
+      "case_sensitive": false,
+      "auto_replace": false,
+      "risk_class": "high",
+      "status": "staged",
+      "source_ids": [
+        "repo:config.py:SCENE_PRESETS['medical'] (2026-08-24 snapshot)",
+        "mechanical:nfkc-halfwidth-katakana-2026-08-24"
+      ],
+      "reviewed_by": [
+        "lin-chichuan-self-curated-pending-domain-reviewer"
+      ],
+      "reviewed_at": "2026-08-24T00:00:00Z"
+    },
+    {
+      "term_id": "seed-ja-med-012",
+      "canonical": "ハーセプチン",
+      "aliases": [
+        "ﾊｰｾプﾁﾝ"
+      ],
+      "term_type": "medication",
+      "languages": [
+        "ja-JP"
+      ],
+      "specialties": [
+        "general-medical"
+      ],
+      "priority": 40,
+      "case_sensitive": false,
+      "auto_replace": false,
+      "risk_class": "high",
+      "status": "staged",
+      "source_ids": [
+        "repo:config.py:SCENE_PRESETS['medical'] (2026-08-24 snapshot)",
+        "mechanical:nfkc-halfwidth-katakana-2026-08-24"
+      ],
+      "reviewed_by": [
+        "lin-chichuan-self-curated-pending-domain-reviewer"
+      ],
+      "reviewed_at": "2026-08-24T00:00:00Z"
+    },
+    {
+      "term_id": "seed-ja-med-013",
+      "canonical": "リリカ",
+      "aliases": [
+        "ﾘﾘｶ"
+      ],
+      "term_type": "medication",
+      "languages": [
+        "ja-JP"
+      ],
+      "specialties": [
+        "general-medical"
+      ],
+      "priority": 40,
+      "case_sensitive": false,
+      "auto_replace": false,
+      "risk_class": "high",
+      "status": "staged",
+      "source_ids": [
+        "repo:config.py:SCENE_PRESETS['medical'] (2026-08-24 snapshot)",
+        "mechanical:nfkc-halfwidth-katakana-2026-08-24"
+      ],
+      "reviewed_by": [
+        "lin-chichuan-self-curated-pending-domain-reviewer"
+      ],
+      "reviewed_at": "2026-08-24T00:00:00Z"
+    },
+    {
+      "term_id": "seed-ja-med-014",
+      "canonical": "デパス",
+      "aliases": [
+        "デパｽ"
+      ],
+      "term_type": "medication",
+      "languages": [
+        "ja-JP"
+      ],
+      "specialties": [
+        "general-medical"
+      ],
+      "priority": 40,
+      "case_sensitive": false,
+      "auto_replace": false,
+      "risk_class": "high",
+      "status": "staged",
+      "source_ids": [
+        "repo:config.py:SCENE_PRESETS['medical'] (2026-08-24 snapshot)",
+        "mechanical:nfkc-halfwidth-katakana-2026-08-24"
+      ],
+      "reviewed_by": [
+        "lin-chichuan-self-curated-pending-domain-reviewer"
+      ],
+      "reviewed_at": "2026-08-24T00:00:00Z"
+    },
+    {
+      "term_id": "seed-ja-med-015",
+      "canonical": "マイスリー",
+      "aliases": [
+        "ﾏｲｽﾘｰ"
+      ],
+      "term_type": "medication",
+      "languages": [
+        "ja-JP"
+      ],
+      "specialties": [
+        "general-medical"
+      ],
+      "priority": 40,
+      "case_sensitive": false,
+      "auto_replace": false,
+      "risk_class": "high",
+      "status": "staged",
+      "source_ids": [
+        "repo:config.py:SCENE_PRESETS['medical'] (2026-08-24 snapshot)",
+        "mechanical:nfkc-halfwidth-katakana-2026-08-24"
+      ],
+      "reviewed_by": [
+        "lin-chichuan-self-curated-pending-domain-reviewer"
+      ],
+      "reviewed_at": "2026-08-24T00:00:00Z"
+    },
+    {
+      "term_id": "seed-ja-exam-001",
+      "canonical": "エコー",
+      "aliases": [
+        "ｴｺｰ"
+      ],
+      "term_type": "exam",
+      "languages": [
+        "ja-JP"
+      ],
+      "specialties": [
+        "general-medical"
+      ],
+      "priority": 55,
+      "case_sensitive": false,
+      "auto_replace": true,
+      "risk_class": "normal",
+      "status": "staged",
+      "source_ids": [
+        "repo:config.py:SCENE_PRESETS['medical'] (2026-08-24 snapshot)",
+        "mechanical:nfkc-halfwidth-katakana-2026-08-24"
+      ],
+      "reviewed_by": [
+        "lin-chichuan-self-curated-pending-domain-reviewer"
+      ],
+      "reviewed_at": "2026-08-24T00:00:00Z"
+    },
+    {
+      "term_id": "seed-ja-exam-002",
+      "canonical": "レントゲン",
+      "aliases": [
+        "ﾚﾝﾄゲﾝ"
+      ],
+      "term_type": "exam",
+      "languages": [
+        "ja-JP"
+      ],
+      "specialties": [
+        "general-medical"
+      ],
+      "priority": 55,
+      "case_sensitive": false,
+      "auto_replace": true,
+      "risk_class": "normal",
+      "status": "staged",
+      "source_ids": [
+        "repo:config.py:SCENE_PRESETS['medical'] (2026-08-24 snapshot)",
+        "mechanical:nfkc-halfwidth-katakana-2026-08-24"
+      ],
+      "reviewed_by": [
+        "lin-chichuan-self-curated-pending-domain-reviewer"
+      ],
+      "reviewed_at": "2026-08-24T00:00:00Z"
+    },
+    {
+      "term_id": "seed-ja-exam-003",
+      "canonical": "カルテ",
+      "aliases": [
+        "ｶﾙﾃ"
+      ],
+      "term_type": "organization",
+      "languages": [
+        "ja-JP"
+      ],
+      "specialties": [
+        "general-medical"
+      ],
+      "priority": 50,
+      "case_sensitive": false,
+      "auto_replace": true,
+      "risk_class": "normal",
+      "status": "staged",
+      "source_ids": [
+        "repo:config.py:SCENE_PRESETS['medical'] (2026-08-24 snapshot)",
+        "mechanical:nfkc-halfwidth-katakana-2026-08-24"
+      ],
+      "reviewed_by": [
+        "lin-chichuan-self-curated-pending-domain-reviewer"
+      ],
+      "reviewed_at": "2026-08-24T00:00:00Z"
+    },
+    {
+      "term_id": "seed-ja-vetted-001",
+      "canonical": "免疫チェックポイント",
+      "aliases": [
+        "免疫检查点"
+      ],
+      "term_type": "anatomy",
+      "languages": [
+        "ja-JP"
+      ],
+      "specialties": [
+        "general-medical"
+      ],
+      "priority": 40,
+      "case_sensitive": false,
+      "auto_replace": false,
+      "risk_class": "ambiguous",
+      "status": "staged",
+      "source_ids": [
+        "repo:config.py:SCENE_PRESETS['medical']['corrections'] (2026-08-24 snapshot)"
+      ],
+      "reviewed_by": [
+        "lin-chichuan-self-curated-pending-domain-reviewer"
+      ],
+      "reviewed_at": "2026-08-24T00:00:00Z"
+    }
+  ]
+}

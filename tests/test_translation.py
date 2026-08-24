@@ -330,6 +330,7 @@ def test_translation_pipeline_rejects_malformed_provider_and_uses_next(
 
     _configure_offline_translation(mock_transcriber)
     mock_transcriber.config["openrouter_api_key"] = "test-only"
+    mock_transcriber.config["allow_cross_provider_llm_fallback"] = True
     calls = []
     monkeypatch.setattr(transcriber_module, "detect_app_style", lambda _cfg: {
         "bundle_id": "",
@@ -365,6 +366,7 @@ def test_translation_pipeline_rejects_answer_and_uses_next_provider(
 
     _configure_offline_translation(mock_transcriber)
     mock_transcriber.config["openrouter_api_key"] = "test-only"
+    mock_transcriber.config["allow_cross_provider_llm_fallback"] = True
     calls = []
     monkeypatch.setattr(transcriber_module, "detect_app_style", lambda _cfg: {
         "bundle_id": "",
@@ -408,6 +410,7 @@ def test_translation_retry_rejects_answer_and_uses_next_provider(
 ):
     _configure_offline_translation(mock_transcriber)
     mock_transcriber.config["openrouter_api_key"] = "test-only"
+    mock_transcriber.config["allow_cross_provider_llm_fallback"] = True
     mock_transcriber._last_stt_cache = {
         "raw": "請問明天的門診幾點開始？",
         "mode": "translate",

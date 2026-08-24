@@ -620,10 +620,16 @@ LOCAL_MODEL_PATHS = {
     "whisper-turbo": "mlx-community/whisper-turbo",
     "breeze-asr-25-4bit": "/Volumes/Satechi_SSD/huggingface/hub/breeze-asr-25-mlx-4bit",
     "breeze-asr-25": "/Volumes/Satechi_SSD/huggingface/hub/breeze-asr-25-mlx",
+    # Qwen3-ASR 是實驗性 opt-in mlx-audio 引擎；非 mlx_whisper 相容架構，
+    # _local_stt() 依 QWEN3_ASR_MODELS 分流到獨立呼叫路徑。
+    "qwen3-asr": "mlx-community/Qwen3-ASR-1.7B-4bit",
 }
 
 # Breeze-ASR-25 基於 whisper-large-v2（80 mel bins），需要特殊處理
 BREEZE_MODELS = {"breeze-asr-25-4bit", "breeze-asr-25"}
+
+# Qwen3-ASR 走 mlx-audio（非 mlx_whisper）呼叫路徑，見 transcriber.py:_local_stt()
+QWEN3_ASR_MODELS = {"qwen3-asr"}
 
 DEFAULT_CONFIG = {
     "openai_api_key": "",
@@ -642,6 +648,9 @@ DEFAULT_CONFIG = {
     "target_language": "",                  # 舊版單語全域翻譯；保留相容，新流程請用 translation_target_languages
     "translation_target_languages": ["ja"], # 獨立翻譯錄音的目標語言（zh-Hant/ja/en/ko，1–4）
     "llm_engine": "groq",                   # 首選 LLM 引擎（groq/openrouter/claude/openai/ollama）
+    # 逐字稿跨雲端 LLM provider fallback 會新增資料處理者，必須由使用者明確 opt-in。
+    # False 時只嘗試所選 provider；本機 Ollama fallback 不會把資料送出裝置，仍可安全使用。
+    "allow_cross_provider_llm_fallback": False,
     "enable_claude_polish": True,           # Claude 後處理潤稿
     "enable_auto_learn": True,              # 自動學習修正
     "enable_filler_removal": True,          # 移除填充詞
@@ -688,7 +697,7 @@ DEFAULT_CONFIG = {
     "openrouter_model": "qwen/qwen3-30b-a3b:free",         # OpenRouter 模型（v2.4.0 修正：原 qwen3.6-plus 不存在；改用免費 MoE 模型）
     "groq_whisper_model": "whisper-large-v3-turbo",  # Groq STT 模型
     "local_llm_timeout_sec": 6.0,           # 本地 Ollama 超時秒數（避免 1.5 秒過短造成頻繁 fallback）
-    "llm_timeout_sec": 5.0,                 # 雲端 LLM 超時秒數（Claude/Groq/OpenAI/OpenRouter）超時即 fallback 下一個引擎
+    "llm_timeout_sec": 5.0,                 # 雲端 LLM 超時秒數；只有明確 opt-in 才跨 provider fallback
     "backup_audio_dir": "",                  # 音訊備份目錄（空字串=不備份）
     "enable_voiceprint": False,              # 聲紋驗證開關
     "voiceprint_threshold": 0.97,            # 聲紋相似度閾值（0.95~0.99）
@@ -712,6 +721,11 @@ DEFAULT_CONFIG = {
     # transcription-only system contract.
     "claude_system_prompt": "",
     "active_scene": "general",
+    # 醫療詞庫 Phase 1（docs/MEDICAL_DICTIONARY_ROADMAP.md §8.3 line 328：
+    # 「緊急停用應支援整個 medical layer」）。預設 True = 沿用既有 medical scene 行為
+    # 並疊加 medical_dictionary bundle；設 False 可整層緊急停用，退回純靜態
+    # SCENE_PRESETS 詞庫（見 medical_dictionary.augment_scene_words/corrections）。
+    "enable_medical_dictionary_bundles": True,
     "dashboard_port": 7865,
 }
 
@@ -960,6 +974,11 @@ def _normalize_known_stale_model_ids(saved):
     replacements = {
         "local_whisper_model": {
             "mlx-community/whisper-turbo": "whisper-turbo",
+            # v2.7.0：dashboard.py 舊版 _MODEL_REPOS["qwen3-asr"] 曾指向這個原始 HF
+            # repo（Qwen 官方 PyTorch/safetensors，非 mlx-audio 相容格式）。沒有 UI
+            # 曾經公開讓使用者選到它，但比照 whisper-turbo 遷移手法安全遷移，防手動
+            # 編輯過 config.json 的舊值卡死在無法載入的 repo id 上。
+            "Qwen/Qwen3-ASR-0.6B": "qwen3-asr",
         },
         "openrouter_model": {
             "qwen/qwen3.6-plus": DEFAULT_CONFIG["openrouter_model"],

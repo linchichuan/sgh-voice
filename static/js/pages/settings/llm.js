@@ -163,6 +163,24 @@ export function mountLlmTab(container, cfg, dirty) {
     checked: !!cfg.enable_filler_removal,
     onChange: (v) => dirty.set('enable_filler_removal', v),
   });
+  const crossProviderToggle = customToggle({
+    id: 'allow_cross_provider_llm_fallback',
+    label: t('settings.llm.crossProvider.label'),
+    description: t('settings.llm.crossProvider.desc'),
+    checked: !!cfg.allow_cross_provider_llm_fallback,
+    onConfirmTurnOn: (applyOn) => {
+      ConfirmDialog({
+        title: t('settings.llm.crossProvider.confirm.title'),
+        message: t('settings.llm.crossProvider.confirm.msg'),
+        confirmText: t('btn.confirm'),
+        onConfirm: () => {
+          applyOn();
+          dirty.set('allow_cross_provider_llm_fallback', true);
+        },
+      });
+    },
+    onTurnOff: () => dirty.set('allow_cross_provider_llm_fallback', false),
+  });
 
   // Privacy: fewshot — use custom toggle so we can confirm BEFORE state flips
   const fewshotInitial = !!cfg.enable_fewshot;
@@ -220,6 +238,7 @@ export function mountLlmTab(container, cfg, dirty) {
       h('div', { class: 'space-y-4 pt-2 border-t border-[var(--border)]' },
         polishSwitch,
         fillerSwitch,
+        crossProviderToggle.node,
       ),
       h('div', { class: 'space-y-4 pt-2 border-t border-[var(--border)]' },
         fewshotToggle.node,

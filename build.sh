@@ -214,13 +214,40 @@ BUILT_VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' 
 # missing. Gate the actual embedded PYZ, not only the build exit code.
 ARCHIVE_LIST="$(pyi-archive_viewer "$APP_PATH/Contents/MacOS/${APP_NAME}" -r -b)"
 REQUIRED_PYTHON_MODULES=(
-    app config dashboard event_ledger memory transcriber translation
-    mlx mlx.nn mlx_whisper
+    app config dashboard event_ledger medical_dictionary memory transcriber translation
+    mlx mlx.nn mlx_whisper mlx_audio mlx_audio.stt
+    mlx_audio.stt.models.qwen3_asr.qwen3_asr
 )
 for required_module in "${REQUIRED_PYTHON_MODULES[@]}"; do
     grep -Eq "^[[:space:]]*${required_module}$" <<< "$ARCHIVE_LIST" \
         || fail "App bundle 缺少必要 Python 模組: $required_module"
 done
+
+MEDICAL_SEED_DIR="$APP_PATH/Contents/Resources/medical_dictionary_seed"
+EXPECTED_MEDICAL_SEED_BUNDLES=3
+EXPECTED_MEDICAL_SEED_TERMS=39
+[[ -d "$MEDICAL_SEED_DIR" ]] || fail "App bundle 缺少 medical_dictionary_seed"
+python - "$MEDICAL_SEED_DIR" "$EXPECTED_MEDICAL_SEED_BUNDLES" "$EXPECTED_MEDICAL_SEED_TERMS" <<'PY'
+import json
+import pathlib
+import sys
+
+seed_dir = pathlib.Path(sys.argv[1])
+expected_bundles = int(sys.argv[2])
+expected_terms = int(sys.argv[3])
+paths = sorted(path for path in seed_dir.glob("*.json") if not path.name.startswith("manifest"))
+if len(paths) != expected_bundles:
+    raise SystemExit(f"expected {expected_bundles} medical seed bundles, found {len(paths)}")
+term_count = 0
+for path in paths:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    terms = payload.get("terms")
+    if not isinstance(terms, list):
+        raise SystemExit(f"invalid terms list in {path.name}")
+    term_count += len(terms)
+if term_count != expected_terms:
+    raise SystemExit(f"expected {expected_terms} medical seed terms, found {term_count}")
+PY
 
 # mlx.core is a native extension and therefore lives beside the PYZ instead of
 # appearing as a pure-Python archive entry. Gate the complete Metal runtime.

@@ -1,0 +1,255 @@
+{
+  "schema_version": 1,
+  "bundle_version": "2026.08.24-seed1",
+  "tenant_id": "common",
+  "specialty": "general-medical",
+  "language": "en",
+  "generated_at": "2026-08-24T00:00:00Z",
+  "source_manifest_version": "seed-manifest-2026.08.24",
+  "_provenance": "seed set, provenance: manually curated 2026-08-24, pending full list. canonical 詞彙全數取自 repo 既有 config.py SCENE_PRESETS['medical']（已隨產品出貨、非本次新造），因此已具備既有審核脈絡；alias 只使用可機械驗證、零臆測的變體來源：中文用 OpenCC t2s（簡繁轉換）、日文片假名用 NFKC 半形/全形往返驗證過的轉換、英文用大小寫變體。 沒有任何一個 alias 是猜測的『ASR 常見錯聽』——這類真正的語音誤聽對照需要實際音訊語料才能驗證，本輪沒有這類語料，因此刻意不臆造。所有 term 的 status 一律為 'staged'（非 'active'），代表只通過本模組的 schema/安全輸入檢查與作者本人的拼寫核對，尚未經過獨立語言/領域 reviewer 正式簽核（roadmap §7.2、§8.2）；staged 狀態下 medical_dictionary.py 只允許用於 ASR prompt bias（PROMPT_MIN_STATUS），任何 auto_replace 一律被 AUTO_REPLACE_MIN_STATUS='active' 擋下，不會實際套用確定性替換。term_type 的 'organization'／'anatomy' 少數用於 roadmap §4.2 六種枚舉裡沒有精確對應類別的行政/生物概念詞（如病歷、幹細胞），屬於最接近的既有分類，非新增枚舉值。",
+  "terms": [
+    {
+      "term_id": "seed-en-001",
+      "canonical": "CT",
+      "aliases": [
+        "ct"
+      ],
+      "term_type": "exam",
+      "languages": [
+        "en"
+      ],
+      "specialties": [
+        "general-medical"
+      ],
+      "priority": 60,
+      "case_sensitive": false,
+      "auto_replace": true,
+      "risk_class": "normal",
+      "status": "staged",
+      "source_ids": [
+        "repo:config.py:SCENE_PRESETS['medical'] (2026-08-24 snapshot)",
+        "mechanical:ascii-lowercase-variant-2026-08-24"
+      ],
+      "reviewed_by": [
+        "lin-chichuan-self-curated-pending-domain-reviewer"
+      ],
+      "reviewed_at": "2026-08-24T00:00:00Z"
+    },
+    {
+      "term_id": "seed-en-002",
+      "canonical": "MRI",
+      "aliases": [
+        "mri"
+      ],
+      "term_type": "exam",
+      "languages": [
+        "en"
+      ],
+      "specialties": [
+        "general-medical"
+      ],
+      "priority": 60,
+      "case_sensitive": false,
+      "auto_replace": true,
+      "risk_class": "normal",
+      "status": "staged",
+      "source_ids": [
+        "repo:config.py:SCENE_PRESETS['medical'] (2026-08-24 snapshot)",
+        "mechanical:ascii-lowercase-variant-2026-08-24"
+      ],
+      "reviewed_by": [
+        "lin-chichuan-self-curated-pending-domain-reviewer"
+      ],
+      "reviewed_at": "2026-08-24T00:00:00Z"
+    },
+    {
+      "term_id": "seed-en-003",
+      "canonical": "SpO2",
+      "aliases": [
+        "spo2"
+      ],
+      "term_type": "exam",
+      "languages": [
+        "en"
+      ],
+      "specialties": [
+        "general-medical"
+      ],
+      "priority": 50,
+      "case_sensitive": false,
+      "auto_replace": true,
+      "risk_class": "normal",
+      "status": "staged",
+      "source_ids": [
+        "repo:config.py:SCENE_PRESETS['medical'] (2026-08-24 snapshot)",
+        "mechanical:ascii-lowercase-variant-2026-08-24"
+      ],
+      "reviewed_by": [
+        "lin-chichuan-self-curated-pending-domain-reviewer"
+      ],
+      "reviewed_at": "2026-08-24T00:00:00Z"
+    },
+    {
+      "term_id": "seed-en-004",
+      "canonical": "HbA1c",
+      "aliases": [
+        "hba1c"
+      ],
+      "term_type": "exam",
+      "languages": [
+        "en"
+      ],
+      "specialties": [
+        "general-medical"
+      ],
+      "priority": 50,
+      "case_sensitive": false,
+      "auto_replace": true,
+      "risk_class": "normal",
+      "status": "staged",
+      "source_ids": [
+        "repo:config.py:SCENE_PRESETS['medical'] (2026-08-24 snapshot)",
+        "mechanical:ascii-lowercase-variant-2026-08-24"
+      ],
+      "reviewed_by": [
+        "lin-chichuan-self-curated-pending-domain-reviewer"
+      ],
+      "reviewed_at": "2026-08-24T00:00:00Z"
+    },
+    {
+      "term_id": "seed-en-005",
+      "canonical": "CAR-T",
+      "aliases": [
+        "car-t"
+      ],
+      "term_type": "acronym",
+      "languages": [
+        "en"
+      ],
+      "specialties": [
+        "general-medical"
+      ],
+      "priority": 40,
+      "case_sensitive": false,
+      "auto_replace": true,
+      "risk_class": "normal",
+      "status": "staged",
+      "source_ids": [
+        "repo:config.py:SCENE_PRESETS['medical'] (2026-08-24 snapshot)",
+        "mechanical:ascii-lowercase-variant-2026-08-24"
+      ],
+      "reviewed_by": [
+        "lin-chichuan-self-curated-pending-domain-reviewer"
+      ],
+      "reviewed_at": "2026-08-24T00:00:00Z"
+    },
+    {
+      "term_id": "seed-en-006",
+      "canonical": "PD-1",
+      "aliases": [
+        "pd-1"
+      ],
+      "term_type": "acronym",
+      "languages": [
+        "en"
+      ],
+      "specialties": [
+        "general-medical"
+      ],
+      "priority": 40,
+      "case_sensitive": false,
+      "auto_replace": true,
+      "risk_class": "normal",
+      "status": "staged",
+      "source_ids": [
+        "repo:config.py:SCENE_PRESETS['medical'] (2026-08-24 snapshot)",
+        "mechanical:ascii-lowercase-variant-2026-08-24"
+      ],
+      "reviewed_by": [
+        "lin-chichuan-self-curated-pending-domain-reviewer"
+      ],
+      "reviewed_at": "2026-08-24T00:00:00Z"
+    },
+    {
+      "term_id": "seed-en-007",
+      "canonical": "PD-L1",
+      "aliases": [
+        "pd-l1"
+      ],
+      "term_type": "acronym",
+      "languages": [
+        "en"
+      ],
+      "specialties": [
+        "general-medical"
+      ],
+      "priority": 40,
+      "case_sensitive": false,
+      "auto_replace": true,
+      "risk_class": "normal",
+      "status": "staged",
+      "source_ids": [
+        "repo:config.py:SCENE_PRESETS['medical'] (2026-08-24 snapshot)",
+        "mechanical:ascii-lowercase-variant-2026-08-24"
+      ],
+      "reviewed_by": [
+        "lin-chichuan-self-curated-pending-domain-reviewer"
+      ],
+      "reviewed_at": "2026-08-24T00:00:00Z"
+    },
+    {
+      "term_id": "seed-en-008",
+      "canonical": "iPS細胞",
+      "aliases": [
+        "ips細胞"
+      ],
+      "term_type": "acronym",
+      "languages": [
+        "en"
+      ],
+      "specialties": [
+        "general-medical"
+      ],
+      "priority": 40,
+      "case_sensitive": false,
+      "auto_replace": true,
+      "risk_class": "normal",
+      "status": "staged",
+      "source_ids": [
+        "repo:config.py:SCENE_PRESETS['medical'] (2026-08-24 snapshot)",
+        "mechanical:ascii-lowercase-variant-2026-08-24"
+      ],
+      "reviewed_by": [
+        "lin-chichuan-self-curated-pending-domain-reviewer"
+      ],
+      "reviewed_at": "2026-08-24T00:00:00Z"
+    },
+    {
+      "term_id": "seed-en-009",
+      "canonical": "NK細胞",
+      "aliases": [
+        "nk細胞"
+      ],
+      "term_type": "acronym",
+      "languages": [
+        "en"
+      ],
+      "specialties": [
+        "general-medical"
+      ],
+      "priority": 40,
+      "case_sensitive": false,
+      "auto_replace": true,
+      "risk_class": "normal",
+      "status": "staged",
+      "source_ids": [
+        "repo:config.py:SCENE_PRESETS['medical'] (2026-08-24 snapshot)",
+        "mechanical:ascii-lowercase-variant-2026-08-24"
+      ],
+      "reviewed_by": [
+        "lin-chichuan-self-curated-pending-domain-reviewer"
+      ],
+      "reviewed_at": "2026-08-24T00:00:00Z"
+    }
+  ]
+}
