@@ -34,7 +34,12 @@ import com.shingihou.sghvoice.learning.VoiceCorrectionTracker
 import com.shingihou.sghvoice.learning.VoiceCorrectionTrackingStatus
 import com.shingihou.sghvoice.processing.DictionaryManager
 import com.shingihou.sghvoice.processing.OpenCCConverter
+import com.shingihou.sghvoice.processing.RecognitionLanguage
+import com.shingihou.sghvoice.processing.TranslationLanguage
+import com.shingihou.sghvoice.processing.TranslationOutput
+import com.shingihou.sghvoice.processing.TranslationRequest
 import com.shingihou.sghvoice.processing.TranscriptionPipeline
+import com.shingihou.sghvoice.processing.VoiceTask
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -106,6 +111,7 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
     private val voiceCorrectionTracker = VoiceCorrectionTracker()
     private var lastCommittedVoiceText = ""
     private var currentLearningDecision: LearningPolicyDecision = LearningPolicy.evaluate(null)
+    private var activeVoiceTask: VoiceTask = VoiceTask.Dictation
 
     override fun onCreate() {
         super.onCreate()
@@ -136,6 +142,9 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
         val view = KeyboardView(this).apply {
             setKeyboardActionListener(this@VoiceInputIME)
             setInputMode(currentInputMode)
+            setRecognitionLanguage(
+                apiConfig?.recognitionLanguage ?: RecognitionLanguage.AUTO
+            )
             updateState(currentState)
         }
         keyboardView = view
@@ -151,6 +160,9 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
         keyboardView?.setInputMode(currentInputMode)
+        keyboardView?.setRecognitionLanguage(
+            apiConfig?.recognitionLanguage ?: RecognitionLanguage.AUTO
+        )
         keyboardView?.updateState(currentState)
         updateManualUi()
     }
@@ -269,6 +281,7 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
         recordingTimerJob = null
         transcriptionJob?.cancel()
         transcriptionJob = null
+        activeVoiceTask = VoiceTask.Dictation
 
         if (resetState) {
             setState(ImeState.IDLE)
@@ -303,7 +316,7 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
             ImeState.DONE,
             ImeState.ERROR -> {
                 inspectVoiceCorrection()
-                startRecording()
+                startRecording(VoiceTask.Dictation)
             }
 
             ImeState.RECORDING -> stopRecordingAndProcess()
@@ -314,8 +327,64 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
         }
     }
 
-    private fun startRecording() {
+    override fun onTranslationPickerRequested() {
+        if (currentLearningDecision.sensitiveField) {
+            showError(getString(R.string.msg_voice_disabled_sensitive))
+            return
+        }
+        if (currentState == ImeState.RECORDING && activeVoiceTask is VoiceTask.Translation) {
+            invalidateVoiceOperation(resetState = true)
+            keyboardView?.setStatusText(getString(R.string.msg_translation_cancelled))
+            return
+        }
+        if (
+            currentState != ImeState.IDLE &&
+            currentState != ImeState.DONE &&
+            currentState != ImeState.ERROR
+        ) {
+            return
+        }
         val config = apiConfig ?: ApiConfig(this).also { apiConfig = it }
+        keyboardView?.showTranslationPanel(config.translationTargets)
+    }
+
+    override fun onTranslationRequested(request: TranslationRequest) {
+        if (currentLearningDecision.sensitiveField) {
+            showError(getString(R.string.msg_voice_disabled_sensitive))
+            return
+        }
+        if (
+            currentState != ImeState.IDLE &&
+            currentState != ImeState.DONE &&
+            currentState != ImeState.ERROR
+        ) {
+            return
+        }
+
+        val config = apiConfig ?: ApiConfig(this).also { apiConfig = it }
+        if (!hasSelectedLlmKey(config)) {
+            showError(getString(R.string.msg_missing_translation_key))
+            return
+        }
+        config.translationTargets = request.targets
+        inspectVoiceCorrection()
+        startRecording(VoiceTask.Translation(request))
+    }
+
+    private fun hasSelectedLlmKey(config: ApiConfig): Boolean =
+        when (config.llmEngine) {
+            "claude" -> config.anthropicApiKey.isNotBlank()
+            "openai" -> config.openAiApiKey.isNotBlank()
+            "groq" -> config.groqApiKey.isNotBlank()
+            else -> false
+        }
+
+    private fun startRecording(task: VoiceTask) {
+        val config = apiConfig ?: ApiConfig(this).also { apiConfig = it }
+        if (!config.hasCloudProcessingConsent) {
+            showError(getString(R.string.msg_cloud_consent_required))
+            return
+        }
         val hasSttKey = if (config.sttEngine == "groq") {
             config.groqApiKey.isNotBlank()
         } else {
@@ -333,6 +402,7 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
         }
 
         invalidateVoiceOperation(resetState = false)
+        activeVoiceTask = task
         val sessionId = inputSessionId
         val operationId = voiceOperationId
         setState(ImeState.STARTING)
@@ -346,6 +416,9 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
                 }
 
                 setState(ImeState.RECORDING)
+                if (task is VoiceTask.Translation) {
+                    keyboardView?.setTranslationRecordingMode()
+                }
                 startRecordingTimer(sessionId, operationId)
             } catch (error: CancellationException) {
                 throw error
@@ -372,7 +445,10 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
                     stopRecordingAndProcess()
                     return@launch
                 }
-                keyboardView?.setRecordingElapsed(formatElapsed(elapsedMs))
+                keyboardView?.setRecordingElapsed(
+                    formattedElapsed = formatElapsed(elapsedMs),
+                    translating = activeVoiceTask is VoiceTask.Translation
+                )
                 delay(1_000)
             }
         }
@@ -385,6 +461,7 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
         val sessionId = inputSessionId
         val operationId = voiceOperationId
         val targetConnection = currentInputConnection
+        val task = activeVoiceTask
 
         recordingTimerJob?.cancel()
         recordingTimerJob = null
@@ -409,7 +486,8 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
                     wavData = wavData,
                     sessionId = sessionId,
                     operationId = operationId,
-                    targetConnection = targetConnection
+                    targetConnection = targetConnection,
+                    task = task
                 )
             } catch (error: CancellationException) {
                 throw error
@@ -426,15 +504,30 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
         wavData: ByteArray,
         sessionId: Long,
         operationId: Long,
-        targetConnection: InputConnection
+        targetConnection: InputConnection,
+        task: VoiceTask
     ) {
         setState(ImeState.PROCESSING)
         transcriptionJob = serviceScope.launch {
             val activePipeline = awaitPipeline(sessionId, operationId) ?: return@launch
 
             try {
+                // Consent can be withdrawn while the user is recording or while
+                // the pipeline is warming up. Re-check at the actual upload
+                // boundary and destroy the in-memory WAV before returning.
+                val config = apiConfig ?: ApiConfig(this@VoiceInputIME).also {
+                    apiConfig = it
+                }
+                if (!config.hasCloudProcessingConsent) {
+                    wavData.fill(0)
+                    if (isCurrentOperation(sessionId, operationId)) {
+                        showError(getString(R.string.msg_cloud_consent_required))
+                    }
+                    return@launch
+                }
                 activePipeline.process(
                     wavData,
+                    task,
                     object : TranscriptionPipeline.ProgressCallback {
                         override fun onWhisperStarted() {
                             updateStatusIfCurrent(
@@ -456,21 +549,35 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
                             updateStatusIfCurrent(
                                 sessionId,
                                 operationId,
-                                R.string.msg_ai_processing
+                                if (task is VoiceTask.Translation) {
+                                    R.string.msg_translating
+                                } else {
+                                    R.string.msg_ai_processing
+                                }
                             )
                         }
 
                         override fun onCompleted(result: TranscriptionPipeline.Result) {
                             if (!isCurrentOperation(sessionId, operationId)) return
 
-                            if (result.success && result.text.isNotBlank()) {
-                                if (targetConnection.commitText(result.text, 1)) {
+                            val textToCommit = when (task) {
+                                VoiceTask.Dictation -> result.text
+                                is VoiceTask.Translation ->
+                                    formatTranslationOutputs(result.translations)
+                            }
+                            if (result.success && textToCommit.isNotBlank()) {
+                                if (targetConnection.commitText(textToCommit, 1)) {
                                     setState(ImeState.DONE)
-                                    beginVoiceCorrectionTracking(
-                                        sessionId = sessionId,
-                                        connection = targetConnection,
-                                        committedText = result.text
-                                    )
+                                    if (task == VoiceTask.Dictation) {
+                                        beginVoiceCorrectionTracking(
+                                            sessionId = sessionId,
+                                            connection = targetConnection,
+                                            committedText = textToCommit
+                                        )
+                                    } else {
+                                        // 翻譯不是錯字修正，不能寫入來源語言的學習詞庫。
+                                        cancelCorrectionTracking()
+                                    }
                                 } else {
                                     showError(getString(R.string.msg_input_connection_lost))
                                 }
@@ -478,15 +585,34 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
                                 showError(getString(R.string.msg_no_speech))
                             } else {
                                 showError(
-                                    getString(R.string.msg_process_failed) +
-                                        (result.error ?: getString(R.string.msg_unknown_error))
+                                    if (task is VoiceTask.Translation) {
+                                        getString(
+                                            R.string.msg_translation_failed_detail,
+                                            translationErrorHint(result.error.orEmpty())
+                                        )
+                                    } else {
+                                        getString(R.string.msg_process_failed) +
+                                            (result.error ?: getString(R.string.msg_unknown_error))
+                                    }
                                 )
                             }
                         }
 
                         override fun onError(error: String) {
                             if (isCurrentOperation(sessionId, operationId)) {
-                                showError(getString(R.string.msg_error) + error)
+                                if (task is VoiceTask.Translation) {
+                                    Log.e(TAG, "Translation failed: $error")
+                                }
+                                showError(
+                                    if (task is VoiceTask.Translation) {
+                                        getString(
+                                            R.string.msg_translation_failed_detail,
+                                            translationErrorHint(error)
+                                        )
+                                    } else {
+                                        getString(R.string.msg_error) + error
+                                    }
+                                )
                             }
                         }
                     }
@@ -504,6 +630,64 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
             }
         }
     }
+
+    private fun translationErrorHint(error: String): String {
+        val normalized = error.lowercase()
+        return getString(
+            when {
+                "401" in normalized ||
+                    "403" in normalized ||
+                    "api key" in normalized -> R.string.translation_error_auth
+
+                "404" in normalized ||
+                    "model" in normalized && (
+                        "not found" in normalized ||
+                            "unavailable" in normalized ||
+                            "access" in normalized
+                        ) -> R.string.translation_error_model
+
+                "429" in normalized ||
+                    "rate limit" in normalized ||
+                    "quota" in normalized ||
+                    "credit" in normalized -> R.string.translation_error_quota
+
+                "json" in normalized ||
+                    "schema" in normalized ||
+                    "parse" in normalized ||
+                    "empty response" in normalized -> R.string.translation_error_format
+
+                "semantic" in normalized ||
+                    "answered source" in normalized ||
+                    "source intent" in normalized -> R.string.translation_error_semantic
+
+                "network" in normalized ||
+                    "timeout" in normalized ||
+                    "connection" in normalized -> R.string.translation_error_network
+
+                else -> R.string.translation_error_unknown
+            }
+        )
+    }
+
+    private fun formatTranslationOutputs(outputs: List<TranslationOutput>): String {
+        if (outputs.isEmpty()) return ""
+        if (outputs.size == 1) return outputs.first().text
+        return outputs.joinToString("\n") { output ->
+            getString(
+                R.string.translation_output_format,
+                getString(translationLanguageLabel(output.language)),
+                output.text
+            )
+        }
+    }
+
+    private fun translationLanguageLabel(language: TranslationLanguage): Int =
+        when (language) {
+            TranslationLanguage.TRADITIONAL_CHINESE -> R.string.translation_language_zh_hant
+            TranslationLanguage.JAPANESE -> R.string.translation_language_ja
+            TranslationLanguage.ENGLISH -> R.string.translation_language_en
+            TranslationLanguage.KOREAN -> R.string.translation_language_ko
+        }
 
     private suspend fun awaitPipeline(
         sessionId: Long,
@@ -533,6 +717,38 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
             keyboardView?.setStatusText(getString(messageRes))
         }
     }
+
+    override fun onRecognitionLanguageChanged(language: RecognitionLanguage) {
+        if (
+            currentState != ImeState.IDLE &&
+            currentState != ImeState.DONE &&
+            currentState != ImeState.ERROR
+        ) {
+            keyboardView?.setStatusText(
+                getString(R.string.msg_recognition_language_busy)
+            )
+            return
+        }
+        val config = apiConfig ?: ApiConfig(this).also { apiConfig = it }
+        config.recognitionLanguage = language
+        keyboardView?.setRecognitionLanguage(language)
+        keyboardView?.announceForAccessibility(
+            getString(
+                R.string.msg_recognition_language_changed,
+                getString(recognitionLanguageLabel(language))
+            )
+        )
+    }
+
+    private fun recognitionLanguageLabel(language: RecognitionLanguage): Int =
+        when (language) {
+            RecognitionLanguage.AUTO -> R.string.recognition_language_auto
+            RecognitionLanguage.TRADITIONAL_CHINESE ->
+                R.string.recognition_language_traditional_chinese
+            RecognitionLanguage.JAPANESE -> R.string.recognition_language_japanese
+            RecognitionLanguage.ENGLISH -> R.string.recognition_language_english
+            RecognitionLanguage.KOREAN -> R.string.recognition_language_korean
+        }
 
     override fun onInputModeChanged(mode: KeyboardView.InputMode) {
         if (mode == currentInputMode) return
@@ -695,6 +911,13 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
             (getSystemService(INPUT_METHOD_SERVICE) as? InputMethodManager)
                 ?.showInputMethodPicker()
         }
+    }
+
+    override fun onKeyboardPickerRequested() {
+        commitActiveComposition()
+        invalidateVoiceOperation(resetState = true)
+        (getSystemService(INPUT_METHOD_SERVICE) as? InputMethodManager)
+            ?.showInputMethodPicker()
     }
 
     private fun selectZhuyinCandidate(candidate: String) {

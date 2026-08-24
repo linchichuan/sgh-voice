@@ -65,6 +65,10 @@ class WhisperClient(private val apiConfig: ApiConfig) {
                 .addFormDataPart("model", modelName)
                 .addFormDataPart("response_format", "json")
                 .apply {
+                    // auto 時刻意不送 language，讓模型保留混合語言自動偵測。
+                    apiConfig.recognitionLanguage.apiCode?.let { language ->
+                        addFormDataPart("language", language)
+                    }
                     // 提示詞：包含自訂詞彙以提升三語混合辨識
                     if (initialPrompt.isNotBlank()) {
                         addFormDataPart("prompt", initialPrompt)

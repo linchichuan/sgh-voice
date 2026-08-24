@@ -18,6 +18,9 @@ dist/
 __pycache__/
 *.py[cod]
 venv/
+.coverage
+coverage.xml
+htmlcov/
 
 # macOS
 .DS_Store
@@ -48,8 +51,19 @@ tts/**/*.out
 .claude/
 .kiro/
 docs/
+# 新增的正式規劃／驗收文件需納入版本控制；其餘新 docs 產物仍忽略。
+!docs/
+docs/*
+!docs/ANDROID_RC_ACCEPTANCE.md
+!docs/MEDICAL_DICTIONARY_ROADMAP.md
+!docs/MACOS_RELEASE_RUNBOOK.md
+!docs/reviews/
+!docs/reviews/*.md
+!docs/app-store/
+!docs/app-store/*.md
 .playwright-cli/
-output/playwright/
+# Browser/device verification screenshots are generated evidence, not source.
+/output/
 
 # Local data（個人設定，不進 git）
 config.json

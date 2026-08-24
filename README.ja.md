@@ -1,15 +1,26 @@
-# 🎙 SGH Voice — AI 音声入力ツール (v2.6.0)
+# 🎙 SGH Voice — AI 音声入力ツール (v2.7.0)
 
 **[English](README.en.md)** | **日本語** | **[繁體中文](README.md)**
 
-> 話すだけでプロの文章に。中国語・日本語・英語の3言語を自動認識 + スマート AI 後処理。データは100%自社管理。
+> 話すだけでプロの文章に。中国語・日本語・英語の3言語を自動認識 + スマート AI 後処理。BYOK方式で、データはユーザーが選択した外部AIプロバイダーに送信して処理します。
 
 [![macOS](https://img.shields.io/badge/macOS-Apple_Silicon-black?logo=apple)](https://github.com/linchichuan/sgh-voice/releases)
 [![iOS](https://img.shields.io/badge/iOS-17.0+-blue?logo=apple)](https://github.com/linchichuan/sgh-voice/releases)
 [![Android](https://img.shields.io/badge/Android-8.0+-green?logo=android)](https://github.com/linchichuan/sgh-voice/releases)
-[![Version](https://img.shields.io/badge/Version-2.6.0-green)]()
+[![Version](https://img.shields.io/badge/Version-2.7.0-green)]()
 
 ---
+
+## 🌟 v2.7.0 の新機能
+
+| 機能 | 詳細 |
+|------|------|
+| **音声入力では質問に回答しない** | 固定の Dictation contract により、質問文や依頼文も原意を保った文字列として処理し、回答のような LLM 出力は破棄します。 |
+| **1回の録音を最大4言語へ翻訳** | Android の長押しと macOS の専用ショートカットから、繁体字中国語・日本語・英語・韓国語を選択できます。STT と LLM は各1回です。 |
+| **Prompt 管理を明確化** | Dashboard で実際の provider／model ID、変更不可の音声入力・翻訳規則、従属的な句読点／書式設定を確認できます。 |
+| **Android IME を改善** | SGH Voice のブランド表示、候補欄、修正学習、翻訳先の記憶を追加し、音声・注音・日本語・英語を同一キーボード内で利用できます。 |
+| **不正な結果を入力しない** | 翻訳は厳密な JSON contract に限定し、key 不足・形式不正・疑わしい音声入力結果は現在の App へ挿入しません。 |
+| **モデルとコスト挙動を表示** | 曖昧な「Cloud」表記ではなく、実際の model ID と翻訳時の呼び出し方法を設定画面で確認できます。 |
 
 ## 🌟 v2.6.0 の新機能
 
@@ -291,9 +302,9 @@ sgh-voice/
 
 | 項目 | 対応 |
 |------|------|
-| 音声データ | OpenAI/Anthropic API にのみ送信、他のサーバーを経由しない |
-| API キー | ローカルの `~/.voice-input/config.json`（macOS）または Keychain（iOS）に保存 |
-| 履歴 | すべてローカル保存、最大2000件 |
+| 音声データ | 選択した OpenAI または Groq の STT API に送信。文字起こし結果は選択した LLM に送信 |
+| API キー | iOS は Keychain、Android は EncryptedSharedPreferences、対応する macOS 版は Keychain または権限600の設定ファイルに保存 |
+| 履歴 | 対応するデスクトップ版はローカル保存。iOS版は発話履歴ファイルを作成しない |
 | アカウント | 不要 |
 | データ追跡 | なし |
 

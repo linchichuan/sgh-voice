@@ -6,9 +6,8 @@
     <string>com.shingihou.pipeline-health</string>
     <key>ProgramArguments</key>
     <array>
-        <string>/usr/local/bin/python3</string>
-        <string>/Users/lin/voice-input/scripts/pipeline_health.py</string>
-        <string>--auto-fix</string>
+        <string>/bin/bash</string>
+        <string>/Users/lin/Library/Application Support/SGHVoice/run_pipeline_health.sh</string>
         <string>--quiet</string>
     </array>
     <key>StartCalendarInterval</key>
@@ -18,14 +17,18 @@
         <key>Minute</key>
         <integer>0</integer>
     </dict>
+    <key>Umask</key>
+    <integer>63</integer>
     <key>StandardOutPath</key>
-    <string>/Users/lin/.voice-input/pipeline-health.stdout.log</string>
+    <string>/Users/lin/Library/Logs/SGHVoice/pipeline-health.stdout.log</string>
     <key>StandardErrorPath</key>
-    <string>/Users/lin/.voice-input/pipeline-health.stderr.log</string>
+    <string>/Users/lin/Library/Logs/SGHVoice/pipeline-health.stderr.log</string>
     <key>EnvironmentVariables</key>
     <dict>
+        <key>HOME</key>
+        <string>/Users/lin</string>
         <key>PATH</key>
-        <string>/usr/local/bin:/usr/bin:/bin</string>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
         <key>PYTHONPATH</key>
         <string>/Users/lin/voice-input</string>
     </dict>

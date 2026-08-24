@@ -1,0 +1,7 @@
+-c constraints.txt
+
+pytest==9.0.3
+pytest-cov==7.1.0
+ruff==0.15.2
+pyobjc-framework-Cocoa==12.1
+pyinstaller==6.19.0

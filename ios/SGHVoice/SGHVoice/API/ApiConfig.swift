@@ -19,26 +19,51 @@ class ApiConfig {
     private let keySetupComplete = "setup_complete"
     private let keySttEngine = "stt_engine"
     private let keyLlmEngine = "llm_engine"
+    private let keyTranslationTargets = "translation_targets"
+    private let keyCloudProcessingConsentVersion = "cloud_processing_consent_version"
     
     // 預設模型
     static let defaultWhisperModel = "whisper-1"
     static let defaultClaudeModel = "claude-haiku-4-5-20251001"
-    static let defaultGroqLlmModel = "llama-3.3-70b-versatile"
+    static let defaultGroqLlmModel = "openai/gpt-oss-120b"
+    // v2 adds explicit disclosure for dictionary and scene prompts sent with STT requests.
+    static let currentCloudProcessingConsentVersion = 2
+    static let supportedClaudeModels = [
+        "claude-haiku-4-5-20251001",
+        "claude-sonnet-5",
+        "claude-opus-5",
+        "claude-opus-4-8",
+        "claude-fable-5"
+    ]
     
     // MARK: - Keychain Methods
     private func saveToKeychain(key: String, value: String) {
-        if let data = value.data(using: .utf8) {
-            let query: [String: Any] = [
-                kSecClass as String: kSecClassGenericPassword,
-                kSecAttrAccount as String: key,
-                kSecValueData as String: data
-            ]
-            
-            // Delete existing item
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrAccount as String: key
+        ]
+
+        guard !value.isEmpty else {
             SecItemDelete(query as CFDictionary)
-            
-            // Add new item
-            SecItemAdd(query as CFDictionary, nil)
+            return
+        }
+        guard let data = value.data(using: .utf8) else { return }
+
+        let attributes: [String: Any] = [
+            kSecValueData as String: data
+        ]
+        let updateStatus = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
+
+        if updateStatus == errSecItemNotFound {
+            var addQuery = query
+            addQuery[kSecValueData as String] = data
+            addQuery[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+            let addStatus = SecItemAdd(addQuery as CFDictionary, nil)
+            if addStatus != errSecSuccess {
+                print("Keychain add failed with status: \(addStatus)")
+            }
+        } else if updateStatus != errSecSuccess {
+            print("Keychain update failed with status: \(updateStatus)")
         }
     }
     
@@ -156,11 +181,72 @@ class ApiConfig {
         get { return defaults.string(forKey: keyLlmEngine) ?? "claude" }
         set { defaults.set(newValue, forKey: keyLlmEngine) }
     }
+
+    var translationTargets: [TranslationLanguage] {
+        get {
+            let saved = defaults.stringArray(forKey: keyTranslationTargets) ?? []
+            let targets = saved.compactMap(TranslationLanguage.init(rawValue:))
+            return (try? TranslationContract.normalizedTargets(targets)) ?? [.japanese]
+        }
+        set {
+            let targets = (try? TranslationContract.normalizedTargets(newValue)) ?? [.japanese]
+            defaults.set(targets.map(\.rawValue), forKey: keyTranslationTargets)
+        }
+    }
+
+    var hasSpeechToTextKey: Bool {
+        switch sttEngine {
+        case "openai":
+            return !openAiApiKey.isEmpty
+        case "groq":
+            return !groqApiKey.isEmpty
+        default:
+            return false
+        }
+    }
+
+    var hasConfiguredLlmKey: Bool {
+        switch llmEngine {
+        case "none":
+            return false
+        case "claude":
+            return !anthropicApiKey.isEmpty
+        case "openai":
+            return !openAiApiKey.isEmpty
+        case "groq":
+            return !groqApiKey.isEmpty
+        default:
+            return false
+        }
+    }
+
+    var canDictate: Bool {
+        hasSpeechToTextKey && (llmEngine == "none" || hasConfiguredLlmKey)
+    }
+
+    var canTranslate: Bool {
+        hasSpeechToTextKey && hasConfiguredLlmKey
+    }
+
+    var hasCloudProcessingConsent: Bool {
+        get {
+            defaults.integer(forKey: keyCloudProcessingConsentVersion)
+                >= ApiConfig.currentCloudProcessingConsentVersion
+        }
+        set {
+            if newValue {
+                defaults.set(
+                    ApiConfig.currentCloudProcessingConsentVersion,
+                    forKey: keyCloudProcessingConsentVersion
+                )
+            } else {
+                defaults.removeObject(forKey: keyCloudProcessingConsentVersion)
+            }
+        }
+    }
     
     var hasApiKeys: Bool {
-        let hasStt = !openAiApiKey.isEmpty || !groqApiKey.isEmpty
-        let hasLlm = !anthropicApiKey.isEmpty || !openAiApiKey.isEmpty || !groqApiKey.isEmpty
-        return hasStt && hasLlm
+        canDictate
     }
     
     func clearAll() {
@@ -173,5 +259,9 @@ class ApiConfig {
         defaults.removeObject(forKey: keyLanguagePref)
         defaults.removeObject(forKey: keyOutputStyle)
         defaults.removeObject(forKey: keySetupComplete)
+        defaults.removeObject(forKey: keySttEngine)
+        defaults.removeObject(forKey: keyLlmEngine)
+        defaults.removeObject(forKey: keyTranslationTargets)
+        defaults.removeObject(forKey: keyCloudProcessingConsentVersion)
     }
 }

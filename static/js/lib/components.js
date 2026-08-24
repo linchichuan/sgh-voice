@@ -238,17 +238,27 @@ export function KeyInput({ id, label, value = '', placeholder = '', onTest, onSa
 
 // ---------- Tabs ----------
 export function Tabs({ tabs, active, onChange }) {
-  const list = h('div', { class: 'flex gap-1 border-b border-[var(--border)] mb-4', role: 'tablist' });
+  const list = h('div', {
+    class: 'flex gap-1 overflow-x-auto overscroll-x-contain border-b border-[var(--border)] mb-4',
+    role: 'tablist',
+    'aria-label': 'Sections',
+  });
   tabs.forEach((tab) => {
     const isActive = tab.id === active;
     const btn = h('button', {
       type: 'button',
       role: 'tab',
       'aria-selected': isActive ? 'true' : 'false',
-      class: `px-4 py-2 text-sm font-medium border-b-2 transition ${isActive ? 'border-[var(--brand-blue)] text-[var(--brand-blue)]' : 'border-transparent text-[var(--text-3)] hover:text-[var(--text)]'}`,
+      class: `shrink-0 whitespace-nowrap min-h-11 px-4 py-2 text-sm font-medium border-b-2 transition ${isActive ? 'border-[var(--brand-blue)] text-[var(--brand-blue)]' : 'border-transparent text-[var(--text-3)] hover:text-[var(--text)]'}`,
       onClick: () => { if (onChange) onChange(tab.id); },
     }, tab.label);
     list.appendChild(btn);
+    if (isActive) {
+      requestAnimationFrame(() => {
+        const centered = btn.offsetLeft - ((list.clientWidth - btn.offsetWidth) / 2);
+        list.scrollTo({ left: Math.max(0, centered), behavior: 'auto' });
+      });
+    }
   });
   return list;
 }

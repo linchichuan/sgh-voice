@@ -5,6 +5,7 @@ dashboard.py — Web Dashboard (Flask)
 import os
 import sys
 import json
+import config as config_store
 from flask import Flask, request, jsonify, send_from_directory, Response
 from config import ConfigSaveError, load_config, save_config, load_stats, update_stats, load_smart_replace, save_smart_replace, DEFAULT_APP_STYLES, BASE_CORRECTIONS as BASE_CORRECTIONS_REF, KEYCHAIN_KEYS, _keychain_available, _keychain_delete
 from memory import Memory
@@ -18,6 +19,7 @@ from hotkey_config import (
     validate_hotkey_config,
     validate_hotkey_mode,
 )
+from translation import TranslationError, normalize_translation_targets
 import anthropic
 
 
@@ -172,8 +174,16 @@ def api_wipe_all():
     # Token 用過即廢
     del _WIPE_TOKEN_STORE[token]
 
-    import shutil, glob
-    data_dir = os.path.expanduser("~/.voice-input")
+    if _engine is not None and hasattr(_engine, "prepare_for_data_wipe"):
+        if not _engine.prepare_for_data_wipe(timeout=10.0):
+            return jsonify({
+                "error": "runtime is still processing data",
+                "code": "wipe_not_quiescent",
+            }), 409
+    config_store.block_runtime_data_writes()
+
+    import shutil
+    data_dir = config_store.DATA_DIR
     targets = [
         ("history.json", "file"),
         ("events.jsonl", "file"),
@@ -183,7 +193,9 @@ def api_wipe_all():
         ("stats.json", "file"),
         ("smart_replace.json", "file"),
         ("audit.log", "file"),                # Codex round 1 補：之前漏掉，audit log 也是 PII
+        ("auto_triage_report.md", "file"),
         ("audio_backup", "dir"),
+        ("reports", "dir"),
     ]
     deleted = []
     failed = []
@@ -200,14 +212,33 @@ def api_wipe_all():
         except Exception as e:
             failed.append({"name": name, "error": str(e)[:120]})
 
-    # 同步從外接 SSD 備份目錄清掉（如果 config 有指定）
-    cfg = load_config()
-    ssd_dir = cfg.get("backup_audio_dir", "")
-    if ssd_dir and os.path.isdir(ssd_dir):
-        wav_files = glob.glob(os.path.join(ssd_dir, "*.wav"))
-        for f in wav_files:
-            try: os.remove(f); deleted.append(f"backup_audio_dir/{os.path.basename(f)}")
-            except Exception as e: failed.append({"name": f, "error": str(e)[:120]})
+    # Corrupt history/config recovery files may still contain transcript data
+    # or private settings. Delete only the exact app-owned quarantine prefixes.
+    try:
+        residue_names = [
+            name for name in os.listdir(data_dir)
+            if name.startswith(("history.json.bad.", "config.json.bad."))
+        ]
+    except OSError:
+        residue_names = []
+    for name in residue_names:
+        path = os.path.join(data_dir, name)
+        try:
+            os.remove(path)
+            deleted.append(name)
+        except Exception as exc:
+            failed.append({"name": name, "error": str(exc)[:120]})
+
+    # 自訂備份目錄可能和使用者其他錄音混用。只刪 manifest 中由本 App
+    # 明確登記的檔案，絕不再 glob 整個目錄的 *.wav。
+    backup_deleted, backup_failed = config_store.delete_registered_audio_backups()
+    deleted.extend(
+        f"backup_audio/{os.path.basename(path)}" for path in backup_deleted
+    )
+    failed.extend(
+        {"name": path, "error": error[:120]}
+        for path, error in backup_failed
+    )
 
     # ⚠️ Codex round 1：清 in-memory state — 不清的話 process 內 Memory 物件還持有
     # 已刪資料，下次 add_to_history / save 又會把資料寫回磁碟，GDPR 沒落地。
@@ -284,12 +315,54 @@ def api_save_config():
     from config import DEFAULT_CONFIG
     allowed_keys = set(DEFAULT_CONFIG.keys())
     data = {k: v for k, v in data.items() if k in allowed_keys}
+    try:
+        data = config_store.validate_config_update(data)
+    except config_store.ConfigValidationError as exc:
+        return jsonify({
+            "error": str(exc),
+            "field": exc.field,
+            "code": "invalid_config_field",
+        }), 400
     if "language" in data and data["language"] not in {"auto", "zh", "ja", "en"}:
         return jsonify({
             "error": "language must be one of auto, zh, ja, en",
             "field": "language",
             "code": "invalid_language_profile",
         }), 400
+    if "translation_target_languages" in data:
+        if not isinstance(data["translation_target_languages"], list):
+            return jsonify({
+                "error": "translation_target_languages must be a list",
+                "field": "translation_target_languages",
+                "code": "invalid_translation_targets",
+            }), 400
+        try:
+            data["translation_target_languages"] = list(
+                normalize_translation_targets(
+                    data["translation_target_languages"]
+                )
+            )
+        except TranslationError as exc:
+            return jsonify({
+                "error": str(exc),
+                "field": "translation_target_languages",
+                "code": "invalid_translation_targets",
+            }), 400
+    if "claude_system_prompt" in data:
+        prompt_value = data["claude_system_prompt"]
+        if not isinstance(prompt_value, str):
+            return jsonify({
+                "error": "custom prompt instructions must be a string",
+                "field": "claude_system_prompt",
+                "code": "invalid_prompt_instructions",
+            }), 400
+        if len(prompt_value) > 4000:
+            return jsonify({
+                "error": "custom prompt instructions must be 4000 characters or fewer",
+                "field": "claude_system_prompt",
+                "code": "invalid_prompt_instructions",
+            }), 400
+        data["claude_system_prompt"] = prompt_value.strip()
     # 只更新非空的 API key（避免覆蓋隱藏的 key）
     warnings = []
     for key in list(_API_KEY_FORMATS.keys()):
@@ -519,12 +592,21 @@ def api_cleanup_corrections():
 
 @app.route("/api/style_profile/regenerate", methods=["POST"])
 def api_regenerate_style_profile():
-    """從最近 N 筆 history.final_text 重新生成使用者語氣 profile，寫入 dictionary.style_profile。
-    ⚠️ 不影響 dictionary corrections — 只更新 style_profile 文字欄位。
-    body: {n?: int=100, apply?: bool=true}（預設直接套用因為純文字、不會污染管線）"""
+    """Locally analyze recent history and optionally update style_profile.
+
+    Transcript samples never leave this Mac. The generated profile contains
+    aggregate style traits only and never echoes a source sample.
+    """
     body = request.get_json(force=True, silent=True) or {}
-    n = int(body.get("n", 100))
-    do_apply = body.get("apply", True)
+    try:
+        n = int(body.get("n", 100))
+    except (TypeError, ValueError):
+        return jsonify({"ok": False, "error": "n 必須是整數"}), 400
+    if not 10 <= n <= 100:
+        return jsonify({"ok": False, "error": "n 必須介於 10 與 100"}), 400
+    do_apply = body.get("apply", False)
+    if not isinstance(do_apply, bool):
+        return jsonify({"ok": False, "error": "apply 必須是布林值"}), 400
 
     samples = []
     for h in reversed(memory.history):
@@ -537,7 +619,7 @@ def api_regenerate_style_profile():
     if len(samples) < 10:
         return jsonify({"ok": False, "error": f"樣本不足（{len(samples)} 筆，需 ≥10）"}), 400
 
-    # 重用腳本邏輯：呼叫 LLM 分析
+    # Reuse the deterministic local analyzer. No provider client is imported.
     import importlib.util
     spec = importlib.util.spec_from_file_location(
         "_style_profile",
@@ -546,20 +628,14 @@ def api_regenerate_style_profile():
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
 
-    cfg = load_config()
-    sample_text = "\n".join(f"- {s}" for s in samples)
-    profile, engine = mod._call_llm(cfg, mod._PROFILE_PROMPT, sample_text)
-    if not profile:
-        return jsonify({"ok": False, "error": "LLM 全部失敗（檢查 API key）"}), 500
-
-    profile = profile.strip().strip('"').strip("'")
+    profile = mod.generate_local_style_profile(samples)
     old_profile = memory.get_style_profile()
     if do_apply:
         memory.update_style_profile(profile)
     return jsonify({
         "ok": True,
         "applied": bool(do_apply),
-        "engine": engine,
+        "engine": "local",
         "samples": len(samples),
         "old_profile": old_profile,
         "new_profile": profile,
@@ -652,7 +728,7 @@ def api_promote_from_history():
                 counter[(w, r)] += 1
 
     base_keys = {k.lower() for k in BASE_CORRECTIONS_REF.keys()}
-    existing = set(memory.dictionary.get("corrections", {}).keys())
+    existing = set(memory.get_all_corrections().keys())
     promoted, sk_substr, sk_opencc, sk_filter, sk_base = [], [], [], [], []
     for (w, r), f in counter.most_common():
         if f < min_freq:
@@ -680,13 +756,7 @@ def api_promote_from_history():
         ]
 
     if do_apply and promoted:
-        corr = memory.dictionary.setdefault("corrections", {})
-        freq_d = memory.dictionary.setdefault("frequency", {})
-        for p in promoted:
-            corr[p["wrong"]] = p["right"]
-            freq_d[p["wrong"]] = freq_d.get(p["wrong"], 0) + p["freq"]
-        from config import save_dictionary
-        save_dictionary(memory.dictionary)
+        memory.apply_promoted_corrections(promoted)
 
     return jsonify({
         "ok": True,
@@ -735,30 +805,51 @@ def api_rewrite():
     directive = REWRITE_STYLE_DIRECTIVES.get(style, REWRITE_STYLE_DIRECTIVES["concise"])
 
     try:
-        client = anthropic.Anthropic(api_key=api_key, max_retries=0)
-        resp = client.messages.create(
-            model=config.get("claude_model", "claude-haiku-4-5-20251001"),
-            max_tokens=1024,
-            system=EDIT_SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": f"<command>{directive}</command>\n<text>{text}</text>"}],
-        )
-        result = resp.content[0].text.strip()
-        # 繁中終層防護；多語 helper 會保留日文新字體與假名 clause。
-        if style != "translate_ja":
+        with config_store.cloud_budget_guard(
+            config,
+            source="anthropic_rewrite",
+        ) as budget:
+            if not budget["allowed"]:
+                return jsonify({
+                    "error": "monthly cloud budget exhausted",
+                    "code": "monthly_budget_exceeded",
+                    "budget_jpy": budget["budget_jpy"],
+                    "spent_jpy": round(budget["spent_jpy"], 4),
+                }), 402
             try:
-                from opencc import OpenCC
-                result = convert_traditional_preserving_japanese(
-                    result,
-                    OpenCC("s2twp"),
-                    language_hint=resolve_output_language_hint(
-                        style, config.get("language"),
-                    ),
-                )
-            except Exception:
-                pass
-        # 追蹤 token 用量
-        _track_usage(resp, "rewrite")
-        return jsonify({"result": result})
+                rewrite_timeout = float(config.get("llm_timeout_sec", 5.0))
+            except (TypeError, ValueError):
+                rewrite_timeout = 5.0
+            rewrite_timeout = min(600.0, max(0.1, rewrite_timeout))
+            client = anthropic.Anthropic(
+                api_key=api_key,
+                max_retries=0,
+                timeout=rewrite_timeout,
+            )
+            resp = client.messages.create(
+                model=config.get("claude_model", "claude-haiku-4-5-20251001"),
+                max_tokens=1024,
+                system=EDIT_SYSTEM_PROMPT,
+                messages=[{"role": "user", "content": f"<command>{directive}</command>\n<text>{text}</text>"}],
+            )
+            result = resp.content[0].text.strip()
+            # 繁中終層防護；多語 helper 會保留日文新字體與假名 clause。
+            if style != "translate_ja":
+                try:
+                    from opencc import OpenCC
+                    result = convert_traditional_preserving_japanese(
+                        result,
+                        OpenCC("s2twp"),
+                        language_hint=resolve_output_language_hint(
+                            style, config.get("language"),
+                        ),
+                    )
+                except Exception:
+                    pass
+            # The guard is still held while usage is persisted, so the next
+            # concurrent request observes this charge before its own decision.
+            _track_usage(resp, "anthropic")
+            return jsonify({"result": result})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -859,15 +950,32 @@ def api_test_llm():
     config = load_config()
     test_msg = "Hello"
     t0 = _time.time()
+    budget_gate = None
+
+    if engine != "ollama":
+        budget_gate = config_store.cloud_budget_guard(config, source=engine)
+        budget = budget_gate.__enter__()
+        if not budget["allowed"]:
+            budget_gate.__exit__(None, None, None)
+            return jsonify({
+                "ok": False,
+                "error": "monthly cloud budget exhausted",
+                "code": "monthly_budget_exceeded",
+                "budget_jpy": budget["budget_jpy"],
+                "spent_jpy": round(budget["spent_jpy"], 4),
+            }), 402
 
     try:
+        usage_source = None
+        response = None
         if engine == "groq":
             import openai as openai_lib
             key = config.get("groq_api_key")
             if not key: return jsonify({"ok": False, "error": "No Groq API Key"}), 200
             client = openai_lib.OpenAI(base_url="https://api.groq.com/openai/v1", api_key=key, timeout=10.0)
             model = config.get("groq_model", "llama-3.3-70b-versatile")
-            client.chat.completions.create(model=model, messages=[{"role": "user", "content": test_msg}], max_tokens=5)
+            response = client.chat.completions.create(model=model, messages=[{"role": "user", "content": test_msg}], max_tokens=5)
+            usage_source = "groq"
 
         elif engine == "openrouter":
             import openai as openai_lib
@@ -875,15 +983,17 @@ def api_test_llm():
             if not key: return jsonify({"ok": False, "error": "No OpenRouter API Key"}), 200
             client = openai_lib.OpenAI(base_url="https://openrouter.ai/api/v1", api_key=key, timeout=15.0)
             model = config.get("openrouter_model", "qwen/qwen3-30b-a3b:free")
-            client.chat.completions.create(model=model, messages=[{"role": "user", "content": test_msg}], max_tokens=5,
-                                           extra_headers={"HTTP-Referer": "https://github.com/sgh-voice", "X-Title": "SGH Voice"})
+            response = client.chat.completions.create(model=model, messages=[{"role": "user", "content": test_msg}], max_tokens=5,
+                                                      extra_headers={"HTTP-Referer": "https://github.com/sgh-voice", "X-Title": "SGH Voice"})
+            usage_source = "openrouter"
 
         elif engine == "claude":
             key = config.get("anthropic_api_key")
             if not key: return jsonify({"ok": False, "error": "No Anthropic API Key"}), 200
             client = anthropic.Anthropic(api_key=key, timeout=10.0)
             model = config.get("claude_model", "claude-3-5-haiku-20241022")
-            client.messages.create(model=model, messages=[{"role": "user", "content": test_msg}], max_tokens=5)
+            response = client.messages.create(model=model, messages=[{"role": "user", "content": test_msg}], max_tokens=5)
+            usage_source = "anthropic"
 
         elif engine == "openai":
             import openai as openai_lib
@@ -891,7 +1001,8 @@ def api_test_llm():
             if not key: return jsonify({"ok": False, "error": "No OpenAI API Key"}), 200
             client = openai_lib.OpenAI(api_key=key, timeout=10.0)
             model = config.get("openai_model", "gpt-4o")
-            client.chat.completions.create(model=model, messages=[{"role": "user", "content": test_msg}], max_tokens=5)
+            response = client.chat.completions.create(model=model, messages=[{"role": "user", "content": test_msg}], max_tokens=5)
+            usage_source = "openai"
 
         elif engine == "ollama":
             import openai as openai_lib
@@ -902,11 +1013,16 @@ def api_test_llm():
         else:
             return jsonify({"ok": False, "error": f"Unknown engine: {engine}"}), 200
 
+        if response is not None and usage_source is not None:
+            _track_usage(response, usage_source, usage_type="connection_test")
         latency = round(_time.time() - t0, 2)
         return jsonify({"ok": True, "engine": engine, "model": model, "latency": latency})
 
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)[:200]}), 200
+    finally:
+        if budget_gate is not None:
+            budget_gate.__exit__(None, None, None)
 
 
 @app.route("/api/service-status")
@@ -1146,8 +1262,20 @@ def set_engine(engine):
 def api_recording_status():
     """取得錄音狀態"""
     if _engine is None:
-        return jsonify({"available": False, "recording": False})
-    return jsonify({"available": True, "recording": _engine.is_recording})
+        return jsonify({
+            "available": False,
+            "recording": False,
+            "mode": None,
+        })
+    return jsonify({
+        "available": True,
+        "recording": _engine.is_recording,
+        "mode": (
+            _engine.active_recording_intent()
+            if _engine.is_recording
+            else None
+        ),
+    })
 
 
 @app.route("/api/recording/start", methods=["POST"])
@@ -1157,8 +1285,27 @@ def api_start_recording():
         return jsonify({"error": "Engine not available"}), 503
     if _engine.is_recording:
         return jsonify({"error": "Already recording"}), 400
-    _engine.start_recording()
-    return jsonify({"ok": True, "status": "recording"})
+    payload = request.get_json(silent=True) or {}
+    if not isinstance(payload, dict):
+        return jsonify({"error": "invalid data"}), 400
+    mode = payload.get("mode", "dictate")
+    if mode not in {"dictate", "translate"}:
+        return jsonify({"error": "mode must be dictate or translate"}), 400
+    targets = payload.get("translation_targets")
+    if targets is not None:
+        if not isinstance(targets, list):
+            return jsonify({"error": "translation_targets must be a list"}), 400
+        try:
+            targets = list(normalize_translation_targets(targets))
+        except TranslationError as exc:
+            return jsonify({"error": str(exc)}), 400
+    started = _engine.start_recording(
+        mode=mode,
+        translation_targets=targets,
+    )
+    if not started:
+        return jsonify({"error": "Unable to start recording"}), 400
+    return jsonify({"ok": True, "status": "recording", "mode": mode})
 
 
 @app.route("/api/recording/stop", methods=["POST"])
@@ -1176,7 +1323,7 @@ def api_stop_recording():
     return jsonify({"ok": True, "status": "processing"})
 
 
-def _track_usage(response, source="anthropic"):
+def _track_usage(response, source="anthropic", usage_type="rewrite"):
     """追蹤 rewrite API 用量（atomic，與 update_stats 共用同一把鎖避免覆寫 daily/total）"""
     try:
         from config import update_stats_atomic
@@ -1209,9 +1356,15 @@ def _track_usage(response, source="anthropic"):
             elif source == "openai":
                 m["openai_input_tokens"] += input_tokens
                 m["openai_output_tokens"] += output_tokens
+            elif source == "groq":
+                m["groq_input_tokens"] += input_tokens
+                m["groq_output_tokens"] += output_tokens
+            elif source == "openrouter":
+                m["openrouter_input_tokens"] += input_tokens
+                m["openrouter_output_tokens"] += output_tokens
             m["details"].append({
                 "t": datetime.now().isoformat(),
-                "s": source, "m": model, "i": input_tokens, "o": output_tokens, "sec": 0, "type": "rewrite"
+                "s": source, "m": model, "i": input_tokens, "o": output_tokens, "sec": 0, "type": usage_type
             })
             if len(m["details"]) > 100: m["details"] = m["details"][-100:]
 

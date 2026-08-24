@@ -37,8 +37,12 @@ class TranscriptionPipeline {
     
     weak var delegate: TranscriptionProgressDelegate?
     
-    /// 執行完整的處理管線
-    func process(wavData: Data) async -> TranscriptionResult {
+    /// 執行完整的處理管線。翻譯模式固定為一次 STT + 一次 LLM，
+    /// 並在開始前快照目標語言，避免錄音途中改設定造成輸出錯置。
+    func process(
+        wavData: Data,
+        intent: TranscriptionIntent = .dictate
+    ) async -> TranscriptionResult {
         do {
             // === 第一層：Whisper 語音辨識 ===
             DispatchQueue.main.async { self.delegate?.onWhisperStarted() }
@@ -47,8 +51,19 @@ class TranscriptionPipeline {
             let rawText = try await whisperClient.transcribe(wavData: wavData, initialPrompt: whisperPrompt)
             
             if rawText.isEmpty {
-                let result = TranscriptionResult(text: "", rawText: "", success: true)
-                DispatchQueue.main.async { self.delegate?.onCompleted(result: result) }
+                let result = TranscriptionResult(
+                    text: "",
+                    rawText: "",
+                    success: !intent.isTranslation,
+                    error: intent.isTranslation ? L10n.text("沒有辨識到可翻譯的語音。") : nil
+                )
+                if result.success {
+                    DispatchQueue.main.async { self.delegate?.onCompleted(result: result) }
+                } else {
+                    DispatchQueue.main.async {
+                        self.delegate?.onError(error: result.error ?? L10n.text("翻譯失敗"))
+                    }
+                }
                 return result
             }
             DispatchQueue.main.async { self.delegate?.onWhisperCompleted(text: rawText) }
@@ -56,15 +71,41 @@ class TranscriptionPipeline {
             // === 第二層：詞庫修正 ===
             let correctedText = dictionaryManager.applyCorrections(to: rawText)
             
-            // === 第三層：LLM 後處理（含場景指令）===
+            // === 第三層：依錄音意圖執行聽寫清理或翻譯 ===
             DispatchQueue.main.async { self.delegate?.onLlmStarted() }
-            
-            var finalText = correctedText
-            do {
-                finalText = try await llmClient.postProcess(text: correctedText)
-            } catch {
-                // LLM 失敗時降級為使用詞庫修正後的結果
-                print("LLM processing failed: \(error)")
+
+            let finalText: String
+            switch intent {
+            case .dictate:
+                do {
+                    finalText = try await llmClient.postProcess(text: correctedText)
+                } catch {
+                    // 一般聽寫可安全降級為詞庫修正後的逐字稿。
+                    print("LLM processing failed: \(error)")
+                    finalText = correctedText
+                }
+            case let .translate(targets):
+                do {
+                    let normalized = try TranslationContract.normalizedTargets(targets)
+                    let translations = try await llmClient.translate(
+                        text: correctedText,
+                        targets: normalized
+                    )
+                    finalText = try TranslationContract.format(
+                        translations,
+                        targets: normalized
+                    )
+                } catch {
+                    let message = L10n.format("翻譯失敗：%@", error.localizedDescription)
+                    let result = TranscriptionResult(
+                        text: "",
+                        rawText: rawText,
+                        success: false,
+                        error: message
+                    )
+                    DispatchQueue.main.async { self.delegate?.onError(error: message) }
+                    return result
+                }
             }
             
             // === 第四層：(留給 OpenCC 擴充，目前依靠 Claude prompt 強制切換繁體) ===

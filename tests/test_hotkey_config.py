@@ -15,6 +15,7 @@ from hotkey_config import (
     MODIFIER_TOKENS,
     RECOMMENDED_ACTION_HOTKEYS,
     RECOMMENDED_RECORD_HOTKEY,
+    RECOMMENDED_TRANSLATION_HOTKEY,
     modifier_is_pressed,
     parse_hotkey,
     validate_hotkey_config,
@@ -100,6 +101,25 @@ def test_recommended_shortcut_does_not_collide_with_action_shortcuts():
         assert not recording_keys.intersection(spec.keycodes)
         assert "right_cmd" not in spec.tokens
         assert "right_ctrl" not in spec.tokens
+
+
+def test_translation_hotkey_may_be_strict_superset_of_recording_hotkey():
+    normalized = validate_hotkey_config({
+        "hotkey": RECOMMENDED_RECORD_HOTKEY,
+        "translation_hotkey": RECOMMENDED_TRANSLATION_HOTKEY,
+        **RECOMMENDED_ACTION_HOTKEYS,
+    })
+
+    assert normalized["translation_hotkey"] == RECOMMENDED_TRANSLATION_HOTKEY
+
+
+def test_equal_recording_and_translation_hotkeys_are_rejected():
+    with pytest.raises(HotkeyValidationError, match="conflicts"):
+        validate_hotkey_config({
+            "hotkey": RECOMMENDED_RECORD_HOTKEY,
+            "translation_hotkey": RECOMMENDED_RECORD_HOTKEY,
+            **RECOMMENDED_ACTION_HOTKEYS,
+        })
 
 
 @pytest.mark.parametrize(
@@ -311,6 +331,115 @@ def test_native_recording_listener_supports_fn_and_right_shift(monkeypatch):
     handle(_FakeEvent(12, 60, FN_MODIFIER_MASK))
     assert engine.stops == 1
     assert engine.is_recording is False
+
+
+def test_native_translation_chord_snapshots_targets_and_stops_on_release(
+    monkeypatch,
+):
+    import app
+
+    handlers = _install_fake_appkit(monkeypatch)
+    monkeypatch.setattr(app.threading, "Thread", _ImmediateThread)
+
+    class Engine:
+        config = {
+            "hotkey": RECOMMENDED_RECORD_HOTKEY,
+            "translation_hotkey": RECOMMENDED_TRANSLATION_HOTKEY,
+            "translation_target_languages": ["ja", "ko"],
+            "hotkey_mode": "push_to_talk",
+        }
+        is_recording = False
+        _on_hotkey_reset = None
+        starts = []
+        stops = 0
+
+        def start_recording(self, from_hotkey=False, **kwargs):
+            self.starts.append({"from_hotkey": from_hotkey, **kwargs})
+            self.is_recording = True
+            return True
+
+        def stop_and_process(self):
+            self.stops += 1
+            self.is_recording = False
+
+        def update_recording_intent(self, *_args, **_kwargs):
+            return False
+
+    engine = Engine()
+    app.setup_hotkey(engine)
+    handle = handlers["global"]
+    fn = FN_MODIFIER_MASK
+    option = 0x80000 | 0x40
+    shift = 0x20000 | 0x4
+
+    handle(_FakeEvent(12, FN_KEYCODE, fn))
+    handle(_FakeEvent(12, 61, fn | option))
+    handle(_FakeEvent(12, 60, fn | option | shift))
+
+    assert engine.starts == [{
+        "from_hotkey": True,
+        "mode": "translate",
+        "translation_targets": ["ja", "ko"],
+    }]
+    assert engine.is_recording is True
+
+    handle(_FakeEvent(12, 60, fn | option))
+    assert engine.stops == 1
+    assert engine.is_recording is False
+
+
+def test_native_translation_modifier_upgrades_active_dictation_without_restart(
+    monkeypatch,
+):
+    import app
+
+    handlers = _install_fake_appkit(monkeypatch)
+    monkeypatch.setattr(app.threading, "Thread", _ImmediateThread)
+
+    class Engine:
+        config = {
+            "hotkey": RECOMMENDED_RECORD_HOTKEY,
+            "translation_hotkey": RECOMMENDED_TRANSLATION_HOTKEY,
+            "translation_target_languages": ["zh-Hant", "en"],
+            "hotkey_mode": "push_to_talk",
+        }
+        is_recording = False
+        _on_hotkey_reset = None
+        starts = 0
+        upgrades = []
+        stops = 0
+
+        def start_recording(self, from_hotkey=False, **kwargs):
+            assert from_hotkey is True
+            assert kwargs == {}
+            self.starts += 1
+            self.is_recording = True
+            return True
+
+        def update_recording_intent(self, mode, targets):
+            self.upgrades.append((mode, list(targets)))
+            return True
+
+        def stop_and_process(self):
+            self.stops += 1
+            self.is_recording = False
+
+    engine = Engine()
+    app.setup_hotkey(engine)
+    handle = handlers["global"]
+    option = 0x80000 | 0x40
+    shift = 0x20000 | 0x4
+
+    handle(_FakeEvent(12, 61, option))
+    handle(_FakeEvent(12, 60, option | shift))
+    assert engine.starts == 1
+
+    handle(_FakeEvent(12, FN_KEYCODE, option | shift | FN_MODIFIER_MASK))
+    assert engine.starts == 1
+    assert engine.upgrades == [("translate", ["zh-Hant", "en"])]
+
+    handle(_FakeEvent(12, 60, option | FN_MODIFIER_MASK))
+    assert engine.stops == 1
 
 
 def test_native_recording_listener_ignores_ptt_while_continuous(monkeypatch):

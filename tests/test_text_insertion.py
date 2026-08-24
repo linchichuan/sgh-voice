@@ -1,4 +1,5 @@
 import sys
+import stat
 import types
 
 import text_insertion
@@ -307,3 +308,17 @@ def test_user_copy_during_modifier_wait_cancels_cmd_v(monkeypatch):
     assert app.paste_text("不能貼出新 clipboard") is False
     assert subprocess_calls == []
     assert "剛複製的內容" in notified[0][1]
+
+
+def test_paste_debug_log_is_owner_only(tmp_path, monkeypatch):
+    import app
+
+    data_dir = tmp_path / ".voice-input"
+    data_dir.mkdir(mode=0o700)
+    monkeypatch.setenv("HOME", str(tmp_path))
+
+    app._paste_log("synthetic metadata only")
+
+    log_path = data_dir / "paste_debug.log"
+    assert log_path.exists()
+    assert stat.S_IMODE(log_path.stat().st_mode) == 0o600

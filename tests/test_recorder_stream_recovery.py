@@ -12,6 +12,7 @@ app.py 靜默回 idle。使用者只看到「🔴錄音中…」之後毫無下�
 """
 import pytest
 import numpy as np
+import stat
 
 import recorder as rec_mod
 
@@ -152,3 +153,16 @@ def test_thread_start_failure_rolls_back_recorder_state(monkeypatch):
     assert r._start_time is None
     assert r._thread is None
     assert r.audio_data == []
+
+
+def test_saved_audio_temp_file_is_owner_only():
+    r = _make_recorder()
+    audio = np.ones(16000, dtype=np.float32) * 0.01
+
+    path = r._save(audio)
+    try:
+        assert path is not None
+        assert stat.S_IMODE(rec_mod.os.stat(path).st_mode) == 0o600
+    finally:
+        if path:
+            rec_mod.os.unlink(path)

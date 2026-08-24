@@ -23,7 +23,7 @@ class DictionaryManager {
     // 內部基礎詞庫
     private let baseCustomWords = [
         "新義豊", "Shingihou", "KusuriJapan", "Medical Supporter",
-        "SGH Phone", "林紀全", "薬機法", "PMD Act",
+        "SGH Phone", "薬機法", "PMD Act",
         "Ultravox", "Twilio", "n8n", "LINE Bot",
         "福岡", "博多", "代表取締役", "繁體中文", "輸入法",
         "Repo", "Repository", "GitHub", "API", "Android", "Kotlin",
@@ -38,8 +38,6 @@ class DictionaryManager {
         "醫療supporter": "Medical Supporter",
         "medicalsupporter": "Medical Supporter",
         "薬日本": "kusurijapan",
-        "林紀泉": "林紀全",
-        "林記全": "林紀全",
         "輸入發": "輸入法",
         "繁體重文": "繁體中文",
         "語音辨是": "語音辨識",
@@ -167,6 +165,14 @@ class DictionaryManager {
     func removeCorrection(wrong: String) {
         corrections.removeValue(forKey: wrong)
         saveCorrections()
+    }
+
+    func clearUserData() {
+        customWords = []
+        corrections = [:]
+        defaults.removeObject(forKey: keyCustomWords)
+        defaults.removeObject(forKey: keyCorrections)
+        defaults.removeObject(forKey: keyActiveScene)
     }
     
     // MARK: - Persistence

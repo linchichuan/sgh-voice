@@ -2,6 +2,8 @@ import Foundation
 
 enum WhisperError: Error {
     case apiKeyNotSet
+    case invalidConfiguration
+    case audioTooLarge
     case networkError(String)
     case invalidResponse(String)
     case emptyResponse
@@ -12,15 +14,19 @@ extension WhisperError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .apiKeyNotSet:
-            return "API Key 未設定（OpenAI 或 Groq），請先到設定頁填入。"
+            return L10n.text("API Key 未設定（OpenAI 或 Groq），請先到設定頁填入。")
+        case .invalidConfiguration:
+            return L10n.text("語音辨識服務設定不正確，請重新選擇 OpenAI 或 Groq。")
+        case .audioTooLarge:
+            return L10n.text("錄音檔超過可安全上傳的大小，請縮短錄音後重試。")
         case let .networkError(message):
-            return "Whisper 網路錯誤：\(message)"
+            return L10n.format("Whisper 網路錯誤：%@", message)
         case let .invalidResponse(message):
-            return "Whisper 回應錯誤：\(message)"
+            return L10n.format("Whisper 回應錯誤：%@", message)
         case .emptyResponse:
-            return "Whisper 回傳空結果。"
+            return L10n.text("Whisper 回傳空結果。")
         case let .parseError(message):
-            return "Whisper 解析失敗：\(message)"
+            return L10n.format("Whisper 解析失敗：%@", message)
         }
     }
 }
@@ -29,9 +35,21 @@ extension WhisperError: LocalizedError {
 /// 將錄音的 WAV 檔傳送至 Whisper API 取得語音辨識結果
 class WhisperClient {
     static let shared = WhisperClient()
+
+    private static let maximumAudioBytes = 24 * 1024 * 1024
     
     private let openAiApiUrl = URL(string: "https://api.openai.com/v1/audio/transcriptions")!
     private let groqApiUrl = URL(string: "https://api.groq.com/openai/v1/audio/transcriptions")!
+
+    private lazy var session: URLSession = {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.urlCache = nil
+        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
+        configuration.httpCookieStorage = nil
+        configuration.httpShouldSetCookies = false
+        configuration.timeoutIntervalForRequest = 90
+        return URLSession(configuration: configuration)
+    }()
     
     /// 傳送 WAV 音訊至 Whisper API 進行語音辨識
     ///
@@ -40,12 +58,28 @@ class WhisperClient {
     ///   - initialPrompt: 提示詞，用於提升辨識精確度（包含自訂詞彙）
     /// - Returns: 辨識後的文字結果
     func transcribe(wavData: Data, initialPrompt: String = "") async throws -> String {
+        guard wavData.count <= Self.maximumAudioBytes else {
+            throw WhisperError.audioTooLarge
+        }
+
         let sttEngine = ApiConfig.shared.sttEngine
-        let useGroq = sttEngine == "groq" || (sttEngine == "openai" && ApiConfig.shared.openAiApiKey.isEmpty && !ApiConfig.shared.groqApiKey.isEmpty)
-        
-        let apiKey = useGroq ? ApiConfig.shared.groqApiKey : ApiConfig.shared.openAiApiKey
-        let apiUrl = useGroq ? groqApiUrl : openAiApiUrl
-        let modelName = useGroq ? "whisper-large-v3-turbo" : (ApiConfig.shared.whisperModel.isEmpty ? ApiConfig.defaultWhisperModel : ApiConfig.shared.whisperModel)
+        let apiKey: String
+        let apiUrl: URL
+        let modelName: String
+        switch sttEngine {
+        case "openai":
+            apiKey = ApiConfig.shared.openAiApiKey
+            apiUrl = openAiApiUrl
+            modelName = ApiConfig.shared.whisperModel.isEmpty
+                ? ApiConfig.defaultWhisperModel
+                : ApiConfig.shared.whisperModel
+        case "groq":
+            apiKey = ApiConfig.shared.groqApiKey
+            apiUrl = groqApiUrl
+            modelName = "whisper-large-v3-turbo"
+        default:
+            throw WhisperError.invalidConfiguration
+        }
         
         if apiKey.isEmpty {
             throw WhisperError.apiKeyNotSet
@@ -91,7 +125,7 @@ class WhisperClient {
         request.httpBody = body
         
         do {
-            let (data, response) = try await URLSession.shared.data(for: request)
+            let (data, response) = try await session.data(for: request)
             
             guard let httpResponse = response as? HTTPURLResponse else {
                 throw WhisperError.invalidResponse("Not HTTP URL Response")
@@ -113,9 +147,9 @@ class WhisperClient {
         } catch let error as URLError {
             switch error.code {
             case .timedOut:
-                throw WhisperError.networkError("連線逾時（timeout），請檢查網路或稍後重試。")
+                throw WhisperError.networkError(L10n.text("連線逾時（timeout），請檢查網路或稍後重試。"))
             case .notConnectedToInternet:
-                throw WhisperError.networkError("裝置目前沒有網路連線。")
+                throw WhisperError.networkError(L10n.text("裝置目前沒有網路連線。"))
             default:
                 throw WhisperError.networkError(error.localizedDescription)
             }

@@ -10,6 +10,8 @@ struct SettingsView: View {
     @State private var activeScene = ""
     @State private var sttEngine = ""
     @State private var llmEngine = ""
+    @State private var hasCloudProcessingConsent = false
+    @State private var showingClearDataConfirmation = false
     
     // Scene Presets mapping from DictionaryManager
     let scenePresets = DictionaryManager.shared.scenePresets.map { key, value in
@@ -20,36 +22,52 @@ struct SettingsView: View {
         Form {
             Section(header: Text("API 服務引擎").font(.headline)) {
                 Picker("語音辨識 (STT)", selection: $sttEngine) {
-                    Text("OpenAI (精確)").tag("openai")
-                    Text("Groq (極速)").tag("groq")
+                    Text("OpenAI").tag("openai")
+                    Text("Groq").tag("groq")
                 }
                 Picker("後處理 (LLM)", selection: $llmEngine) {
                     Text("Claude (Anthropic)").tag("claude")
                     Text("OpenAI (GPT-4o)").tag("openai")
-                    Text("Groq (Llama 3)").tag("groq")
+                    Text("Groq (GPT-OSS 120B)").tag("groq")
                     Text("不使用 (None)").tag("none")
                 }
             }
             
             Section(header: Text("API 金鑰 (Keychain 加密儲存)").font(.headline)) {
                 SecureField("OpenAI API Key (sk-...)", text: $openAiKey)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
+                    .apiCredentialInput()
                 SecureField("Anthropic API Key (sk-ant-...)", text: $anthropicKey)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
+                    .apiCredentialInput()
                 SecureField("Groq API Key (gsk-...)", text: $groqKey)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
+                    .apiCredentialInput()
             }
             
             Section(header: Text("模型選用設定").font(.headline)) {
                 TextField("Whisper 模型名稱", text: $whisperModel)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                TextField("Claude 模型名稱", text: $claudeModel)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
+                    .apiCredentialInput()
+
+                Picker("Claude 模型", selection: $claudeModel) {
+                    Text("Haiku 4.5（建議）")
+                        .tag("claude-haiku-4-5-20251001")
+                    Text("Sonnet 5")
+                        .tag("claude-sonnet-5")
+                    Text("Opus 5")
+                        .tag("claude-opus-5")
+                    Text("Opus 4.8")
+                        .tag("claude-opus-4-8")
+                    Text("Fable 5（30 天資料保留）")
+                        .tag("claude-fable-5")
+                    if !ApiConfig.supportedClaudeModels.contains(claudeModel) {
+                        Text(L10n.format("自訂：%@", claudeModel)).tag(claudeModel)
+                    }
+                }
+
+                TextField("自訂 Claude 模型 ID", text: $claudeModel)
+                    .apiCredentialInput()
+
+                Text("SGH Voice 會關閉 Sonnet 5／Opus 5 的額外 thinking；Fable 5 依官方限制使用 low effort。模型可用性、價格與資料處理條件以 Anthropic 最新公告為準。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 
                 Button("恢復預設模型") {
                     whisperModel = ApiConfig.defaultWhisperModel
@@ -67,8 +85,34 @@ struct SettingsView: View {
                 
                 Picker("語音使用場景", selection: $activeScene) {
                     ForEach(scenePresets, id: \.0) { preset in
-                        Text(preset.1).tag(preset.0)
+                        Text(L10n.text(preset.1)).tag(preset.0)
                     }
+                }
+            }
+
+            Section(header: Text("隱私與資料").font(.headline)) {
+                Text("開始錄音前，App 會說明語音、逐字稿及語音辨識詞庫提示將傳送至你選擇的 OpenAI、Anthropic 或 Groq 服務。SGH Voice 不會將內容上傳至新義豊的伺服器。")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+
+                Text("醫療模式不得輸入可識別特定患者的姓名、聯絡方式、病歷號或其他個人資訊。")
+                    .font(.footnote)
+                    .foregroundStyle(.orange)
+
+                Link(
+                    "查看隱私權政策",
+                    destination: URL(string: "https://voice.shingihou.com/privacy.html")!
+                )
+
+                if hasCloudProcessingConsent {
+                    Button("撤回雲端處理同意") {
+                        ApiConfig.shared.hasCloudProcessingConsent = false
+                        hasCloudProcessingConsent = false
+                    }
+                }
+
+                Button("清除 API 金鑰、詞庫與偏好設定", role: .destructive) {
+                    showingClearDataConfirmation = true
                 }
             }
         }
@@ -78,6 +122,20 @@ struct SettingsView: View {
         }
         .onDisappear {
             saveSettings()
+        }
+        .confirmationDialog(
+            "清除這台裝置上的 SGH Voice 設定？",
+            isPresented: $showingClearDataConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("清除 API 金鑰、詞庫與偏好設定", role: .destructive) {
+                ApiConfig.shared.clearAll()
+                DictionaryManager.shared.clearUserData()
+                loadSettings()
+            }
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text("此操作會刪除 Keychain 內的 API 金鑰、模型、使用偏好與自訂詞庫，且無法復原。")
         }
     }
     
@@ -91,6 +149,7 @@ struct SettingsView: View {
         activeScene = DictionaryManager.shared.activeScene
         sttEngine = ApiConfig.shared.sttEngine
         llmEngine = ApiConfig.shared.llmEngine
+        hasCloudProcessingConsent = ApiConfig.shared.hasCloudProcessingConsent
     }
     
     private func saveSettings() {
@@ -113,3 +172,16 @@ struct SettingsView: View {
     }
 }
 #endif
+
+private extension View {
+    @ViewBuilder
+    func apiCredentialInput() -> some View {
+        #if os(iOS)
+        self
+            .textInputAutocapitalization(.never)
+            .autocorrectionDisabled()
+        #else
+        self
+        #endif
+    }
+}

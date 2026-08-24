@@ -1,4 +1,4 @@
-// advanced.js — Settings sub-tab: scene, system prompt, typing speed, style profile.
+// advanced.js — Settings sub-tab: scene, typing speed, style profile.
 import { h, classes, Card, Button, Toast } from '../../lib/components.js';
 import { t } from '../../lib/i18n.js';
 import * as api from '../../lib/api.js';
@@ -16,18 +16,6 @@ export function mountAdvancedTab(container, cfg, dirty) {
     SCENES.map((s) => h('option', { value: s.id, selected: cfg.active_scene === s.id ? '' : null }, t(s.labelKey))),
   );
   sceneSelect.addEventListener('change', () => dirty.set('active_scene', sceneSelect.value));
-
-  // System prompt textarea
-  const promptId = 'claude_system_prompt';
-  const promptArea = h('textarea', {
-    id: promptId,
-    rows: 6,
-    class: classes.input + ' font-mono text-sm leading-relaxed resize-y',
-    placeholder: '(empty = built-in _DICTATE_SYSTEM)',
-    'aria-label': t('settings.adv.prompt'),
-    spellcheck: 'false',
-  }, cfg.claude_system_prompt || '');
-  promptArea.addEventListener('change', () => dirty.set('claude_system_prompt', promptArea.value));
 
   // Typing speed
   const typingId = 'typing_speed_cpm';
@@ -73,15 +61,12 @@ export function mountAdvancedTab(container, cfg, dirty) {
         sceneSelect,
       ),
       h('div', { class: 'space-y-1.5 pt-2 border-t border-[var(--border)]' },
-        h('label', { class: classes.label, for: promptId }, t('settings.adv.prompt')),
-        promptArea,
-      ),
-      h('div', { class: 'space-y-1.5 pt-2 border-t border-[var(--border)]' },
         h('label', { class: classes.label, for: typingId }, t('settings.adv.typing')),
         typingInput,
       ),
       h('div', { class: 'pt-2 border-t border-[var(--border)]' },
         h('h3', { class: 'text-sm font-semibold text-[var(--text)] mb-2' }, t('settings.adv.style.title')),
+        h('p', { class: 'text-xs text-[var(--muted)] mb-3' }, t('settings.adv.style.localOnly')),
         regenBtn,
       ),
     ),

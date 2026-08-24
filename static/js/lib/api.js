@@ -137,7 +137,11 @@ export async function streamModelDownload(key, onMessage, onError) {
 
 // ---------- Ollama / Style profile / Audit ----------
 export const detectOllama          = ()        => request('POST', '/api/ollama/detect');
-export const regenerateStyleProfile = ()       => request('POST', '/api/style_profile/regenerate');
+export const regenerateStyleProfile = ()       => request(
+  'POST',
+  '/api/style_profile/regenerate',
+  { n: 100, apply: true },
+);
 export const getAuditLog            = ()       => request('GET',  '/api/audit-log');
 
 // ---------- GDPR ----------

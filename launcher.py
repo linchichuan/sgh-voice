@@ -5,8 +5,6 @@ launcher.py — .app bundle 入口點
 """
 import sys
 import os
-import shutil
-import json
 
 
 def get_bundle_dir():
@@ -18,36 +16,33 @@ def get_bundle_dir():
 
 def init_user_data():
     """首次啟動：複製預設設定到 ~/.voice-input/"""
-    data_dir = os.path.expanduser("~/.voice-input")
-    if os.path.exists(os.path.join(data_dir, "config.json")):
-        return  # 已初始化
-
-    os.makedirs(data_dir, exist_ok=True)
-    from config import DEFAULT_CONFIG, save_config, save_dictionary
+    from config import (
+        CONFIG_FILE,
+        DICTIONARY_FILE,
+        HISTORY_FILE,
+        STATS_FILE,
+        DEFAULT_CONFIG,
+        load_dictionary,
+        load_stats,
+        save_config,
+        save_dictionary,
+        save_history,
+        save_stats,
+    )
     
     # 建立預設 config
-    if not os.path.exists(os.path.join(data_dir, "config.json")):
+    if not os.path.exists(CONFIG_FILE):
         save_config(DEFAULT_CONFIG.copy())
 
     # 建立預設 dictionary
-    if not os.path.exists(os.path.join(data_dir, "dictionary.json")):
-        save_dictionary({"corrections": {}, "frequency": {}, "auto_added": []})
+    if not os.path.exists(DICTIONARY_FILE):
+        save_dictionary(load_dictionary())
 
     # 初始化空的 history 和 stats
-    for filename, default in [
-        ("history.json", []),
-        ("stats.json", {
-            "total_dictations": 0, "total_words": 0,
-            "total_characters": 0, "total_seconds_saved": 0,
-            "total_audio_seconds": 0, "daily": {},
-            "languages_detected": {}, "corrections_applied": 0,
-            "first_use_date": "", "streak_days": 0, "last_use_date": "",
-        }),
-    ]:
-        filepath = os.path.join(data_dir, filename)
-        if not os.path.exists(filepath):
-            with open(filepath, "w", encoding="utf-8") as f:
-                json.dump(default, f, ensure_ascii=False, indent=2)
+    if not os.path.exists(HISTORY_FILE):
+        save_history([])
+    if not os.path.exists(STATS_FILE):
+        save_stats(load_stats())
 
 
 if __name__ == "__main__":

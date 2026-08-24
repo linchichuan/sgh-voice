@@ -251,6 +251,7 @@ def test_hotkey_marker_v1_migrates_unavailable_and_same_family_defaults():
         PREVIOUS_V1_ACTION_HOTKEYS,
         RECOMMENDED_ACTION_HOTKEYS,
         RECOMMENDED_RECORD_HOTKEY,
+        RECOMMENDED_TRANSLATION_HOTKEY,
     )
 
     candidate = {
@@ -264,7 +265,8 @@ def test_hotkey_marker_v1_migrates_unavailable_and_same_family_defaults():
     migrated, did = cfg._migrate_hotkeys_v5(candidate)
 
     assert did is True
-    assert migrated["hotkey_config_version"] == cfg.HOTKEY_CONFIG_VERSION == 3
+    assert migrated["hotkey_config_version"] == cfg.HOTKEY_CONFIG_VERSION == 4
+    assert migrated["translation_hotkey"] == RECOMMENDED_TRANSLATION_HOTKEY
     for field, value in RECOMMENDED_ACTION_HOTKEYS.items():
         assert migrated[field] == value
 
@@ -275,6 +277,7 @@ def test_hotkey_marker_v2_moves_cancel_off_ptt_modifier_families():
         PREVIOUS_V2_ACTION_HOTKEYS,
         RECOMMENDED_ACTION_HOTKEYS,
         RECOMMENDED_RECORD_HOTKEY,
+        RECOMMENDED_TRANSLATION_HOTKEY,
     )
 
     candidate = {
@@ -288,7 +291,8 @@ def test_hotkey_marker_v2_moves_cancel_off_ptt_modifier_families():
     migrated, did = cfg._migrate_hotkeys_v5(candidate)
 
     assert did is True
-    assert migrated["hotkey_config_version"] == cfg.HOTKEY_CONFIG_VERSION == 3
+    assert migrated["hotkey_config_version"] == cfg.HOTKEY_CONFIG_VERSION == 4
+    assert migrated["translation_hotkey"] == RECOMMENDED_TRANSLATION_HOTKEY
     assert migrated["cancel_hotkey"] == RECOMMENDED_ACTION_HOTKEYS["cancel_hotkey"]
 
 

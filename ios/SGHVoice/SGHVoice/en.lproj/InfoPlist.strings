@@ -1,0 +1,2 @@
+"CFBundleDisplayName" = "SGH Voice";
+"NSMicrophoneUsageDescription" = "SGH Voice records audio and sends it to the speech-to-text provider you select to create a transcript.";

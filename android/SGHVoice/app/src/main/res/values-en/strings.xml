@@ -6,6 +6,7 @@
 
     <!-- Keyboard Status -->
     <string name="keyboard_brand">SGH Voice</string>
+    <string name="keyboard_brand_short">SGH</string>
     <string name="mode_voice">Voice</string>
     <string name="mode_zhuyin">注</string>
     <string name="mode_japanese">あ</string>
@@ -14,6 +15,17 @@
     <string name="mode_zhuyin_desc">Switch to Zhuyin input</string>
     <string name="mode_japanese_desc">Switch to Japanese romaji input</string>
     <string name="mode_english_desc">Switch to English input</string>
+    <string name="recognition_language_button_desc">Speech recognition language: %1$s. Double tap to choose a language.</string>
+    <string name="recognition_language_auto">Auto (for mixed languages)</string>
+    <string name="recognition_language_traditional_chinese">Traditional Chinese</string>
+    <string name="recognition_language_japanese">Japanese</string>
+    <string name="recognition_language_english">English</string>
+    <string name="recognition_language_korean">Korean</string>
+    <string name="recognition_language_auto_short">V·A</string>
+    <string name="recognition_language_traditional_chinese_short">V·ZH</string>
+    <string name="recognition_language_japanese_short">V·JA</string>
+    <string name="recognition_language_english_short">V·EN</string>
+    <string name="recognition_language_korean_short">V·KO</string>
     <string name="status_idle">Tap to start speaking</string>
     <string name="status_starting">Preparing microphone…</string>
     <string name="status_recording">Recording — tap again to send</string>
@@ -22,13 +34,30 @@
     <string name="status_done">Done</string>
     <string name="status_error">Error</string>
     <string name="status_recording_elapsed">Recording %1$s — tap again to send</string>
+    <string name="status_translation_recording_elapsed">Translation recording %1$s — tap to send, hold to cancel</string>
     <string name="status_recording_limit">Two-minute limit reached — sending</string>
     <string name="status_learning_saved">Learned locally: “%1$s → %2$s”</string>
     <string name="status_learning_disabled">Personalized learning is disabled for this field</string>
     <string name="mic_action_start">Start speaking</string>
     <string name="mic_action_recording">Stop and convert</string>
+    <string name="mic_action_translation_recording">Stop and translate</string>
     <string name="mic_action_processing">Converting to text…</string>
-    <string name="voice_toggle_hint">Tap to start, then tap again when finished</string>
+    <string name="voice_toggle_hint">Tap to dictate; press and hold to choose 1–4 translation languages</string>
+    <string name="translation_picker_title">Translation targets (choose 1–4)</string>
+    <string name="translation_picker_status">Translation mode: choose languages, then record</string>
+    <string name="translation_picker_accessibility">Translation language picker opened</string>
+    <string name="translation_language_zh_hant">繁中</string>
+    <string name="translation_language_ja">日本語</string>
+    <string name="translation_language_en">English</string>
+    <string name="translation_language_ko">한국어</string>
+    <string name="translation_target_selected_desc">%1$s, selected. Double tap to deselect.</string>
+    <string name="translation_target_unselected_desc">%1$s, not selected. Double tap to select.</string>
+    <string name="translation_cancel">Cancel</string>
+    <string name="translation_start">Record to translate</string>
+    <string name="translation_recording_mic_desc">Tap to stop and translate; hold to cancel and discard</string>
+    <string name="translation_output_format">%1$s: %2$s</string>
+    <string name="translation_default_targets">Default long-press translation languages</string>
+    <string name="translation_default_targets_desc">Choose at least one. You can adjust them after holding the microphone.</string>
 
     <string name="msg_record_failed">Recording failed: </string>
     <string name="msg_record_too_short">Recording too short, try again.</string>
@@ -46,9 +75,23 @@
     <string name="msg_initialization_timeout">Initialization timed out. Try again.</string>
     <string name="msg_input_connection_lost">The input field changed, so the result was not inserted.</string>
     <string name="msg_voice_disabled_sensitive">Cloud voice input is unavailable in this sensitive field.</string>
+    <string name="msg_missing_translation_key">Choose an LLM and configure its API key in the SGH Voice app first.</string>
+    <string name="msg_translating">Translating into the selected languages…</string>
+    <string name="msg_translation_failed">Translation failed. The source text was not inserted.</string>
+    <string name="msg_translation_failed_detail">Translation failed: %1$s. The source text was not inserted.</string>
+    <string name="translation_error_auth">The API key is invalid or cannot access the selected model</string>
+    <string name="translation_error_model">The selected translation model is unavailable; choose another model in Settings</string>
+    <string name="translation_error_quota">The API quota is exhausted or requests are being rate limited</string>
+    <string name="translation_error_format">The model returned an incomplete format; please try again</string>
+    <string name="translation_error_semantic">The model did not faithfully preserve the source question or request, so nothing was inserted</string>
+    <string name="translation_error_network">The network request failed; check the connection and try again</string>
+    <string name="translation_error_unknown">The translation service is temporarily unavailable</string>
+    <string name="msg_translation_cancelled">Translation canceled. The recording was not sent.</string>
+    <string name="msg_recognition_language_busy">The recognition language cannot change while recording or processing</string>
+    <string name="msg_recognition_language_changed">Speech recognition language changed to %1$s</string>
 
     <!-- Keyboard buttons -->
-    <string name="mic_button_desc">Tap to start or stop recording</string>
+    <string name="mic_button_desc">Tap to start or stop dictation; press and hold for translation mode</string>
     <string name="key_backspace">⌫</string>
     <string name="key_backspace_desc">Backspace</string>
     <string name="key_space">Space</string>
@@ -61,7 +104,7 @@
     <string name="key_comma">,</string>
     <string name="key_period">.</string>
     <string name="key_next_keyboard">Next</string>
-    <string name="key_next_keyboard_desc">Switch to the next system keyboard</string>
+    <string name="key_next_keyboard_desc">Tap for the next system keyboard; hold to choose a system keyboard</string>
     <string name="zhuyin_composition_hint">Enter Zhuyin and choose a candidate</string>
     <string name="zhuyin_no_candidates">No candidates yet</string>
     <string name="candidate_ready_hint">Candidates and learned terms appear here</string>
@@ -86,6 +129,15 @@
     <string name="btn_show">Show</string>
     <string name="btn_save_keys">Save Keys</string>
     <string name="msg_keys_saved">Keys saved securely</string>
+    <string name="cloud_consent_title">Consent to external AI processing</string>
+    <string name="cloud_consent_summary">SGH Voice must send data to the external AI services you select to provide speech recognition, text processing, and translation.</string>
+    <string name="cloud_consent_audio">• Recorded audio is sent to the selected OpenAI or Groq speech-recognition API.</string>
+    <string name="cloud_consent_transcript">• Transcribed text is sent to the selected Anthropic, OpenAI, or Groq model.</string>
+    <string name="cloud_consent_dictionary">• Built-in terms, terms you add, and the selected scene prompt are sent with the speech-recognition request to improve recognition.</string>
+    <string name="cloud_consent_provider_terms">Data may be linked to your provider account and is handled under each provider’s retention, deletion, and pricing terms. It is not sent to Shingihou servers. Do not enter information that identifies a patient.</string>
+    <string name="cloud_consent_checkbox">I have read and agree to the external processing above</string>
+    <string name="cloud_consent_privacy_link">View the full Privacy Policy</string>
+    <string name="msg_cloud_consent_required">Voice features are not enabled. Review and accept external AI processing in SGH Voice settings first.</string>
 
     <string name="step_enable_ime">Enable Keyboard</string>
     <string name="desc_enable_ime">Please enable SGH Voice in System Settings, then switch to it.</string>
@@ -110,7 +162,7 @@
 
     <!-- Usage Guide -->
     <string name="usage_title">Usage Guide</string>
-    <string name="usage_step1">1. In Voice mode, tap once to record and tap again to stop and recognize.</string>
+    <string name="usage_step1">1. Tap the microphone for normal dictation. Hold it to choose 1–4 translation languages. Hold again while recording to cancel safely.</string>
     <string name="usage_step2">2. Switch between Zhuyin, Japanese romaji, and English inside the same keyboard.</string>
     <string name="usage_step3">3. Voice mode handles mixed Chinese, Japanese, and English; Chinese output is Traditional Chinese.</string>
     <string name="usage_step4">4. Frequently selected candidates move forward. Short voice-text corrections in the same field are learned locally.</string>
@@ -127,6 +179,10 @@
     <string name="label_llm_engine">Text post-processing (LLM) service</string>
     <string name="label_stt_model">Speech recognition model</string>
     <string name="label_llm_model">Text post-processing model</string>
+    <string name="recognition_language_label">Speech recognition language</string>
+    <string name="recognition_language_desc">Auto keeps mixed Traditional Chinese, Japanese, English, and Korean recognition available. Choosing one language can improve single-language accuracy and latency. You can also change this from the Voice tab.</string>
+    <string name="recognition_language_field_label">Source language</string>
+    <string name="system_keyboard_language_note">SGH Voice includes Zhuyin, Japanese, and English keyboards. Users enable Korean or other device keyboards in Android Settings. Tap the keyboard switch key to cycle, or hold it to choose directly.</string>
     <string name="model_id_format">Actual model ID: %1$s</string>
     <string name="model_cost_notice">Models differ in speed, accuracy, and API cost. Availability depends on your provider account.</string>
     <string name="engine_openai">OpenAI</string>
@@ -140,8 +196,9 @@
     <string name="model_groq_stt_large">Whisper Large V3 (higher accuracy)</string>
     <string name="model_claude_haiku">Claude Haiku 4.5 (fast, lower cost, recommended)</string>
     <string name="model_claude_sonnet">Claude Sonnet 5 (higher quality)</string>
-    <string name="model_claude_opus">Claude Opus 4.8 (high quality, higher cost)</string>
-    <string name="model_claude_fable">Claude Fable 5 (latest long-running model; not recommended for dictation)</string>
+    <string name="model_claude_opus_5">Claude Opus 5 (latest Opus; high quality and cost)</string>
+    <string name="model_claude_opus">Claude Opus 4.8 (previous Opus generation)</string>
+    <string name="model_claude_fable">Claude Fable 5 (highest-capability long-running model; not recommended for dictation)</string>
     <string name="model_openai_llm_mini">GPT-4o mini (fast, lower cost)</string>
     <string name="model_openai_llm_full">GPT-4o (higher quality)</string>
     <string name="model_groq_llm_small">GPT OSS 20B (fast, lower cost)</string>
@@ -153,12 +210,13 @@
     <string name="price_groq_stt_large">US$0.111 per audio hour</string>
     <string name="price_claude_haiku">Per 1M tokens: US$1 input / US$5 output</string>
     <string name="price_claude_sonnet">Through 2026-08-31: US$2 input / US$10 output; then US$3 / US$15</string>
+    <string name="price_claude_opus_5">Per 1M tokens: US$5 input / US$25 output; SGH Voice disables extra thinking</string>
     <string name="price_claude_opus">Per 1M tokens: US$5 input / US$25 output</string>
-    <string name="price_claude_fable">Per 1M tokens: US$10 input / US$50 output</string>
+    <string name="price_claude_fable">Per 1M tokens: US$10 input / US$50 output; requires 30-day data retention</string>
     <string name="price_openai_llm_mini">Per 1M tokens: US$0.15 input / US$0.60 output</string>
     <string name="price_openai_llm_full">Per 1M tokens: US$2.50 input / US$10 output</string>
     <string name="price_groq_llm_small">Per 1M tokens: US$0.075 input / US$0.30 output</string>
     <string name="price_groq_llm_large">Per 1M tokens: US$0.15 input / US$0.60 output</string>
-    <string name="model_price_reference">Price reference: official public provider pricing checked 2026-07-26. Your provider’s current pricing and bill take precedence.</string>
+    <string name="model_price_reference">Price reference: official public provider pricing checked 2026-07-27. Your provider’s current pricing and bill take precedence.</string>
     <string name="groq_reasoning_notice">SGH Voice uses low reasoning effort for GPT OSS to limit latency and reasoning-token use during dictation cleanup.</string>
 </resources>

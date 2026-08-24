@@ -1,0 +1,2 @@
+"CFBundleDisplayName" = "SGH Voice";
+"NSMicrophoneUsageDescription" = "錄音會傳送至你選擇的語音辨識服務，以轉換為文字。";

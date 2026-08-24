@@ -10,6 +10,25 @@ const ENGINES = [
   { id: 'openrouter', label: 'OpenRouter',     modelKey: 'openrouter_model' },
 ];
 
+const MODEL_PRESETS = {
+  groq: [
+    ['openai/gpt-oss-20b', 'US$0.075 / US$0.30 per MTok'],
+    ['openai/gpt-oss-120b', 'US$0.15 / US$0.60 per MTok'],
+    ['llama-3.3-70b-versatile', 'US$0.59 / US$0.79 per MTok'],
+  ],
+  claude: [
+    ['claude-haiku-4-5-20251001', 'US$1 / US$5 per MTok'],
+    ['claude-sonnet-5', 'US$2 / US$10 through 2026-08-31; then US$3 / US$15'],
+    ['claude-opus-5', 'US$5 / US$25 per MTok'],
+    ['claude-opus-4-8', 'US$5 / US$25 per MTok'],
+    ['claude-fable-5', 'US$10 / US$50 per MTok · 30-day data retention'],
+  ],
+  openai: [
+    ['gpt-4o-mini', 'US$0.15 / US$0.60 per MTok'],
+    ['gpt-4o', 'US$2.50 / US$10 per MTok'],
+  ],
+};
+
 function radioPanel({ name, options, value, onChange }) {
   const group = h('div', { class: 'grid grid-cols-2 md:grid-cols-5 gap-2', role: 'radiogroup', 'aria-label': t('settings.llm.engine') });
   options.forEach((opt) => {
@@ -25,19 +44,27 @@ function radioPanel({ name, options, value, onChange }) {
   return group;
 }
 
-function modelInput({ id, key, value, onChange }) {
+function modelInput({ id, key, value, onChange, presets = [] }) {
+  const listId = `${id}-presets`;
   const input = h('input', {
     id, type: 'text',
     class: classes.input + ' font-mono text-sm',
     value: value || '',
     placeholder: key,
+    list: presets.length ? listId : null,
     'aria-label': `${t('settings.llm.model')} (${key})`,
     spellcheck: 'false',
   });
   input.addEventListener('change', () => onChange(input.value));
+  const datalist = presets.length
+    ? h('datalist', { id: listId }, ...presets.map(([model, price]) => (
+      h('option', { value: model, label: `${model} · ${price}` })
+    )))
+    : null;
   return h('div', { class: 'space-y-1.5' },
     h('label', { class: classes.label, for: id }, `${t('settings.llm.model')} — ${key}`),
     input,
+    datalist,
   );
 }
 
@@ -120,6 +147,7 @@ export function mountLlmTab(container, cfg, dirty) {
       key: eng.modelKey,
       value: cfg[eng.modelKey],
       onChange: (v) => dirty.set(eng.modelKey, v),
+      presets: MODEL_PRESETS[eng.id] || [],
     }));
   });
 

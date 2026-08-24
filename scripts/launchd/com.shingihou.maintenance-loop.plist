@@ -8,8 +8,11 @@
   <key>ProgramArguments</key>
   <array>
     <string>/bin/bash</string>
-    <string>/Users/lin/voice-input/scripts/maintenance_loop.sh</string>
+    <string>/Users/lin/Library/Application Support/SGHVoice/run_scheduled_task.sh</string>
+    <string>maintenance-loop</string>
   </array>
+  <key>Umask</key>
+  <integer>63</integer>
   <key>StartCalendarInterval</key>
   <dict>
     <key>Hour</key>
@@ -18,9 +21,9 @@
     <integer>0</integer>
   </dict>
   <key>StandardOutPath</key>
-  <string>/Users/lin/.voice-input/maintenance-loop.stdout.log</string>
+  <string>/Users/lin/Library/Logs/SGHVoice/maintenance-loop.stdout.log</string>
   <key>StandardErrorPath</key>
-  <string>/Users/lin/.voice-input/maintenance-loop.stderr.log</string>
+  <string>/Users/lin/Library/Logs/SGHVoice/maintenance-loop.stderr.log</string>
   <key>EnvironmentVariables</key>
   <dict>
     <key>PATH</key>

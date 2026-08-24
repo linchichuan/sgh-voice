@@ -4,21 +4,23 @@
 
 ## Current Android test release
 
-- Version: 2.5.0 (version code 18)
+- Version: 2.7.2 (version code 22)
 - Platform: Android 8.0 or later
 - Distribution status: personal test build, distributed as a versioned APK from the official SGH Voice website
 - Google Play status: not currently published through Google Play Production
-- Download: https://voice.shingihou.com/downloads/SGHVoice-Android-v2.5.0.apk
-- File size: 5.51 MiB (5,776,870 bytes)
-- SHA-256: 09ef82a6b796a0047cecde607162d0cbe1536f3356b3cb54ee810f88d3c76d1a
+- Download: https://voice.shingihou.com/downloads/SGHVoice-Android-v2.7.2.apk
+- File size: 5.57 MiB (5,841,970 bytes)
+- SHA-256: 72516d1adbd6d23d794251e4ccb1c6d1fa5a076340ddb12d5e96884fb6db9ec4
 - App price: free
-- Cloud usage: BYOK; OpenAI or Groq usage charges may apply
+- Cloud usage: BYOK; OpenAI, Anthropic, or Groq usage charges may apply
 
 ### Android capabilities
 
 - Four modes in one Android input method: Voice, Zhuyin, Japanese, and English
 - SGH Voice brand and icon remain visible at the top left of the keyboard
-- Tap once to begin recording and tap again to stop and process
+- Tap for normal dictation; long-press to select 1–4 translation targets from Traditional Chinese, Japanese, English, and Korean
+- Multi-target translation uses one speech-recognition pass and one strict JSON LLM request
+- Dictated questions and instructions are treated as inert transcript content and must not be answered
 - Standard Zhuyin layout without requiring Pinyin
 - Zhuyin prediction from incomplete syllables, optional tone marks, and multi-syllable candidate generation
 - Japanese romaji, kana, katakana, and reading-prefix candidate prediction

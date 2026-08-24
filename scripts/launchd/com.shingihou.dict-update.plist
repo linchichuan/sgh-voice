@@ -5,11 +5,14 @@
 <dict>
   <key>Label</key>
   <string>com.shingihou.dict-update</string>
-  <key>ProgramArguments</key>
-  <array>
-    <string>/Users/lin/voice-input/venv/bin/python3</string>
-    <string>/Users/lin/voice-input/scripts/dict-update.py</string>
-  </array>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>/Users/lin/Library/Application Support/SGHVoice/run_scheduled_task.sh</string>
+        <string>dict-update</string>
+    </array>
+    <key>Umask</key>
+    <integer>63</integer>
   <key>StartCalendarInterval</key>
   <dict>
     <key>Weekday</key>
@@ -19,10 +22,10 @@
     <key>Minute</key>
     <integer>0</integer>
   </dict>
-  <key>StandardOutPath</key>
-  <string>/Users/lin/.voice-input/dict-update.stdout.log</string>
-  <key>StandardErrorPath</key>
-  <string>/Users/lin/.voice-input/dict-update.stderr.log</string>
+    <key>StandardOutPath</key>
+    <string>/Users/lin/Library/Logs/SGHVoice/dict-update.stdout.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/lin/Library/Logs/SGHVoice/dict-update.stderr.log</string>
   <key>EnvironmentVariables</key>
   <dict>
     <key>PATH</key>

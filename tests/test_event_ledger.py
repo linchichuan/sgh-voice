@@ -1,6 +1,9 @@
 """Tests for event_ledger.py — session lifecycle, TLS fallback, overlapping sessions.
 這個檔案曾在 v2.4 連續 round 4-7 反覆出問題（_active_list / TLS 行為），是測試覆蓋的高槓桿區。"""
 import threading
+import json
+import os
+import stat
 import pytest
 
 
@@ -99,8 +102,7 @@ def test_overlapping_sessions_end_a_keeps_b_resolvable(isolated_data_dir):
 def test_log_safe_with_no_active_session(isolated_data_dir):
     """完全沒 session 時 log() 仍能寫，session 欄位為 None。不該 raise。"""
     import event_ledger as el
-    import json
-    el.log("test_event", foo="bar")
+    el.log("test_event", phase="idle")
 
     # 讀回 events.jsonl 看內容
     assert el.EVENTS_FILE.endswith("events.jsonl")
@@ -110,4 +112,23 @@ def test_log_safe_with_no_active_session(isolated_data_dir):
     entry = json.loads(lines[-1])
     assert entry["type"] == "test_event"
     assert entry["session"] is None
-    assert entry["foo"] == "bar"
+    assert entry["phase"] == "idle"
+
+
+def test_log_drops_non_allowlisted_payload_and_is_owner_only(isolated_data_dir):
+    import event_ledger as el
+
+    el.log(
+        "synthetic_event",
+        phase="processing",
+        transcript="synthetic sensitive text",
+        api_key="synthetic-secret",
+    )
+
+    with open(el.EVENTS_FILE, "r", encoding="utf-8") as handle:
+        entry = json.loads(handle.readlines()[-1])
+    assert entry["phase"] == "processing"
+    assert "transcript" not in entry
+    assert "api_key" not in entry
+    assert stat.S_IMODE(os.stat(el.EVENTS_FILE).st_mode) == 0o600
+    assert stat.S_IMODE(os.stat(os.path.dirname(el.EVENTS_FILE)).st_mode) == 0o700

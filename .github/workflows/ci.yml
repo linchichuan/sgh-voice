@@ -6,34 +6,112 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  test:
+  python:
+    name: Python 3.12
     runs-on: macos-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        python: ["3.11", "3.12"]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - name: Setup Python ${{ matrix.python }}
-        uses: actions/setup-python@v5
+      - name: Set up Python
+        uses: actions/setup-python@v7
         with:
-          python-version: ${{ matrix.python }}
+          python-version: "3.12"
           cache: pip
+          cache-dependency-path: requirements-dev.lock
 
-      - name: Install runtime dependencies
-        run: |
-          python -m pip install --upgrade pip
-          # 安裝 runtime 必要套件（OpenCC / mlx-whisper 等可選元件在 CI 跳過）
-          pip install openai anthropic numpy soundfile pyperclip flask opencc-python-reimplemented || true
+      - name: Install locked dependencies
+        run: python -m pip install --require-hashes -r requirements-dev.lock
 
-      - name: Install dev dependencies
-        run: pip install -r requirements-dev.txt
+      - name: Run release-critical Ruff checks
+        run: ruff check . --select E9,F63,F7,F82
 
-      - name: Lint with ruff (advisory)
-        run: |
-          ruff check . --select E,F,W,B --ignore E501 || true
-
-      - name: Run tests
+      - name: Run Python tests
         run: pytest tests/ -v --cov=. --cov-report=term-missing --cov-config=/dev/null
+
+  android:
+    name: Android SDK 36
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: Set up Python for release metadata verification
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install Android SDK 36
+        run: sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Test, lint and build a clean debug APK
+        working-directory: android/SGHVoice
+        run: ./gradlew testDebugUnitTest lintDebug assembleDebug --no-daemon --stacktrace
+
+      - name: Verify immutable signed public release
+        run: ./scripts/verify_mobile_rc.sh --artifact-only
+
+  ios:
+    name: iOS source and metadata
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install source-check dependencies
+        run: |
+          command -v jq >/dev/null || brew install jq
+          command -v rg >/dev/null || brew install ripgrep
+
+      - name: Run repository-owned App Store preflight
+        run: ./scripts/verify_ios_app_store_preflight.sh --source-only
+
+  web:
+    name: Web, i18n and Firestore rules
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Java for Firebase Emulator
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: sgh-voice-web/package-lock.json
+
+      - name: Install locked web tooling
+        working-directory: sgh-voice-web
+        run: npm ci --ignore-scripts
+
+      - name: Audit production dependencies
+        working-directory: sgh-voice-web
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Check JavaScript syntax
+        working-directory: sgh-voice-web
+        run: |
+          node --check i18n.js
+          node --check main.js
+          node --check firebase.js
+
+      - name: Test Firestore registration rules
+        working-directory: sgh-voice-web
+        run: npm run test:rules

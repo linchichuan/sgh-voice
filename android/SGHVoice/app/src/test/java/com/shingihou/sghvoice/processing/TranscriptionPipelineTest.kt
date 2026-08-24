@@ -10,6 +10,8 @@ import org.mockito.Mock
 import org.mockito.Mockito.`when`
 import org.mockito.MockitoAnnotations
 import org.mockito.kotlin.any
+import org.mockito.kotlin.times
+import org.mockito.kotlin.verify
 
 /**
  * 處理管線單元測試
@@ -66,5 +68,68 @@ class TranscriptionPipelineTest {
         val expected = "語音輸入法測試，日本人，English test."
         val actual = openCCConverter.convert(input)
         assertEquals(expected, actual)
+    }
+
+    @Test
+    fun `translation converts only zh-Hant and does not apply final source corrections`() =
+        runBlocking {
+            val rawWav = ByteArray(100)
+            val rawText = "请确认明天的时间"
+            val correctedSource = "请确认明天的时间"
+            val request = TranslationRequest.create(
+                listOf(
+                    TranslationLanguage.TRADITIONAL_CHINESE,
+                    TranslationLanguage.JAPANESE
+                )
+            )
+
+            `when`(dictionaryManager.buildWhisperPrompt()).thenReturn("")
+            `when`(whisperClient.transcribe(any(), any())).thenReturn(rawText)
+            `when`(dictionaryManager.applyCorrections(rawText)).thenReturn(correctedSource)
+            `when`(llmClient.translate(correctedSource, request)).thenReturn(
+                listOf(
+                    TranslationOutput(
+                        TranslationLanguage.TRADITIONAL_CHINESE,
+                        "请确认明天的时间"
+                    ),
+                    TranslationOutput(
+                        TranslationLanguage.JAPANESE,
+                        "明日の時間をご確認ください"
+                    )
+                )
+            )
+
+            val result = pipeline.process(
+                rawWav,
+                VoiceTask.Translation(request)
+            )
+
+            assertEquals(true, result.success)
+            assertEquals("請確認明天的時間", result.translations[0].text)
+            assertEquals("明日の時間をご確認ください", result.translations[1].text)
+            verify(dictionaryManager, times(1)).applyCorrections(rawText)
+            Unit
+        }
+
+    @Test
+    fun `translation failure does not fall back to the source text`() = runBlocking {
+        val rawWav = ByteArray(100)
+        val rawText = "你好"
+        val request = TranslationRequest.create(listOf(TranslationLanguage.JAPANESE))
+
+        `when`(dictionaryManager.buildWhisperPrompt()).thenReturn("")
+        `when`(whisperClient.transcribe(any(), any())).thenReturn(rawText)
+        `when`(dictionaryManager.applyCorrections(rawText)).thenReturn(rawText)
+        `when`(llmClient.translate(rawText, request))
+            .thenThrow(IllegalStateException("malformed translation"))
+
+        val result = pipeline.process(
+            rawWav,
+            VoiceTask.Translation(request)
+        )
+
+        assertEquals(false, result.success)
+        assertEquals("", result.text)
+        assertEquals(emptyList<TranslationOutput>(), result.translations)
     }
 }

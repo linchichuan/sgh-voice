@@ -11,6 +11,7 @@ def test_dashboard_serves_index_and_static_assets(isolated_data_dir):
     assert client.get("/css/tokens.css").status_code == 200
     assert client.get("/js/app.js").status_code == 200
     assert client.get("/js/lib/api.js").status_code == 200
+    assert client.get("/js/pages/settings/prompts.js").status_code == 200
 
 
 def test_dashboard_router_keeps_hash_query_on_settings_route():

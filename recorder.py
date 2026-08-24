@@ -205,15 +205,24 @@ class Recorder:
         或 A 的 _backup 把檔案 move 走 → B 的 STT 讀不到、音訊整段遺失）。"""
         if audio_array is None and not self.audio_data:
             return None
+        fp = None
         try:
             audio = audio_array if audio_array is not None else np.concatenate(self.audio_data, axis=0).flatten()
             sr = self.config.get("sample_rate", 16000)
             if len(audio) < sr * 0.3:
                 return None
-            fp = os.path.join(tempfile.gettempdir(), f"voice_input_{time.time_ns()}.wav")
+            fd, fp = tempfile.mkstemp(prefix="voice_input_", suffix=".wav")
+            os.fchmod(fd, 0o600)
+            os.close(fd)
             sf.write(fp, audio, sr)
+            os.chmod(fp, 0o600)
             return fp
         except Exception as e:
+            if fp:
+                try:
+                    os.remove(fp)
+                except OSError:
+                    pass
             print(f"Save error: {e}")
             return None
 

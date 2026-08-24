@@ -1,4 +1,7 @@
 #!/bin/bash
+set -u
+umask 077
+
 # ─── HuggingFace 新 ASR 模型監控 ───────────────────────────
 # launchd 每天 08:00 執行，發現新模型推 macOS 通知
 # 用法：
@@ -8,6 +11,11 @@
 DATA_DIR="$HOME/.voice-input"
 TRACKER_FILE="$DATA_DIR/hf_seen_models.txt"
 NOTIFY_LOG="$DATA_DIR/hf_alerts.log"
+NOTIFY_SCRIPT='on run argv
+set notificationTitle to item 1 of argv
+set notificationBody to item 2 of argv
+display notification notificationBody with title notificationTitle
+end run'
 mkdir -p "$DATA_DIR"
 touch "$TRACKER_FILE"
 
@@ -60,7 +68,7 @@ if [ -n "$NEW_MODELS" ]; then
   BODY=$(echo "$NEW_MODELS" | head -5 | sed '/^$/d')
 
   # macOS 原生通知
-  osascript -e "display notification \"${BODY}\" with title \"${TITLE}\"" 2>/dev/null
+  osascript -e "$NOTIFY_SCRIPT" -- "$TITLE" "$BODY" 2>/dev/null
 
   # 寫 log
   {
@@ -97,7 +105,9 @@ if [ -n "$NEW_MODELS" ] && [ -n "$ANTHROPIC_API_KEY" ]; then
     if [ -n "$EVAL" ]; then
       SCORE=$(echo "$EVAL" | grep -oE '^[0-9]+')
       if [ "$SCORE" -ge 7 ] 2>/dev/null; then
-        osascript -e "display notification \"${model_id}: ${EVAL}\" with title \"🔥 高分新模型！\"" 2>/dev/null
+        HIGH_TITLE="🔥 高分新模型！"
+        HIGH_BODY="${model_id}: ${EVAL}"
+        osascript -e "$NOTIFY_SCRIPT" -- "$HIGH_TITLE" "$HIGH_BODY" 2>/dev/null
         echo "[hf-model-watch] 高分: ${model_id} — ${EVAL}" >> "$NOTIFY_LOG"
       fi
     fi

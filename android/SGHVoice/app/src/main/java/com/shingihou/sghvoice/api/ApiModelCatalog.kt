@@ -16,6 +16,7 @@ object ApiModelCatalog {
 
     const val CLAUDE_HAIKU_4_5 = "claude-haiku-4-5-20251001"
     const val CLAUDE_SONNET_5 = "claude-sonnet-5"
+    const val CLAUDE_OPUS_5 = "claude-opus-5"
     const val CLAUDE_OPUS_4_8 = "claude-opus-4-8"
     const val CLAUDE_FABLE_5 = "claude-fable-5"
 
@@ -45,6 +46,7 @@ object ApiModelCatalog {
     val claudeModels = listOf(
         CLAUDE_HAIKU_4_5,
         CLAUDE_SONNET_5,
+        CLAUDE_OPUS_5,
         CLAUDE_OPUS_4_8,
         CLAUDE_FABLE_5
     )

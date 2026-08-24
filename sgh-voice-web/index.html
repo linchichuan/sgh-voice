@@ -21,7 +21,7 @@
     <meta property="og:site_name" content="SGH Voice">
     <meta property="og:title" content="SGH Voice — 一個輸入法，語音、注音、日文、英文都能用。">
     <meta property="og:description"
-        content="Android 個人測試版 APK v2.5.0 現已可直接下載；另提供 macOS Apple Silicon v2.6.0。">
+        content="Android 個人測試版 APK v2.7.2：短按聽寫、長按選擇最多四種翻譯語言；另提供 macOS Apple Silicon v2.6.0。">
     <meta property="og:url" content="https://voice.shingihou.com/">
     <meta property="og:image" content="https://voice.shingihou.com/assets/generated/og-android-v240.png">
     <meta property="og:image:type" content="image/png">
@@ -47,7 +47,7 @@
     <link
         href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;family=Noto+Sans+JP:wght@400;500;600;700&amp;family=Noto+Sans+TC:wght@400;500;600;700&amp;display=swap"
         rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=20260726-android">
+    <link rel="stylesheet" href="style.css?v=20260730-download-registration">
 
     <script type="application/ld+json">
     {
@@ -58,10 +58,10 @@
           "name": "SGH Voice for Android",
           "applicationCategory": "ProductivityApplication",
           "operatingSystem": "Android 8.0 or later",
-          "softwareVersion": "2.5.0",
+          "softwareVersion": "2.7.2",
           "url": "https://voice.shingihou.com/",
-          "downloadUrl": "https://voice.shingihou.com/downloads/SGHVoice-Android-v2.5.0.apk",
-          "description": "A personal test build of a multilingual Android input method with voice, predictive Zhuyin, reading-prefix Japanese candidates, English, expandable candidates, and local personalization.",
+          "downloadUrl": "https://voice.shingihou.com/downloads/SGHVoice-Android-v2.7.2.apk",
+          "description": "A personal test build of a multilingual Android input method with tap-to-dictate, long-press translation into up to four languages, predictive Zhuyin, Japanese candidates, English, and local personalization.",
           "offers": {
             "@type": "Offer",
             "price": "0",
@@ -102,9 +102,8 @@
 
     <noscript>
         <div class="noscript">
-            <strong>Android 個人測試版：</strong>
-            本 APK 並非 Google Play 公開版本。請理解側載安裝的相容性與安全風險後，再
-            <a href="/downloads/SGHVoice-Android-v2.5.0.apk" download>下載 v2.5.0 APK</a>。
+            <strong>下載功能需要 JavaScript：</strong>
+            為記錄下載者的姓名／暱稱與 Email，請啟用 JavaScript 後重新載入本頁。
         </div>
     </noscript>
 
@@ -161,7 +160,7 @@
                 <div class="hero-copy">
                     <div class="eyebrow">
                         <span class="status-dot" aria-hidden="true"></span>
-                        <span data-i18n="hero.eyebrow">Android 個人測試版 · v2.5.0</span>
+                        <span data-i18n="hero.eyebrow">Android 個人測試版 · v2.7.2</span>
                     </div>
                     <h1 data-i18n="hero.title">一個輸入法，<br><span><span class="no-break">語音、</span><span
                                 class="no-break">注音、</span><span class="no-break">日文、</span><span
@@ -186,7 +185,7 @@
                     <div class="hero-facts" aria-label="Android release facts">
                         <span data-i18n="hero.fact1">Android 8+</span>
                         <span data-i18n="hero.fact2">已簽署 APK</span>
-                        <span data-i18n="hero.fact3">中・日・英</span>
+                        <span data-i18n="hero.fact3">最多四語翻譯</span>
                     </div>
                     <p class="hero-distribution-note">
                         <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -199,8 +198,8 @@
 
                 <div class="device-stage">
                     <div class="stage-label stage-label-voice">
-                        <span>Voice</span>
-                        <strong data-i18n="hero.float.voice">點一下開始，再點一下完成</strong>
+                        <span>VOICE + TRANSLATE</span>
+                        <strong data-i18n="hero.float.voice">短按聽寫，長按選擇翻譯語言</strong>
                     </div>
                     <div class="stage-label stage-label-modes">
                         <span>注 · あ · ABC</span>
@@ -209,14 +208,14 @@
                     <div class="phone-shell">
                         <div class="phone-speaker" aria-hidden="true"></div>
                         <picture>
-                            <source srcset="/assets/generated/android-voice-v250.webp" type="image/webp">
-                            <img src="/assets/generated/android-voice-v250.webp"
-                                alt="SGH Voice Android keyboard in voice mode" width="810" height="1800">
+                            <source srcset="/assets/generated/android-translation-ui.webp" type="image/webp">
+                            <img src="/assets/generated/android-translation-ui.webp"
+                                alt="Illustration of the SGH Voice Android four-language translation interface" width="810" height="1800">
                         </picture>
                     </div>
                     <div class="release-stamp" aria-hidden="true">
                         <small>ANDROID</small>
-                        <strong>2.5.0</strong>
+                        <strong>2.7.2</strong>
                     </div>
                 </div>
             </div>
@@ -257,8 +256,8 @@
                         </div>
                         <div>
                             <span>VOICE</span>
-                            <h3 data-i18n="modes.voice.title">點一下，開始說話</h3>
-                            <p data-i18n="modes.voice.desc">再點一次停止，並送往你所選的 OpenAI 或 Groq 語音辨識模型；不必一直壓住按鈕。</p>
+                            <h3 data-i18n="modes.voice.title">短按聽寫，長按翻譯</h3>
+                            <p data-i18n="modes.voice.desc">短按開始一般聽寫，再按一次完成；長按則可選繁中、日文、英文、韓文 1–4 種目標，再錄音翻譯。</p>
                         </div>
                     </article>
                     <article class="mode-card mode-zhuyin">
@@ -289,28 +288,28 @@
 
                 <div class="interface-showcase">
                     <div class="showcase-copy">
-                        <span class="section-kicker" data-i18n="showcase.kicker">ACTUAL ANDROID BUILD</span>
-                        <h3 data-i18n="showcase.title">這不是示意圖。<br>這就是 v2.5.0 的實際鍵盤。</h3>
+                        <span class="section-kicker" data-i18n="showcase.kicker">ANDROID FEATURE UI</span>
+                        <h3 data-i18n="showcase.title">翻譯與注音功能介面</h3>
                         <p data-i18n="showcase.desc">
-                            左上固定 SGH Voice 品牌；候選最多 24 個，可從水平列展開成三欄多列。
+                            以下為功能說明用介面；左上固定 SGH Voice 品牌，候選最多 24 個。
                         </p>
                         <ul>
                             <li data-i18n="showcase.item1">左上顯示 SGH Voice 品牌與識別圖示</li>
                             <li data-i18n="showcase.item2">最多 24 個候選，可展開成三欄多列</li>
-                            <li data-i18n="showcase.item3">點按式錄音，錄音與處理狀態清楚可見</li>
+                            <li data-i18n="showcase.item3">短按一般聽寫；長按選擇最多四種翻譯目標</li>
                             <li data-i18n="showcase.item4">保留系統鍵盤切換鍵，隨時可以退出</li>
-                            <li data-i18n="showcase.item5">看清實際 STT／LLM 模型 ID、官方價格基準後再切換</li>
+                            <li data-i18n="showcase.item5">查看 STT／LLM 模型 ID 與官方價格基準後再切換</li>
                         </ul>
                     </div>
                     <div class="screenshot-pair">
                         <figure>
-                            <img src="/assets/generated/android-voice-v250.webp"
-                                alt="Actual SGH Voice Android voice keyboard" width="810" height="1800" loading="lazy">
-                            <figcaption data-i18n="showcase.voice.caption">Voice · 點按錄音</figcaption>
+                            <img src="/assets/generated/android-translation-ui.webp"
+                                alt="Illustration of the SGH Voice Android multi-language translation interface" width="810" height="1800" loading="lazy">
+                            <figcaption data-i18n="showcase.voice.caption">Voice · 長按多語翻譯</figcaption>
                         </figure>
                         <figure>
-                            <img src="/assets/generated/android-zhuyin-v250.webp"
-                                alt="Actual SGH Voice Android Zhuyin keyboard" width="810" height="1800" loading="lazy">
+                            <img src="/assets/generated/android-zhuyin-ui.webp"
+                                alt="Illustration of the SGH Voice Android Zhuyin interface" width="810" height="1800" loading="lazy">
                             <figcaption data-i18n="showcase.zhuyin.caption">注 · 標準注音</figcaption>
                         </figure>
                     </div>
@@ -502,6 +501,9 @@
                     <p data-i18n="download.alert.desc">
                         本版本尚未透過 Google Play Production 公開發佈。APK 可直接下載，但需要手動允許特定來源安裝。側載與測試版本可能有裝置相容性、穩定性、資料遺失及第三方 API 費用等風險；請在理解後自行決定是否安裝。若無法接受，請等待正式商店版本。
                     </p>
+                    <p class="distribution-responsibility" data-i18n="download.alert.responsibility">
+                        <strong>責任與安全提示：</strong>此 APK 尚未經 Google Play 審核或認證，Android 可能顯示「未知應用程式」或「未經驗證」等安全提示。本版本僅供測試，不保證功能、相容性或穩定性；在適用法令允許範圍內，安裝與使用風險由使用者自行承擔。若選擇測試，僅在確認本頁官方網址、檔名與 SHA-256 後，允許目前瀏覽器安裝未知應用程式；請勿關閉 Google Play Protect。若系統判定為惡意程式或持續封鎖，請停止安裝。
+                    </p>
                     <ul>
                         <li data-i18n="download.alert.item1">確認檔名、版本、權限與下方 SHA-256</li>
                         <li data-i18n="download.alert.item2">不要關閉 Google Play Protect</li>
@@ -514,6 +516,43 @@
                             target="_blank" rel="noopener" data-i18n="download.alert.playLink">Google Play 測試規則</a>
                     </div>
                 </div>
+
+                <form class="download-registration" id="downloadRegistrationForm">
+                    <div class="registration-heading">
+                        <span data-i18n="download.registration.badge">DOWNLOAD REGISTRATION</span>
+                        <h3 data-i18n="download.registration.title">下載前，請留下聯絡資料</h3>
+                        <p data-i18n="download.registration.desc">
+                            請填寫姓名或暱稱及 Email。本頁按鈕會在登記成功後開始下載；此登記不是下載檔案的存取控制，版本化發布檔仍是公開連結。
+                        </p>
+                    </div>
+                    <div class="registration-fields">
+                        <label class="registration-field" for="downloadName">
+                            <span data-i18n="download.registration.name">姓名或暱稱</span>
+                            <input type="text" id="downloadName" name="name" autocomplete="name"
+                                minlength="1" maxlength="100" required>
+                        </label>
+                        <label class="registration-field" for="downloadEmail">
+                            <span data-i18n="download.registration.email">Email</span>
+                            <input type="email" id="downloadEmail" name="email" autocomplete="email"
+                                maxlength="254" placeholder="name@example.com" required>
+                        </label>
+                    </div>
+                    <label class="risk-check registration-consent" for="downloadPrivacyConsent">
+                        <input type="checkbox" id="downloadPrivacyConsent" required>
+                        <span class="custom-checkbox" aria-hidden="true">
+                            <svg viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"></path></svg>
+                        </span>
+                        <span>
+                            <span data-i18n="download.registration.consent">我同意將上述資料用於下載紀錄與必要聯絡，並已閱讀</span>
+                            <a href="privacy.html" target="_blank" rel="noopener"
+                                data-i18n="download.registration.privacy">隱私權政策</a><span
+                                data-i18n="download.registration.period">。</span>
+                        </span>
+                    </label>
+                    <p class="registration-status" id="downloadRegistrationStatus" role="status"
+                        aria-live="polite" data-state="idle"
+                        data-i18n="download.registration.status">填妥資料後，請選擇下方要下載的平台。</p>
+                </form>
 
                 <div class="download-grid">
                     <article class="download-card download-android">
@@ -533,7 +572,7 @@
                         <dl class="release-meta">
                             <div>
                                 <dt data-i18n="download.meta.version">版本</dt>
-                                <dd>2.5.0 (18)</dd>
+                                <dd>2.7.2 (22)</dd>
                             </div>
                             <div>
                                 <dt data-i18n="download.meta.requirement">系統需求</dt>
@@ -541,7 +580,7 @@
                             </div>
                             <div>
                                 <dt data-i18n="download.meta.size">檔案大小</dt>
-                                <dd>5.51 MiB</dd>
+                                <dd>5.57 MiB</dd>
                             </div>
                             <div>
                                 <dt data-i18n="download.meta.format">格式</dt>
@@ -552,7 +591,7 @@
                         <div class="hash-block">
                             <div>
                                 <span>SHA-256</span>
-                                <code id="apkHash">09ef82a6b796a0047cecde607162d0cbe1536f3356b3cb54ee810f88d3c76d1a</code>
+                                <code id="apkHash">72516d1adbd6d23d794251e4ccb1c6d1fa5a076340ddb12d5e96884fb6db9ec4</code>
                             </div>
                             <button type="button" class="copy-button" id="copyHashButton" data-i18n="download.hash.copy">複製</button>
                         </div>
@@ -563,19 +602,21 @@
                                 <svg viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"></path></svg>
                             </span>
                             <span data-i18n="download.consent">
-                                我已了解這是非 Google Play 公開版的個人測試 APK，願意自行評估上述風險。
+                                我已了解這是未經 Google Play 審核或認證的個人測試 APK，可能出現安全提示；我會核對官方來源與 SHA-256、自行承擔測試風險，且不會關閉 Google Play Protect。
                             </span>
                         </label>
 
                         <a class="btn btn-primary download-button disabled" id="apkDownloadButton"
-                            aria-disabled="true" aria-describedby="riskDisclosure" tabindex="-1"
-                            data-download-href="/downloads/SGHVoice-Android-v2.5.0.apk">
+                            aria-disabled="true" aria-describedby="riskDisclosure downloadRegistrationStatus"
+                            tabindex="-1" data-platform="android" data-version="2.7.2"
+                            data-filename="SGHVoice-Android-v2.7.2.apk"
+                            data-download-href="/downloads/SGHVoice-Android-v2.7.2.apk">
                             <svg viewBox="0 0 24 24" aria-hidden="true">
                                 <path d="M12 3v12m0 0 5-5m-5 5-5-5M5 19h14"></path>
                             </svg>
-                            <span data-i18n="download.android.cta">勾選上方確認後下載 APK</span>
+                            <span data-i18n="download.android.cta">填寫資料並確認風險後下載 APK</span>
                         </a>
-                        <p class="download-file">SGHVoice-Android-v2.5.0.apk</p>
+                        <p class="download-file">SGHVoice-Android-v2.7.2.apk</p>
                     </article>
 
                     <article class="download-card download-mac">
@@ -605,12 +646,15 @@
                                 <dd>Apple Silicon</dd>
                             </div>
                         </dl>
-                        <a class="btn btn-secondary download-button"
-                            href="https://github.com/linchichuan/sgh-voice/releases/download/v2.6.0/SGH.Voice-2.6.0-apple-silicon.dmg">
+                        <a class="btn btn-secondary download-button disabled" id="macDownloadButton"
+                            aria-disabled="true" aria-describedby="downloadRegistrationStatus" tabindex="-1"
+                            data-platform="macos" data-version="2.6.0"
+                            data-filename="SGH.Voice-2.6.0-apple-silicon.dmg"
+                            data-download-href="https://github.com/linchichuan/sgh-voice/releases/download/v2.6.0/SGH.Voice-2.6.0-apple-silicon.dmg">
                             <svg viewBox="0 0 24 24" aria-hidden="true">
                                 <path d="M12 3v12m0 0 5-5m-5 5-5-5M5 19h14"></path>
                             </svg>
-                            <span data-i18n="download.mac.cta">下載 macOS v2.6.0</span>
+                            <span data-i18n="download.mac.cta">填寫資料後下載 macOS v2.6.0</span>
                         </a>
                         <a class="text-link" href="https://github.com/linchichuan/sgh-voice/releases/tag/v2.6.0"
                             target="_blank" rel="noopener" data-i18n="download.mac.notes">查看版本說明</a>
@@ -650,6 +694,10 @@
                         <summary data-i18n="faq.q5">日文輸入和一般日本手機鍵盤一樣嗎？</summary>
                         <p data-i18n="faq.a5">目前為 Phase 1，支援 Romaji、假名、讀音前綴預測，以及最多 24 個可展開候選；尚不是 Mozc 等成熟輸入法的整句文脈轉換等級。</p>
                     </details>
+                    <details>
+                        <summary data-i18n="faq.q6">我口述一個問句時，模型會直接回答嗎？</summary>
+                        <p data-i18n="faq.a6">不應該。一般聽寫把整段內容視為逐字稿，即使像問句或命令也只能整理文字；翻譯模式只能翻譯。v2.7.2 另有輸出守門，若模型把問句當指令回答，會捨棄該答案。</p>
+                    </details>
                 </div>
             </div>
         </section>
@@ -688,8 +736,9 @@
         </div>
     </footer>
 
-    <script src="i18n.js?v=20260726-android-v250"></script>
-    <script src="main.js?v=20260726-android-v250"></script>
+    <script src="i18n.js?v=20260730-download-registration"></script>
+    <script src="firebase.js?v=20260730-download-registration"></script>
+    <script src="main.js?v=20260730-download-registration"></script>
 </body>
 
 </html>

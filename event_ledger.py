@@ -16,10 +16,14 @@ event_ledger.py — Production observability for silent failures.
 """
 
 import json
+import math
 import os
+import re
 import threading
 import time
 from datetime import datetime
+
+from config import runtime_data_write_guard
 
 EVENTS_FILE = os.path.expanduser("~/.voice-input/events.jsonl")
 MAX_SIZE_BYTES = 50 * 1024 * 1024  # 50MB
@@ -34,6 +38,92 @@ _tls = threading.local()
 # 用 list 而非單一 pointer：處理重疊 pipeline + early-return 不會誤清誰的 session。
 _active_list = []
 _active_lock = threading.Lock()
+
+_ALLOWED_FIELDS = {
+    "action", "app_id", "audio_sec", "budget_jpy", "chars_out", "engine",
+    "error", "fallback_index", "latency_ms", "len_in", "len_out", "llm_ms",
+    "llm_source", "method", "mode", "ok", "phase", "reason", "retry",
+    "score", "source", "spent_jpy", "stt_ms", "stt_source", "success",
+    "targets", "text_len", "threshold", "total_ms", "validator",
+}
+_BOOLEAN_FIELDS = {"ok", "retry", "success"}
+_NUMERIC_FIELDS = {
+    "audio_sec", "budget_jpy", "chars_out", "fallback_index", "latency_ms",
+    "len_in", "len_out", "llm_ms", "score", "spent_jpy", "stt_ms",
+    "text_len", "threshold", "total_ms",
+}
+_IDENTIFIER_FIELDS = {
+    "action", "app_id", "engine", "method", "mode", "phase", "source",
+    "stt_source", "llm_source", "validator",
+}
+_IDENTIFIER_RE = re.compile(r"^[A-Za-z0-9_.:/-]{1,120}$")
+_ERROR_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_.]{0,99}$")
+_AUDIO_REASON_RE = re.compile(
+    r"^(?:rms=[0-9.]+ < [0-9.]+|clipping=[0-9.]+% > [0-9.]+%|"
+    r"crest=[0-9.]+ [<>] [0-9.]+(?:（[^）]{1,20}）)?)$"
+)
+_KNOWN_REASONS = {
+    "empty",
+    "edit_mode_chat_reply",
+    "code_switch_span_changed",
+    "full_segment_hallucination",
+    "trailing_extension",
+    "translation target must be a string",
+    "select at least one translation target",
+    "select at most four translation targets",
+    "translation response is empty",
+    "translation response is not valid JSON",
+    "translation response must be a JSON object",
+    "translation response keys do not match targets",
+    "translation source is empty",
+    "translations must be a mapping",
+    "translation semantics do not match target snapshot",
+}
+_TRANSLATION_REASON_RE = re.compile(
+    r"^translation for (?:zh-Hant|ja|en|ko) (?:is empty|"
+    r"is an unchanged source echo|is not in the requested target language|"
+    r"looks like an assistant answer|did not preserve the source request|"
+    r"did not preserve the source question|expanded far beyond the source)$"
+)
+_TARGET_MISMATCH_REASON_RE = re.compile(
+    r"^translation response keys do not match targets(?: \("
+    r"(?:missing|extra)=(?:zh-Hant|ja|en|ko)(?:,(?:zh-Hant|ja|en|ko))*"
+    r"(?:; (?:missing|extra)=(?:zh-Hant|ja|en|ko)(?:,(?:zh-Hant|ja|en|ko))*)?"
+    r"\))?$"
+)
+
+
+def _safe_reason(value):
+    if not isinstance(value, str):
+        return None
+    if value in _KNOWN_REASONS:
+        return value
+    if _AUDIO_REASON_RE.fullmatch(value):
+        return value
+    if _TRANSLATION_REASON_RE.fullmatch(value):
+        return value
+    if _TARGET_MISMATCH_REASON_RE.fullmatch(value):
+        return value
+    return None
+
+
+def _safe_field(key, value):
+    if key in _BOOLEAN_FIELDS:
+        return value if isinstance(value, bool) else None
+    if key in _NUMERIC_FIELDS:
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return None
+        return value if math.isfinite(float(value)) else None
+    if key in _IDENTIFIER_FIELDS:
+        return value if isinstance(value, str) and _IDENTIFIER_RE.fullmatch(value) else None
+    if key == "error":
+        return value if isinstance(value, str) and _ERROR_RE.fullmatch(value) else None
+    if key == "reason":
+        return _safe_reason(value)
+    if key == "targets" and isinstance(value, (list, tuple)):
+        targets = [item for item in value if item in {"zh-Hant", "ja", "en", "ko"}]
+        return targets if len(targets) == len(value) and len(targets) <= 4 else None
+    return None
 
 
 def new_session():
@@ -89,19 +179,38 @@ def log(event_type, **fields):
     try:
         entry = {
             "ts": datetime.now().isoformat(timespec="milliseconds"),
-            "type": event_type,
+            "type": (
+                event_type
+                if isinstance(event_type, str) and _IDENTIFIER_RE.fullmatch(event_type)
+                else "invalid_event_type"
+            ),
             "session": _resolve_session(),
         }
-        # 確保 fields 不會 leak 文字內容（白名單檢查）
+        # Only explicit, typed metadata crosses this persistence boundary.
         for k, v in fields.items():
-            entry[k] = v
+            if k not in _ALLOWED_FIELDS:
+                continue
+            safe_value = _safe_field(k, v)
+            if safe_value is not None:
+                entry[k] = safe_value
 
-        with _lock:
-            os.makedirs(os.path.dirname(EVENTS_FILE), exist_ok=True)
-            if os.path.exists(EVENTS_FILE) and os.path.getsize(EVENTS_FILE) > MAX_SIZE_BYTES:
-                _rotate()
-            with open(EVENTS_FILE, "a", encoding="utf-8") as f:
-                f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+        with runtime_data_write_guard() as allowed:
+            if not allowed:
+                return
+            with _lock:
+                parent = os.path.dirname(EVENTS_FILE)
+                os.makedirs(parent, mode=0o700, exist_ok=True)
+                os.chmod(parent, 0o700)
+                if os.path.exists(EVENTS_FILE) and os.path.getsize(EVENTS_FILE) > MAX_SIZE_BYTES:
+                    _rotate()
+                fd = os.open(
+                    EVENTS_FILE,
+                    os.O_WRONLY | os.O_CREAT | os.O_APPEND,
+                    0o600,
+                )
+                os.chmod(EVENTS_FILE, 0o600)
+                with os.fdopen(fd, "a", encoding="utf-8") as f:
+                    f.write(json.dumps(entry, ensure_ascii=False) + "\n")
     except Exception:
         pass
 
@@ -113,6 +222,7 @@ def _rotate():
         if os.path.exists(rotated):
             os.remove(rotated)
         os.replace(EVENTS_FILE, rotated)
+        os.chmod(rotated, 0o600)
     except Exception:
         pass
 

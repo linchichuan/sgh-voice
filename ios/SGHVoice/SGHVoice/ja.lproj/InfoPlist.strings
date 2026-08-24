@@ -1,0 +1,2 @@
+"CFBundleDisplayName" = "SGH Voice";
+"NSMicrophoneUsageDescription" = "音声を文字起こしするために録音し、選択した音声認識サービスへ送信します。";

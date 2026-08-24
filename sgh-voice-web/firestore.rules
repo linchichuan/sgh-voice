@@ -32,6 +32,58 @@ service cloud.firestore {
                     && request.resource.data.device.size() < 200;
       allow read, update, delete: if false;
     }
+    // Download registration — create-only records for Android/macOS downloads
+    match /sgh-voice-downloads/{docId} {
+      allow create: if request.resource.data.keys().hasOnly([
+                        'name',
+                        'email',
+                        'platform',
+                        'version',
+                        'fileName',
+                        'locale',
+                        'consentVersion',
+                        'riskAcknowledged',
+                        'createdAt'
+                      ])
+                    && request.resource.data.name is string
+                    && request.resource.data.name.size() > 0
+                    && request.resource.data.name.size() <= 100
+                    && request.resource.data.email is string
+                    && request.resource.data.email.size() > 3
+                    && request.resource.data.email.size() <= 254
+                    && request.resource.data.email.matches('^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$')
+                    && request.resource.data.platform in ['android', 'macos']
+                    && request.resource.data.version is string
+                    && request.resource.data.version.size() > 0
+                    && request.resource.data.version.size() <= 32
+                    && request.resource.data.fileName is string
+                    && request.resource.data.fileName.size() > 0
+                    && request.resource.data.fileName.size() <= 160
+                    && request.resource.data.locale is string
+                    && request.resource.data.locale.size() > 0
+                    && request.resource.data.locale.size() <= 32
+                    && request.resource.data.locale in ['ja', 'zh', 'en']
+                    && request.resource.data.consentVersion is int
+                    && request.resource.data.consentVersion == 2
+                    && request.resource.data.riskAcknowledged is bool
+                    && (
+                      (
+                        request.resource.data.platform == 'android'
+                        && request.resource.data.version == '2.7.2'
+                        && request.resource.data.fileName == 'SGHVoice-Android-v2.7.2.apk'
+                        && request.resource.data.riskAcknowledged == true
+                      )
+                      ||
+                      (
+                        request.resource.data.platform == 'macos'
+                        && request.resource.data.version == '2.6.0'
+                        && request.resource.data.fileName == 'SGH.Voice-2.6.0-apple-silicon.dmg'
+                        && request.resource.data.riskAcknowledged == false
+                      )
+                    )
+                    && request.resource.data.createdAt == request.time;
+      allow read, update, delete: if false;
+    }
     // Default: deny all
     match /{document=**} {
       allow read, write: if false;

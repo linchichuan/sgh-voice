@@ -2,9 +2,12 @@
 # ═══════════════════════════════════════════
 # 🎙 SGH Voice — Continuous Evolution Loop
 # ═══════════════════════════════════════════
+set -euo pipefail
+umask 077
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+INSTALLED_SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_DIR="${SGH_VOICE_PROJECT_DIR:-$(dirname "$INSTALLED_SCRIPT_DIR")}"
+SCRIPT_DIR="$PROJECT_DIR/scripts"
 VENV_PYTHON="$PROJECT_DIR/venv/bin/python3"
 SPECS_DIR="$PROJECT_DIR/.kiro/specs"
 
@@ -14,6 +17,7 @@ echo "Time: $(date '+%Y-%m-%d %H:%M:%S')"
 echo "=========================================="
 
 mkdir -p "$SPECS_DIR"
+chmod 700 "$SPECS_DIR"
 STATUS_FILE="$SPECS_DIR/auto-upgrade-status.md"
 
 echo "# 自動進化狀態報告 (Continuous Evolution Status)" > "$STATUS_FILE"
@@ -26,9 +30,9 @@ export PYTHONPATH="$PROJECT_DIR"
 if [ -f "$VENV_PYTHON" ]; then
     "$VENV_PYTHON" "$SCRIPT_DIR/auto_triage.py"
     if [ -f ~/.voice-input/auto_triage_report.md ]; then
-        echo "✅ 分析完成。"
+        echo "✅ 本機分析完成。"
         echo "## 1. 歷史錯誤分析" >> "$STATUS_FILE"
-        cat ~/.voice-input/auto_triage_report.md >> "$STATUS_FILE"
+        echo "已產生私有待審核報告：~/.voice-input/auto_triage_report.md" >> "$STATUS_FILE"
     else
         echo "⚠️ 無法產生分析報告或無需分析。"
         echo "## 1. 歷史錯誤分析" >> "$STATUS_FILE"
@@ -37,6 +41,7 @@ if [ -f "$VENV_PYTHON" ]; then
 else
     echo "❌ 找不到 Python 虛擬環境。"
 fi
+chmod 600 "$STATUS_FILE"
 echo "" >> "$STATUS_FILE"
 
 # 2. 醫學辭書擴充（領域進化）

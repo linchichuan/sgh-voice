@@ -3,3 +3,4 @@ pytest-cov>=4.0
 ruff>=0.5
 keyring>=24.0
 pyobjc-framework-Cocoa>=10.0; sys_platform == "darwin"
+pyinstaller>=6.0; sys_platform == "darwin"

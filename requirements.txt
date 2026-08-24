@@ -11,5 +11,9 @@ opencc-python-reimplemented>=0.1.7
 elevenlabs>=1.0.0
 pywebview>=5.0
 keyring>=24.0
+# macOS Apple Silicon builds advertise local Whisper as the default route, so
+# these are release dependencies rather than undocumented optional packages.
+mlx>=0.30.6; sys_platform == "darwin" and platform_machine == "arm64"
+mlx-whisper>=0.4.3; sys_platform == "darwin" and platform_machine == "arm64"
 # 可選：Qwen3-ASR MLX（多語 ASR，Apple Silicon 專用）
 # pip install mlx-qwen3-asr

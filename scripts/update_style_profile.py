@@ -1,120 +1,142 @@
-"""
-從 history 最近 N 筆 final_text 分析使用者語氣，產出 1-2 段描述寫回 dictionary.style_profile。
-這是個人化後處理的「高層描述」，與 few-shot 的「具體範例」互補。
+#!/usr/bin/env python3
+"""Build an aggregate writing-style profile without exporting history text.
 
-用法：
-  python3 scripts/update_style_profile.py              # dry-run 印出
-  python3 scripts/update_style_profile.py --apply      # 寫入 dictionary
-  python3 scripts/update_style_profile.py --n 200      # 用最近 200 筆（預設 100）
-
-排程（launchd 週日 02:00 自動更新）：見 scripts/launchd/com.shingihou.style-profile.plist
+The analyzer is deliberately deterministic and local-only. It reports broad
+formatting traits, never sample text, names, or provider-generated inferences.
 """
+
+from __future__ import annotations
+
 import argparse
-import os
+import re
+import statistics
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT))
 
-from config import load_config, save_dictionary
+ROOT = Path(__file__).resolve().parent.parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 from memory import Memory
 
 
-_PROFILE_PROMPT = (
-    "你是文體分析助理。以下是使用者最近的語音輸入轉寫結果（已經過後處理，"
-    "代表使用者預期的書寫風格）。請輸出 1~2 段、總共不超過 200 字的「使用者語氣特徵描述」，"
-    "供下游 LLM 在後處理時當 system prompt 提示。\n\n"
-    "請涵蓋以下面向（有則寫，沒有跳過）：\n"
-    "- 句子長短偏好（短切多 / 長句連綴）\n"
-    "- 標點習慣（逗號密集？句號偏少？慣用問號/驚嘆號？）\n"
-    "- 語氣（口語 / 書面 / 商務 / 技術）\n"
-    "- 中英日混排習慣（是否常夾英文技術詞？英文是否半形？）\n"
-    "- 慣用句式或口頭禪（「對吧」「就是說」之類）\n"
-    "- 領域用詞特徵（醫療 / 技術 / 商務）\n\n"
-    "嚴格要求：\n"
-    "- 只輸出描述本身，不要任何前綴（不要『根據分析』『以下是』『使用者偏好』之類的開場）。\n"
-    "- 用繁體中文。\n"
-    "- 把這段描述當作後續 LLM 的 system prompt 一部分，所以要寫成「指令式」的風格指南，例：\n"
-    "  「偏好短句、常夾英文技術詞（如 prompt、API），中文用全形標點、英文用半形空格分隔。」\n"
+_ASCII_WORD_RE = re.compile(r"[A-Za-z][A-Za-z0-9_.+/-]*")
+_KANA_RE = re.compile(r"[\u3040-\u30ff\u31f0-\u31ff]")
+_CJK_RE = re.compile(r"[\u3400-\u9fff]")
+_TECH_TERMS = {
+    "api",
+    "sdk",
+    "llm",
+    "prompt",
+    "server",
+    "deploy",
+    "git",
+    "cloud",
+    "websocket",
+}
+_MEDICAL_MARKERS = (
+    "醫療",
+    "診所",
+    "患者",
+    "病院",
+    "医療",
+    "薬",
+    "處方",
+    "診療",
+)
+_BUSINESS_MARKERS = (
+    "客戶",
+    "合作",
+    "提案",
+    "契約",
+    "運用",
+    "業務",
+    "確認",
+    "schedule",
 )
 
 
-def _call_llm(config, prompt, content):
-    """以主管線同樣的 fallback 鏈呼叫 LLM。"""
-    full = f"{prompt}\n\n=== 使用者最近輸入樣本 ===\n{content}"
+def generate_local_style_profile(samples: list[str]) -> str:
+    """Return aggregate style instructions without echoing any sample text."""
+    cleaned = [
+        sample.strip()
+        for sample in samples
+        if isinstance(sample, str) and sample.strip()
+    ]
+    if not cleaned:
+        raise ValueError("at least one non-empty sample is required")
 
-    # Groq（最快、便宜）
-    if config.get("groq_api_key"):
-        try:
-            import openai
-            client = openai.OpenAI(base_url="https://api.groq.com/openai/v1",
-                                    api_key=config["groq_api_key"], timeout=30)
-            resp = client.chat.completions.create(
-                model=config.get("groq_model", "llama-3.3-70b-versatile"),
-                messages=[{"role": "user", "content": full}],
-                temperature=0.2, max_tokens=400,
-            )
-            return resp.choices[0].message.content.strip(), "groq"
-        except Exception as e:
-            print(f"⚠️  Groq 失敗: {e}")
+    lengths = [len(sample) for sample in cleaned]
+    average_length = statistics.fmean(lengths)
+    combined = "\n".join(cleaned)
+    lowered = combined.lower()
 
-    if config.get("openrouter_api_key"):
-        try:
-            import openai
-            client = openai.OpenAI(base_url="https://openrouter.ai/api/v1",
-                                    api_key=config["openrouter_api_key"], timeout=30)
-            resp = client.chat.completions.create(
-                model=config.get("openrouter_model", "qwen/qwen3-30b-a3b:free"),
-                messages=[{"role": "user", "content": full}],
-                temperature=0.2, max_tokens=400,
-            )
-            return resp.choices[0].message.content.strip(), "openrouter"
-        except Exception as e:
-            print(f"⚠️  OpenRouter 失敗: {e}")
+    if average_length < 35:
+        sentence_trait = "偏好精簡短句，避免不必要的長篇鋪陳"
+    elif average_length > 90:
+        sentence_trait = "偏好資訊完整的長句，但應維持清楚分段"
+    else:
+        sentence_trait = "偏好中等長度、資訊密度適中的句子"
 
-    if config.get("anthropic_api_key"):
-        try:
-            import anthropic
-            client = anthropic.Anthropic(api_key=config["anthropic_api_key"], timeout=30)
-            resp = client.messages.create(
-                model=config.get("claude_model", "claude-haiku-4-5-20251001"),
-                max_tokens=400, temperature=0.2,
-                messages=[{"role": "user", "content": full}],
-            )
-            return resp.content[0].text.strip(), "claude"
-        except Exception as e:
-            print(f"⚠️  Claude 失敗: {e}")
+    comma_count = sum(combined.count(mark) for mark in ("，", ",", "、"))
+    stop_count = sum(
+        combined.count(mark) for mark in ("。", ".", "！", "!", "？", "?")
+    )
+    if comma_count > max(stop_count * 2, 4):
+        punctuation_trait = "常以逗號串接資訊，輸出時保留節奏並適度斷句"
+    elif stop_count == 0:
+        punctuation_trait = "原始輸入較少句末標點，輸出時補齊自然標點"
+    else:
+        punctuation_trait = "標點使用均衡，維持自然完整的句末標點"
 
-    if config.get("openai_api_key"):
-        try:
-            import openai
-            client = openai.OpenAI(api_key=config["openai_api_key"], timeout=30)
-            resp = client.chat.completions.create(
-                model=config.get("openai_model", "gpt-4o-mini"),
-                messages=[{"role": "user", "content": full}],
-                temperature=0.2, max_tokens=400,
-            )
-            return resp.choices[0].message.content.strip(), "openai"
-        except Exception as e:
-            print(f"⚠️  OpenAI 失敗: {e}")
+    ascii_words = _ASCII_WORD_RE.findall(combined)
+    cjk_chars = _CJK_RE.findall(combined)
+    language_traits: list[str] = []
+    if ascii_words and cjk_chars:
+        language_traits.append("保留中英文混排與半形英文技術詞")
+    if _KANA_RE.search(combined) and cjk_chars:
+        language_traits.append("保留中文與日文混排，不任意翻譯專有內容")
+    if not language_traits:
+        language_traits.append("維持原輸入語言，不自行增加其他語言")
 
-    return None, None
+    domains: list[str] = []
+    ascii_terms = {word.lower() for word in ascii_words}
+    if ascii_terms & _TECH_TERMS:
+        domains.append("技術")
+    if any(marker in combined for marker in _MEDICAL_MARKERS):
+        domains.append("醫療")
+    if any(marker.lower() in lowered for marker in _BUSINESS_MARKERS):
+        domains.append("商務")
+    domain_trait = (
+        f"保留{'、'.join(domains)}領域的正式專有名詞"
+        if domains
+        else "保留原有專有名詞，不推測或擴寫未提供的內容"
+    )
+
+    return "；".join(
+        [sentence_trait, punctuation_trait, *language_traits, domain_trait]
+    ) + "。"
 
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--apply", action="store_true", help="實際寫入 dictionary.style_profile")
-    parser.add_argument("--n", type=int, default=100, help="採樣最近 N 筆（預設 100）")
-    parser.add_argument("--min-chars", type=int, default=15, help="單筆最少字元（過濾極短紀錄）")
+def main() -> int:
+    parser = argparse.ArgumentParser(
+        description="在本機從近期紀錄產生不含原文的寫作風格摘要"
+    )
+    parser.add_argument("--apply", action="store_true", help="寫入 dictionary.style_profile")
+    parser.add_argument("--n", type=int, default=100, help="最近樣本數（10-100）")
+    parser.add_argument("--min-chars", type=int, default=15, help="單筆最少字元")
     args = parser.parse_args()
 
-    config = load_config()
-    mem = Memory()
+    if not 10 <= args.n <= 100:
+        parser.error("--n must be between 10 and 100")
+    if args.min_chars < 1:
+        parser.error("--min-chars must be positive")
 
-    samples = []
-    for h in reversed(mem.history):
-        text = (h.get("final_text") or "").strip()
+    memory = Memory()
+    samples: list[str] = []
+    for entry in reversed(memory.history):
+        text = (entry.get("final_text") or "").strip()
         if len(text) < args.min_chars:
             continue
         samples.append(text)
@@ -125,27 +147,19 @@ def main():
         print(f"❌ 樣本不足（{len(samples)} 筆，需 ≥10）")
         return 1
 
-    sample_text = "\n".join(f"- {s}" for s in samples)
-    print(f"📊 採樣 {len(samples)} 筆（總長 {len(sample_text)} 字）")
-    print("⏳ 呼叫 LLM 分析...")
-
-    profile, engine = _call_llm(config, _PROFILE_PROMPT, sample_text)
-    if not profile:
-        print("❌ 所有 LLM 都失敗")
-        return 1
-
-    profile = profile.strip().strip('"').strip("'")
-    print(f"\n=== 新 Profile（by {engine}）===\n{profile}\n")
-    print(f"=== 舊 Profile ===\n{mem.get_style_profile()}\n")
+    profile = generate_local_style_profile(samples)
+    print(f"📊 已在本機彙整 {len(samples)} 筆；未傳送或輸出逐字稿內容")
+    print(f"\n=== 新 Profile（local）===\n{profile}\n")
+    print(f"=== 舊 Profile ===\n{memory.get_style_profile()}\n")
 
     if not args.apply:
-        print("💡 dry-run。確認無誤加 --apply 寫入。")
+        print("💡 dry-run。確認無誤後加 --apply 寫入。")
         return 0
 
-    mem.update_style_profile(profile)
+    memory.update_style_profile(profile)
     print(f"✅ 已寫入 dictionary.style_profile（{len(profile)} 字）")
     return 0
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    raise SystemExit(main())

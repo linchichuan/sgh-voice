@@ -1,15 +1,26 @@
-# 🎙 SGH Voice — 讓想法流動，不再卡在鍵盤上 (v2.6.0)
+# 🎙 SGH Voice — 讓想法流動，不再卡在鍵盤上 (v2.7.0)
 
 **[English](README.en.md) | [日本語](README.ja.md) | 繁體中文**
 
-> 說話即成專業文章。中日英三語自動辨識 + **原生語言保持**，資料 100% 掌控在手。
+> 說話即成專業文章。中日英三語自動辨識 + **原生語言保持**；採 BYOK，資料會依使用者選擇傳送至外部 AI 服務商處理。
 
 [![macOS](https://img.shields.io/badge/macOS-Apple_Silicon-black?logo=apple)](https://github.com/linchichuan/sgh-voice/releases)
 [![iOS](https://img.shields.io/badge/iOS-17.0+-blue?logo=apple)](https://github.com/linchichuan/sgh-voice/releases)
 [![Android](https://img.shields.io/badge/Android-8.0+-green?logo=android)](https://github.com/linchichuan/sgh-voice/releases)
-[![Version](https://img.shields.io/badge/Version-2.6.0-green)]()
+[![Version](https://img.shields.io/badge/Version-2.7.0-green)]()
 
 ---
+
+## 🌟 v2.7.0：安全聽寫、多語翻譯與 Prompt 管理
+
+| 重點改進 | 說明 |
+|------|------|
+| **聽寫不再回答問題** | 鎖定 Dictation contract，疑問句與命令句只會被整理成原意文字；若後處理模型產生回答，守門器會丟棄該結果。 |
+| **一段語音翻譯最多四語** | Android 長按錄音鍵、macOS 使用獨立快捷鍵，可選繁中、日文、英文、韓文；同一段音訊只做一次 STT 與一次 LLM 呼叫。 |
+| **Prompt 管理透明化** | Dashboard 顯示實際 provider／model ID、不可覆寫的聽寫與翻譯規則，以及只可追加標點／格式偏好的自訂欄位。 |
+| **Android 輸入法升級** | 保留語音、注音、日文與英文入口，加入 SGH Voice 品牌、候選列、個人修正學習與翻譯目標記憶。 |
+| **失敗時不亂輸入** | 翻譯必須符合嚴格 JSON contract；模型格式錯誤、缺 key 或結果可疑時直接停止，不把錯誤文字貼進目前 App。 |
+| **模型與成本可辨識** | 設定頁直接顯示目前模型 ID 與翻譯呼叫方式，避免只看到「Cloud」卻不知道實際使用哪個模型。 |
 
 ## 🌟 v2.6.0：可信的中日英混講個人化
 
@@ -72,10 +83,9 @@
 
 ---
 
-## 🤖 Android 測試計畫 (NPP)
+## 🤖 Android 個人測試版
 
-我們需要 20 位熱血的測試者協助 Android 版通過 Google Play 審核。如果您是 Android 用戶，請務必加入我們！
-👉 [立即填寫申請表](https://voice.shingihou.com/#beta)
+目前可從 [voice.shingihou.com](https://voice.shingihou.com/#download) 下載 APK 側載，不必等待 Google Play 封閉測試名額。這仍是個人測試版，並非 Play 商店正式發布；安裝前請閱讀頁面上的風險說明，且僅從官方下載頁取得檔案。
 
 ---
 

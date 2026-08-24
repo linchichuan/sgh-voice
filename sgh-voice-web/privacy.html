@@ -5,6 +5,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SGH Voice - Privacy Policy / プライバシーポリシー</title>
+    <meta name="description" content="SGH Voice が音声、文字、API キー、端末内学習データ、ダウンロード登録情報をどのように取り扱うかを説明します。">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="https://voice.shingihou.com/privacy.html">
+    <link rel="alternate" hreflang="ja" href="https://voice.shingihou.com/privacy.html?lang=ja">
+    <link rel="alternate" hreflang="zh-Hant" href="https://voice.shingihou.com/privacy.html?lang=zh">
+    <link rel="alternate" hreflang="en" href="https://voice.shingihou.com/privacy.html?lang=en">
+    <link rel="alternate" hreflang="x-default" href="https://voice.shingihou.com/privacy.html">
     <style>
         * {
             margin: 0;
@@ -164,7 +171,7 @@
             <div class="card">
                 <h2>1. はじめに</h2>
                 <p>本プライバシーポリシーは、新義豊株式会社（以下「当社」）が提供する「SGH Voice」アプリケーション（以下「本アプリ」）における個人情報の取扱いについて説明します。</p>
-                <p><strong>最終更新日：</strong>2026年7月26日（Android v2.5.0 対応）</p>
+                <p><strong>最終更新日：</strong>2026年8月24日（モバイル版とダウンロード登録のプライバシー表示を更新）</p>
             </div>
 
             <div class="card">
@@ -172,20 +179,24 @@
                 <h3>2.1 音声データ</h3>
                 <p>本アプリは、マイクを使用して音声を録音します。この録音データは、音声認識（Speech-to-Text）処理のためにのみ使用されます。</p>
                 <ul>
-                    <li>音声データは端末上で一時的に保持され、処理完了後に自動的に削除されます（音声バックアップ機能を有効にした場合を除く。詳細は10項参照）。</li>
-                    <li>音声データは、選択された <strong>STT (Speech-to-Text) プロバイダー</strong>（OpenAI 音声認識 API / Groq 音声認識 API）にのみ送信されます。Android v2.5.0 では設定画面で実際のモデル ID を確認・選択できます。</li>
+                    <li>iOS版の録音ファイルは端末の一時領域にのみ作成され、読み込み後、キャンセル時、またはアプリがバックグラウンドへ移行した時に削除されます。macOS版で音声バックアップを有効にした場合は10項をご確認ください。</li>
+                    <li>音声データは、選択された <strong>STT (Speech-to-Text) プロバイダー</strong>（OpenAI 音声認識 API / Groq 音声認識 API）にのみ送信されます。Android v2.7.2 では設定画面で実際のモデル ID を確認・選択できます。</li>
                     <li>LLM 後処理（Anthropic / OpenAI / Groq / OpenRouter / Ollama）には音声ではなく、文字起こし後のテキストのみが送信されます。</li>
                     <li>当社のサーバーに音声データを保存することはありません。</li>
                 </ul>
 
                 <h3>2.2 API キー</h3>
-                <p>ユーザーが入力した API キー（OpenAI / Anthropic / Groq / OpenRouter / ElevenLabs）は、端末内の保護領域に保存されます。Android 版では EncryptedSharedPreferences、macOS v2.4.0 以降では Keychain への移行を進めており、それ以前の macOS 版では <code>~/.voice-input/config.json</code> にファイルパーミッション 600 で保管されます。これらのキーが当社のサーバーに送信されることはありません。</p>
+                <p>ユーザーが入力した API キー（OpenAI / Anthropic / Groq / OpenRouter / ElevenLabs）は、端末内の保護領域に保存されます。iOS版はKeychain、Android版はEncryptedSharedPreferencesを使用します。macOS v2.4.0以降ではKeychainへの移行を進めており、それ以前のmacOS版では <code>~/.voice-input/config.json</code> にファイルパーミッション600で保管されます。これらのキーが当社のサーバーに送信されることはありません。</p>
 
                 <h3>2.3 辞書データ</h3>
-                <p>ユーザーが登録したカスタム辞書、候補頻度、短い修正ルールは端末のローカルストレージにのみ保存されます。Android 版はパスワード欄およびパーソナライズ禁止欄で学習を無効にします。</p>
+                <p>カスタム辞書、候補頻度および短い修正ルールの保存先は端末内です。音声認識精度を高めるため、iOS版ではプリセット語彙、ユーザーが追加した語彙および選択中のシーンに関するプロンプトを、録音音声とともに選択されたSTTプロバイダー（OpenAIまたはGroq）へ送信します。Android版でも、プリセット語彙、ユーザーが追加した語彙および選択中のシーンに関するプロンプトを、録音音声とともに選択されたSTTプロバイダーへ送信します。短い修正ルールと候補頻度は送信せず、端末上で処理します。Android版はパスワード欄で音声入力と学習を無効にし、パーソナライズ禁止欄では学習だけを無効にします。Android版では、初回のクラウド処理前にこれらの送信内容をアプリ内で説明し、版管理された同意を取得します。</p>
 
                 <h3>2.4 発話履歴</h3>
-                <p>macOS 版では、各回の音声認識結果と最終出力テキストを <code>~/.voice-input/history.json</code> に保存し、Dashboard で参照・編集・削除できます。Android v2.5.0 は完全な発話履歴ファイルを作成せず、個人化に必要な候補頻度と短い修正ルールのみを端末内に保持します。いずれも当社のサーバーには送信されません。</p>
+                <p>macOS版では、各回の音声認識結果と最終出力テキストを <code>~/.voice-input/history.json</code> に保存し、Dashboardで参照・編集・削除できます。iOS版は発話履歴ファイルを作成せず、現在の結果を画面上に一時表示します。Android v2.7.2も完全な発話履歴ファイルを作成せず、個人化に必要な候補頻度と短い修正ルールのみを端末内に保持します。いずれも当社のサーバーには送信されません。</p>
+                <p>macOS版のスタイルプロファイル再生成は、直近最大100件を端末内で集計し、文章の長さ・句読点・言語混在等の特徴だけを保存します。本文を外部AIへ送信したり、プロファイルに原文を転載したりしません。端末内の診断レポートは内容プレビューを保存せずメタデータのみを記録します。自動トリアージレポートには、ユーザーが編集した短い修正候補が含まれる場合があります。</p>
+
+                <h3>2.5 ウェブサイトでのダウンロード登録</h3>
+                <p>Android または macOS 版をダウンロードする際、お名前またはニックネーム、メールアドレス、対象プラットフォーム、バージョン、表示言語および登録日時を収集します。これらはダウンロード状況の把握、重要な更新・セキュリティ情報等の必要なご連絡、お問い合わせ対応のために利用し、Google Firebase（Cloud Firestore）に保存します。</p>
             </div>
 
             <div class="card">
@@ -195,6 +206,7 @@
                     <li>AI による文章の後処理・校正</li>
                     <li>繁体字中国語への変換</li>
                     <li>カスタム辞書による認識精度の向上</li>
+                    <li>ダウンロード記録の管理および必要なご連絡</li>
                 </ul>
             </div>
 
@@ -202,11 +214,18 @@
                 <h2>4. 第三者への提供</h2>
                 <p>用途別に、ユーザーが選択した以下の第三者プロバイダーにデータを送信します：</p>
                 <ul>
-                    <li><strong>STT (Speech-to-Text)：</strong>OpenAI 音声認識 API / Groq 音声認識 API — 選択したモデルで音声を文字に変換</li>
+                    <li><strong>STT (Speech-to-Text)：</strong>OpenAI 音声認識 API / Groq 音声認識 API — 選択したモデルで音声を文字に変換。iOS版およびAndroid版では、認識精度向上用の辞書語彙とシーンプロンプトも送信</li>
                     <li><strong>LLM 後処理：</strong>Anthropic / OpenAI / Groq / OpenRouter / Ollama（ローカル）— 文字起こし結果を整理・校正</li>
                     <li><strong>OpenRouter</strong> はリクエスト毎に内部で複数のモデルプロバイダー（Meta / DeepSeek 等）にサブルーティングする場合があります。本アプリは送信先モデルをユーザーが選択できる仕様としており、各サブプロバイダーのプライバシーポリシーをご確認ください。</li>
                 </ul>
-                <p>各プロバイダーのプライバシーポリシーについては、各社のウェブサイトをご確認ください。それ以外の第三者への情報提供は一切行いません。</p>
+                <p>ダウンロード登録情報の保管には Google Firebase（Cloud Firestore）を利用します。各AIプロバイダーに送信したデータの保存期間と削除方法は、ユーザー自身のプロバイダー契約、アカウント設定および各社のプライバシーポリシーに従います。当社はユーザーのBYOKアカウント内にあるプロバイダー側のデータを直接削除できません。それ以外の第三者への情報提供は行いません。</p>
+                <ul>
+                    <li><strong>OpenAI：</strong>APIデータは初期設定で学習に使用されません。Abuse monitoring logには送信内容が含まれる場合があり、通常は最長30日間保管されます。承認済みのZero Data RetentionまたはModified Abuse Monitoring設定では条件が異なります。</li>
+                    <li><strong>Groq：</strong>推論の入力・出力は初期設定では保管されません。ただし、サービス信頼性または不正利用調査のためのログが最長30日間一時保管される場合があります。Zero Data Retention設定では条件が異なります。</li>
+                    <li><strong>Anthropic：</strong>Messages APIの通常の会話内容は初期設定では保管されません。ただし、Claude Fable 5はCovered Modelとして30日間のデータ保持が必須で、Zero Data Retentionでは利用できません。</li>
+                </ul>
+                <p>最新条件：<a href="https://platform.openai.com/docs/models/default-usage-policies-by-endpoint">OpenAI Data Controls</a> / <a href="https://console.groq.com/docs/your-data">Groq Your Data</a> / <a href="https://platform.claude.com/docs/en/manage-claude/api-and-data-retention">Anthropic API and Data Retention</a></p>
+                <p>連携対象は、各社の契約条件、プライバシーポリシーおよび適用法に基づき、本ポリシーと同等以上の保護を提供するプロバイダーに限定します。ユーザー固有の法人契約やアカウント設定により保護条件が異なる場合、ユーザーは送信前に当該条件を確認し、必要な保護を満たさないプロバイダーを選択しないでください。</p>
             </div>
 
             <div class="card">
@@ -217,10 +236,10 @@
             <div class="card">
                 <h2>6. データの保護</h2>
                 <ul>
-                    <li>API キーはファイルパーミッション 600 で保存（macOS v2.4.0 以降は Keychain への移行を順次実施）</li>
+                    <li>APIキーはiOSではKeychain、AndroidではEncryptedSharedPreferences、対応するmacOS版ではKeychainまたは権限を600に限定した設定ファイルに保存</li>
                     <li>すべての API 通信は HTTPS / TLS 1.2 以上で暗号化</li>
                     <li>音声データは処理後に即座に削除（音声バックアップを有効化した場合を除く）</li>
-                    <li>当社のサーバーへ送信されるデータはありません（BYOK モデル）</li>
+                    <li>アプリ内の音声・文字・API キーは当社のサーバーへ送信されません（ウェブサイトで明示的に送信するダウンロード登録情報を除く）</li>
                 </ul>
             </div>
 
@@ -239,12 +258,12 @@
             <div class="card">
                 <h2>9. 医療モード利用時の注意</h2>
                 <p>医療モード（<code>medical</code> / <code>medical_consultation</code>）を有効にした場合、生成テキストには診療内容・症状・処方等の医療情報が含まれる可能性があります。これらは要配慮個人情報に該当します。</p>
-                <p>送信先の AI プロバイダー（OpenAI / Anthropic / Groq / OpenRouter）は医療情報処理に関する個別契約（BAA / DPA）を締結していないため、<strong>特定の患者を識別可能な情報の入力は禁止します。</strong>医療現場でのご利用には、ローカル LLM（Ollama）の使用を推奨します。</p>
+                <p>SGH Voice iOS版は、利用者と送信先AIプロバイダーとの間に医療情報処理に必要な契約（BAA / DPA等）が存在することを確認しません。適切な契約と組織内ルールがない限り、<strong>特定の患者を識別可能な情報を入力しないでください。</strong>ローカルLLM（Ollama）は対応するデスクトップ版でのみ選択できます。</p>
             </div>
 
             <div class="card">
                 <h2>10. 音声バックアップ</h2>
-                <p>初期設定では録音音声は文字起こし完了後に即時削除されます。ユーザーが Dashboard で「音声バックアップ先」を指定した場合のみ、WAV ファイルが当該ディレクトリに保管されます。保管された音声の管理責任はユーザーに帰属します。当社のサーバーには送信されません。</p>
+                <p>iOS版は音声バックアップ機能を提供せず、録音ファイルを一時領域から削除します。対応するデスクトップ版でユーザーがDashboardから「音声バックアップ先」を明示的に指定した場合のみ、WAVファイルが当該ディレクトリに保管されます。保管された音声の管理責任はユーザーに帰属します。当社のサーバーには送信されません。</p>
             </div>
 
             <div class="card">
@@ -276,8 +295,13 @@
                     <li>声紋データ（<code>voiceprint.npy</code>）</li>
                     <li>音声バックアップ（<code>audio_backup/</code> 配下の WAV ファイル）</li>
                     <li>使用統計（<code>stats.json</code>）</li>
+                    <li>診断・自動トリアージレポート（<code>reports/</code>、<code>auto_triage_report.md</code>）</li>
+                    <li>破損した履歴・設定の隔離コピー（該当する場合）</li>
                 </ul>
                 <p>API キーは別途、Dashboard 設定画面より個別に削除できます。</p>
+                <p>iOS版では、設定画面の「APIキー・辞書・設定を消去」からKeychain内のAPIキー、カスタム辞書および端末内の設定を削除できます。アプリを削除した場合、iOSのアプリ領域にあるデータも削除されます。</p>
+                <p>ウェブサイトのダウンロード登録情報は、上記利用目的に必要な期間に限って保管し、不要となった情報を定期的に見直します。開示・訂正・削除をご希望の場合は、登録したメールアドレスを明記のうえ、下記窓口までご連絡ください。</p>
+                <p>AIプロバイダーへ送信済みのデータを削除する場合は、ユーザー自身のプロバイダーアカウントまたは各社の問い合わせ窓口からお手続きください。</p>
             </div>
 
             <div class="card">
@@ -294,7 +318,7 @@
             <div class="card">
                 <h2>1. 前言</h2>
                 <p>本隱私權政策說明新義豊株式會社（以下簡稱「本公司」）所提供之「SGH Voice」應用程式（以下簡稱「本應用程式」）如何處理個人資訊。</p>
-                <p><strong>最後更新：</strong>2026 年 7 月 26 日（Android v2.5.0 對應）</p>
+                <p><strong>最後更新：</strong>2026 年 8 月 24 日（更新行動版與下載登記的隱私說明）</p>
             </div>
 
             <div class="card">
@@ -302,20 +326,24 @@
                 <h3>2.1 語音資料</h3>
                 <p>本應用程式使用麥克風錄製語音。該錄音資料僅用於語音辨識（Speech-to-Text）處理。</p>
                 <ul>
-                    <li>語音資料在裝置上暫時保存，處理完成後自動刪除（啟用音訊備份功能除外，詳見第 10 項）。</li>
-                    <li>語音資料僅傳送至所選之 <strong>STT (Speech-to-Text) 服務商</strong>（OpenAI 語音辨識 API / Groq 語音辨識 API）。Android v2.5.0 可在設定畫面確認並選擇實際 model ID。</li>
+                    <li>iOS 版只會在裝置暫存目錄建立錄音檔，讀取完成、取消錄音或 App 進入背景時即刪除。macOS 版若啟用音訊備份，請參閱第 10 項。</li>
+                    <li>語音資料僅傳送至所選之 <strong>STT (Speech-to-Text) 服務商</strong>（OpenAI 語音辨識 API / Groq 語音辨識 API）。Android v2.7.2 可在設定畫面確認並選擇實際 model ID。</li>
                     <li>LLM 後處理（Anthropic / OpenAI / Groq / OpenRouter / Ollama）收到的是文字轉譯結果，並非原始語音。</li>
                     <li>本公司不會在伺服器上儲存任何語音資料。</li>
                 </ul>
 
                 <h3>2.2 API 金鑰</h3>
-                <p>使用者輸入的 API 金鑰（OpenAI / Anthropic / Groq / OpenRouter / ElevenLabs）儲存於裝置內保護區域。Android 版使用 EncryptedSharedPreferences；macOS v2.4.0 起逐步遷移至 Keychain，更早的 macOS 版本則以檔案權限 600 儲存於 <code>~/.voice-input/config.json</code>。這些金鑰不會被傳送至本公司的伺服器。</p>
+                <p>使用者輸入的 API 金鑰（OpenAI / Anthropic / Groq / OpenRouter / ElevenLabs）儲存於裝置內保護區域。iOS 版使用 Keychain，Android 版使用 EncryptedSharedPreferences；macOS v2.4.0 起逐步遷移至 Keychain，更早的 macOS 版本則以檔案權限 600 儲存於 <code>~/.voice-input/config.json</code>。這些金鑰不會被傳送至本公司的伺服器。</p>
 
                 <h3>2.3 詞庫資料</h3>
-                <p>使用者註冊的自訂詞庫、候選頻率及短修正規則僅儲存在裝置的本機儲存空間中。Android 版會在密碼欄位及禁止個人化的欄位停用學習。</p>
+                <p>自訂詞庫、候選頻率及短修正規則儲存在裝置本機。為提高語音辨識正確率，iOS 版會將預載詞彙、使用者新增詞彙及所選場景提示，與錄音一起傳送至使用者選擇的 STT 服務商（OpenAI 或 Groq）。Android 版也會將預載詞彙、使用者新增詞彙及所選場景提示，與錄音一起傳送至所選 STT 服務商。短修正規則與候選頻率不會上傳，而是在裝置上處理。Android 版會在密碼欄位停用語音與學習，在禁止個人化欄位只停用學習。Android 版會在首次雲端處理前於 App 內說明上述傳送內容，並取得版本化同意。</p>
 
                 <h3>2.4 發話歷史</h3>
-                <p>macOS 版會將每次語音辨識結果與最終輸出文字儲存於 <code>~/.voice-input/history.json</code>，可從 Dashboard 檢視、編輯、刪除。Android v2.5.0 不建立完整發話歷史檔案，只在裝置內保存個人化所需的候選頻率與短修正規則。上述資料皆不會傳送至本公司伺服器。</p>
+                <p>macOS 版會將每次語音辨識結果與最終輸出文字儲存於 <code>~/.voice-input/history.json</code>，可從 Dashboard 檢視、編輯、刪除。iOS 版不建立發話歷史檔案，只在目前畫面暫時顯示結果。Android v2.7.2 也不建立完整發話歷史檔案，只在裝置內保存個人化所需的候選頻率與短修正規則。上述資料皆不會傳送至本公司伺服器。</p>
+                <p>macOS 版重新生成風格 Profile 時，只會在裝置本機彙整最近最多 100 筆紀錄，並保存句長、標點及語言混用等整體特徵；不會將原文傳送給外部 AI，也不會在 Profile 內重現原文。本機健康報告不保存逐字稿預覽，只記錄後設資料；自動分類報告可能包含使用者已編輯的短修正候選。</p>
+
+                <h3>2.5 網站下載登記</h3>
+                <p>下載 Android 或 macOS 版本時，本公司會蒐集姓名或暱稱、Email、下載平台、版本、顯示語言及登記時間。資料用於掌握下載狀況、必要的版本或安全通知及回覆詢問，並儲存於 Google Firebase（Cloud Firestore）。</p>
             </div>
 
             <div class="card">
@@ -325,6 +353,7 @@
                     <li>AI 文字後處理與潤稿</li>
                     <li>繁體中文轉換</li>
                     <li>透過自訂詞庫提升辨識準確度</li>
+                    <li>管理下載紀錄及必要聯絡</li>
                 </ul>
             </div>
 
@@ -332,11 +361,18 @@
                 <h2>4. 第三方資訊提供</h2>
                 <p>依用途別，使用者所選之以下第三方服務商會接收對應資料：</p>
                 <ul>
-                    <li><strong>STT (Speech-to-Text)：</strong>OpenAI 語音辨識 API / Groq 語音辨識 API — 以所選模型將語音轉為文字</li>
+                    <li><strong>STT (Speech-to-Text)：</strong>OpenAI 語音辨識 API / Groq 語音辨識 API — 以所選模型將語音轉為文字；iOS 版與 Android 版也會傳送提升辨識率所需的詞庫詞彙及場景提示</li>
                     <li><strong>LLM 後處理：</strong>Anthropic / OpenAI / Groq / OpenRouter / Ollama（本機）— 整理潤稿文字結果</li>
                     <li><strong>OpenRouter</strong> 可能依請求動態路由至內部多個模型服務商（Meta / DeepSeek 等子服務商）。請另行確認各子服務商之隱私權政策。</li>
                 </ul>
-                <p>各服務商之隱私權政策請參閱其官方網站。除此之外，本公司不會向任何第三方提供資訊。</p>
+                <p>下載登記資料使用 Google Firebase（Cloud Firestore）保存。送往 AI 服務商的資料，其保存期間與刪除方式依使用者本人的服務商契約、帳號設定及各公司隱私權政策辦理；本公司無法直接刪除使用者 BYOK 帳號內的服務商端資料。除此之外，本公司不會向其他第三方提供資訊。</p>
+                <ul>
+                    <li><strong>OpenAI：</strong>API 資料預設不會用於訓練。Abuse monitoring logs 可能包含送出內容，一般最長保存 30 天；經核准的 Zero Data Retention 或 Modified Abuse Monitoring 設定適用不同條件。</li>
+                    <li><strong>Groq：</strong>推論輸入與輸出預設不保留，但因服務可靠性或疑似濫用調查所產生的紀錄可能暫存最長 30 天；Zero Data Retention 設定適用不同條件。</li>
+                    <li><strong>Anthropic：</strong>Messages API 的一般對話內容預設不保留；但 Claude Fable 5 屬於 Covered Model，必須保留資料 30 天，且無法在 Zero Data Retention 下使用。</li>
+                </ul>
+                <p>最新條件：<a href="https://platform.openai.com/docs/models/default-usage-policies-by-endpoint">OpenAI Data Controls</a> / <a href="https://console.groq.com/docs/your-data">Groq Your Data</a> / <a href="https://platform.claude.com/docs/en/manage-claude/api-and-data-retention">Anthropic API and Data Retention</a></p>
+                <p>本服務僅整合依其契約條款、隱私權政策及適用法律提供與本政策相同或更高資料保護的服務商。若使用者本人的法人契約或帳號設定導致保護條件不同，使用者應在傳送前確認相關條件，且不得選擇未達必要保護水準的服務商。</p>
             </div>
 
             <div class="card">
@@ -347,10 +383,10 @@
             <div class="card">
                 <h2>6. 資料保護</h2>
                 <ul>
-                    <li>API 金鑰以檔案權限 600 儲存（macOS v2.4.0 起逐步遷移至 Keychain）</li>
+                    <li>API 金鑰在 iOS 使用 Keychain、Android 使用 EncryptedSharedPreferences；支援的 macOS 版本使用 Keychain 或權限設為 600 的設定檔</li>
                     <li>所有 API 通訊皆透過 HTTPS / TLS 1.2 以上加密</li>
                     <li>語音資料處理後立即刪除（除非啟用音訊備份）</li>
-                    <li>不會有任何資料傳送至本公司的伺服器（BYOK 自帶金鑰模式）</li>
+                    <li>應用程式內的語音、文字與 API 金鑰不會傳送至本公司伺服器（不含使用者在網站明示送出的下載登記資料）</li>
                 </ul>
             </div>
 
@@ -369,12 +405,12 @@
             <div class="card">
                 <h2>9. 醫療模式使用注意</h2>
                 <p>啟用醫療模式（<code>medical</code> / <code>medical_consultation</code>）時，生成文字可能包含診療內容、症狀、處方等醫療資訊。此屬特種個人資料。</p>
-                <p>送往的 AI 服務商（OpenAI / Anthropic / Groq / OpenRouter）並未針對醫療資訊處理簽訂個別契約（BAA / DPA），<strong>禁止輸入足以識別特定患者的資訊。</strong>於醫療現場使用時，建議切換為本機 LLM（Ollama）。</p>
+                <p>SGH Voice iOS 版不會確認使用者與所選 AI 服務商之間是否具備醫療資訊處理所需的契約（例如 BAA / DPA）。若沒有適用契約與組織內規範，<strong>請勿輸入足以識別特定患者的資訊。</strong>本機 LLM（Ollama）僅可在支援的桌面版選用。</p>
             </div>
 
             <div class="card">
                 <h2>10. 音訊備份</h2>
-                <p>預設情況下，錄音音訊在文字轉譯完成後立即刪除。僅當使用者於 Dashboard 指定「音訊備份位置」時，WAV 檔案才會保留於該目錄。所保存音訊的管理責任由使用者承擔。不會傳送至本公司伺服器。</p>
+                <p>iOS 版不提供音訊備份功能，錄音檔會從暫存目錄刪除。僅在支援的桌面版中，使用者於 Dashboard 明確指定「音訊備份位置」時，WAV 檔案才會保留於該目錄。所保存音訊的管理責任由使用者承擔。不會傳送至本公司伺服器。</p>
             </div>
 
             <div class="card">
@@ -406,8 +442,13 @@
                     <li>聲紋資料（<code>voiceprint.npy</code>）</li>
                     <li>音訊備份（<code>audio_backup/</code> 內之 WAV 檔）</li>
                     <li>使用統計（<code>stats.json</code>）</li>
+                    <li>診斷與自動分類報告（<code>reports/</code>、<code>auto_triage_report.md</code>）</li>
+                    <li>損壞歷史或設定的隔離副本（如有）</li>
                 </ul>
                 <p>API 金鑰可從 Dashboard 設定頁面個別刪除。</p>
+                <p>iOS 版可從設定畫面的「清除 API 金鑰、詞庫與偏好設定」刪除 Keychain 內的 API 金鑰、自訂詞庫與裝置內設定；刪除 App 時，iOS App 儲存區中的資料亦會移除。</p>
+                <p>網站下載登記資料只在上述使用目的所需期間保存，並定期檢視不再需要的資料。如欲查詢、更正或刪除，請於來信中註明登記時使用的 Email，並聯絡下方窗口。</p>
+                <p>如需刪除已傳送至 AI 服務商的資料，請由使用者本人的服務商帳號或各公司聯絡窗口辦理。</p>
             </div>
 
             <div class="card">
@@ -425,7 +466,7 @@
                 <h2>1. Introduction</h2>
                 <p>This Privacy Policy describes how Shingihou Co., Ltd. ("we", "us") handles personal information in
                     the "SGH Voice" application ("the App").</p>
-                <p><strong>Last Updated:</strong> July 26, 2026 (Android v2.5.0 support)</p>
+                <p><strong>Last Updated:</strong> August 24, 2026 (mobile and download-registration privacy disclosure update)</p>
             </div>
 
             <div class="card">
@@ -433,20 +474,24 @@
                 <h3>2.1 Audio Data</h3>
                 <p>The App uses the microphone to record audio. This recording data is used solely for speech-to-text processing.</p>
                 <ul>
-                    <li>Audio data is temporarily stored on the device and automatically deleted after processing (unless audio backup is enabled — see Section 10).</li>
-                    <li>Audio data is sent <strong>only to the selected STT (Speech-to-Text) provider</strong> (OpenAI Speech Recognition API / Groq Speech Recognition API). Android v2.5.0 shows and lets the user select the actual model ID in Settings.</li>
+                    <li>On iOS, the recording file is created only in the temporary directory and is deleted after it is read, when recording is cancelled, or when the app enters the background. See Section 10 for optional audio backup on macOS.</li>
+                    <li>Audio data is sent <strong>only to the selected STT (Speech-to-Text) provider</strong> (OpenAI Speech Recognition API / Groq Speech Recognition API). Android v2.7.2 shows and lets the user select the actual model ID in Settings.</li>
                     <li>LLM post-processing (Anthropic / OpenAI / Groq / OpenRouter / Ollama) receives <strong>only the transcribed text, not the audio</strong>.</li>
                     <li>We do not store any audio data on our servers.</li>
                 </ul>
 
                 <h3>2.2 API Keys</h3>
-                <p>API keys entered by the user (OpenAI / Anthropic / Groq / OpenRouter / ElevenLabs) are stored in a protected location on the device. Android uses EncryptedSharedPreferences. Starting with v2.4.0, macOS gradually migrates to Keychain; earlier macOS versions store keys in <code>~/.voice-input/config.json</code> with file permissions 600. These keys are never transmitted to our servers.</p>
+                <p>API keys entered by the user (OpenAI / Anthropic / Groq / OpenRouter / ElevenLabs) are stored in a protected location on the device. iOS uses Keychain and Android uses EncryptedSharedPreferences. Starting with v2.4.0, macOS gradually migrates to Keychain; earlier macOS versions store keys in <code>~/.voice-input/config.json</code> with file permissions 600. These keys are never transmitted to our servers.</p>
 
                 <h3>2.3 Dictionary Data</h3>
-                <p>Custom dictionaries, candidate frequency, and short correction rules are stored only in the device's local storage. Android disables learning in password and no-personalization fields.</p>
+                <p>Custom dictionaries, candidate frequency, and short correction rules are stored on the device. To improve speech-recognition accuracy, the iOS version sends built-in vocabulary, user-added vocabulary, and the selected scene prompt to the selected STT provider (OpenAI or Groq) together with the recording. The Android version also sends built-in vocabulary, user-added vocabulary, and the selected scene prompt to the selected STT provider with the recording. Short correction rules and candidate frequency are processed on-device and are not sent. Android disables voice and learning in password fields, and disables learning only in no-personalization fields. Before the first cloud request, Android shows these data categories in the app and records versioned consent.</p>
 
                 <h3>2.4 Transcription History</h3>
-                <p>On macOS, each speech-recognition result and final output text is stored locally in <code>~/.voice-input/history.json</code> and can be viewed, edited, and deleted from the Dashboard. Android v2.5.0 does not create a complete dictation-history file; it stores only candidate frequency and short correction rules needed for personalization. Neither platform sends this local data to our servers.</p>
+                <p>On macOS, each speech-recognition result and final output text is stored locally in <code>~/.voice-input/history.json</code> and can be viewed, edited, and deleted from the Dashboard. The iOS version does not create an utterance-history file and displays the current result only in memory. Android v2.7.2 also does not create a complete dictation-history file; it stores only candidate frequency and short correction rules needed for personalization. None of these platforms send this local data to our servers.</p>
+                <p>On macOS, style-profile regeneration aggregates at most 100 recent entries locally and stores only broad traits such as sentence length, punctuation, and language mixing. It does not send source text to an external AI or reproduce source text in the profile. Local health reports store metadata without transcript previews. The local auto-triage report may contain short correction candidates from entries the user edited.</p>
+
+                <h3>2.5 Website Download Registration</h3>
+                <p>When you download the Android or macOS release, we collect your name or nickname, email address, target platform, version, display language, and registration time. We use this information to understand download activity, provide necessary release or security notices, and respond to inquiries. The records are stored in Google Firebase (Cloud Firestore).</p>
             </div>
 
             <div class="card">
@@ -456,6 +501,7 @@
                     <li>AI-powered text post-processing and proofreading</li>
                     <li>Traditional Chinese character conversion</li>
                     <li>Improving recognition accuracy through custom dictionaries</li>
+                    <li>Managing download records and necessary communications</li>
                 </ul>
             </div>
 
@@ -463,11 +509,18 @@
                 <h2>4. Third-Party Sharing</h2>
                 <p>Depending on the configured purpose, the following third-party providers receive data:</p>
                 <ul>
-                    <li><strong>STT (Speech-to-Text):</strong> OpenAI Speech Recognition API / Groq Speech Recognition API — convert audio to text with the selected model</li>
+                    <li><strong>STT (Speech-to-Text):</strong> OpenAI Speech Recognition API / Groq Speech Recognition API — convert audio to text with the selected model; on iOS and Android, recognition vocabulary and the selected scene prompt are also sent</li>
                     <li><strong>LLM post-processing:</strong> Anthropic / OpenAI / Groq / OpenRouter / Ollama (local) — clean up the transcribed text</li>
                     <li><strong>OpenRouter</strong> may dynamically route requests to internal model sub-providers (Meta / DeepSeek, etc.). Please review each sub-provider's privacy policy.</li>
                 </ul>
-                <p>Please refer to each provider's website for their privacy policies. We do not share information with any other third parties.</p>
+                <p>Download registration records are stored using Google Firebase (Cloud Firestore). Retention and deletion of data sent to an AI provider are governed by the user's own provider agreement, account settings, and that provider's privacy policy. We cannot directly delete provider-side data held under a user's BYOK account. We do not share the information with other third parties.</p>
+                <ul>
+                    <li><strong>OpenAI:</strong> API data is not used for training by default. Abuse-monitoring logs may include submitted content and are normally retained for up to 30 days; approved Zero Data Retention or Modified Abuse Monitoring settings apply different conditions.</li>
+                    <li><strong>Groq:</strong> Inference inputs and outputs are not retained by default, but logs for service reliability or suspected-abuse investigations may be retained temporarily for up to 30 days; Zero Data Retention settings apply different conditions.</li>
+                    <li><strong>Anthropic:</strong> Standard Messages API conversation content is not retained by default. However, Claude Fable 5 is a Covered Model that requires 30-day data retention and is not available under Zero Data Retention.</li>
+                </ul>
+                <p>Current terms: <a href="https://platform.openai.com/docs/models/default-usage-policies-by-endpoint">OpenAI Data Controls</a> / <a href="https://console.groq.com/docs/your-data">Groq Your Data</a> / <a href="https://platform.claude.com/docs/en/manage-claude/api-and-data-retention">Anthropic API and Data Retention</a></p>
+                <p>We integrate only providers that, under their terms, privacy policies, and applicable law, provide the same or greater protection described in this policy. If a user's organization agreement or account settings result in different protections, the user must verify those terms before sending data and must not select a provider that does not meet the required level of protection.</p>
             </div>
 
             <div class="card">
@@ -478,10 +531,10 @@
             <div class="card">
                 <h2>6. Data Security</h2>
                 <ul>
-                    <li>API keys stored with file permissions 600 (macOS migrates to Keychain starting v2.4.0)</li>
+                    <li>API keys are stored in Keychain on iOS, EncryptedSharedPreferences on Android, and Keychain or a permission-600 configuration file on supported macOS versions</li>
                     <li>All API communications are encrypted via HTTPS / TLS 1.2 or higher</li>
                     <li>Audio data is deleted immediately after processing (unless audio backup is enabled)</li>
-                    <li>No data is transmitted to our servers (BYOK — Bring Your Own Key model)</li>
+                    <li>In-app audio, text, and API keys are not transmitted to our servers (except download registration details explicitly submitted through the website)</li>
                 </ul>
             </div>
 
@@ -500,12 +553,12 @@
             <div class="card">
                 <h2>9. Medical Mode Notice</h2>
                 <p>When the medical mode (<code>medical</code> / <code>medical_consultation</code>) is enabled, generated text may contain clinical content, symptoms, prescriptions, and similar medical information — which qualifies as sensitive personal information.</p>
-                <p>The destination AI providers (OpenAI / Anthropic / Groq / OpenRouter) have not signed individual contracts (BAA / DPA) for medical-data processing. <strong>Entering information that can identify a specific patient is prohibited.</strong> For clinical use, we recommend switching to a local LLM (Ollama).</p>
+                <p>SGH Voice for iOS does not verify whether the user has an agreement with the selected AI provider that is appropriate for processing medical information (such as a BAA or DPA). Unless an applicable agreement and organizational policy are in place, <strong>do not enter information that can identify a specific patient.</strong> Local LLM processing with Ollama is available only in supported desktop versions.</p>
             </div>
 
             <div class="card">
                 <h2>10. Audio Backup</h2>
-                <p>By default, recorded audio is deleted immediately after transcription. Only when the user specifies an "audio backup directory" in the Dashboard are WAV files retained in that directory. The user is responsible for the management of any retained audio. No audio is transmitted to our servers.</p>
+                <p>The iOS version does not provide audio backup and deletes recording files from its temporary directory. Only in supported desktop versions, when the user explicitly selects an audio backup directory in the Dashboard, are WAV files retained there. The user is responsible for managing retained audio. No audio is transmitted to our servers.</p>
             </div>
 
             <div class="card">
@@ -537,8 +590,13 @@
                     <li>Voiceprint (<code>voiceprint.npy</code>)</li>
                     <li>Audio backup (WAV files under <code>audio_backup/</code>)</li>
                     <li>Usage statistics (<code>stats.json</code>)</li>
+                    <li>Diagnostic and auto-triage reports (<code>reports/</code>, <code>auto_triage_report.md</code>)</li>
+                    <li>Quarantined corrupt history or configuration copies, when present</li>
                 </ul>
                 <p>API keys can be deleted individually from the Dashboard Settings page.</p>
+                <p>On iOS, “Clear API Keys, Dictionary, and Preferences” in Settings removes API keys from Keychain and deletes the custom dictionary and on-device preferences. Deleting the app also removes data from the iOS app container.</p>
+                <p>Website download registration data is retained only as long as needed for the purposes stated above, and records that are no longer needed are reviewed periodically. To access, correct, or delete this data, contact us below and include the email address used for registration.</p>
+                <p>To delete data already sent to an AI provider, use your provider account or contact that provider directly.</p>
             </div>
 
             <div class="card">

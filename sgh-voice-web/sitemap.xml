@@ -3,7 +3,7 @@
         xmlns:xhtml="http://www.w3.org/1999/xhtml">
   <url>
     <loc>https://voice.shingihou.com/</loc>
-    <lastmod>2026-07-26</lastmod>
+    <lastmod>2026-08-24</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
     <xhtml:link rel="alternate" hreflang="ja" href="https://voice.shingihou.com/?lang=ja"/>
@@ -13,14 +13,22 @@
   </url>
   <url>
     <loc>https://voice.shingihou.com/privacy.html</loc>
-    <lastmod>2026-07-20</lastmod>
+    <lastmod>2026-08-24</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://voice.shingihou.com/privacy.html?lang=ja"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://voice.shingihou.com/privacy.html?lang=zh"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://voice.shingihou.com/privacy.html?lang=en"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://voice.shingihou.com/privacy.html"/>
   </url>
   <url>
     <loc>https://voice.shingihou.com/terms.html</loc>
-    <lastmod>2026-07-20</lastmod>
+    <lastmod>2026-08-24</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://voice.shingihou.com/terms.html?lang=ja"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://voice.shingihou.com/terms.html?lang=zh"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://voice.shingihou.com/terms.html?lang=en"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://voice.shingihou.com/terms.html"/>
   </url>
 </urlset>

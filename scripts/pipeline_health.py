@@ -29,6 +29,8 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
+from scripts.private_io import atomic_write_json, atomic_write_text, ensure_private_directory
+
 DATA_DIR = Path.home() / ".voice-input"
 DICT_FILE = DATA_DIR / "dictionary.json"
 HISTORY_FILE = DATA_DIR / "history.json"
@@ -46,16 +48,21 @@ def load_json(path):
 
 
 def save_json(path, data):
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+    atomic_write_json(Path(path), data)
 
 
 def notify(title, body):
     """macOS 原生通知"""
     try:
+        script = """
+on run argv
+    set notificationTitle to item 1 of argv
+    set notificationBody to item 2 of argv
+    display notification notificationBody with title notificationTitle
+end run
+"""
         subprocess.run(
-            ["osascript", "-e", f'display notification "{body}" with title "{title}"'],
+            ["osascript", "-e", script, "--", str(title), str(body)],
             capture_output=True, timeout=5,
         )
     except Exception:
@@ -312,8 +319,6 @@ def monitor_llm_quality(history):
                 "final_len": len(final),
                 "ratio": round(ratio, 2),
                 "llm_source": llm_source,
-                "raw_preview": raw[:80],
-                "final_preview": final[:80],
             })
             source_stats[llm_source]["halluc"] += 1
             if day:
@@ -327,8 +332,6 @@ def monitor_llm_quality(history):
                 "final_len": len(final),
                 "ratio": round(ratio, 2),
                 "llm_source": llm_source,
-                "raw_preview": raw[:80],
-                "final_preview": final[:80],
             })
             source_stats[llm_source]["trim"] += 1
             if day:
@@ -473,14 +476,31 @@ def detect_speed_anomalies(history):
     for combo, data in combo_stats.items():
         times = data["times"]
         durations = data["durations"]
+        rtf_samples = [
+            (process_time, audio_duration)
+            for process_time, audio_duration in zip(times, durations)
+            if isinstance(audio_duration, (int, float)) and audio_duration > 0
+        ]
+        rtf_sample_count = len(rtf_samples)
+        realtime_factor = None
+        avg_audio_duration = None
+        if rtf_samples:
+            measured_times = [sample[0] for sample in rtf_samples]
+            measured_durations = [sample[1] for sample in rtf_samples]
+            realtime_factor = round(
+                sum(measured_times) / sum(measured_durations), 2
+            )
+            avg_audio_duration = round(
+                sum(measured_durations) / rtf_sample_count, 1
+            )
         combo_summary[combo] = {
             "count": len(times),
             "avg_process": round(sum(times) / len(times), 2),
             "p50_process": round(sorted(times)[len(times) // 2], 2),
-            "avg_audio_duration": round(sum(durations) / max(len(durations), 1), 1),
-            "realtime_factor": round(
-                sum(times) / max(sum(durations), 0.1), 2
-            ),  # 處理時間 / 音訊長度
+            "avg_audio_duration": avg_audio_duration,
+            "realtime_factor": realtime_factor,
+            "rtf_sample_count": rtf_sample_count,
+            "rtf_coverage_pct": round(rtf_sample_count / len(times) * 100, 1),
         }
 
     # 按日趨勢
@@ -614,19 +634,23 @@ def generate_report(results, auto_fix=False, history_count=0):
 
     if r3.get("hallucination_samples"):
         lines.append("")
-        lines.append("**幻覺樣本（final 遠長於 raw）：**")
+        lines.append("**幻覺事件（僅列 metadata；不保存逐字稿內容）：**")
         for s in r3["hallucination_samples"][:3]:
-            lines.append(f"- [{s['timestamp'][:16]}] ratio={s['ratio']} ({s['llm_source']})")
-            lines.append(f"  - raw: {s['raw_preview']}")
-            lines.append(f"  - final: {s['final_preview']}")
+            lines.append(
+                f"- [{s['timestamp'][:16]}] ratio={s['ratio']} "
+                f"raw_chars={s['raw_len']} final_chars={s['final_len']} "
+                f"({s['llm_source']})"
+            )
 
     if r3.get("over_trim_samples"):
         lines.append("")
-        lines.append("**過度刪減樣本（final 遠短於 raw）：**")
+        lines.append("**過度刪減事件（僅列 metadata；不保存逐字稿內容）：**")
         for s in r3["over_trim_samples"][:3]:
-            lines.append(f"- [{s['timestamp'][:16]}] ratio={s['ratio']} ({s['llm_source']})")
-            lines.append(f"  - raw: {s['raw_preview']}")
-            lines.append(f"  - final: {s['final_preview']}")
+            lines.append(
+                f"- [{s['timestamp'][:16]}] ratio={s['ratio']} "
+                f"raw_chars={s['raw_len']} final_chars={s['final_len']} "
+                f"({s['llm_source']})"
+            )
 
     if r3.get("trend_14d"):
         lines.append("")
@@ -673,10 +697,16 @@ def generate_report(results, auto_fix=False, history_count=0):
         lines.append("|------|------|---------|--------|----------|")
         for combo, stats in sorted(r5["combo_summary"].items(), key=lambda x: -x[1]["count"]):
             rtf = stats["realtime_factor"]
-            rtf_icon = "🟢" if rtf < 0.5 else "🟡" if rtf < 1.0 else "🔴"
+            sample_count = stats.get("rtf_sample_count", 0)
+            total_count = stats["count"]
+            if rtf is None:
+                rtf_display = f"N/A ({sample_count}/{total_count})"
+            else:
+                rtf_icon = "🟢" if rtf < 0.5 else "🟡" if rtf < 1.0 else "🔴"
+                rtf_display = f"{rtf_icon} {rtf}x ({sample_count}/{total_count})"
             lines.append(
                 f"| {combo} | {stats['count']} | {stats['avg_process']} | "
-                f"{stats['p50_process']} | {rtf_icon} {rtf}x |"
+                f"{stats['p50_process']} | {rtf_display} |"
             )
 
     if r5.get("anomaly_samples"):
@@ -838,16 +868,14 @@ def main():
         report = generate_report(results, auto_fix=args.auto_fix, history_count=len(history))
 
         # 儲存報告
-        REPORT_DIR.mkdir(parents=True, exist_ok=True)
+        ensure_private_directory(REPORT_DIR)
         today = datetime.now().strftime("%Y-%m-%d")
         report_file = REPORT_DIR / f"health_{today}.md"
-        with open(report_file, "w", encoding="utf-8") as f:
-            f.write(report)
+        atomic_write_text(report_file, report)
 
         # 也保存一份 latest
         latest_file = REPORT_DIR / "health_latest.md"
-        with open(latest_file, "w", encoding="utf-8") as f:
-            f.write(report)
+        atomic_write_text(latest_file, report)
 
         if not args.quiet:
             print(f"\n{report}")

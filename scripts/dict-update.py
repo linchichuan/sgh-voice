@@ -26,6 +26,8 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
+from scripts.private_io import atomic_write_json, ensure_private_directory
+
 DATA_DIR = Path.home() / ".voice-input"
 DICT_FILE = DATA_DIR / "dictionary.json"
 LOG_FILE = DATA_DIR / "dict-update.log"
@@ -33,8 +35,10 @@ LOG_FILE = DATA_DIR / "dict-update.log"
 
 def log(msg: str):
     """寫 log 到 ~/.voice-input/dict-update.log"""
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-    with open(LOG_FILE, "a", encoding="utf-8") as f:
+    ensure_private_directory(DATA_DIR)
+    fd = os.open(LOG_FILE, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
+    os.chmod(LOG_FILE, 0o600)
+    with os.fdopen(fd, "a", encoding="utf-8") as f:
         f.write(f"{datetime.now().isoformat()} | {msg}\n")
     print(f"  {msg}")
 
@@ -42,8 +46,15 @@ def log(msg: str):
 def notify(title: str, body: str):
     """macOS 原生通知"""
     try:
+        script = """
+on run argv
+    set notificationTitle to item 1 of argv
+    set notificationBody to item 2 of argv
+    display notification notificationBody with title notificationTitle
+end run
+"""
         subprocess.run(
-            ["osascript", "-e", f'display notification "{body}" with title "{title}"'],
+            ["osascript", "-e", script, "--", str(title), str(body)],
             capture_output=True, timeout=5,
         )
     except Exception:
@@ -60,9 +71,7 @@ def load_dictionary() -> dict:
 
 def save_dictionary(d: dict):
     """儲存辭書"""
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-    with open(DICT_FILE, "w", encoding="utf-8") as f:
-        json.dump(d, f, ensure_ascii=False, indent=2)
+    atomic_write_json(DICT_FILE, d)
 
 
 def fetch_pmda_terms() -> list[str]:

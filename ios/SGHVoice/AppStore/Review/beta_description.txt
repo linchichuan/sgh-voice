@@ -1,0 +1,5 @@
+SGH Voice iOS版は、利用者自身が選択した外部AIを使って音声を文字に変換し、文章整理と多言語翻訳を行うBYOK型アプリです。
+
+今回のベータでは、録音から文字起こしまでの安定性、質問へ回答しない音声入力処理、1回の録音から最大4言語への翻訳、初回の外部AI処理同意、録音一時ファイルの削除、APIキーのKeychain保存、iPhone / iPad表示を重点的に確認します。
+
+AppleのBeta App Review担当者は、provider API keyではなく新義豊発行のEvaluation Access codeを使用します。一般の外部テスターは、割り当てられたEvaluation Accessまたは自身が契約するOpenAI / Anthropic / GroqのAPIキーを使用します。実在する患者情報、機密情報、個人情報は入力しないでください。

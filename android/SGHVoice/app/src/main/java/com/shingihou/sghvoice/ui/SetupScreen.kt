@@ -23,6 +23,8 @@ import com.shingihou.sghvoice.api.ApiConfig
 import com.shingihou.sghvoice.api.ApiModelCatalog
 import com.shingihou.sghvoice.learning.PersonalizationRepository
 import com.shingihou.sghvoice.processing.DictionaryManager
+import com.shingihou.sghvoice.processing.RecognitionLanguage
+import com.shingihou.sghvoice.processing.TranslationLanguage
 import androidx.compose.ui.res.stringResource
 import com.shingihou.sghvoice.R
 
@@ -31,7 +33,10 @@ import com.shingihou.sghvoice.R
  * 包含三個分頁：基本設定、個人詞庫、使用說明
  */
 @Composable
-fun SetupScreen(apiConfig: ApiConfig) {
+fun SetupScreen(
+    apiConfig: ApiConfig,
+    onCloudConsentGranted: () -> Unit = {}
+) {
     val context = LocalContext.current
     val dictionaryManager = remember { DictionaryManager(context) }
     val personalization = remember { PersonalizationRepository.getInstance(context) }
@@ -56,7 +61,7 @@ fun SetupScreen(apiConfig: ApiConfig) {
 
         Box(modifier = Modifier.fillMaxSize().padding(16.dp)) {
             when (selectedTab) {
-                0 -> BasicSettingsTab(apiConfig)
+                0 -> BasicSettingsTab(apiConfig, onCloudConsentGranted)
                 1 -> DictionaryTab(dictionaryManager, personalization)
                 2 -> UsageTab()
             }
@@ -66,7 +71,10 @@ fun SetupScreen(apiConfig: ApiConfig) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun BasicSettingsTab(apiConfig: ApiConfig) {
+private fun BasicSettingsTab(
+    apiConfig: ApiConfig,
+    onCloudConsentGranted: () -> Unit
+) {
     val context = LocalContext.current
     val scrollState = rememberScrollState()
     
@@ -89,6 +97,15 @@ private fun BasicSettingsTab(apiConfig: ApiConfig) {
     var selectedClaudeModel by remember { mutableStateOf(apiConfig.claudeModel) }
     var selectedOpenAiLlmModel by remember { mutableStateOf(apiConfig.openAiLlmModel) }
     var selectedGroqLlmModel by remember { mutableStateOf(apiConfig.groqLlmModel) }
+    var selectedRecognitionLanguage by remember {
+        mutableStateOf(apiConfig.recognitionLanguage)
+    }
+    var selectedTranslationTargets by remember {
+        mutableStateOf(apiConfig.translationTargets.toSet())
+    }
+    var cloudConsentAccepted by remember {
+        mutableStateOf(apiConfig.hasCloudProcessingConsent)
+    }
 
     val openAiSttModels = listOf(
         UiModelOption(
@@ -129,6 +146,11 @@ private fun BasicSettingsTab(apiConfig: ApiConfig) {
             ApiModelCatalog.CLAUDE_SONNET_5,
             stringResource(R.string.model_claude_sonnet),
             stringResource(R.string.price_claude_sonnet)
+        ),
+        UiModelOption(
+            ApiModelCatalog.CLAUDE_OPUS_5,
+            stringResource(R.string.model_claude_opus_5),
+            stringResource(R.string.price_claude_opus_5)
         ),
         UiModelOption(
             ApiModelCatalog.CLAUDE_OPUS_4_8,
@@ -197,6 +219,23 @@ private fun BasicSettingsTab(apiConfig: ApiConfig) {
                     onModelSelected = { selectedOpenAiSttModel = it }
                 )
             }
+
+            RecognitionLanguageSelector(
+                selectedLanguage = selectedRecognitionLanguage,
+                options = listOf(
+                    RecognitionLanguage.AUTO to
+                        stringResource(R.string.recognition_language_auto),
+                    RecognitionLanguage.TRADITIONAL_CHINESE to
+                        stringResource(R.string.recognition_language_traditional_chinese),
+                    RecognitionLanguage.JAPANESE to
+                        stringResource(R.string.recognition_language_japanese),
+                    RecognitionLanguage.ENGLISH to
+                        stringResource(R.string.recognition_language_english),
+                    RecognitionLanguage.KOREAN to
+                        stringResource(R.string.recognition_language_korean)
+                ),
+                onLanguageSelected = { selectedRecognitionLanguage = it }
+            )
             
             Spacer(modifier = Modifier.height(8.dp))
             Text(stringResource(R.string.label_llm_engine), fontWeight = FontWeight.SemiBold)
@@ -251,6 +290,44 @@ private fun BasicSettingsTab(apiConfig: ApiConfig) {
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                stringResource(R.string.translation_default_targets),
+                fontWeight = FontWeight.SemiBold
+            )
+            Text(
+                stringResource(R.string.translation_default_targets_desc),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            val translationLanguages = listOf(
+                TranslationLanguage.TRADITIONAL_CHINESE to
+                    stringResource(R.string.translation_language_zh_hant),
+                TranslationLanguage.JAPANESE to
+                    stringResource(R.string.translation_language_ja),
+                TranslationLanguage.ENGLISH to
+                    stringResource(R.string.translation_language_en),
+                TranslationLanguage.KOREAN to
+                    stringResource(R.string.translation_language_ko)
+            )
+            translationLanguages.forEach { (language, label) ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(
+                        checked = language in selectedTranslationTargets,
+                        onCheckedChange = { checked ->
+                            selectedTranslationTargets = if (checked) {
+                                selectedTranslationTargets + language
+                            } else if (selectedTranslationTargets.size > 1) {
+                                selectedTranslationTargets - language
+                            } else {
+                                selectedTranslationTargets
+                            }
+                        }
+                    )
+                    Text(label)
+                }
+            }
         }
 
         // === 步驟二：API 金鑰 ===
@@ -306,6 +383,55 @@ private fun BasicSettingsTab(apiConfig: ApiConfig) {
                     }
                 }
             )
+
+            Spacer(modifier = Modifier.height(16.dp))
+            Divider()
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                stringResource(R.string.cloud_consent_title),
+                fontWeight = FontWeight.SemiBold
+            )
+            Text(
+                stringResource(R.string.cloud_consent_summary),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                stringResource(R.string.cloud_consent_audio),
+                style = MaterialTheme.typography.bodySmall
+            )
+            Text(
+                stringResource(R.string.cloud_consent_transcript),
+                style = MaterialTheme.typography.bodySmall
+            )
+            Text(
+                stringResource(R.string.cloud_consent_dictionary),
+                style = MaterialTheme.typography.bodySmall
+            )
+            Text(
+                stringResource(R.string.cloud_consent_provider_terms),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Checkbox(
+                    checked = cloudConsentAccepted,
+                    onCheckedChange = { cloudConsentAccepted = it }
+                )
+                Text(stringResource(R.string.cloud_consent_checkbox))
+            }
+            TextButton(
+                onClick = {
+                    context.startActivity(
+                        Intent(
+                            Intent.ACTION_VIEW,
+                            Uri.parse("https://voice.shingihou.com/privacy.html")
+                        )
+                    )
+                }
+            ) {
+                Text(stringResource(R.string.cloud_consent_privacy_link))
+            }
             Spacer(modifier = Modifier.height(16.dp))
             
             Text(stringResource(R.string.output_style_label), fontWeight = FontWeight.SemiBold)
@@ -337,6 +463,14 @@ private fun BasicSettingsTab(apiConfig: ApiConfig) {
                     apiConfig.claudeModel = selectedClaudeModel
                     apiConfig.openAiLlmModel = selectedOpenAiLlmModel
                     apiConfig.groqLlmModel = selectedGroqLlmModel
+                    apiConfig.recognitionLanguage = selectedRecognitionLanguage
+                    apiConfig.translationTargets = TranslationLanguage.entries.filter {
+                        it in selectedTranslationTargets
+                    }
+                    apiConfig.hasCloudProcessingConsent = cloudConsentAccepted
+                    if (cloudConsentAccepted) {
+                        onCloudConsentGranted()
+                    }
                     saveMessage = msgSaved
                 },
                 modifier = Modifier.fillMaxWidth()
@@ -349,6 +483,11 @@ private fun BasicSettingsTab(apiConfig: ApiConfig) {
         // === 步驟三：啟用輸入法 ===
         StepCard(stepNumber = 3, title = stringResource(R.string.step_enable_ime)) {
             Text(stringResource(R.string.desc_enable_ime), style = MaterialTheme.typography.bodyMedium)
+            Text(
+                stringResource(R.string.system_keyboard_language_note),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = {
                     context.startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS))
@@ -357,6 +496,61 @@ private fun BasicSettingsTab(apiConfig: ApiConfig) {
                     val imm = context.getSystemService(InputMethodManager::class.java)
                     imm?.showInputMethodPicker()
                 }, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.btn_switch_ime)) }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun RecognitionLanguageSelector(
+    selectedLanguage: RecognitionLanguage,
+    options: List<Pair<RecognitionLanguage, String>>,
+    onLanguageSelected: (RecognitionLanguage) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val selectedLabel = options.firstOrNull { it.first == selectedLanguage }?.second
+        ?: options.first().second
+
+    Spacer(modifier = Modifier.height(12.dp))
+    Text(
+        stringResource(R.string.recognition_language_label),
+        fontWeight = FontWeight.SemiBold
+    )
+    Text(
+        stringResource(R.string.recognition_language_desc),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
+    Spacer(modifier = Modifier.height(6.dp))
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = !expanded }
+    ) {
+        OutlinedTextField(
+            value = selectedLabel,
+            onValueChange = {},
+            readOnly = true,
+            label = { Text(stringResource(R.string.recognition_language_field_label)) },
+            trailingIcon = {
+                ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
+            },
+            modifier = Modifier
+                .menuAnchor()
+                .fillMaxWidth()
+        )
+        ExposedDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+            options.forEach { (language, label) ->
+                DropdownMenuItem(
+                    text = { Text(label) },
+                    onClick = {
+                        onLanguageSelected(language)
+                        expanded = false
+                    }
+                )
             }
         }
     }

@@ -5,8 +5,16 @@ const mobileToggle = document.getElementById("mobileToggle");
 const navLinks = document.getElementById("navLinks");
 const riskAcknowledgement = document.getElementById("riskAck");
 const apkDownloadButton = document.getElementById("apkDownloadButton");
+const macDownloadButton = document.getElementById("macDownloadButton");
 const copyHashButton = document.getElementById("copyHashButton");
 const apkHash = document.getElementById("apkHash");
+const downloadRegistrationForm = document.getElementById("downloadRegistrationForm");
+const downloadName = document.getElementById("downloadName");
+const downloadEmail = document.getElementById("downloadEmail");
+const downloadPrivacyConsent = document.getElementById("downloadPrivacyConsent");
+const downloadRegistrationStatus = document.getElementById("downloadRegistrationStatus");
+const downloadButtons = [apkDownloadButton, macDownloadButton].filter(Boolean);
+let downloadIsPending = false;
 
 function updateNavbar() {
     if (navbar) {
@@ -84,28 +92,140 @@ function translate(key, fallback) {
     return (window.SGH_I18N && window.SGH_I18N[key]) || fallback;
 }
 
+function registrationIsValid() {
+    return Boolean(
+        downloadRegistrationForm
+        && downloadName
+        && downloadEmail
+        && downloadPrivacyConsent
+        && downloadName.value.trim()
+        && downloadName.validity.valid
+        && downloadEmail.validity.valid
+        && downloadPrivacyConsent.checked
+    );
+}
+
+function setDownloadButtonState(button, enabled, label) {
+    if (!button) return;
+
+    button.classList.toggle("disabled", !enabled);
+    button.setAttribute("aria-disabled", String(!enabled));
+    button.tabIndex = enabled ? 0 : -1;
+    const labelElement = button.querySelector("span");
+    if (labelElement) labelElement.textContent = label;
+}
+
 function syncDownloadState() {
-    if (!riskAcknowledgement || !apkDownloadButton) return;
+    const registered = registrationIsValid();
+    const androidEnabled = registered && riskAcknowledgement?.checked && !downloadIsPending;
+    const macEnabled = registered && !downloadIsPending;
 
-    const accepted = riskAcknowledgement.checked;
-    const label = apkDownloadButton.querySelector("span");
-    apkDownloadButton.classList.toggle("disabled", !accepted);
-    apkDownloadButton.setAttribute("aria-disabled", String(!accepted));
-    apkDownloadButton.tabIndex = accepted ? 0 : -1;
+    setDownloadButtonState(
+        apkDownloadButton,
+        androidEnabled,
+        androidEnabled
+            ? translate("download.android.ctaReady", "登記並下載 APK")
+            : translate("download.android.cta", "填寫資料並確認風險後下載 APK")
+    );
+    setDownloadButtonState(
+        macDownloadButton,
+        macEnabled,
+        macEnabled
+            ? translate("download.mac.ctaReady", "登記並下載 macOS v2.6.0")
+            : translate("download.mac.cta", "填寫資料後下載 macOS v2.6.0")
+    );
+}
 
-    if (accepted) {
-        apkDownloadButton.href = apkDownloadButton.dataset.downloadHref;
-        apkDownloadButton.setAttribute("download", "SGHVoice-Android-v2.5.0.apk");
-        label.textContent = translate("download.android.ctaReady", "我了解，下載 APK");
-    } else {
-        apkDownloadButton.removeAttribute("href");
-        apkDownloadButton.removeAttribute("download");
-        label.textContent = translate("download.android.cta", "勾選上方確認後下載 APK");
+function setRegistrationStatus(message, state = "idle") {
+    if (!downloadRegistrationStatus) return;
+    downloadRegistrationStatus.textContent = message;
+    downloadRegistrationStatus.dataset.state = state;
+}
+
+function startFileDownload(button) {
+    const link = document.createElement("a");
+    link.href = button.dataset.downloadHref;
+    link.download = button.dataset.filename || "";
+    link.rel = "noopener";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+}
+
+async function handleDownload(event) {
+    event.preventDefault();
+    const button = event.currentTarget;
+
+    if (!registrationIsValid()) {
+        downloadRegistrationForm?.reportValidity();
+        setRegistrationStatus(
+            translate("download.registration.invalid", "請填妥姓名／暱稱、有效 Email，並勾選隱私權同意。"),
+            "error"
+        );
+        return;
+    }
+
+    if (button.dataset.platform === "android" && !riskAcknowledgement?.checked) {
+        riskAcknowledgement?.focus();
+        setRegistrationStatus(
+            translate("download.registration.riskRequired", "下載 Android APK 前，請先勾選測試版風險確認。"),
+            "error"
+        );
+        return;
+    }
+
+    downloadIsPending = true;
+    syncDownloadState();
+    setRegistrationStatus(
+        translate("download.registration.saving", "正在登記下載資料…"),
+        "pending"
+    );
+
+    try {
+        const firestore = await window.SGH_FIRESTORE_READY;
+        await firestore.addDoc(firestore.collection(firestore.db, "sgh-voice-downloads"), {
+            name: downloadName.value.trim(),
+            email: downloadEmail.value.trim().toLowerCase(),
+            platform: button.dataset.platform,
+            version: button.dataset.version,
+            fileName: button.dataset.filename,
+            locale: window.SGH_LANG || document.documentElement.lang || "unknown",
+            consentVersion: 2,
+            riskAcknowledged: button.dataset.platform === "android"
+                ? Boolean(riskAcknowledgement?.checked)
+                : false,
+            createdAt: firestore.serverTimestamp()
+        });
+
+        setRegistrationStatus(
+            translate("download.registration.success", "登記完成，下載即將開始。"),
+            "success"
+        );
+        startFileDownload(button);
+    } catch (error) {
+        console.error("Unable to register download:", error);
+        setRegistrationStatus(
+            translate("download.registration.error", "登記失敗，尚未開始下載。請稍後再試。"),
+            "error"
+        );
+    } finally {
+        downloadIsPending = false;
+        syncDownloadState();
     }
 }
 
-if (riskAcknowledgement && apkDownloadButton) {
+if (downloadRegistrationForm) {
+    downloadRegistrationForm.addEventListener("submit", (event) => event.preventDefault());
+    downloadRegistrationForm.addEventListener("input", syncDownloadState);
+    downloadRegistrationForm.addEventListener("change", syncDownloadState);
+}
+
+if (riskAcknowledgement) {
     riskAcknowledgement.addEventListener("change", syncDownloadState);
+}
+
+if (downloadButtons.length) {
+    downloadButtons.forEach((button) => button.addEventListener("click", handleDownload));
     syncDownloadState();
 }
 
@@ -127,4 +247,11 @@ if (copyHashButton && apkHash) {
     });
 }
 
-window.addEventListener("sgh:languagechange", syncDownloadState);
+window.addEventListener("sgh:languagechange", () => {
+    syncDownloadState();
+    if (downloadRegistrationStatus?.dataset.state === "idle") {
+        setRegistrationStatus(
+            translate("download.registration.status", "填妥資料後，請選擇下方要下載的平台。")
+        );
+    }
+});

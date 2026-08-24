@@ -35,16 +35,16 @@ class MainActivity : ComponentActivity() {
 
         apiConfig = ApiConfig(this)
 
-        // 請求錄音權限
-        requestMicrophonePermission()
-
         setContent {
             SGHVoiceTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    SetupScreen(apiConfig = apiConfig)
+                    SetupScreen(
+                        apiConfig = apiConfig,
+                        onCloudConsentGranted = ::requestMicrophonePermission
+                    )
                 }
             }
         }

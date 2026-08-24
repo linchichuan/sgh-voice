@@ -11,6 +11,7 @@ import android.view.HapticFeedbackConstants
 import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
+import android.view.View.OnAttachStateChangeListener
 import android.widget.GridLayout
 import android.widget.HorizontalScrollView
 import android.widget.ImageButton
@@ -33,6 +34,9 @@ import com.shingihou.sghvoice.ime.manual.KeyboardLayer
 import com.shingihou.sghvoice.ime.manual.ManualKeyboardLayoutProvider
 import com.shingihou.sghvoice.ime.manual.ManualKeyboardMode
 import com.shingihou.sghvoice.ime.manual.ShiftState
+import com.shingihou.sghvoice.processing.RecognitionLanguage
+import com.shingihou.sghvoice.processing.TranslationLanguage
+import com.shingihou.sghvoice.processing.TranslationRequest
 
 /**
  * SGH Voice 鍵盤視圖。
@@ -60,10 +64,14 @@ class KeyboardView @JvmOverloads constructor(
 
     interface KeyboardActionListener {
         fun onMicToggle()
+        fun onTranslationPickerRequested()
+        fun onTranslationRequested(request: TranslationRequest)
+        fun onRecognitionLanguageChanged(language: RecognitionLanguage)
         fun onInputModeChanged(mode: InputMode)
         fun onKeyAction(action: KeyAction)
         fun onCandidateSelected(candidate: String)
         fun onNextKeyboardPressed()
+        fun onKeyboardPickerRequested()
     }
 
     private val layoutProvider = ManualKeyboardLayoutProvider()
@@ -72,6 +80,7 @@ class KeyboardView @JvmOverloads constructor(
     private var keyboardLayer = KeyboardLayer.LETTERS
     private var shiftState = ShiftState.OFF
     private var japaneseScriptMode = JapaneseScriptMode.HIRAGANA
+    private var recognitionLanguage = RecognitionLanguage.AUTO
 
     private lateinit var keyboardRoot: View
     private lateinit var voiceModeButton: TextView
@@ -85,6 +94,12 @@ class KeyboardView @JvmOverloads constructor(
     private lateinit var micButton: TextView
     private lateinit var statusText: TextView
     private lateinit var voiceStateDot: View
+    private lateinit var voiceHint: TextView
+    private lateinit var translationPanel: View
+    private lateinit var translationCancelButton: TextView
+    private lateinit var translationStartButton: TextView
+    private lateinit var translationChipButtons: Map<TranslationLanguage, TextView>
+    private val selectedTranslationTargets = linkedSetOf<TranslationLanguage>()
     private lateinit var compositionText: TextView
     private lateinit var candidateScroller: HorizontalScrollView
     private lateinit var candidateContainer: LinearLayout
@@ -117,6 +132,7 @@ class KeyboardView @JvmOverloads constructor(
 
     fun setInputMode(mode: InputMode) {
         setCandidatesExpanded(false)
+        hideTranslationPanel()
         inputMode = mode
         keyboardLayer = KeyboardLayer.LETTERS
         shiftState = ShiftState.OFF
@@ -144,6 +160,12 @@ class KeyboardView @JvmOverloads constructor(
             )
             renderManualKeyboard()
         }
+        renderVoiceModeLabel()
+    }
+
+    fun setRecognitionLanguage(language: RecognitionLanguage) {
+        recognitionLanguage = language
+        renderVoiceModeLabel()
     }
 
     fun setManualKeyboardState(
@@ -168,8 +190,44 @@ class KeyboardView @JvmOverloads constructor(
         statusText.text = text
     }
 
-    fun setRecordingElapsed(formattedElapsed: String) {
-        statusText.text = context.getString(R.string.status_recording_elapsed, formattedElapsed)
+    fun setRecordingElapsed(formattedElapsed: String, translating: Boolean = false) {
+        statusText.text = context.getString(
+            if (translating) {
+                R.string.status_translation_recording_elapsed
+            } else {
+                R.string.status_recording_elapsed
+            },
+            formattedElapsed
+        )
+    }
+
+    fun setTranslationRecordingMode() {
+        micButton.setText(R.string.mic_action_translation_recording)
+        micButton.contentDescription =
+            context.getString(R.string.translation_recording_mic_desc)
+    }
+
+    fun showTranslationPanel(targets: List<TranslationLanguage>) {
+        selectedTranslationTargets.clear()
+        selectedTranslationTargets.addAll(
+            runCatching { TranslationRequest.create(targets).targets }
+                .getOrDefault(listOf(TranslationLanguage.JAPANESE))
+        )
+        renderTranslationTargets()
+        micButton.isVisible = false
+        translationPanel.isVisible = true
+        voiceHint.isVisible = false
+        statusText.setText(R.string.translation_picker_status)
+        translationPanel.announceForAccessibility(
+            context.getString(R.string.translation_picker_accessibility)
+        )
+    }
+
+    fun hideTranslationPanel() {
+        if (!::translationPanel.isInitialized) return
+        translationPanel.isVisible = false
+        micButton.isVisible = true
+        voiceHint.isVisible = true
     }
 
     fun updateCandidates(composition: String, candidates: List<String>) {
@@ -321,6 +379,17 @@ class KeyboardView @JvmOverloads constructor(
         micButton = findViewById(R.id.btn_mic)
         statusText = findViewById(R.id.tv_status)
         voiceStateDot = findViewById(R.id.voice_state_dot)
+        voiceHint = findViewById(R.id.tv_voice_hint)
+        translationPanel = findViewById(R.id.translation_panel)
+        translationCancelButton = findViewById(R.id.btn_translation_cancel)
+        translationStartButton = findViewById(R.id.btn_translation_start)
+        translationChipButtons = linkedMapOf(
+            TranslationLanguage.TRADITIONAL_CHINESE to
+                findViewById(R.id.chip_translation_zh_hant),
+            TranslationLanguage.JAPANESE to findViewById(R.id.chip_translation_ja),
+            TranslationLanguage.ENGLISH to findViewById(R.id.chip_translation_en),
+            TranslationLanguage.KOREAN to findViewById(R.id.chip_translation_ko)
+        )
         compositionText = findViewById(R.id.tv_composition)
         candidateScroller = findViewById(R.id.candidate_scroller)
         candidateContainer = findViewById(R.id.candidate_container)
@@ -358,24 +427,63 @@ class KeyboardView @JvmOverloads constructor(
             hapticTap(it)
             listener?.onNextKeyboardPressed()
         }
+        nextKeyboardButton.setOnLongClickListener {
+            it.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+            listener?.onKeyboardPickerRequested()
+            true
+        }
         candidateExpandButton.setOnClickListener {
             hapticTap(it)
             setCandidatesExpanded(!candidatesExpanded)
         }
         micButton.setOnClickListener {
             hapticTap(it)
+            hideTranslationPanel()
             listener?.onMicToggle()
+        }
+        micButton.setOnLongClickListener {
+            if (!it.isEnabled) return@setOnLongClickListener false
+            it.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+            listener?.onTranslationPickerRequested()
+            true
+        }
+        translationChipButtons.forEach { (language, button) ->
+            button.setOnClickListener {
+                hapticTap(it)
+                if (!selectedTranslationTargets.remove(language)) {
+                    selectedTranslationTargets.add(language)
+                }
+                renderTranslationTargets()
+            }
+        }
+        translationCancelButton.setOnClickListener {
+            hapticTap(it)
+            hideTranslationPanel()
+            updateState(VoiceInputIME.ImeState.IDLE)
+        }
+        translationStartButton.setOnClickListener {
+            if (selectedTranslationTargets.isEmpty()) return@setOnClickListener
+            hapticTap(it)
+            val request = TranslationRequest.create(selectedTranslationTargets)
+            hideTranslationPanel()
+            listener?.onTranslationRequested(request)
         }
         layerButton.setOnClickListener { dispatchVoiceAction(it, KeyAction.InsertText("@")) }
         commaButton.setOnClickListener { dispatchVoiceAction(it, KeyAction.InsertText("，")) }
         spaceButton.setOnClickListener { dispatchVoiceAction(it, KeyAction.Space) }
         periodButton.setOnClickListener { dispatchVoiceAction(it, KeyAction.InsertText("。")) }
         backspaceButton.setOnClickListener { dispatchVoiceAction(it, KeyAction.Backspace) }
+        installRepeatingBackspace(backspaceButton)
         enterButton.setOnClickListener { dispatchVoiceAction(it, KeyAction.Enter) }
     }
 
     private fun bindModeButton(button: TextView, mode: InputMode) {
         button.setOnClickListener {
+            if (mode == InputMode.VOICE && mode == inputMode) {
+                hapticTap(it)
+                showRecognitionLanguageMenu(it)
+                return@setOnClickListener
+            }
             if (mode == inputMode) return@setOnClickListener
             hapticTap(it)
             listener?.onInputModeChanged(mode)
@@ -393,6 +501,84 @@ class KeyboardView @JvmOverloads constructor(
         periodButton.text = "。"
     }
 
+    private fun renderVoiceModeLabel() {
+        if (!::voiceModeButton.isInitialized) return
+        if (inputMode == InputMode.VOICE) {
+            voiceModeButton.setText(recognitionLanguageShortLabel(recognitionLanguage))
+            voiceModeButton.contentDescription = context.getString(
+                R.string.recognition_language_button_desc,
+                context.getString(recognitionLanguageLabel(recognitionLanguage))
+            )
+        } else {
+            voiceModeButton.setText(R.string.mode_voice)
+            voiceModeButton.setContentDescription(
+                context.getString(R.string.mode_voice_desc)
+            )
+        }
+    }
+
+    private fun showRecognitionLanguageMenu(anchor: View) {
+        PopupMenu(context, anchor).apply {
+            RecognitionLanguage.entries.forEach { language ->
+                menu.add(
+                    R.id.group_recognition_language,
+                    language.ordinal,
+                    language.ordinal,
+                    recognitionLanguageLabel(language)
+                ).apply {
+                    isCheckable = true
+                    isChecked = language == recognitionLanguage
+                }
+            }
+            menu.setGroupCheckable(R.id.group_recognition_language, true, true)
+            setOnMenuItemClickListener { item ->
+                val language = RecognitionLanguage.entries.getOrNull(item.itemId)
+                    ?: return@setOnMenuItemClickListener false
+                listener?.onRecognitionLanguageChanged(language)
+                true
+            }
+            show()
+        }
+    }
+
+    private fun recognitionLanguageLabel(language: RecognitionLanguage): Int =
+        when (language) {
+            RecognitionLanguage.AUTO -> R.string.recognition_language_auto
+            RecognitionLanguage.TRADITIONAL_CHINESE ->
+                R.string.recognition_language_traditional_chinese
+            RecognitionLanguage.JAPANESE -> R.string.recognition_language_japanese
+            RecognitionLanguage.ENGLISH -> R.string.recognition_language_english
+            RecognitionLanguage.KOREAN -> R.string.recognition_language_korean
+        }
+
+    private fun recognitionLanguageShortLabel(language: RecognitionLanguage): Int =
+        when (language) {
+            RecognitionLanguage.AUTO -> R.string.recognition_language_auto_short
+            RecognitionLanguage.TRADITIONAL_CHINESE ->
+                R.string.recognition_language_traditional_chinese_short
+            RecognitionLanguage.JAPANESE -> R.string.recognition_language_japanese_short
+            RecognitionLanguage.ENGLISH -> R.string.recognition_language_english_short
+            RecognitionLanguage.KOREAN -> R.string.recognition_language_korean_short
+        }
+
+    private fun renderTranslationTargets() {
+        translationChipButtons.forEach { (language, button) ->
+            val selected = language in selectedTranslationTargets
+            styleModeButton(button, selected)
+            button.contentDescription = context.getString(
+                if (selected) {
+                    R.string.translation_target_selected_desc
+                } else {
+                    R.string.translation_target_unselected_desc
+                },
+                button.text
+            )
+        }
+        val hasSelection = selectedTranslationTargets.isNotEmpty()
+        translationStartButton.isEnabled = hasSelection
+        translationStartButton.alpha = if (hasSelection) 1f else 0.45f
+    }
+
     private fun renderManualKeyboard() {
         val manualMode = when (inputMode) {
             InputMode.ZHUYIN -> ManualKeyboardMode.ZHUYIN
@@ -406,7 +592,7 @@ class KeyboardView @JvmOverloads constructor(
             val rowView = LinearLayout(context).apply {
                 orientation = HORIZONTAL
                 gravity = android.view.Gravity.CENTER
-                layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, dp(50))
+                layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, dp(48))
                 val horizontalInset = when {
                     manualMode == ManualKeyboardMode.ZHUYIN ||
                         keyboardLayer != KeyboardLayer.LETTERS -> 0
@@ -467,7 +653,7 @@ class KeyboardView @JvmOverloads constructor(
                     if (key.role == KeyRole.CHARACTER) Typeface.NORMAL else Typeface.BOLD
                 )
             )
-            layoutParams = LayoutParams(0, dp(50), key.widthWeight)
+            layoutParams = LayoutParams(0, dp(48), key.widthWeight)
             setOnClickListener {
                 hapticTap(it)
                 when (val action = key.action) {
@@ -634,27 +820,67 @@ class KeyboardView @JvmOverloads constructor(
 
     @SuppressLint("ClickableViewAccessibility")
     private fun installRepeatingBackspace(button: TextView) {
-        var repeatAction: Runnable? = null
-        button.setOnLongClickListener {
-            hapticTap(it)
-            listener?.onKeyAction(KeyAction.Backspace)
-            repeatAction = object : Runnable {
-                override fun run() {
-                    listener?.onKeyAction(KeyAction.Backspace)
-                    button.postDelayed(this, 70L)
+        var repeatCount = 0
+        var isRepeating = false
+        val repeatAction = object : Runnable {
+            override fun run() {
+                if (!button.isPressed || !button.isAttachedToWindow) return
+                if (!isRepeating) {
+                    isRepeating = true
+                    button.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
                 }
-            }.also { button.postDelayed(it, 100L) }
-            true
-        }
-        button.setOnTouchListener { _, event ->
-            if (event.actionMasked == MotionEvent.ACTION_UP ||
-                event.actionMasked == MotionEvent.ACTION_CANCEL
-            ) {
-                repeatAction?.let(button::removeCallbacks)
-                repeatAction = null
+                listener?.onKeyAction(KeyAction.Backspace)
+                repeatCount += 1
+                button.postDelayed(
+                    this,
+                    BackspaceRepeatPolicy.intervalAfter(repeatCount)
+                )
             }
-            false
         }
+
+        fun stopRepeating() {
+            button.removeCallbacks(repeatAction)
+            repeatCount = 0
+            isRepeating = false
+        }
+
+        button.setOnTouchListener { view, event ->
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    stopRepeating()
+                    view.isPressed = true
+                    button.postDelayed(
+                        repeatAction,
+                        BackspaceRepeatPolicy.INITIAL_DELAY_MS
+                    )
+                    true
+                }
+
+                MotionEvent.ACTION_UP -> {
+                    val repeated = isRepeating
+                    stopRepeating()
+                    view.isPressed = false
+                    if (!repeated) view.performClick()
+                    true
+                }
+
+                MotionEvent.ACTION_CANCEL,
+                MotionEvent.ACTION_OUTSIDE -> {
+                    stopRepeating()
+                    view.isPressed = false
+                    true
+                }
+
+                else -> true
+            }
+        }
+        button.addOnAttachStateChangeListener(object : OnAttachStateChangeListener {
+            override fun onViewAttachedToWindow(view: View) = Unit
+
+            override fun onViewDetachedFromWindow(view: View) {
+                stopRepeating()
+            }
+        })
     }
 
     private fun applyMicState(

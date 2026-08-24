@@ -31,6 +31,7 @@ class TranscriptionPipeline(
     data class Result(
         val text: String = "",
         val rawText: String = "",
+        val translations: List<TranslationOutput> = emptyList(),
         val success: Boolean = true,
         val error: String? = null
     )
@@ -63,7 +64,18 @@ class TranscriptionPipeline(
      * @param callback 進度回呼（可選）
      * @return 處理結果
      */
-    suspend fun process(wavData: ByteArray, callback: ProgressCallback? = null): Result {
+    suspend fun process(wavData: ByteArray, callback: ProgressCallback? = null): Result =
+        process(wavData, VoiceTask.Dictation, callback)
+
+    /**
+     * 依任務明確分流口述與翻譯。翻譯只在來源文字套一次詞庫修正，目標文字不再
+     * 套來源修正；OpenCC 也只套用在 zh-Hant 目標。
+     */
+    suspend fun process(
+        wavData: ByteArray,
+        task: VoiceTask,
+        callback: ProgressCallback? = null
+    ): Result {
         try {
             // === 第一層：Whisper 語音辨識 ===
             callback?.onWhisperStarted()
@@ -80,31 +92,11 @@ class TranscriptionPipeline(
             // === 第二層：詞庫修正 ===
             val correctedText = dictionaryManager.applyCorrections(rawText)
 
-            // === 第三層：LLM 後處理（含場景指令）===
-            callback?.onLlmStarted()
-            val sceneExtra = dictionaryManager.getSceneSystemPromptExtra()
-            val processedText = try {
-                llmClient.postProcess(correctedText, sceneExtra)
-            } catch (error: CancellationException) {
-                throw error
-            } catch (e: Exception) {
-                // LLM 失敗時降級為使用詞庫修正後的結果
-                correctedText
+            val result = when (task) {
+                VoiceTask.Dictation -> processDictation(correctedText, rawText, callback)
+                is VoiceTask.Translation ->
+                    processTranslation(correctedText, rawText, task.request, callback)
             }
-
-            // === 第四層：OpenCC 繁體中文轉換 ===
-            val traditionalText = openCCConverter.convert(processedText)
-
-            // === 第五層：最終詞庫修正 ===
-            // LLM 有機會重新改寫第二層已修正的詞，因此在輸出前再做一次
-            // 非連鎖、最長優先的本機規則套用。
-            val finalText = dictionaryManager.applyCorrections(traditionalText)
-
-            val result = Result(
-                text = finalText,
-                rawText = rawText,
-                success = true
-            )
             callback?.onCompleted(result)
             return result
 
@@ -120,6 +112,54 @@ class TranscriptionPipeline(
                 error = errorMsg
             )
         }
+    }
+
+    private suspend fun processDictation(
+        correctedText: String,
+        rawText: String,
+        callback: ProgressCallback?
+    ): Result {
+        callback?.onLlmStarted()
+        val sceneExtra = dictionaryManager.getSceneSystemPromptExtra()
+        val processedText = try {
+            llmClient.postProcess(correctedText, sceneExtra)
+        } catch (error: CancellationException) {
+            throw error
+        } catch (_: Exception) {
+            // 一般口述維持既有降級策略：LLM 失敗仍可輸出詞庫修正後文字。
+            correctedText
+        }
+
+        val traditionalText = openCCConverter.convert(processedText)
+        val finalText = dictionaryManager.applyCorrections(traditionalText)
+        return Result(
+            text = finalText,
+            rawText = rawText,
+            success = true
+        )
+    }
+
+    private suspend fun processTranslation(
+        correctedText: String,
+        rawText: String,
+        request: TranslationRequest,
+        callback: ProgressCallback?
+    ): Result {
+        callback?.onLlmStarted()
+        val translated = llmClient.translate(correctedText, request)
+        val finalized = translated.map { output ->
+            if (output.language == TranslationLanguage.TRADITIONAL_CHINESE) {
+                output.copy(text = openCCConverter.convert(output.text))
+            } else {
+                output
+            }
+        }
+        return Result(
+            text = finalized.first().text,
+            rawText = rawText,
+            translations = finalized,
+            success = true
+        )
     }
 
     /**

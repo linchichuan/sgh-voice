@@ -7,10 +7,12 @@
   <string>com.shingihou.promote-corrections</string>
   <key>ProgramArguments</key>
   <array>
-    <string>/Users/lin/voice-input/venv/bin/python3</string>
-    <string>/Users/lin/voice-input/scripts/dictionary_promote_from_history.py</string>
-    <string>--apply</string>
+    <string>/bin/bash</string>
+    <string>/Users/lin/Library/Application Support/SGHVoice/run_scheduled_task.sh</string>
+    <string>promote-corrections</string>
   </array>
+  <key>Umask</key>
+  <integer>63</integer>
   <key>StartCalendarInterval</key>
   <dict>
     <key>Hour</key>
@@ -19,9 +21,9 @@
     <integer>30</integer>
   </dict>
   <key>StandardOutPath</key>
-  <string>/Users/lin/.voice-input/promote-corrections.stdout.log</string>
+  <string>/Users/lin/Library/Logs/SGHVoice/promote-corrections.stdout.log</string>
   <key>StandardErrorPath</key>
-  <string>/Users/lin/.voice-input/promote-corrections.stderr.log</string>
+  <string>/Users/lin/Library/Logs/SGHVoice/promote-corrections.stderr.log</string>
   <key>EnvironmentVariables</key>
   <dict>
     <key>PATH</key>

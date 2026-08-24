@@ -1,5 +1,35 @@
 # Changelog
 
+## Unreleased — Android v2.7.3 Candidate & Release Hardening
+
+- Android 退格鍵支援長按連續刪除並在持續按壓後加速；點按仍只刪除一個字元。
+- Android 語音辨識來源可由使用者選擇 Auto、繁體中文、日文、英文或韓文；Auto 保留混合語言辨識，指定語言時才送出 STT `language`。
+- 鍵盤切換鍵支援點按循環、長按開啟系統鍵盤選擇器；韓文與其他裝置鍵盤由使用者自行啟用與選擇。
+- 收斂手機鍵盤外框、功能列與手動輸入列比例，保留既有錄音主按鈕尺寸及至少 44dp 的主要觸控區。
+- Android、iOS 與 macOS 翻譯流程新增本機語意守門：問句必須維持問句、請求必須維持請求；合法 JSON 若含代答、已完成動作或極端擴寫，也會 fail closed。
+- Android 與 iOS 在實際送往雲端前再次確認版本化同意；即使錄音開始後撤回同意，也會清除記憶體中的錄音並中止上傳。Android 原始碼升為 2.7.3（versionCode 23），既有已簽署 2.7.2 APK 保持不可變，待原 sideload signer 從安全備份恢復後再產生 2.7.3 候選檔。
+- 新增醫療詞庫分階段規劃；本輪未載入完整醫療詞表或新增 runtime 索引。
+- 新增 Android RC 實機驗收表、一鍵 preflight 腳本與可持續追加的多語翻譯語意回歸 corpus。
+
+## Android v2.7.1 (2026-07-27) — Japanese Translation Reliability Hotfix
+
+- 修正 Android 日文翻譯在模型回傳 Markdown JSON fence 或 `ja-JP`／`Japanese` 語言標籤時，被過度嚴格解析直接丟棄、因而無法貼入目前欄位的問題。
+- Claude、OpenAI 與 Groq 翻譯請求改用 provider-side Structured Outputs／JSON Schema，本機仍會驗證目標語言、非空內容、重複與額外欄位。
+- LLM HTTP／網路／模型／額度／格式錯誤不再被吞掉；輸入法會顯示可採取行動的本地化錯誤原因，同時維持失敗時不插入原文。
+- Android 版本升為 2.7.1（versionCode 21）。
+
+## v2.7.0 (2026-07-27) — Safe Dictation, Multi-target Translation & Prompt Management
+
+- macOS、Android、iOS 的聽寫後處理統一為「只整理逐字稿、不得回答或執行內容」；新增疑問／請求的 answer-like output guard，短句也會驗證，異常結果直接退回原逐字稿。
+- Android 長按錄音鍵、macOS 獨立翻譯快捷鍵與 iOS App 內長按流程，可從繁中、日文、英文、韓文選擇 1–4 個目標；每段音訊只執行一次 STT 與一次 LLM，並以嚴格 JSON schema 解析。
+- 翻譯失敗採 fail-closed：缺少 API key、JSON 格式錯誤、目標缺漏或結果不可信時不會自動貼入；翻譯結果也不會被誤收為人工修正學習資料。
+- Dashboard 新增 Prompt 管理頁，顯示目前 provider／model ID、鎖定的 Dictation／Translation／Quick Rewrite 用途，以及只能追加標點與格式偏好的自訂指示。
+- 模型選項與 2026-07-27 官方價格基準同步；新增 Claude Opus 5，Sonnet 5／Opus 5 關閉不必要的 thinking，Fable 5 與 Groq GPT OSS 固定 low effort，並為所有翻譯輸出設定 token 上限。
+- macOS 新增獨立翻譯快捷鍵與目標語言設定，並阻擋錄音／動作快捷鍵的重疊或前綴衝突。
+- Android IME 更新 SGH Voice 品牌與多語模式介面，保留語音、注音、日文、英文輸入，擴充候選與使用者修正學習行為；版本升為 2.7.0（versionCode 20）。
+- iOS standalone App 加入短按聽寫、長按翻譯目標選擇與相同輸出守門；受 iOS 系統限制，目前不是可直接收音的第三方鍵盤擴充。
+- Firebase 下載頁更新 Android 個人測試版 APK、實機介面截圖、SHA-256 與側載風險揭露；macOS 公開下載仍維持已打包的 v2.6.0。
+
 ## v2.6.0 (2026-07-20) — Verified Multilingual Personalization
 
 - Dashboard 手動新增詞彙現在真正進入 STT 與 LLM 共用 vocabulary prompt；統一並自動遷移 `manual_added`／`auto_added` 詞庫 schema，避免 UI 有詞、辨識管線卻沒使用。

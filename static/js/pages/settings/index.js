@@ -8,6 +8,7 @@ import { createDirty } from './dirty.js';
 import { mountApiKeysTab } from './api-keys.js';
 import { mountSttTab } from './stt.js';
 import { mountLlmTab } from './llm.js';
+import { mountPromptsTab } from './prompts.js';
 import { mountHotkeysTab } from './hotkeys.js';
 import { mountPrivacyTab } from './privacy.js';
 import { mountAdvancedTab } from './advanced.js';
@@ -16,6 +17,7 @@ const TABS = [
   { id: 'keys',     i18n: 'settings.tab.keys',     mounter: mountApiKeysTab },
   { id: 'stt',      i18n: 'settings.tab.stt',      mounter: mountSttTab },
   { id: 'llm',      i18n: 'settings.tab.llm',      mounter: mountLlmTab },
+  { id: 'prompts',  i18n: 'settings.tab.prompts',  mounter: mountPromptsTab },
   { id: 'hotkeys',  i18n: 'settings.tab.hotkeys',  mounter: mountHotkeysTab },
   { id: 'privacy',  i18n: 'settings.tab.privacy',  mounter: mountPrivacyTab },
   { id: 'advanced', i18n: 'settings.tab.advanced', mounter: mountAdvancedTab },

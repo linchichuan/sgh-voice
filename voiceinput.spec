@@ -3,10 +3,15 @@
 VoiceInput.app — PyInstaller 打包配置
 Apple Silicon (arm64) only
 """
+import os
 import platform
 from PyInstaller.utils.hooks import collect_all, collect_data_files, collect_dynamic_libs
 
-_target_arch = 'arm64' if platform.machine() == 'arm64' else 'x86_64'
+_target_arch = os.environ.get(
+    'SGH_PYI_TARGET_ARCH',
+    'arm64' if platform.machine() == 'arm64' else 'x86_64',
+)
+_build_version = os.environ.get('SGH_BUILD_VERSION', '2.7.0')
 
 block_cipher = None
 
@@ -108,8 +113,8 @@ app = BUNDLE(
     info_plist={
         'CFBundleName': 'SGH Voice',
         'CFBundleDisplayName': 'SGH Voice',
-        'CFBundleVersion': '2.6.0',
-        'CFBundleShortVersionString': '2.6.0',
+        'CFBundleVersion': _build_version,
+        'CFBundleShortVersionString': _build_version,
         'LSMinimumSystemVersion': '13.0',
         'LSUIElement': True,  # 選單列 App，不顯示 Dock 圖示
         'NSMicrophoneUsageDescription': 'SGH Voice 需要麥克風權限來錄製語音並轉為文字。',

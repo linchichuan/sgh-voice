@@ -1,15 +1,26 @@
-# 🎙 SGH Voice — AI Voice Input Tool (v2.6.0)
+# 🎙 SGH Voice — AI Voice Input Tool (v2.7.0)
 
 **English** | **[日本語](README.ja.md)** | **[繁體中文](README.md)**
 
-> Speak and get professional text. Trilingual Chinese-Japanese-English auto-detection + smart AI post-processing. 100% data ownership.
+> Speak and get professional text. Trilingual Chinese-Japanese-English auto-detection + smart AI post-processing. BYOK requests are processed by the external AI provider selected by the user.
 
 [![macOS](https://img.shields.io/badge/macOS-Apple_Silicon-black?logo=apple)](https://github.com/linchichuan/sgh-voice/releases)
 [![iOS](https://img.shields.io/badge/iOS-17.0+-blue?logo=apple)](https://github.com/linchichuan/sgh-voice/releases)
 [![Android](https://img.shields.io/badge/Android-8.0+-green?logo=android)](https://github.com/linchichuan/sgh-voice/releases)
-[![Version](https://img.shields.io/badge/Version-2.6.0-green)]()
+[![Version](https://img.shields.io/badge/Version-2.7.0-green)]()
 
 ---
+
+## 🌟 What's New in v2.7.0
+
+| Feature | Details |
+|---------|---------|
+| **Dictation never answers** | A locked dictation contract keeps questions and requests as transcript text. Answer-like LLM output is rejected. |
+| **Translate one recording into up to four languages** | Android long press and a separate macOS shortcut can target Traditional Chinese, Japanese, English, and Korean using one STT plus one LLM call. |
+| **Transparent prompt management** | Dashboard shows the active provider/model ID, locked dictation/translation contracts, and a subordinate punctuation/formatting preference field. |
+| **Upgraded Android IME** | Voice, Zhuyin, Japanese, and English remain available without switching keyboards, with SGH branding, candidates, correction learning, and remembered translation targets. |
+| **Fail-closed output contracts** | Translation requires exact JSON. Missing keys, malformed output, or suspicious dictation results are not inserted into the active app. |
+| **Visible model and cost behavior** | Settings identifies the actual model ID and explains translation call behavior instead of presenting an ambiguous “Cloud” label. |
 
 ## 🌟 What's New in v2.6.0
 
@@ -291,9 +302,9 @@ sgh-voice/
 
 | Item | Approach |
 |------|----------|
-| Audio data | Sent only to OpenAI/Anthropic APIs, no other servers |
-| API Keys | Stored locally in `~/.voice-input/config.json` (macOS) or Keychain (iOS) |
-| History | All stored locally, max 2000 entries |
+| Audio data | Sent to the selected OpenAI or Groq STT API; transcripts are sent to the selected LLM provider |
+| API Keys | Stored in Keychain on iOS, EncryptedSharedPreferences on Android, and Keychain or a permission-600 configuration file on supported macOS versions |
+| History | Stored locally on supported desktop versions; iOS does not create an utterance-history file |
 | Account required | No |
 | Data tracking | None |
 

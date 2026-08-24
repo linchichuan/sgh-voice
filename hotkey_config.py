@@ -13,15 +13,20 @@ import re
 from typing import Mapping
 
 
-HOTKEY_FIELDS = (
+RECORDING_HOTKEY_FIELDS = (
     "hotkey",
+    "translation_hotkey",
+)
+ACTION_HOTKEY_FIELDS = (
     "rewrite_hotkey",
     "retry_hotkey",
     "cancel_hotkey",
     "continuous_hotkey",
 )
+HOTKEY_FIELDS = (*RECORDING_HOTKEY_FIELDS, *ACTION_HOTKEY_FIELDS)
 
 RECOMMENDED_RECORD_HOTKEY = "right_option+right_shift"
+RECOMMENDED_TRANSLATION_HOTKEY = "fn+right_option+right_shift"
 FN_RECORD_HOTKEY = "fn+right_shift"
 RECOMMENDED_ACTION_HOTKEYS = {
     # Use only keys present on Apple's compact keyboards.  Keeping the action
@@ -179,9 +184,9 @@ _TOKEN_ORDER = {
         (
             "ctrl",
             "right_ctrl",
+            "fn",
             "option",
             "right_option",
-            "fn",
             "shift",
             "right_shift",
             "cmd",
@@ -389,8 +394,13 @@ def validate_hotkey_config(
 
     Action chords may share one key with another action.  Runtime listeners
     require an exact match within the action-key set, so a third modifier does
-    not wake a second action.  Recording is stricter: it must be fully disjoint
-    from every action because PTT remains held while Cancel is pressed.
+    not wake a second action.  Recording chords must be fully disjoint from
+    actions because PTT remains held while Cancel is pressed.
+
+    The normal and translation recording chords may either be fully disjoint or
+    form one strict superset pair (the recommended translation chord adds Fn to
+    the normal chord).  The shared recording listener performs longest-match
+    selection and snapshots the selected recording intent.
     """
 
     specs = {}
@@ -411,7 +421,31 @@ def validate_hotkey_config(
     active = [spec for spec in specs.values() if spec.keycodes]
     for index, left in enumerate(active):
         for right in active[index + 1 :]:
-            if "hotkey" in {left.field, right.field} and (
+            pair_fields = {left.field, right.field}
+            left_recording = left.field in RECORDING_HOTKEY_FIELDS
+            right_recording = right.field in RECORDING_HOTKEY_FIELDS
+
+            if left_recording and right_recording:
+                if left.keycodes == right.keycodes:
+                    raise HotkeyValidationError(
+                        f"{left.field} ({left.normalized}) conflicts with "
+                        f"{right.field} ({right.normalized})",
+                        field=left.field,
+                    )
+                if left.keycodes & right.keycodes:
+                    is_strict_superset_pair = (
+                        left.keycodes < right.keycodes
+                        or right.keycodes < left.keycodes
+                    )
+                    if not is_strict_superset_pair:
+                        raise HotkeyValidationError(
+                            f"{left.field} ({left.normalized}) overlaps "
+                            f"{right.field} ({right.normalized})",
+                            field=left.field,
+                        )
+                continue
+
+            if (left_recording or right_recording) and (
                 left.keycodes & right.keycodes
             ):
                 raise HotkeyValidationError(
@@ -419,21 +453,25 @@ def validate_hotkey_config(
                     f"{right.field} ({right.normalized})",
                     field=left.field,
                 )
-            if {left.field, right.field} == {"hotkey", "cancel_hotkey"}:
-                left_families = {
+            if "cancel_hotkey" in pair_fields and (
+                left_recording or right_recording
+            ):
+                recording_spec = left if left_recording else right
+                cancel_spec = left if left.field == "cancel_hotkey" else right
+                recording_families = {
                     _MODIFIER_FAMILY[token]
-                    for token in left.tokens
+                    for token in recording_spec.tokens
                     if token in MODIFIER_TOKENS
                 }
-                right_families = {
+                cancel_families = {
                     _MODIFIER_FAMILY[token]
-                    for token in right.tokens
+                    for token in cancel_spec.tokens
                     if token in MODIFIER_TOKENS
                 }
-                if left_families & right_families:
+                if recording_families & cancel_families:
                     raise HotkeyValidationError(
                         f"cancel_hotkey ({specs['cancel_hotkey'].normalized}) "
-                        "shares a modifier family with the recording hotkey",
+                        f"shares a modifier family with {recording_spec.field}",
                         field="cancel_hotkey",
                     )
             if left.keycodes.issubset(right.keycodes) or right.keycodes.issubset(

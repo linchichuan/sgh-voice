@@ -1,9 +1,10 @@
 name: Deploy SGH Voice website to Firebase Hosting
 
 on:
-  push:
-    branches:
-      - main
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
 
 permissions:
   contents: read
@@ -14,13 +15,62 @@ concurrency:
 
 jobs:
   deploy:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
     runs-on: ubuntu-latest
+    environment:
+      name: firebase-production
+      url: https://voice.shingihou.com
     steps:
-      - name: Check out repository
+      - name: Check out the exact commit that passed CI
         uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Refuse a stale main-branch deployment
+        run: |
+          git fetch --no-tags origin main
+          test "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)"
+
+      - name: Set up Java for Firebase Emulator
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: sgh-voice-web/package-lock.json
+
+      - name: Install locked Firebase tooling
+        working-directory: sgh-voice-web
+        run: npm ci --ignore-scripts
+
+      - name: Audit production dependencies
+        working-directory: sgh-voice-web
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Test Firestore rules before authentication
+        working-directory: sgh-voice-web
+        run: npm run test:rules
+
+      - name: Authenticate Firebase CLI
+        uses: google-github-actions/auth@v3
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SGH_MEISHI }}
+
+      - name: Deploy tested Firestore rules
+        working-directory: sgh-voice-web
+        run: ./node_modules/.bin/firebase deploy --only firestore:rules --project sgh-meishi --config firebase.json --non-interactive
 
       - name: Deploy live site
-        uses: FirebaseExtended/action-hosting-deploy@v0
+        uses: FirebaseExtended/action-hosting-deploy@v0.11.0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SGH_MEISHI }}

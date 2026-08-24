@@ -3,6 +3,7 @@ memory.py — 詞庫記憶與自動學習系統
 模仿 Typeless 的 Personal Dictionary + Personalization Progress
 """
 import difflib
+from functools import wraps
 import re
 import threading
 from datetime import datetime
@@ -14,8 +15,18 @@ from config import (
 from multilingual import language_profile
 
 
+def _dictionary_synchronized(method):
+    """Serialize every access that can race with a dictionary mutation."""
+    @wraps(method)
+    def wrapped(self, *args, **kwargs):
+        with self._dictionary_lock:
+            return method(self, *args, **kwargs)
+    return wrapped
+
+
 class Memory:
     def __init__(self):
+        self._dictionary_lock = threading.RLock()
         self.dictionary = load_dictionary()
         self.history = load_history()
         self._history_lock = threading.Lock()
@@ -24,12 +35,14 @@ class Memory:
         # 自動清理不合規的詞庫規則（避免壞規則堆積）
         self.cleanup_bad_corrections()
 
+    @_dictionary_synchronized
     def reload(self):
         self.dictionary = load_dictionary()
         self.history = load_history()
         self._normalize_dictionary_schema()
         self.cleanup_bad_corrections()
 
+    @_dictionary_synchronized
     def _normalize_dictionary_schema(self):
         """Migrate every historical custom-word shape into one flat schema.
 
@@ -95,6 +108,7 @@ class Memory:
         if changed:
             save_dictionary(self.dictionary)
 
+    @_dictionary_synchronized
     def clear_all_in_memory(self):
         """v2.4.0：wipe_all GDPR Art. 17 後呼叫 — 把 process 內快取的 history / dictionary
         重置為空，避免後續寫入又把已刪資料 persistence 回磁碟。
@@ -118,6 +132,7 @@ class Memory:
 
     # ─── Whisper Prompt ──────────────────────────────────
 
+    @_dictionary_synchronized
     def build_whisper_prompt(self, custom_words, scene_words=None):
         """合併 config + 個人詞庫 + scene + BASE 詞彙後注入 Whisper prompt。
         ⚠️ 嚴格限制數量（≤20 詞）和長度（≤200 字元），
@@ -157,6 +172,7 @@ class Memory:
 
     # ─── Apply Corrections ───────────────────────────────
 
+    @_dictionary_synchronized
     def apply_corrections(self, text, scene_corrections=None, scene_key=None, app_id=None):
         """套用修正，多層合併（後者覆蓋前者）：
             BASE_CORRECTIONS  ← 程式碼基底
@@ -199,6 +215,7 @@ class Memory:
         return result
 
     # ─── 多層詞庫管理（手動 only，永不自動寫入）─────────────
+    @_dictionary_synchronized
     def add_scene_correction(self, scene_key, wrong, right):
         """手動新增場景級修正規則。⚠️ 不過守門員以外的自動寫入路徑都禁止呼叫這個。"""
         if not scene_key or not wrong or not right or wrong == right:
@@ -210,6 +227,7 @@ class Memory:
         save_dictionary(self.dictionary)
         return True
 
+    @_dictionary_synchronized
     def remove_scene_correction(self, scene_key, wrong):
         bucket = self.dictionary.get("corrections_by_scene", {}).get(scene_key, {})
         if wrong in bucket:
@@ -218,6 +236,7 @@ class Memory:
             return True
         return False
 
+    @_dictionary_synchronized
     def add_app_correction(self, app_id, wrong, right):
         if not app_id or not wrong or not right or wrong == right:
             return False
@@ -228,6 +247,7 @@ class Memory:
         save_dictionary(self.dictionary)
         return True
 
+    @_dictionary_synchronized
     def remove_app_correction(self, app_id, wrong):
         bucket = self.dictionary.get("corrections_by_app", {}).get(app_id, {})
         if wrong in bucket:
@@ -236,13 +256,19 @@ class Memory:
             return True
         return False
 
+    @_dictionary_synchronized
     def get_scene_corrections(self, scene_key=None):
         d = self.dictionary.get("corrections_by_scene", {})
-        return d.get(scene_key, {}) if scene_key else d
+        return dict(d.get(scene_key, {})) if scene_key else {
+            key: dict(value) for key, value in d.items() if isinstance(value, dict)
+        }
 
+    @_dictionary_synchronized
     def get_app_corrections(self, app_id=None):
         d = self.dictionary.get("corrections_by_app", {})
-        return d.get(app_id, {}) if app_id else d
+        return dict(d.get(app_id, {})) if app_id else {
+            key: dict(value) for key, value in d.items() if isinstance(value, dict)
+        }
 
     # ─── Auto Learn ──────────────────────────────────────
 
@@ -321,6 +347,7 @@ class Memory:
             return False
         return True
 
+    @_dictionary_synchronized
     def learn_correction(self, original, corrected, source="manual"):
         """從手動修正中自動學習。所有來源都套用嚴格守門，避免污染詞庫。"""
         if original.strip() == corrected.strip():
@@ -351,6 +378,7 @@ class Memory:
             save_dictionary(self.dictionary)
         return learned
 
+    @_dictionary_synchronized
     def cleanup_bad_corrections(self):
         """清理現有 corrections 中不符合守門規則的條目（自動執行）。"""
         corr = self.dictionary.get("corrections", {})
@@ -368,6 +396,7 @@ class Memory:
             print(f" 🧹 已自動清理 {removed_count} 筆不合規的詞庫規則")
         return []
 
+    @_dictionary_synchronized
     def add_custom_word(self, word):
         """手動新增詞彙到詞庫"""
         manual = self.dictionary.setdefault("manual_added", [])
@@ -377,6 +406,7 @@ class Memory:
             return True
         return False
 
+    @_dictionary_synchronized
     def add_auto_word(self, word):
         """系統自動提取的詞彙"""
         auto = self.dictionary.setdefault("auto_added", [])
@@ -386,6 +416,7 @@ class Memory:
             return True
         return False
 
+    @_dictionary_synchronized
     def remove_custom_word(self, word):
         """刪除自訂詞彙（會檢查自動或手動）"""
         removed = False
@@ -400,6 +431,7 @@ class Memory:
             save_dictionary(self.dictionary)
         return removed
 
+    @_dictionary_synchronized
     def add_correction(self, wrong, right, force=False):
         """新增 corrections 規則。預設過守門員防止偽規則（標點對應、跨語意 paraphrase 等）。
         force=True 才允許繞過守門員（僅供 CLI/測試使用，UI 路徑禁止傳 force）。
@@ -412,6 +444,7 @@ class Memory:
         save_dictionary(self.dictionary)
         return True
 
+    @_dictionary_synchronized
     def get_style_profile(self):
         """獲取用戶個人風格特徵描述（用於注入 Prompt）。
         ⚠️ 預設必須為空：舊版預設「偏好專業、精確且有禮貌的商務語氣」會在每一次
@@ -420,11 +453,13 @@ class Memory:
         風格只能由使用者明確設定。"""
         return self.dictionary.get("style_profile", "")
 
+    @_dictionary_synchronized
     def update_style_profile(self, new_profile):
         """更新風格特徵描述"""
         self.dictionary["style_profile"] = new_profile
         save_dictionary(self.dictionary)
 
+    @_dictionary_synchronized
     def remove_correction(self, wrong):
         """刪除修正規則"""
         corrections = self.dictionary.get("corrections", {})
@@ -434,22 +469,40 @@ class Memory:
             return True
         return False
 
+    @_dictionary_synchronized
     def get_all_corrections(self):
-        return self.dictionary.get("corrections", {})
+        return dict(self.dictionary.get("corrections", {}))
 
+    @_dictionary_synchronized
     def get_all_custom_words(self):
         # 兼容原本寫法，返回全部
-        return self.dictionary.get("auto_added", []) + self.dictionary.get("manual_added", [])
+        return list(self.dictionary.get("auto_added", [])) + list(self.dictionary.get("manual_added", []))
 
+    @_dictionary_synchronized
     def get_dictionary_words(self):
         """為 UI 返回區分來源的單字"""
         return {
-            "auto_added": self.dictionary.get("auto_added", []),
-            "manual_added": self.dictionary.get("manual_added", [])
+            "auto_added": list(self.dictionary.get("auto_added", [])),
+            "manual_added": list(self.dictionary.get("manual_added", []))
         }
+
+    @_dictionary_synchronized
+    def apply_promoted_corrections(self, promoted):
+        """Atomically merge a reviewed promotion batch and persist one snapshot."""
+        if not promoted:
+            return False
+        corr = self.dictionary.setdefault("corrections", {})
+        freq_d = self.dictionary.setdefault("frequency", {})
+        for item in promoted:
+            wrong = item["wrong"]
+            corr[wrong] = item["right"]
+            freq_d[wrong] = freq_d.get(wrong, 0) + item["freq"]
+        save_dictionary(self.dictionary)
+        return True
 
     # ─── Personalization Progress ────────────────────────
 
+    @_dictionary_synchronized
     def get_personalization_score(self):
         """計算個人化進度。改良版：總分難更上限，加入最近 7 天活躍度（持續使用會有成就感）。
         分項：詞庫 25 + 詞彙 20 + 累計使用 25 + 本週活躍 30 = 100"""

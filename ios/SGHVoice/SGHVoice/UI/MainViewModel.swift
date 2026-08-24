@@ -4,12 +4,23 @@ import Combine
 
 @MainActor
 class MainViewModel: ObservableObject, TranscriptionProgressDelegate {
+    private static let maximumRecordingDurationSeconds = 600
     
     @Published var isRecording = false
     @Published var transcribedText = ""
     @Published var rawText = ""
-    @Published var statusMessage = "準備就緒"
+    @Published private(set) var statusMessage = L10n.text("準備就緒")
+    @Published private(set) var statusIsError = false
     @Published var isProcessing = false
+    @Published private(set) var isPreparingRecording = false
+    @Published private(set) var activeIntent: TranscriptionIntent = .dictate
+    @Published var selectedTranslationTargets: [TranslationLanguage] {
+        didSet {
+            if let normalized = try? TranslationContract.normalizedTargets(selectedTranslationTargets) {
+                ApiConfig.shared.translationTargets = normalized
+            }
+        }
+    }
     
     // Scene presettings expose
     @Published var selectedScene: String {
@@ -26,48 +37,114 @@ class MainViewModel: ObservableObject, TranscriptionProgressDelegate {
     
     private let audioRecorder = AudioRecorder()
     private let pipeline = TranscriptionPipeline.shared
+    private var recordingPreparationTask: Task<Void, Never>?
+    private var recordingLimitTask: Task<Void, Never>?
     
     init() {
         self.selectedScene = DictionaryManager.shared.activeScene
         self.outputStyle = ApiConfig.shared.outputStyle
+        self.selectedTranslationTargets = ApiConfig.shared.translationTargets
         pipeline.delegate = self
     }
     
     // MARK: - Actions
     
-    func toggleRecording() {
+    func toggleDictationRecording() {
         if isRecording {
             stopRecording()
         } else {
-            startRecording()
+            startRecording(intent: .dictate)
         }
     }
-    
-    private func startRecording() {
-        Task {
+
+    func startTranslationRecording(targets: [TranslationLanguage]) {
+        guard !isRecording, !isProcessing, !isPreparingRecording else { return }
+        do {
+            let normalized = try TranslationContract.normalizedTargets(targets)
+            selectedTranslationTargets = normalized
+            startRecording(intent: .translate(normalized))
+        } catch {
+            setStatusMessage(error.localizedDescription, isError: true)
+        }
+    }
+
+    func stopRecording() {
+        guard isRecording else { return }
+        stopActiveRecording()
+    }
+
+    func stopRecordingForPrivacy() {
+        guard isRecording || isPreparingRecording else { return }
+        recordingPreparationTask?.cancel()
+        recordingPreparationTask = nil
+        recordingLimitTask?.cancel()
+        recordingLimitTask = nil
+        audioRecorder.release()
+        isRecording = false
+        isPreparingRecording = false
+        setLocalizedStatus("App 進入背景，已停止並刪除暫存錄音")
+    }
+
+    private func startRecording(intent: TranscriptionIntent) {
+        guard !isRecording, !isProcessing, !isPreparingRecording else { return }
+        isPreparingRecording = true
+        setLocalizedStatus("正在準備麥克風...")
+        recordingPreparationTask?.cancel()
+        recordingPreparationTask = Task {
+            defer { self.isPreparingRecording = false }
             do {
+                self.activeIntent = intent
+                try Task.checkCancellation()
                 try await audioRecorder.startRecording()
+                try Task.checkCancellation()
                 self.isRecording = true
-                self.statusMessage = "錄音中..."
+                self.setLocalizedStatus(intent.isTranslation ? "翻譯錄音中..." : "聽寫錄音中...")
                 self.transcribedText = ""
                 self.rawText = ""
+                self.scheduleRecordingLimit()
                 
                 // Add soft haptic feedback
                 #if canImport(UIKit)
                 let generator = UIImpactFeedbackGenerator(style: .medium)
                 generator.impactOccurred()
                 #endif
+            } catch is CancellationError {
+                self.audioRecorder.release()
             } catch {
-                self.statusMessage = "錄音失敗: \(error.localizedDescription)"
+                self.setStatusMessage(
+                    L10n.format("錄音失敗: %@", error.localizedDescription),
+                    isError: true
+                )
                 self.isRecording = false
             }
+            self.recordingPreparationTask = nil
         }
     }
     
-    private func stopRecording() {
+    private func scheduleRecordingLimit() {
+        recordingLimitTask?.cancel()
+        recordingLimitTask = Task { [weak self] in
+            do {
+                try await Task.sleep(
+                    for: .seconds(Self.maximumRecordingDurationSeconds)
+                )
+            } catch {
+                return
+            }
+            guard !Task.isCancelled else { return }
+            self?.stopActiveRecording(limitReached: true)
+        }
+    }
+
+    private func stopActiveRecording(limitReached: Bool = false) {
+        recordingLimitTask?.cancel()
+        recordingLimitTask = nil
         Task {
-            guard let wavData = audioRecorder.stopRecording() else {
-                self.statusMessage = "無法取得錄音檔"
+            if limitReached {
+                self.setLocalizedStatus("錄音已達 10 分鐘上限，正在處理...")
+            }
+            guard let wavData = await audioRecorder.stopRecording() else {
+                self.setLocalizedStatus("無法取得錄音檔", isError: true)
                 self.isRecording = false
                 return
             }
@@ -80,8 +157,19 @@ class MainViewModel: ObservableObject, TranscriptionProgressDelegate {
             generator.impactOccurred()
             #endif
             
-            // Starts processing pipeline
-            let _ = await pipeline.process(wavData: wavData)
+            // 快照本次錄音意圖，處理途中即使使用者改設定也不改變目標。
+            let intentSnapshot = activeIntent
+            // Consent may be withdrawn while recording. Re-check immediately
+            // before the first provider call and discard the in-memory WAV.
+            guard ApiConfig.shared.hasCloudProcessingConsent else {
+                self.isProcessing = false
+                self.setLocalizedStatus(
+                    "雲端處理同意已撤回，本次錄音已刪除",
+                    isError: true
+                )
+                return
+            }
+            let _ = await pipeline.process(wavData: wavData, intent: intentSnapshot)
         }
     }
     
@@ -89,20 +177,26 @@ class MainViewModel: ObservableObject, TranscriptionProgressDelegate {
     
     nonisolated func onWhisperStarted() {
         Task { @MainActor in
-            self.statusMessage = "正在將語音轉文字 (Whisper)..."
+            self.setLocalizedStatus("正在將語音轉文字 (Whisper)...")
         }
     }
     
     nonisolated func onWhisperCompleted(text: String) {
         Task { @MainActor in
             self.rawText = text
-            self.transcribedText = text
+            if !self.activeIntent.isTranslation {
+                self.transcribedText = text
+            }
         }
     }
     
     nonisolated func onLlmStarted() {
         Task { @MainActor in
-            self.statusMessage = "正在潤飾文句與繁體處理 (AI)..."
+            self.setLocalizedStatus(
+                self.activeIntent.isTranslation
+                    ? "正在翻譯所選語言 (AI)..."
+                    : "正在整理逐字稿 (AI)..."
+            )
         }
     }
     
@@ -112,7 +206,7 @@ class MainViewModel: ObservableObject, TranscriptionProgressDelegate {
             if result.success {
                 self.transcribedText = result.text
                 self.rawText = result.rawText
-                self.statusMessage = "處理完成"
+                self.setLocalizedStatus("處理完成")
                 
                 // Success Haptic
                 #if canImport(UIKit)
@@ -120,7 +214,16 @@ class MainViewModel: ObservableObject, TranscriptionProgressDelegate {
                 generator.notificationOccurred(.success)
                 #endif
             } else {
-                self.statusMessage = "處理失敗: \(result.error ?? "Unknown error")"
+                self.setStatusMessage(
+                    L10n.format(
+                        "處理失敗: %@",
+                        result.error ?? L10n.text("未知錯誤")
+                    ),
+                    isError: true
+                )
+                if self.activeIntent.isTranslation {
+                    self.transcribedText = ""
+                }
                 
                 // Error Haptic
                 #if canImport(UIKit)
@@ -134,7 +237,26 @@ class MainViewModel: ObservableObject, TranscriptionProgressDelegate {
     nonisolated func onError(error: String) {
         Task { @MainActor in
             self.isProcessing = false
-            self.statusMessage = "發生錯誤: \(error)"
+            if self.activeIntent.isTranslation {
+                self.transcribedText = ""
+            }
+            self.setStatusMessage(
+                L10n.format("發生錯誤: %@", error),
+                isError: true
+            )
         }
+    }
+
+    func setCopiedStatus() {
+        setLocalizedStatus("已複製結果")
+    }
+
+    private func setLocalizedStatus(_ key: String, isError: Bool = false) {
+        setStatusMessage(L10n.text(key), isError: isError)
+    }
+
+    private func setStatusMessage(_ message: String, isError: Bool = false) {
+        statusMessage = message
+        statusIsError = isError
     }
 }

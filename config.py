@@ -3,11 +3,14 @@ config.py — 設定與資料持久化層
 所有本地資料都存在 ~/.voice-input/（可能是 symlink 指向外接 SSD）
 """
 import json
+import math
 import os
 import platform
 import stat
 import threading
 import time
+import tempfile
+from contextlib import contextmanager
 from datetime import datetime, date
 
 from hotkey_config import (
@@ -17,14 +20,147 @@ from hotkey_config import (
     PREVIOUS_V2_ACTION_HOTKEYS,
     RECOMMENDED_ACTION_HOTKEYS,
     RECOMMENDED_RECORD_HOTKEY,
+    RECOMMENDED_TRANSLATION_HOTKEY,
 )
 
 # 跨 thread 序列化 stats.json 的 read-modify-write，避免 update_stats 與 _track_usage race
 _STATS_LOCK = threading.RLock()
+_AUDIO_BACKUP_MANIFEST_LOCK = threading.RLock()
+_RUNTIME_DATA_WRITE_LOCK = threading.RLock()
+_CLOUD_BUDGET_LOCK = threading.RLock()
+_RUNTIME_DATA_WRITES_BLOCKED = False
+
+# Keep the backend cutoff aligned with the Cost & Audit estimates.  These are
+# conservative product estimates (JPY), not provider billing guarantees.
+CLOUD_PRICING_JPY = {
+    "groq_stt_audio_sec": 0.00065,
+    "openai_stt_audio_sec": 0.0009,
+    "groq_input_1k": 0.06,
+    "groq_output_1k": 0.09,
+    "openai_input_1k": 0.38,
+    "openai_output_1k": 1.50,
+    "anthropic_input_1k": 0.12,
+    "anthropic_output_1k": 0.60,
+    "openrouter_input_1k": 0.0,
+    "openrouter_output_1k": 0.0,
+}
 
 
 class ConfigSaveError(RuntimeError):
     """A requested config update could not be persisted safely."""
+
+
+class ConfigValidationError(ValueError):
+    """A config field has the wrong type or an unsafe runtime value."""
+
+    def __init__(self, field, message):
+        super().__init__(message)
+        self.field = field
+
+
+def block_runtime_data_writes():
+    """Permanently stop runtime-data persistence for the current process."""
+    global _RUNTIME_DATA_WRITES_BLOCKED
+    with _RUNTIME_DATA_WRITE_LOCK:
+        _RUNTIME_DATA_WRITES_BLOCKED = True
+
+
+def resume_runtime_data_writes():
+    """Start a fresh persistence lifecycle (used by process startup and tests)."""
+    global _RUNTIME_DATA_WRITES_BLOCKED
+    with _RUNTIME_DATA_WRITE_LOCK:
+        _RUNTIME_DATA_WRITES_BLOCKED = False
+
+
+@contextmanager
+def runtime_data_write_guard():
+    """Serialize a runtime write against the privacy wipe stop boundary."""
+    with _RUNTIME_DATA_WRITE_LOCK:
+        yield not _RUNTIME_DATA_WRITES_BLOCKED
+
+
+def estimate_current_month_cloud_cost_jpy(stats=None):
+    """Return the same current-month estimate used by the local cost UI."""
+    if stats is None:
+        stats = load_stats()
+    month_key = date.today().strftime("%Y-%m")
+    row = (stats.get("usage", {}) if isinstance(stats, dict) else {}).get(
+        month_key, {}
+    )
+    if not isinstance(row, dict):
+        row = {}
+
+    def number(key):
+        try:
+            return max(0.0, float(row.get(key, 0) or 0))
+        except (TypeError, ValueError):
+            return 0.0
+
+    p = CLOUD_PRICING_JPY
+    return (
+        number("groq_input_tokens") / 1000 * p["groq_input_1k"]
+        + number("groq_output_tokens") / 1000 * p["groq_output_1k"]
+        + number("groq_whisper_seconds") * p["groq_stt_audio_sec"]
+        + number("openai_input_tokens") / 1000 * p["openai_input_1k"]
+        + number("openai_output_tokens") / 1000 * p["openai_output_1k"]
+        + number("openai_whisper_seconds") * p["openai_stt_audio_sec"]
+        + number("anthropic_input_tokens") / 1000 * p["anthropic_input_1k"]
+        + number("anthropic_output_tokens") / 1000 * p["anthropic_output_1k"]
+        + number("openrouter_input_tokens") / 1000 * p["openrouter_input_1k"]
+        + number("openrouter_output_tokens") / 1000 * p["openrouter_output_1k"]
+    )
+
+
+def cloud_budget_status(config, stats=None, source=None):
+    """Return a fail-closed decision for a cloud STT/LLM request."""
+    enabled = bool(config.get("enable_budget_cutoff", False))
+    try:
+        budget = float(config.get("monthly_budget_jpy", 0) or 0)
+    except (TypeError, ValueError):
+        return {"allowed": False, "budget_jpy": 0.0, "spent_jpy": 0.0}
+    if not enabled or budget == 0:
+        return {"allowed": True, "budget_jpy": budget, "spent_jpy": 0.0}
+    if budget < 0:
+        return {
+            "allowed": False,
+            "budget_jpy": budget,
+            "spent_jpy": 0.0,
+            "reason": "invalid_budget",
+        }
+    spent = estimate_current_month_cloud_cost_jpy(stats)
+    source_name = str(source or "").strip().lower()
+    if source_name.startswith("openrouter"):
+        model = str(config.get("openrouter_model", "")).strip().lower()
+        if not model.endswith(":free"):
+            # OpenRouter prices vary by selected model.  A zero placeholder
+            # must never turn the hard cutoff into a paid-call bypass.
+            return {
+                "allowed": False,
+                "budget_jpy": budget,
+                "spent_jpy": spent,
+                "reason": "unpriced_provider",
+            }
+    allowed = spent < budget
+    return {"allowed": allowed, "budget_jpy": budget, "spent_jpy": spent}
+
+
+@contextmanager
+def cloud_budget_guard(config, source=None):
+    """Serialize metered calls when hard cutoff is enabled.
+
+    Callers must record usage synchronously before leaving the context so the
+    next concurrent request observes the completed charge.
+    """
+    enabled = bool(config.get("enable_budget_cutoff", False))
+    try:
+        budget = float(config.get("monthly_budget_jpy", 0) or 0)
+    except (TypeError, ValueError):
+        budget = -1
+    if not enabled or budget == 0:
+        yield cloud_budget_status(config, stats={}, source=source)
+        return
+    with _CLOUD_BUDGET_LOCK:
+        yield cloud_budget_status(config, source=source)
 
 
 def _ensure_data_dir():
@@ -476,6 +612,7 @@ HISTORY_FILE = os.path.join(DATA_DIR, "history.json")
 STATS_FILE = os.path.join(DATA_DIR, "stats.json")
 SMART_REPLACE_FILE = os.path.join(DATA_DIR, "smart_replace.json")
 AUDIT_LOG_FILE = os.path.join(DATA_DIR, "audit.log")
+AUDIO_BACKUP_MANIFEST_FILE = os.path.join(DATA_DIR, "audio_backup_manifest.json")
 
 # ─── 本地模型路徑映射（短名稱 → 實際路徑）────────────────
 LOCAL_MODEL_PATHS = {
@@ -498,10 +635,12 @@ DEFAULT_CONFIG = {
     "claude_model": "claude-haiku-4-5-20251001",
     "hotkey_mode": "push_to_talk",          # push_to_talk | toggle
     "hotkey": RECOMMENDED_RECORD_HOTKEY,    # 預設避開 Codex right_cmd；可在 Dashboard 即時修改
-    "hotkey_config_version": 3,             # 獨立於 Keychain schema，確保舊熱鍵可先安全遷移
+    "translation_hotkey": RECOMMENDED_TRANSLATION_HOTKEY,  # Fn + 錄音鍵；同一段 STT 轉為 1–4 語
+    "hotkey_config_version": 4,             # 獨立於 Keychain schema，確保舊熱鍵可先安全遷移
     "language": "auto",                     # auto, zh, ja, en
     "ui_language": "auto",                  # Dashboard UI 語言：auto / ja / en / zh-TW
-    "target_language": "",                  # 翻譯目標語言（空 = 不翻譯）
+    "target_language": "",                  # 舊版單語全域翻譯；保留相容，新流程請用 translation_target_languages
+    "translation_target_languages": ["ja"], # 獨立翻譯錄音的目標語言（zh-Hant/ja/en/ko，1–4）
     "llm_engine": "groq",                   # 首選 LLM 引擎（groq/openrouter/claude/openai/ollama）
     "enable_claude_polish": True,           # Claude 後處理潤稿
     "enable_auto_learn": True,              # 自動學習修正
@@ -528,6 +667,7 @@ DEFAULT_CONFIG = {
     "continuous_min_segment_duration": 0.6, # 連續模式：低於此秒數的片段直接丟棄（防止單音/咳嗽觸發）
     "continuous_max_segment_duration": 30.0,# 連續模式：超過此秒數強制切片（避免 Whisper 吃太重）
     "continuous_max_pending_segments": 2,   # 連續模式同時處理中的片段上限，避免 STT/LLM 堆積吃記憶體
+    "ptt_max_inflight_transcriptions": 2,   # PTT 錄音中/排隊/處理中的 pipeline 上限
     "enable_audio_gate": True,              # 音訊品質前置守門（太靜/削峰/純噪音直接 skip Whisper）
     "audio_gate_rms_min": 0.003,            # RMS 下限（低於此=靜音/背景音）
     "audio_gate_clipping_max": 0.05,        # 削峰樣本比例上限（>5% 視為失真）
@@ -567,10 +707,98 @@ DEFAULT_CONFIG = {
     },
     "openai_model": "gpt-4o",                 # OpenAI LLM 模型
     "app_styles": {},                          # App 感知風格（空 = 使用 DEFAULT_APP_STYLES）
-    "claude_system_prompt": "",  # 空字串 = 使用 _DICTATE_SYSTEM 內建 prompt
+    # Legacy key retained for config compatibility. This is now an additive,
+    # provider-independent style hint; it can no longer replace the locked
+    # transcription-only system contract.
+    "claude_system_prompt": "",
     "active_scene": "general",
     "dashboard_port": 7865,
 }
+
+
+_CONFIG_NUMERIC_BOUNDS = {
+    "hotkey_config_version": (0, 1_000_000),
+    "fewshot_count": (0, 20),
+    "fewshot_min_input_chars": (0, 10_000),
+    "sample_rate": (8000, 192000),
+    "max_recording_duration": (0.3, 3600),
+    "silence_threshold": (0, 1),
+    "silence_duration": (0.1, 60),
+    "hybrid_audio_threshold": (0.1, 3600),
+    "hybrid_text_threshold": (0, 1_000_000),
+    "llm_timeout_sec": (0.1, 600),
+    "stt_timeout_base_sec": (0.1, 600),
+    "stt_timeout_factor": (0, 20),
+    "stt_timeout_max_sec": (0.1, 3600),
+    "local_llm_timeout_sec": (0.1, 600),
+    "continuous_silence_duration": (0.1, 60),
+    "continuous_min_segment_duration": (0.1, 60),
+    "continuous_max_segment_duration": (0.3, 3600),
+    "continuous_max_pending_segments": (1, 16),
+    "ptt_max_inflight_transcriptions": (1, 8),
+    "audio_gate_rms_min": (0, 1),
+    "audio_gate_clipping_max": (0, 1),
+    "audio_gate_crest_min": (0, 1_000),
+    "audio_gate_crest_max": (0, 1_000),
+    "voiceprint_threshold": (0, 1),
+    "typing_speed_cpm": (1, 10_000),
+    "monthly_budget_jpy": (0, 1_000_000_000),
+    "dashboard_port": (1024, 65535),
+}
+
+
+def validate_config_update(data):
+    """Validate known config values before they reach runtime threads."""
+    if not isinstance(data, dict):
+        raise ConfigValidationError("config", "config update must be an object")
+    for field, value in data.items():
+        if field not in DEFAULT_CONFIG:
+            raise ConfigValidationError(field, "unknown config field")
+        default = DEFAULT_CONFIG[field]
+        if isinstance(default, bool):
+            valid_type = isinstance(value, bool)
+        elif isinstance(default, int):
+            valid_type = isinstance(value, int) and not isinstance(value, bool)
+        elif isinstance(default, float):
+            valid_type = isinstance(value, (int, float)) and not isinstance(value, bool)
+        elif isinstance(default, str):
+            valid_type = isinstance(value, str)
+        elif isinstance(default, list):
+            valid_type = isinstance(value, list)
+        elif isinstance(default, dict):
+            valid_type = isinstance(value, dict)
+        else:
+            valid_type = isinstance(value, type(default))
+        if not valid_type:
+            raise ConfigValidationError(
+                field,
+                f"{field} has invalid type",
+            )
+        if field in _CONFIG_NUMERIC_BOUNDS:
+            number = float(value)
+            minimum, maximum = _CONFIG_NUMERIC_BOUNDS[field]
+            if not math.isfinite(number) or not minimum <= number <= maximum:
+                raise ConfigValidationError(
+                    field,
+                    f"{field} must be between {minimum} and {maximum}",
+                )
+    return dict(data)
+
+
+def _sanitize_saved_config(saved):
+    """Drop persisted values that cannot satisfy the runtime schema."""
+    clean = {}
+    for field, value in saved.items():
+        if field == "config_version":
+            if isinstance(value, int) and not isinstance(value, bool) and value >= 1:
+                clean[field] = value
+            continue
+        try:
+            validate_config_update({field: value})
+        except ConfigValidationError:
+            continue
+        clean[field] = value
+    return clean
 
 
 def _ensure_dir():
@@ -597,9 +825,10 @@ def _ensure_dir():
 #   4 = v2.5.3 build candidate：短暫使用 F9/F10/F11 action chord
 #   5 = v2.5.3 final：純 modifier action chord + 獨立 hotkey migration marker
 # HOTKEY_CONFIG_VERSION 3：Cancel 改用 ctrl+cmd，避開 PTT 的 Option/Shift family
+# HOTKEY_CONFIG_VERSION 4：新增獨立翻譯錄音 chord；安全配置才自動啟用
 # 升級流程：load_config 時若偵測舊版 schema，套用對應 migration，再覆寫 config_version。
 CONFIG_VERSION = 5
-HOTKEY_CONFIG_VERSION = 3
+HOTKEY_CONFIG_VERSION = 4
 
 def _migrate_config(saved):
     """套用版本之間的 migration。回傳 (migrated_dict, did_migrate: bool)。"""
@@ -697,6 +926,20 @@ def _migrate_hotkeys_v5(saved):
         for field, old_values in legacy_candidates.items():
             if saved.get(field) in old_values:
                 saved[field] = replacements[field]
+        if "translation_hotkey" not in saved:
+            safe_for_recommended_translation = (
+                saved.get("hotkey", RECOMMENDED_RECORD_HOTKEY)
+                == RECOMMENDED_RECORD_HOTKEY
+                and all(
+                    saved.get(field, recommended) == recommended
+                    for field, recommended in RECOMMENDED_ACTION_HOTKEYS.items()
+                )
+            )
+            saved["translation_hotkey"] = (
+                RECOMMENDED_TRANSLATION_HOTKEY
+                if safe_for_recommended_translation
+                else ""
+            )
         saved["hotkey_config_version"] = HOTKEY_CONFIG_VERSION
         did_migrate = True
 
@@ -736,8 +979,20 @@ def _normalize_known_stale_model_ids(saved):
 def load_config():
     _ensure_dir()
     if os.path.exists(CONFIG_FILE):
-        with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-            saved = json.load(f)
+        try:
+            with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+                saved = json.load(f)
+            if not isinstance(saved, dict):
+                raise ValueError("config root must be an object")
+        except (json.JSONDecodeError, UnicodeDecodeError, ValueError):
+            backup = f"{CONFIG_FILE}.bad.{time.time_ns()}"
+            try:
+                os.replace(CONFIG_FILE, backup)
+                os.chmod(backup, 0o600)
+            except OSError:
+                pass
+            return {**DEFAULT_CONFIG, "config_version": CONFIG_VERSION}
+        saved = _sanitize_saved_config(saved)
         saved, migrated_basic = _migrate_config(saved)
 
         # v2 → v3：若 keyring 可用，把明文 key 搬進 Keychain（idempotent）
@@ -765,15 +1020,13 @@ def load_config():
             try:
                 # 寫回 JSON 時用 _strip_keychain_keys_for_json 把已搬到 Keychain 的 key 從明文剝離
                 to_write = _strip_keychain_keys_for_json(merged)
-                with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-                    json.dump(to_write, f, ensure_ascii=False, indent=2)
-                os.chmod(CONFIG_FILE, 0o600)
+                _atomic_write_config_json(to_write)
                 print(
                     " ⚙️ config.json migrated "
                     f"(schema v{saved.get('config_version', 1)}, "
                     f"hotkey v{saved.get('hotkey_config_version', 0)})"
                 )
-            except OSError:
+            except ConfigSaveError:
                 pass
         return merged
     return {**DEFAULT_CONFIG, "config_version": CONFIG_VERSION}
@@ -794,6 +1047,56 @@ def _strip_keychain_keys_for_json(config):
         if _keychain_get(key_name):
             cleaned[key_name] = ""
     return cleaned
+
+
+def _atomic_write_config_json(payload):
+    """Durably replace config.json without exposing a partial file."""
+    try:
+        _atomic_write_private_json(CONFIG_FILE, payload)
+    except (OSError, TypeError, ValueError) as exc:
+        raise ConfigSaveError(f"failed to atomically save config: {exc}") from exc
+
+
+def _atomic_write_private_json(path, payload):
+    """Atomically replace one app-owned JSON file with mode 0600."""
+    tmp_path = None
+    parent = os.path.dirname(path) or "."
+    os.makedirs(parent, mode=0o700, exist_ok=True)
+    try:
+        fd, tmp_path = tempfile.mkstemp(
+            dir=parent,
+            prefix=f".{os.path.basename(path)}.",
+            suffix=".tmp",
+        )
+        os.fchmod(fd, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(payload, f, ensure_ascii=False, indent=2)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp_path, path)
+        tmp_path = None
+        try:
+            # mkstemp/fchmod already make the replacement 0600.  This is only
+            # a defensive re-check and must not turn a successful replace into
+            # a reported save failure on filesystems that reject chmod.
+            os.chmod(path, 0o600)
+        except OSError:
+            pass
+        try:
+            directory_fd = os.open(parent, os.O_RDONLY)
+            try:
+                os.fsync(directory_fd)
+            finally:
+                os.close(directory_fd)
+        except OSError:
+            # Some removable/network filesystems do not support directory fsync.
+            pass
+    finally:
+        if tmp_path:
+            try:
+                os.remove(tmp_path)
+            except OSError:
+                pass
 
 
 def save_config(config):
@@ -845,13 +1148,7 @@ def save_config(config):
         # keyring 不可用：fallback 到舊行為（明文 + chmod 600）
         to_write = config
 
-    with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-        json.dump(to_write, f, ensure_ascii=False, indent=2)
-    # 強制 config.json 權限為 600（含 fallback 路徑的 API Key，僅本人可讀寫）
-    try:
-        os.chmod(CONFIG_FILE, 0o600)
-    except OSError:
-        pass
+    _atomic_write_config_json(to_write)
 
 
 # ─── Dictionary ──────────────────────────────────────────
@@ -874,11 +1171,88 @@ def load_dictionary():
 def save_dictionary(d):
     """原子寫入（tmp + os.replace），與 save_history 一致 —
     個人詞庫是這個產品的核心資產，process 在寫入中途 crash 不能損毀檔案。"""
+    with runtime_data_write_guard() as allowed:
+        if not allowed:
+            return False
+        _ensure_dir()
+        _atomic_write_private_json(DICTIONARY_FILE, d)
+        return True
+
+
+# ─── App-owned audio backup manifest ─────────────────────
+
+def _load_audio_backup_manifest_unlocked():
+    if not os.path.exists(AUDIO_BACKUP_MANIFEST_FILE):
+        return []
+    try:
+        with open(AUDIO_BACKUP_MANIFEST_FILE, "r", encoding="utf-8") as f:
+            value = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return []
+    if not isinstance(value, list):
+        return []
+    return [path for path in value if isinstance(path, str) and path]
+
+
+def _save_audio_backup_manifest_unlocked(paths):
     _ensure_dir()
-    tmp = DICTIONARY_FILE + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(d, f, ensure_ascii=False, indent=2)
-    os.replace(tmp, DICTIONARY_FILE)
+    manifest_file = AUDIO_BACKUP_MANIFEST_FILE
+    if not paths:
+        try:
+            os.remove(manifest_file)
+        except FileNotFoundError:
+            pass
+        return
+    _atomic_write_private_json(manifest_file, paths)
+
+
+def register_audio_backup(path):
+    """Register one exact app-created WAV before it is moved into a user folder."""
+    resolved = os.path.realpath(os.path.abspath(os.path.expanduser(str(path))))
+    if not resolved.lower().endswith(".wav"):
+        raise ValueError("audio backup must be a WAV file")
+    with runtime_data_write_guard() as allowed:
+        if not allowed:
+            return None
+        with _AUDIO_BACKUP_MANIFEST_LOCK:
+            paths = _load_audio_backup_manifest_unlocked()
+            if resolved not in paths:
+                paths.append(resolved)
+                _save_audio_backup_manifest_unlocked(paths)
+    return resolved
+
+
+def unregister_audio_backup(path):
+    resolved = os.path.realpath(os.path.abspath(os.path.expanduser(str(path))))
+    with runtime_data_write_guard() as allowed:
+        if not allowed:
+            return False
+        with _AUDIO_BACKUP_MANIFEST_LOCK:
+            paths = [
+                item for item in _load_audio_backup_manifest_unlocked()
+                if item != resolved
+            ]
+            _save_audio_backup_manifest_unlocked(paths)
+    return True
+
+
+def delete_registered_audio_backups():
+    """Delete exact manifest entries; never glob a configured backup directory."""
+    deleted = []
+    failed = []
+    with _AUDIO_BACKUP_MANIFEST_LOCK:
+        remaining = []
+        for path in _load_audio_backup_manifest_unlocked():
+            try:
+                os.remove(path)
+                deleted.append(path)
+            except FileNotFoundError:
+                deleted.append(path)
+            except OSError as exc:
+                remaining.append(path)
+                failed.append((path, str(exc)))
+        _save_audio_backup_manifest_unlocked(remaining)
+    return deleted, failed
 
 
 # ─── History ─────────────────────────────────────────────
@@ -905,15 +1279,16 @@ def load_history():
 
 
 def save_history(history):
-    _ensure_dir()
-    history = history[-2000:]  # 保留最近 2000 筆
-    # Capture once：測試／runtime config reload 可能在背景寫入期間切換全域 path；
-    # tmp 與 destination 必須永遠位於同一 filesystem 才能原子 os.replace。
-    history_file = HISTORY_FILE
-    tmp = history_file + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(history, f, ensure_ascii=False, indent=2)
-    os.replace(tmp, history_file)
+    with runtime_data_write_guard() as allowed:
+        if not allowed:
+            return False
+        _ensure_dir()
+        history = history[-2000:]  # 保留最近 2000 筆
+        # Capture once：測試／runtime config reload 可能在背景寫入期間切換全域 path；
+        # tmp 與 destination 必須永遠位於同一 filesystem 才能原子 os.replace。
+        history_file = HISTORY_FILE
+        _atomic_write_private_json(history_file, history)
+        return True
 
 
 # ─── Stats ───────────────────────────────────────────────
@@ -956,13 +1331,13 @@ def load_stats():
 
 
 def save_stats(stats):
-    _ensure_dir()
     with _STATS_LOCK:
-        # 原子寫入：先寫 .tmp 再 rename，避免讀者看到半寫狀態
-        tmp = STATS_FILE + ".tmp"
-        with open(tmp, "w", encoding="utf-8") as f:
-            json.dump(stats, f, ensure_ascii=False, indent=2)
-        os.replace(tmp, STATS_FILE)
+        with runtime_data_write_guard() as allowed:
+            if not allowed:
+                return False
+            _ensure_dir()
+            _atomic_write_private_json(STATS_FILE, stats)
+            return True
 
 
 def update_stats_atomic(mutator):
@@ -995,9 +1370,12 @@ def load_smart_replace():
 
 
 def save_smart_replace(rules):
-    _ensure_dir()
-    with open(SMART_REPLACE_FILE, "w", encoding="utf-8") as f:
-        json.dump(rules, f, ensure_ascii=False, indent=2)
+    with runtime_data_write_guard() as allowed:
+        if not allowed:
+            return False
+        _ensure_dir()
+        _atomic_write_private_json(SMART_REPLACE_FILE, rules)
+        return True
 
 
 def update_stats(text, audio_duration, config):

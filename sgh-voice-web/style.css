@@ -1287,6 +1287,16 @@ svg {
     font-size: 14px;
 }
 
+.distribution-alert .distribution-responsibility {
+    padding-top: 18px;
+    border-top: 1px solid rgba(138, 72, 29, 0.22);
+    font-size: 13px;
+}
+
+.distribution-responsibility strong {
+    color: #5d3116;
+}
+
 .distribution-alert ul {
     grid-column: 2;
     display: grid;
@@ -1333,6 +1343,102 @@ svg {
     gap: 22px;
     align-items: start;
     margin-top: 24px;
+}
+
+.download-registration {
+    display: grid;
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+    gap: 22px 36px;
+    margin-top: 24px;
+    padding: 28px 30px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+    background: var(--surface-strong);
+    box-shadow: var(--shadow-sm);
+}
+
+.registration-heading > span {
+    color: var(--blue);
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+}
+
+.registration-heading h3 {
+    margin-top: 5px;
+    font-size: clamp(20px, 2vw, 26px);
+    letter-spacing: -0.035em;
+}
+
+.registration-heading p {
+    margin-top: 8px;
+    color: var(--muted);
+    font-size: 13px;
+}
+
+.registration-fields {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+}
+
+.registration-field {
+    display: grid;
+    gap: 7px;
+    color: var(--ink-soft);
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.registration-field input {
+    width: 100%;
+    min-height: 48px;
+    padding: 0 14px;
+    border: 1px solid var(--line-strong);
+    border-radius: 11px;
+    color: var(--ink);
+    background: #fff;
+    font: inherit;
+    font-size: 14px;
+    font-weight: 500;
+    outline: none;
+    transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.registration-field input:focus {
+    border-color: var(--blue);
+    box-shadow: 0 0 0 4px rgba(70, 89, 220, 0.14);
+}
+
+.registration-consent {
+    grid-column: 2;
+    margin-top: -2px;
+}
+
+.registration-consent a {
+    color: var(--blue);
+    font-weight: 750;
+}
+
+.registration-status {
+    grid-column: 2;
+    min-height: 20px;
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.registration-status[data-state="pending"] {
+    color: var(--blue);
+}
+
+.registration-status[data-state="success"] {
+    color: var(--success);
+    font-weight: 700;
+}
+
+.registration-status[data-state="error"] {
+    color: #a53a2d;
+    font-weight: 700;
 }
 
 .download-card {
@@ -2204,6 +2310,20 @@ svg {
 
     .download-card {
         padding: 24px 20px;
+    }
+
+    .download-registration {
+        grid-template-columns: 1fr;
+        padding: 24px 20px;
+    }
+
+    .registration-fields {
+        grid-template-columns: 1fr;
+    }
+
+    .registration-consent,
+    .registration-status {
+        grid-column: 1;
     }
 
     .release-meta {

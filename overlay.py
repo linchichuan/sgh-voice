@@ -83,22 +83,30 @@ class StatusOverlay:
             'zh-TW': {
                 'recording': '🔴  錄音中', 'processing': '⏳  辨識處理中', 'done': '✅  完成',
                 'paste_failed': '⚠️  已轉寫，輸入失敗',
-                'stage_stt': '🎧  辨識中', 'stage_llm': '✨  整理中', 'stage_paste': '📋  貼上中',
+                'translation_failed': '⚠️  翻譯失敗',
+                'stage_stt': '🎧  辨識中', 'stage_llm': '✨  整理中',
+                'stage_translate': '🌐  翻譯中', 'stage_paste': '📋  貼上中',
             },
             'zh-CN': {
                 'recording': '🔴  录音中', 'processing': '⏳  识别处理中', 'done': '✅  完成',
                 'paste_failed': '⚠️  已转写，输入失败',
-                'stage_stt': '🎧  识别中', 'stage_llm': '✨  整理中', 'stage_paste': '📋  粘贴中',
+                'translation_failed': '⚠️  翻译失败',
+                'stage_stt': '🎧  识别中', 'stage_llm': '✨  整理中',
+                'stage_translate': '🌐  翻译中', 'stage_paste': '📋  粘贴中',
             },
             'ja': {
                 'recording': '🔴  録音中', 'processing': '⏳  認識処理中', 'done': '✅  完了',
                 'paste_failed': '⚠️  文字起こし済み・入力失敗',
-                'stage_stt': '🎧  認識中', 'stage_llm': '✨  整理中', 'stage_paste': '📋  貼り付け中',
+                'translation_failed': '⚠️  翻訳に失敗しました',
+                'stage_stt': '🎧  認識中', 'stage_llm': '✨  整理中',
+                'stage_translate': '🌐  翻訳中', 'stage_paste': '📋  貼り付け中',
             },
             'en': {
                 'recording': '🔴  Recording', 'processing': '⏳  Processing', 'done': '✅  Done',
                 'paste_failed': '⚠️  Transcribed · insert failed',
-                'stage_stt': '🎧  Transcribing', 'stage_llm': '✨  Refining', 'stage_paste': '📋  Pasting',
+                'translation_failed': '⚠️  Translation failed',
+                'stage_stt': '🎧  Transcribing', 'stage_llm': '✨  Refining',
+                'stage_translate': '🌐  Translating', 'stage_paste': '📋  Pasting',
             },
         }
         return db[lang]
@@ -203,10 +211,10 @@ class StatusOverlay:
             Foundation.NSTimer.scheduledTimerWithTimeInterval_repeats_block_(
                 1.5, False, lambda t: self._window.orderOut_(None) if self._window else None
             )
-        elif status == "paste_failed":
+        elif status in {"paste_failed", "translation_failed"}:
             self._stop_animation()
             self._pending_stage_prefix = None
-            self._label.setStringValue_(self.texts["paste_failed"])
+            self._label.setStringValue_(self.texts[status])
             self._label.setTextColor_(
                 AppKit.NSColor.colorWithCalibratedRed_green_blue_alpha_(0.95, 0.68, 0.32, 1.0)
             )

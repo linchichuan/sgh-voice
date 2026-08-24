@@ -27,14 +27,17 @@ from multilingual import (
     resolve_output_language_hint,
 )
 from hotkey_config import (
+    ACTION_HOTKEY_FIELDS,
     FN_KEYCODE,
     HOTKEY_FIELDS,
     MODIFIER_KEYCODES,
     RECOMMENDED_RECORD_HOTKEY,
+    RECOMMENDED_TRANSLATION_HOTKEY,
     HotkeyValidationError,
     modifier_is_pressed,
     parse_hotkey,
 )
+from translation import TranslationError, normalize_translation_targets
 from text_insertion import (
     accessibility_is_trusted,
     capture_pasteboard,
@@ -48,9 +51,7 @@ from text_insertion import (
 
 
 _active_engines = []
-_ACTION_HOTKEY_FIELDS = tuple(
-    field for field in HOTKEY_FIELDS if field != "hotkey"
-)
+_ACTION_HOTKEY_FIELDS = ACTION_HOTKEY_FIELDS
 
 
 def _resource_path(*parts):
@@ -171,7 +172,13 @@ import time
 import argparse
 import webbrowser
 
-from config import load_config, save_config, update_stats
+from config import (
+    load_config,
+    register_audio_backup,
+    save_config,
+    unregister_audio_backup,
+    update_stats,
+)
 from memory import Memory
 from transcriber import Transcriber
 from recorder import Recorder
@@ -297,7 +304,14 @@ def _paste_log(msg):
     try:
         import os
         log_path = os.path.expanduser("~/.voice-input/paste_debug.log")
-        with open(log_path, "a", encoding="utf-8") as f:
+        os.makedirs(os.path.dirname(log_path), mode=0o700, exist_ok=True)
+        fd = os.open(
+            log_path,
+            os.O_WRONLY | os.O_CREAT | os.O_APPEND,
+            0o600,
+        )
+        os.chmod(log_path, 0o600)
+        with os.fdopen(fd, "a", encoding="utf-8") as f:
             from datetime import datetime
             f.write(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}\n")
     except Exception:
@@ -562,10 +576,17 @@ def show_copy_dialog(text):
 def notify(title, message):
     """非同步顯示 macOS 通知，不阻塞主流程"""
     try:
-        msg = message[:80].replace('"', '\\"')
+        # Never interpolate notification data into AppleScript source.  Quotes,
+        # backslashes and newlines are all valid notification text, but become
+        # executable AppleScript syntax when embedded in the ``-e`` program.
+        script = """on run argv
+    set notificationTitle to item 1 of argv
+    set notificationMessage to item 2 of argv
+    display notification notificationMessage with title notificationTitle sound name "Glass"
+end run"""
         subprocess.Popen([
             "osascript", "-e",
-            f'display notification "{msg}" with title "{title}" sound name "Glass"'
+            script, "--", str(title), str(message)[:80],
         ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except Exception:
         pass
@@ -577,7 +598,7 @@ class VoiceEngine:
     """語音輸入核心引擎，被 CLI / MenuBar / Dashboard 共用"""
 
     def __init__(self):
-        self.version = "2.6.0"
+        self.version = "2.7.0"
         self.config = load_config()
         self.memory = Memory()
         self.transcriber = Transcriber(self.config, self.memory)
@@ -599,6 +620,7 @@ class VoiceEngine:
         # gesture marks the exact recording before its callback thread runs.
         self._active_recording_tokens = set()
         self._cancelled_recording_tokens = set()
+        self._recording_context_by_token = {}
         self._stopping_recording_token = None
         self._processing_recording_tokens = []
         self._continuous_cancel_event = None
@@ -607,12 +629,45 @@ class VoiceEngine:
         self._inflight_transcriptions = 0
         # Cancel hotkey 標記：set 後 paste 階段會跳過
         self._cancel_inflight = False
+        # A privacy wipe is a process-level stop boundary.  Once armed, no new
+        # recording may create data until the app is restarted.
+        self._data_wipe_in_progress = False
+        self._backup_threads = set()
 
     def start_background_tasks(self):
         """主程式啟動後再跑背景任務，避免搶佔啟動時的系統資源"""
         if self.config.get("enable_hybrid_mode", True) and self.config.get("enable_model_warmup", False):
             print(get_i18n("log_warmup"))
             threading.Thread(target=self.transcriber.warmup, daemon=True).start()
+
+    def prepare_for_data_wipe(self, timeout=10.0):
+        """Block new recordings and wait until active data producers are idle.
+
+        The flag intentionally remains armed after success (or timeout).  A wipe
+        is a privacy stop boundary; restarting the app is the explicit way to
+        begin a fresh data lifecycle.
+        """
+        with self._state_lock:
+            self._data_wipe_in_progress = True
+
+        deadline = time.monotonic() + max(0.0, float(timeout))
+        while True:
+            with self._state_lock:
+                backup_threads = {
+                    thread for thread in getattr(self, "_backup_threads", set())
+                    if thread.is_alive()
+                }
+                self._backup_threads = backup_threads
+                quiescent = (
+                    not self.is_recording
+                    and self._inflight_transcriptions == 0
+                    and not backup_threads
+                )
+            if quiescent:
+                return True
+            if time.monotonic() >= deadline:
+                return False
+            time.sleep(0.02)
 
     def reload_config(self):
         previous = self.config
@@ -642,9 +697,54 @@ class VoiceEngine:
         if hotkeys_changed:
             log("ok", f"錄音熱鍵已即時更新: {self.config.get('hotkey')}")
 
-    def start_recording(self, from_hotkey=False):
+    def start_recording(
+        self,
+        from_hotkey=False,
+        mode="dictate",
+        translation_targets=None,
+    ):
         """from_hotkey=True 才會 arm push-to-talk watchdog；CLI/Dashboard/menu bar
-        從外部主動呼叫時請保持 False，否則會被 60s watchdog 截掉。"""
+        從外部主動呼叫時請保持 False，否則會被 60s watchdog 截掉。
+
+        ``mode`` 與翻譯目標會在錄音 token 建立時快照；Dashboard 中途變更
+        設定不會讓同一段音訊在處理階段漂移到另一組語言。
+        """
+        with self._state_lock:
+            if getattr(self, "_data_wipe_in_progress", False):
+                log("warn", "資料清除中；重新啟動 App 後才能開始新錄音")
+                return False
+            runtime_config = getattr(self, "config", {})
+            if not isinstance(runtime_config, dict):
+                runtime_config = {}
+            try:
+                max_inflight = max(
+                    1,
+                    int(runtime_config.get("ptt_max_inflight_transcriptions", 2)),
+                )
+            except (TypeError, ValueError):
+                max_inflight = 1
+            active_pipelines = max(
+                int(getattr(self, "_inflight_transcriptions", 0)),
+                len(getattr(self, "_active_recording_tokens", set())),
+            )
+            if active_pipelines >= max_inflight:
+                log("warn", "前一段語音仍在處理，已暫停新的錄音以避免工作堆積")
+                return False
+        if mode not in {"dictate", "translate"}:
+            log("warn", f"不支援的錄音模式: {mode}")
+            return False
+        normalized_targets = ()
+        if mode == "translate":
+            try:
+                normalized_targets = normalize_translation_targets(
+                    translation_targets
+                    if translation_targets is not None
+                    else self.config.get("translation_target_languages", [])
+                )
+            except TranslationError as exc:
+                log("warn", f"翻譯目標無效: {exc}")
+                notify("SGH Voice", f"翻譯目標無效：{exc}")
+                return False
         # stop_and_process/cancel_current 也使用這把鎖。新一段錄音只會在
         # 上一段 InputStream 完成 join、audio_data 已取走後才開始，避免舊 stop
         # 清掉新錄音的 buffer / start time / stop event。
@@ -658,6 +758,18 @@ class VoiceEngine:
                 self._record_start_ts = time.time()
                 recording_token = self._record_start_ts
                 self._active_recording_tokens.add(recording_token)
+                recording_contexts = getattr(
+                    self,
+                    "_recording_context_by_token",
+                    None,
+                )
+                if recording_contexts is None:
+                    recording_contexts = {}
+                    self._recording_context_by_token = recording_contexts
+                recording_contexts[recording_token] = {
+                    "mode": mode,
+                    "translation_targets": list(normalized_targets),
+                }
 
             recorder_started = False
             try:
@@ -673,6 +785,11 @@ class VoiceEngine:
                             self._record_start_ts = None
                         self._active_recording_tokens.discard(recording_token)
                         self._cancelled_recording_tokens.discard(recording_token)
+                        getattr(
+                            self,
+                            "_recording_context_by_token",
+                            {},
+                        ).pop(recording_token, None)
                     log("warn", "recorder 尚未釋放，略過本次錄音啟動")
                     self._safe_status_change("idle")
                     return False
@@ -735,8 +852,71 @@ class VoiceEngine:
                         self._record_start_ts = None
                     self._active_recording_tokens.discard(recording_token)
                     self._cancelled_recording_tokens.discard(recording_token)
+                    getattr(
+                        self,
+                        "_recording_context_by_token",
+                        {},
+                    ).pop(recording_token, None)
                 self._safe_status_change("idle")
                 raise
+
+    def update_recording_intent(self, mode, translation_targets=None):
+        """Upgrade the active chord intent without restarting the microphone.
+
+        This closes the normal-chord-prefix race when the user presses the
+        translation modifier a fraction later: the already-running audio stream
+        is retained, while the token snapshot becomes a translation request.
+        """
+
+        if mode not in {"dictate", "translate"}:
+            return False
+        normalized_targets = ()
+        if mode == "translate":
+            try:
+                normalized_targets = normalize_translation_targets(
+                    translation_targets
+                    if translation_targets is not None
+                    else self.config.get("translation_target_languages", [])
+                )
+            except TranslationError as exc:
+                log("warn", f"翻譯目標無效: {exc}")
+                return False
+        with self._state_lock:
+            token = self._record_start_ts
+            if not self.is_recording or token not in self._active_recording_tokens:
+                return False
+            recording_contexts = getattr(
+                self,
+                "_recording_context_by_token",
+                None,
+            )
+            if recording_contexts is None:
+                recording_contexts = {}
+                self._recording_context_by_token = recording_contexts
+            recording_contexts[token] = {
+                "mode": mode,
+                "translation_targets": list(normalized_targets),
+            }
+        log(
+            "info",
+            "錄音意圖切換為翻譯: "
+            + ", ".join(normalized_targets)
+            if mode == "translate"
+            else "錄音意圖切換為一般口述",
+        )
+        return True
+
+    def active_recording_intent(self):
+        with self._state_lock:
+            context = getattr(
+                self,
+                "_recording_context_by_token",
+                {},
+            ).get(
+                self._record_start_ts,
+                {},
+            )
+            return context.get("mode", "dictate")
 
     def _on_recorder_error(self, msg, armed_for_ts):
         """recorder thread 回報「麥克風串流開啟失敗」：重置 engine 狀態 + 明確告知使用者。
@@ -749,6 +929,11 @@ class VoiceEngine:
             self._record_start_ts = None
             self._active_recording_tokens.discard(armed_for_ts)
             self._cancelled_recording_tokens.discard(armed_for_ts)
+            getattr(
+                self,
+                "_recording_context_by_token",
+                {},
+            ).pop(armed_for_ts, None)
         self._cancel_watchdog()
         log("error", f"🎙 {msg}")
         log("warn", "已重新初始化音訊系統，請再按一次熱鍵重試；若仍失敗請檢查 系統設定→隱私權與安全性→麥克風，或重啟 App")
@@ -867,6 +1052,11 @@ class VoiceEngine:
         with self._state_lock:
             self._active_recording_tokens.discard(recording_token)
             self._cancelled_recording_tokens.discard(recording_token)
+            getattr(
+                self,
+                "_recording_context_by_token",
+                {},
+            ).pop(recording_token, None)
             self._processing_recording_tokens = [
                 token
                 for token in self._processing_recording_tokens
@@ -916,7 +1106,13 @@ class VoiceEngine:
             self._safe_status_change("idle")
         return True
 
-    def stop_and_process(self, mode="dictate", edit_context="", sync=False):
+    def stop_and_process(
+        self,
+        mode=None,
+        edit_context="",
+        sync=False,
+        translation_targets=None,
+    ):
         """停止錄音 → 立刻釋放 engine（可開新錄音）→ 轉寫/貼上在背景跑。
         sync=True 時改為同步等待轉寫結果（CLI/REPL 用）。"""
         # Claim engine state and fully release the old PortAudio stream as one
@@ -930,6 +1126,16 @@ class VoiceEngine:
                 if not self.is_recording:
                     return None
                 recording_token = self._record_start_ts
+                recording_context = dict(
+                    getattr(
+                        self,
+                        "_recording_context_by_token",
+                        {},
+                    ).get(
+                        recording_token,
+                        {"mode": "dictate", "translation_targets": []},
+                    )
+                )
                 self.is_recording = False
                 self._record_start_ts = None
                 self._stopping_recording_token = recording_token
@@ -946,6 +1152,14 @@ class VoiceEngine:
 
         if self._discard_cancelled_recording(recording_token, filepath):
             return None
+
+        if mode is None:
+            mode = recording_context.get("mode", "dictate")
+        if translation_targets is None:
+            translation_targets = recording_context.get(
+                "translation_targets",
+                [],
+            )
 
         if (audio_array is None or (hasattr(audio_array, '__len__') and len(audio_array) == 0)) and not filepath:
             # 不可以靜默：使用者按了停止卻什麼都沒發生，會以為 App 壞了。
@@ -983,6 +1197,7 @@ class VoiceEngine:
                 mode,
                 edit_context,
                 recording_token,
+                translation_targets,
             )
 
         threading.Thread(
@@ -994,6 +1209,7 @@ class VoiceEngine:
                 mode,
                 edit_context,
                 recording_token,
+                translation_targets,
             ),
             daemon=True,
         ).start()
@@ -1007,6 +1223,7 @@ class VoiceEngine:
         mode,
         edit_context,
         recording_token=None,
+        translation_targets=None,
     ):
         """背景跑：Whisper → 後處理 → 自動貼上。paste 用 lock 序列化。"""
         if self._discard_cancelled_recording(recording_token, filepath):
@@ -1041,6 +1258,14 @@ class VoiceEngine:
             try: self.overlay.update_stage(stage)
             except Exception: pass
 
+        def _should_cancel_pipeline():
+            with self._state_lock:
+                if getattr(self, "_data_wipe_in_progress", False):
+                    return True
+                if recording_token is not None:
+                    return recording_token in self._cancelled_recording_tokens
+                return bool(self._cancel_inflight)
+
         result = None
         cancelled_output = False
         paste_succeeded = None
@@ -1053,12 +1278,38 @@ class VoiceEngine:
             # audio_input dict now owns the ndarray reference; keep this frame lighter while
             # STT/LLM runs, especially when cloud STT reads the wav file directly.
             audio_array = None
-            result = self.transcriber.transcribe(audio_input, duration, mode, edit_context, on_stage=_on_stage)
+            result = self.transcriber.transcribe(
+                audio_input,
+                duration,
+                mode,
+                edit_context,
+                on_stage=_on_stage,
+                translation_targets=translation_targets,
+                should_cancel=_should_cancel_pipeline,
+            )
 
-            if result:
+            if result and result.get("error"):
+                error_code = result.get("error")
+                error_detail = result.get("error_detail", "")
+                if error_code == "translation_failed":
+                    message = "翻譯失敗：請確認已設定可用的 LLM API Key 或稍後重試"
+                else:
+                    message = f"翻譯要求無效：{error_detail or error_code}"
+                log("error", message)
+                notify("SGH Voice", message)
+                with self._state_lock:
+                    other_inflight = (
+                        self._inflight_transcriptions > 1 or self.is_recording
+                    )
+                if not other_inflight:
+                    try:
+                        self.overlay.show("translation_failed")
+                    except Exception:
+                        pass
+            elif result:
                 final = result["final"] or ""
                 proc  = result.get("process_time", 0)
-                log("done", f"{_c('bold', final[:80])}{'…' if len(final)>80 else ''}")
+                log("done", f"轉寫完成（{len(final)} 字元）")
                 log("info", f"錄音 {duration:.1f}s  |  處理 {proc:.1f}s  |  {len(final)} 字元")
                 log_sep()
                 try:
@@ -1140,7 +1391,13 @@ class VoiceEngine:
                 )
 
                 def _backup(discard=discard_file):
+                    destination = None
+                    registered = False
                     try:
+                        with self._state_lock:
+                            discard = discard or getattr(
+                                self, "_data_wipe_in_progress", False
+                            )
                         if discard:
                             if os.path.exists(filepath):
                                 os.remove(filepath)
@@ -1152,13 +1409,46 @@ class VoiceEngine:
                             ts = datetime.now().strftime("%Y%m%d_%H%M%S")
                             ext = os.path.splitext(filepath)[1]
                             import shutil
-                            shutil.move(filepath, os.path.join(audio_dir, f"{ts}{ext}"))
+                            destination = os.path.join(
+                                audio_dir,
+                                f"sgh_voice_{ts}_{time.time_ns()}{ext}",
+                            )
+                            # Register before move: a crash may leave a harmless
+                            # missing manifest entry, never an untracked audio file.
+                            register_audio_backup(destination)
+                            registered = True
+                            shutil.move(filepath, destination)
                         else:
                             if os.path.exists(filepath):
                                 os.remove(filepath)
                     except Exception:
-                        pass
-                threading.Thread(target=_backup, daemon=True).start()
+                        if registered and destination:
+                            try:
+                                unregister_audio_backup(destination)
+                            except Exception:
+                                pass
+                        try:
+                            if os.path.exists(filepath):
+                                os.remove(filepath)
+                        except OSError:
+                            pass
+                    finally:
+                        with self._state_lock:
+                            getattr(self, "_backup_threads", set()).discard(
+                                threading.current_thread()
+                            )
+
+                backup_thread = threading.Thread(target=_backup, daemon=True)
+                with self._state_lock:
+                    if not hasattr(self, "_backup_threads"):
+                        self._backup_threads = set()
+                    self._backup_threads.add(backup_thread)
+                try:
+                    backup_thread.start()
+                except Exception:
+                    with self._state_lock:
+                        self._backup_threads.discard(backup_thread)
+                    raise
         except Exception as e:
             log("error", f"transcribe 未預期錯誤: {e}")
             import traceback
@@ -1361,7 +1651,10 @@ class VoiceEngine:
             try: self.overlay.show("processing")
             except Exception: pass
             self._safe_status_change("processing")
-            log("info", f"🔁 Retry：跳過 STT，重跑 LLM（raw={cache['raw'][:30]}...）")
+            log(
+                "info",
+                f"🔁 Retry：跳過 STT，重跑 LLM（raw_chars={len(cache.get('raw') or '')}）",
+            )
 
             def _retry_on_stage(stage):
                 # 同 _transcribe_and_paste：若 user 在 retry 期間開始新錄音，不要偷改 prefix
@@ -1431,7 +1724,10 @@ class VoiceEngine:
                 # 原本這裡再手動 add_to_history 一次 → 每段切片寫兩筆重複歷史，
                 # 污染統計 / few-shot 範例 / dictionary promote 來源。
                 result = self.transcriber.transcribe(
-                    audio_array, audio_duration=duration, history_mode="continuous"
+                    audio_array,
+                    audio_duration=duration,
+                    history_mode="continuous",
+                    should_cancel=cancel_event.is_set,
                 )
                 if not result or cancel_event.is_set():
                     return
@@ -1458,7 +1754,7 @@ class VoiceEngine:
                 else:
                     try: self.overlay.show_transcript(final, duration=2.5)
                     except Exception: pass
-                log("ok", f"[continuous] {final[:60]}")
+                log("ok", f"[continuous] 轉寫完成（{len(final)} 字元）")
             except Exception as e:
                 log("error", f"continuous segment: {e}")
 
@@ -1632,7 +1928,10 @@ class VoiceEngine:
             except Exception:
                 pass
 
-            log("info", f"Quick-Rewrite [{style}] 處理中：{selected[:40]}...")
+            log(
+                "info",
+                f"Quick-Rewrite [{style}] 處理中（input_chars={len(selected)}）",
+            )
             rewritten = self._rewrite_text(selected, style)
             if not rewritten or rewritten.strip() == selected.strip():
                 log("warn", "改寫結果為空或無變化")
@@ -1661,6 +1960,9 @@ def setup_hotkey(engine):
 
     config = engine.config
     hotkey_source = str(config.get("hotkey", RECOMMENDED_RECORD_HOTKEY) or "")
+    translation_hotkey_source = str(
+        config.get("translation_hotkey", RECOMMENDED_TRANSLATION_HOTKEY) or ""
+    )
     mode = config.get("hotkey_mode", "push_to_talk")
     try:
         initial_spec = parse_hotkey(
@@ -1675,10 +1977,25 @@ def setup_hotkey(engine):
         )
         initial_spec = parse_hotkey(RECOMMENDED_RECORD_HOTKEY, field="hotkey")
     hotkey_str = initial_spec.normalized
-    target_keys = set(initial_spec.keycodes)
+    normal_target_keys = set(initial_spec.keycodes)
+    try:
+        initial_translation_spec = parse_hotkey(
+            translation_hotkey_source,
+            field="translation_hotkey",
+        )
+    except HotkeyValidationError as exc:
+        log("warn", f"Invalid translation hotkey ({exc}); disabling it")
+        initial_translation_spec = parse_hotkey(
+            "",
+            field="translation_hotkey",
+        )
+    translation_target_keys = set(initial_translation_spec.keycodes)
+    relevant_recording_keys = normal_target_keys | translation_target_keys
 
     # Tracking state
     currently_pressed = set()
+    active_recording_kind = None
+    suppress_until_clear = False
     
     # Event mask: only key events and flags changed (modifier keys)
     # NSKeyDownMask=1<<10, NSKeyUpMask=1<<11, NSFlagsChangedMask=1<<12
@@ -1686,16 +2003,31 @@ def setup_hotkey(engine):
 
     def _process_event(event):
         """Core event processing logic (shared by global and local monitors)"""
-        nonlocal currently_pressed, hotkey_source, hotkey_str, mode, target_keys
+        nonlocal currently_pressed, hotkey_source, translation_hotkey_source
+        nonlocal hotkey_str, mode, normal_target_keys
+        nonlocal translation_target_keys, relevant_recording_keys
+        nonlocal active_recording_kind, suppress_until_clear
 
         # Dashboard save 會即時 reload engine.config。Listener 不需重複註冊
         # NSEvent monitor；下一個鍵盤事件到來時直接切換 target。
         next_source = str(
             engine.config.get("hotkey", RECOMMENDED_RECORD_HOTKEY) or ""
         )
+        next_translation_source = str(
+            engine.config.get(
+                "translation_hotkey",
+                RECOMMENDED_TRANSLATION_HOTKEY,
+            )
+            or ""
+        )
         next_mode = engine.config.get("hotkey_mode", "push_to_talk")
-        if next_source != hotkey_source or next_mode != mode:
+        if (
+            next_source != hotkey_source
+            or next_translation_source != translation_hotkey_source
+            or next_mode != mode
+        ):
             hotkey_source = next_source
+            translation_hotkey_source = next_translation_source
             mode = next_mode
             try:
                 next_spec = parse_hotkey(
@@ -1704,14 +2036,28 @@ def setup_hotkey(engine):
                     allow_legacy_single_modifier=True,
                 )
                 hotkey_str = next_spec.normalized
-                target_keys = set(next_spec.keycodes)
+                normal_target_keys = set(next_spec.keycodes)
             except HotkeyValidationError as exc:
                 log("warn", f"Invalid runtime recording hotkey: {exc}")
-                target_keys = set()
+                normal_target_keys = set()
+            try:
+                translation_spec = parse_hotkey(
+                    translation_hotkey_source,
+                    field="translation_hotkey",
+                )
+                translation_target_keys = set(translation_spec.keycodes)
+            except HotkeyValidationError as exc:
+                log("warn", f"Invalid runtime translation hotkey: {exc}")
+                translation_target_keys = set()
+            relevant_recording_keys = (
+                normal_target_keys | translation_target_keys
+            )
             currently_pressed.clear()
-            _process_event.last_active = False
+            active_recording_kind = None
+            suppress_until_clear = False
+            _process_event.last_physical_kind = None
 
-        if not target_keys:
+        if not normal_target_keys:
             return
         try:
             etype = event.type()
@@ -1731,69 +2077,117 @@ def setup_hotkey(engine):
 
         # Update state
         if etype == NSKeyDown:
-            if vk in target_keys:
+            if vk in relevant_recording_keys:
                 currently_pressed.add(vk)
         elif etype == NSKeyUp:
             currently_pressed.discard(vk)
         elif etype == NSFlagsChanged:
             flags = event.modifierFlags()
-            if vk in target_keys:
+            if vk in relevant_recording_keys:
                 if modifier_is_pressed(vk, flags):
                     currently_pressed.add(vk)
                 else:
                     currently_pressed.discard(vk)
 
-        # Trigger Logic
-        if len(target_keys) == 1:
-            list_target = list(target_keys)[0]
-            is_active = (list_target in currently_pressed)
-            if getattr(engine, "_continuous_active", False):
-                # Continuous mode owns Recorder until its own toggle/cancel.
-                # Track the physical chord but never reinterpret its release
-                # as a PTT stop for the continuous stream.
-                _process_event.last_active = is_active
-                return
-            
-            if is_active:
-                 if not getattr(_process_event, 'last_active', False):  # Rising Edge
-                     if mode == "push_to_talk":
-                         if not engine.is_recording:
-                             engine.start_recording(from_hotkey=True)
-                     elif mode == "toggle":
-                         if engine.is_recording:
-                             threading.Thread(target=engine.stop_and_process, daemon=True).start()
-                         else:
-                             engine.start_recording(from_hotkey=True)
-            else:
-                 if getattr(_process_event, 'last_active', False):  # Falling Edge
-                     if mode == "push_to_talk":
-                         if engine.is_recording:
-                             threading.Thread(target=engine.stop_and_process, daemon=True).start()
+        # Longest-match recording logic.  The recommended translation chord is
+        # ``normal chord + Fn``.  Translation wins whenever both match.
+        translation_active = bool(translation_target_keys) and (
+            translation_target_keys.issubset(currently_pressed)
+        )
+        normal_active = normal_target_keys.issubset(currently_pressed)
+        physical_kind = (
+            "translate"
+            if translation_active
+            else ("dictate" if normal_active else None)
+        )
 
-            _process_event.last_active = is_active
+        if getattr(engine, "_continuous_active", False):
+            _process_event.last_physical_kind = physical_kind
+            return
 
-        else:
-            # Combo Mode
-            is_active = target_keys.issubset(currently_pressed)
-            if getattr(engine, "_continuous_active", False):
-                _process_event.last_active = is_active
-                return
+        if suppress_until_clear:
+            if physical_kind is None:
+                suppress_until_clear = False
+            _process_event.last_physical_kind = physical_kind
+            return
 
-            if is_active and not getattr(_process_event, 'last_active', False):
-                if mode == "push_to_talk":
-                    if not engine.is_recording:
-                         engine.start_recording(from_hotkey=True)
-                elif mode == "toggle":
+        targets_snapshot = list(
+            engine.config.get("translation_target_languages", [])
+        )
+
+        if mode == "push_to_talk":
+            if active_recording_kind is None and physical_kind is not None:
+                if not engine.is_recording:
+                    if physical_kind == "translate":
+                        started = engine.start_recording(
+                            from_hotkey=True,
+                            mode="translate",
+                            translation_targets=targets_snapshot,
+                        )
+                    else:
+                        started = engine.start_recording(from_hotkey=True)
+                    if started is not False:
+                        active_recording_kind = physical_kind
+            elif (
+                active_recording_kind == "dictate"
+                and physical_kind == "translate"
+            ):
+                # If the extra modifier arrives after the base chord, retain
+                # the audio already captured and atomically upgrade the token.
+                if engine.update_recording_intent(
+                    "translate",
+                    targets_snapshot,
+                ):
+                    active_recording_kind = "translate"
+            elif active_recording_kind is not None:
+                active_still_held = (
+                    physical_kind == active_recording_kind
+                    or (
+                        active_recording_kind == "dictate"
+                        and physical_kind == "translate"
+                    )
+                )
+                if not active_still_held:
                     if engine.is_recording:
-                        threading.Thread(target=engine.stop_and_process, daemon=True).start()
+                        threading.Thread(
+                            target=engine.stop_and_process,
+                            daemon=True,
+                        ).start()
+                    active_recording_kind = None
+                    suppress_until_clear = physical_kind is not None
+        else:
+            previous_physical_kind = getattr(
+                _process_event,
+                "last_physical_kind",
+                None,
+            )
+            if previous_physical_kind is None and physical_kind is not None:
+                if engine.is_recording:
+                    threading.Thread(
+                        target=engine.stop_and_process,
+                        daemon=True,
+                    ).start()
+                else:
+                    if physical_kind == "translate":
+                        engine.start_recording(
+                            from_hotkey=True,
+                            mode="translate",
+                            translation_targets=targets_snapshot,
+                        )
                     else:
                         engine.start_recording(from_hotkey=True)
-            
-            elif not is_active and getattr(_process_event, 'last_active', False):
-                 if mode == "push_to_talk" and engine.is_recording:
-                     threading.Thread(target=engine.stop_and_process, daemon=True).start()
+            elif (
+                previous_physical_kind == "dictate"
+                and physical_kind == "translate"
+                and engine.is_recording
+                and engine.active_recording_intent() == "dictate"
+            ):
+                engine.update_recording_intent(
+                    "translate",
+                    targets_snapshot,
+                )
 
-            _process_event.last_active = is_active
+        _process_event.last_physical_kind = physical_kind
 
     def handle_global_event(event):
         """Global monitor handler — does NOT return the event (void callback)"""
@@ -1823,8 +2217,11 @@ def setup_hotkey(engine):
     # 提供 reset hook：watchdog fire（代表 keyUp 被吞）時清掉 stale press state，
     # 否則 closure 還以為使用者持續按著，下一次按會被吃掉。
     def _reset_hotkey_state():
+        nonlocal active_recording_kind, suppress_until_clear
         currently_pressed.clear()
-        _process_event.last_active = False
+        active_recording_kind = None
+        suppress_until_clear = False
+        _process_event.last_physical_kind = None
         action_reset = getattr(engine, "_on_action_hotkey_reset", None)
         if action_reset:
             action_reset()
@@ -1893,7 +2290,18 @@ def _setup_dynamic_action_hotkey(engine, config_key, action_callback, label):
         recording_source = str(
             engine.config.get("hotkey", RECOMMENDED_RECORD_HOTKEY) or ""
         ).strip()
-        next_sources = (recording_source, *action_sources)
+        translation_recording_source = str(
+            engine.config.get(
+                "translation_hotkey",
+                RECOMMENDED_TRANSLATION_HOTKEY,
+            )
+            or ""
+        ).strip()
+        next_sources = (
+            recording_source,
+            translation_recording_source,
+            *action_sources,
+        )
         if next_sources == hotkey_sources:
             return
         hotkey_sources = next_sources
@@ -1909,12 +2317,21 @@ def _setup_dynamic_action_hotkey(engine, config_key, action_callback, label):
         relevant_keys = set()
         recording_keys = set()
         try:
-            recording_keys = set(
+            normal_recording_keys = set(
                 parse_hotkey(
                     recording_source,
                     field="hotkey",
                     allow_legacy_single_modifier=True,
                 ).keycodes
+            )
+            translation_recording_keys = set(
+                parse_hotkey(
+                    translation_recording_source,
+                    field="translation_hotkey",
+                ).keycodes
+            )
+            recording_keys = (
+                normal_recording_keys | translation_recording_keys
             )
         except HotkeyValidationError as exc:
             log("warn", f"Invalid hotkey: {exc}")
@@ -2194,25 +2611,41 @@ def _setup_hotkey_pynput(engine):
             return char.lower()
         return None
 
-    hotkey_source = None
-    target_tokens = set()
+    hotkey_sources = None
+    normal_tokens = set()
+    translation_tokens = set()
+    relevant_tokens = set()
     currently_pressed = set()
-    last_active = False
+    active_recording_kind = None
+    last_physical_kind = None
+    suppress_until_clear = False
 
     def _refresh_target():
-        nonlocal hotkey_source, target_tokens, last_active
+        nonlocal hotkey_sources, normal_tokens, translation_tokens
+        nonlocal relevant_tokens, active_recording_kind
+        nonlocal last_physical_kind, suppress_until_clear
         next_source = str(
             engine.config.get("hotkey", RECOMMENDED_RECORD_HOTKEY) or ""
         )
-        if next_source == hotkey_source:
+        next_translation_source = str(
+            engine.config.get(
+                "translation_hotkey",
+                RECOMMENDED_TRANSLATION_HOTKEY,
+            )
+            or ""
+        )
+        next_sources = (next_source, next_translation_source)
+        if next_sources == hotkey_sources:
             return
-        hotkey_source = next_source
+        hotkey_sources = next_sources
         currently_pressed.clear()
-        last_active = False
+        active_recording_kind = None
+        last_physical_kind = None
+        suppress_until_clear = False
         try:
-            target_tokens = set(
+            normal_tokens = set(
                 parse_hotkey(
-                    hotkey_source,
+                    next_source,
                     field="hotkey",
                     allow_legacy_single_modifier=True,
                 ).tokens
@@ -2223,47 +2656,121 @@ def _setup_hotkey_pynput(engine):
                 f"Invalid pynput hotkey ({exc}); using "
                 f"{RECOMMENDED_RECORD_HOTKEY}",
             )
-            target_tokens = set(
+            normal_tokens = set(
                 parse_hotkey(RECOMMENDED_RECORD_HOTKEY, field="hotkey").tokens
             )
+        try:
+            translation_tokens = set(
+                parse_hotkey(
+                    next_translation_source,
+                    field="translation_hotkey",
+                ).tokens
+            )
+        except HotkeyValidationError as exc:
+            log("warn", f"Invalid pynput translation hotkey ({exc}); disabling it")
+            translation_tokens = set()
+        relevant_tokens = normal_tokens | translation_tokens
 
     def _apply_active_state():
-        nonlocal last_active
-        is_active = bool(target_tokens) and target_tokens.issubset(
+        nonlocal active_recording_kind, last_physical_kind
+        nonlocal suppress_until_clear
+        translation_active = bool(translation_tokens) and (
+            translation_tokens.issubset(currently_pressed)
+        )
+        normal_active = bool(normal_tokens) and normal_tokens.issubset(
             currently_pressed
         )
+        physical_kind = (
+            "translate"
+            if translation_active
+            else ("dictate" if normal_active else None)
+        )
         if getattr(engine, "_continuous_active", False):
-            last_active = is_active
+            last_physical_kind = physical_kind
             return
+        if suppress_until_clear:
+            if physical_kind is None:
+                suppress_until_clear = False
+            last_physical_kind = physical_kind
+            return
+
         mode = engine.config.get("hotkey_mode", "push_to_talk")
-        if is_active and not last_active:
-            if mode == "push_to_talk":
+        targets_snapshot = list(
+            engine.config.get("translation_target_languages", [])
+        )
+        if mode == "push_to_talk":
+            if active_recording_kind is None and physical_kind is not None:
                 if not engine.is_recording:
-                    engine.start_recording(from_hotkey=True)
-            elif engine.is_recording:
+                    if physical_kind == "translate":
+                        started = engine.start_recording(
+                            from_hotkey=True,
+                            mode="translate",
+                            translation_targets=targets_snapshot,
+                        )
+                    else:
+                        started = engine.start_recording(from_hotkey=True)
+                    if started is not False:
+                        active_recording_kind = physical_kind
+            elif (
+                active_recording_kind == "dictate"
+                and physical_kind == "translate"
+            ):
+                if engine.update_recording_intent(
+                    "translate",
+                    targets_snapshot,
+                ):
+                    active_recording_kind = "translate"
+            elif active_recording_kind is not None:
+                active_still_held = (
+                    physical_kind == active_recording_kind
+                    or (
+                        active_recording_kind == "dictate"
+                        and physical_kind == "translate"
+                    )
+                )
+                if not active_still_held:
+                    if engine.is_recording:
+                        threading.Thread(
+                            target=engine.stop_and_process,
+                            daemon=True,
+                        ).start()
+                    active_recording_kind = None
+                    suppress_until_clear = physical_kind is not None
+        elif last_physical_kind is None and physical_kind is not None:
+            if engine.is_recording:
                 threading.Thread(
-                    target=engine.stop_and_process, daemon=True
+                    target=engine.stop_and_process,
+                    daemon=True,
                 ).start()
             else:
-                engine.start_recording(from_hotkey=True)
-        elif not is_active and last_active:
-            if mode == "push_to_talk" and engine.is_recording:
-                threading.Thread(
-                    target=engine.stop_and_process, daemon=True
-                ).start()
-        last_active = is_active
+                if physical_kind == "translate":
+                    engine.start_recording(
+                        from_hotkey=True,
+                        mode="translate",
+                        translation_targets=targets_snapshot,
+                    )
+                else:
+                    engine.start_recording(from_hotkey=True)
+        elif (
+            last_physical_kind == "dictate"
+            and physical_kind == "translate"
+            and engine.is_recording
+            and engine.active_recording_intent() == "dictate"
+        ):
+            engine.update_recording_intent("translate", targets_snapshot)
+        last_physical_kind = physical_kind
 
     def on_press(key):
         _refresh_target()
         token = _token_for_key(key)
-        if token in target_tokens:
+        if token in relevant_tokens:
             currently_pressed.add(token)
         _apply_active_state()
 
     def on_release(key):
         _refresh_target()
         token = _token_for_key(key)
-        if token:
+        if token in relevant_tokens:
             currently_pressed.discard(token)
         _apply_active_state()
 
@@ -2273,9 +2780,12 @@ def _setup_hotkey_pynput(engine):
     listener.start()
 
     def _reset_hotkey_state():
-        nonlocal last_active
+        nonlocal active_recording_kind, last_physical_kind
+        nonlocal suppress_until_clear
         currently_pressed.clear()
-        last_active = False
+        active_recording_kind = None
+        last_physical_kind = None
+        suppress_until_clear = False
         action_reset = getattr(engine, "_on_action_hotkey_reset", None)
         if action_reset:
             action_reset()
@@ -2325,12 +2835,31 @@ def run_cli():
                 continue
 
         print("🔴 錄音中... 按 Enter 停止")
-        engine.start_recording()
+        engine.start_recording(
+            mode=mode if mode == "translate" else "dictate",
+            translation_targets=(
+                config.get("translation_target_languages", [])
+                if mode == "translate"
+                else None
+            ),
+        )
         input()
-        result = engine.stop_and_process(mode=mode, edit_context=edit_ctx, sync=True)
+        result = engine.stop_and_process(
+            mode=mode,
+            edit_context=edit_ctx,
+            sync=True,
+            translation_targets=(
+                config.get("translation_target_languages", [])
+                if mode == "translate"
+                else None
+            ),
+        )
 
-        if not result:
-            print("⚠️  未偵測到音訊\n")
+        if not result or result.get("error"):
+            if result and result.get("error") == "translation_failed":
+                print("⚠️  翻譯失敗，請確認 LLM 服務與 API Key\n")
+            else:
+                print("⚠️  未偵測到音訊\n")
             continue
 
         # v2.4.0：transcribe() 只回傳 {raw, final, process_time}，沒有 corrected 中間欄位。
