@@ -79,7 +79,10 @@ find_android_build_tool() {
 }
 
 normalize_fingerprint() {
-    tr -cd '[:xdigit:]' | tr '[:lower:]' '[:upper:]'
+    # POSIX character classes are locale-sensitive and produced divergent
+    # output between macOS and the Ubuntu Actions runner.  Fingerprints are
+    # ASCII by definition, so normalize them with an explicit ASCII regex.
+    python -c 'import re, sys; print(re.sub(r"[^0-9A-Fa-f]", "", sys.stdin.read()).upper(), end="")'
 }
 
 sha256_file() {
@@ -145,7 +148,11 @@ verify_release_apk() {
             head -n 1 |
             normalize_fingerprint
     )"
-    [[ "$actual_cert" == "$EXPECTED_CERT_SHA256" ]] || fail "Release APK signer certificate does not match the approved fingerprint"
+    if [[ "$actual_cert" != "$EXPECTED_CERT_SHA256" ]]; then
+        echo "[RC] expected signer: $EXPECTED_CERT_SHA256" >&2
+        echo "[RC] actual signer:   ${actual_cert:-<missing>}" >&2
+        fail "Release APK signer certificate does not match the approved fingerprint"
+    fi
 }
 
 verify_public_copy() {

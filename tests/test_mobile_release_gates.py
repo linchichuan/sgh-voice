@@ -71,6 +71,15 @@ def test_mobile_rc_cli_documents_artifact_only_and_partial_modes():
     assert "PARTIAL and exits 3" in completed.stdout
 
 
+def test_mobile_rc_fingerprint_normalization_is_locale_independent():
+    script = (REPO_ROOT / "scripts" / "verify_mobile_rc.sh").read_text(
+        encoding="utf-8"
+    )
+
+    assert "[^0-9A-Fa-f]" in script
+    assert "[:xdigit:]" not in script
+
+
 def test_mobile_and_web_localization_keys_remain_in_parity():
     android_resource_roots = [
         ANDROID_ROOT / "app" / "src" / "main" / "res" / folder / "strings.xml"
