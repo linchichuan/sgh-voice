@@ -49,7 +49,7 @@
 | 檢查項目 | 指令 | 結果 | 證據／備註 |
 |---|---|---|---|
 | Git diff 格式檢查 | `git diff --check` | ✅ PASS | 無空白或 patch 格式錯誤；工作區仍含本輪待提交變更，不宣稱 clean |
-| Python 迴歸測試 | 乾淨 Python 3.12 venv 執行 `python -m pytest -q` | ✅ PASS | 465 tests 全部通過，exit 0；Qwen3-ASR 模組可載入且環境未安裝舊 `librosa` |
+| Python 迴歸測試 | 乾淨 Python 3.12 venv 執行 `python -m pytest -q` | ✅ PASS | 466 tests 全部通過，exit 0；Qwen3-ASR 模組可載入且環境未安裝舊 `librosa` |
 | Python 靜態檢查 | `ruff check . --select E9,F63,F7,F82` | ✅ PASS | 無 release-critical Ruff 錯誤 |
 | iOS source／metadata preflight | `./scripts/verify_ios_app_store_preflight.sh --source-only` | ✅ PASS | 全部 Swift application sources type-check 通過；不包含 Xcode Archive／TestFlight／App Store 帳號 gate |
 | Android 單元測試 | `cd android/SGHVoice && ./gradlew testDebugUnitTest --no-daemon` | ✅ PASS | 122 tests，0 failures／0 errors（`app/build/test-results/testDebugUnitTest/`，2026-08-24 13:38 產出） |

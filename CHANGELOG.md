@@ -18,7 +18,7 @@
 - 修正 recorder chunk 計算的浮點截斷（`int(x/0.1)`→`int(round(x/0.1))`）：連續模式最短分段 0.6s 不再被悄悄砍成 0.5s；`start_continuous()` 補 thread 存活守門，比照 `start()` 防 PortAudio 重入 deadlock。
 - iOS 補齊 OpenCC s2twp 最終防護層：內嵌上游 OpenCC 詞典資料（與 macOS/Android 同源）之純 Swift 實作，dictate 輸出與幻覺截斷比對均經繁中正規化；translate 輸出因跨語言漢字風險暫不套用（明確標註）。
 - Dashboard 新增 `GET /api/latency_summary` 與 Cost & Audit 延遲卡片：近 7/30 天 pipeline p50/p90/p95/p99 與 STT/LLM 分項均值（重用 `scripts/event_summary.py` 同一計算路徑）。
-- 測試基準大幅補強：LLM 五引擎 fallback 鏈、連續模式併發/backpressure、貼上 idempotency、PTT 自停競態、latency API、醫療詞庫共 70+ 新測試；全量 465 tests 通過。
+- 測試基準大幅補強：LLM 五引擎 fallback 鏈、連續模式併發/backpressure、貼上 idempotency、PTT 自停競態、latency API、醫療詞庫共 70+ 新測試；全量 466 tests 通過。
 
 ## Android v2.7.1 (2026-07-27) — Japanese Translation Reliability Hotfix
 

@@ -155,7 +155,7 @@ source "$BUILD_VENV/bin/activate"
 
 PYTHON_MINOR="$(python -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')"
 [[ "$PYTHON_MINOR" == "3.12" ]] \
-    || fail "建置固定要求 Python 3.12；目前為 $PYTHON_MINOR（環境：$BUILD_VENV）"
+    || fail "建置固定要求 Python 3.12；目前為 ${PYTHON_MINOR}（環境：${BUILD_VENV}）"
 
 require_command pyinstaller
 require_command pyi-archive_viewer

@@ -43,6 +43,18 @@ def test_build_requires_the_locked_python_minor_version():
     assert "requirements-dev.lock" in script
 
 
+def test_build_braces_variables_adjacent_to_cjk_punctuation():
+    """Newer Bash versions may treat non-ASCII identifier characters as part
+    of an unbraced expansion.  Release diagnostics must remain executable
+    under `set -u` in a UTF-8 locale."""
+    script = _script()
+
+    assert "${PYTHON_MINOR}（" in script
+    assert "${BUILD_VENV}）" in script
+    assert "$PYTHON_MINOR（" not in script
+    assert "$BUILD_VENV）" not in script
+
+
 def test_release_requires_developer_id_and_secure_timestamp():
     script = _script()
 
