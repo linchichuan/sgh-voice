@@ -78,6 +78,9 @@ def test_mobile_rc_fingerprint_normalization_is_locale_independent():
 
     assert "[^0-9A-Fa-f]" in script
     assert "[:xdigit:]" not in script
+    assert "--print-certs-pem" in script
+    assert "openssl x509 -outform DER" in script
+    assert "certificate SHA-256 digest: //p" not in script
 
 
 def test_mobile_and_web_localization_keys_remain_in_parity():

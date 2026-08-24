@@ -117,11 +117,12 @@ APKSIGNER_BIN="$(find_android_build_tool apksigner || true)"
 AAPT_BIN="$(find_android_build_tool aapt || true)"
 [[ -n "$APKSIGNER_BIN" ]] || fail "apksigner is required to verify the release artifact"
 [[ -n "$AAPT_BIN" ]] || fail "aapt is required to verify the release artifact version"
+command -v openssl >/dev/null 2>&1 || fail "openssl is required to verify the signer certificate"
 
 verify_release_apk() {
     local apk="$1"
     local actual_sha actual_size badging actual_version_code actual_version_name
-    local signer_report actual_cert
+    local signer_report signer_pem_report signer_pem actual_cert
 
     [[ -f "$apk" ]] || fail "Expected release APK is missing"
 
@@ -142,10 +143,20 @@ verify_release_apk() {
 
     signer_report="$("$APKSIGNER_BIN" verify --verbose --print-certs "$apk")"
     printf '%s\n' "$signer_report" | grep -Eq '^Verified using v2 scheme .*: true$' || fail "Release APK is not verified with APK Signature Scheme v2"
+    printf '%s\n' "$signer_report" | grep -Eq '^Number of signers: 1$' || fail "Release APK must have exactly one signer"
+
+    # Derive the fingerprint from the certificate bytes instead of parsing
+    # apksigner's human-readable digest label, which differs across SDK hosts.
+    signer_pem_report="$("$APKSIGNER_BIN" verify --print-certs-pem "$apk")"
+    signer_pem="$(
+        printf '%s\n' "$signer_pem_report" |
+            awk '/-----BEGIN CERTIFICATE-----/{capture=1} capture{print} /-----END CERTIFICATE-----/{exit}'
+    )"
+    [[ "$signer_pem" == *"-----BEGIN CERTIFICATE-----"* ]] || fail "Release APK signer certificate PEM is missing"
     actual_cert="$(
-        printf '%s\n' "$signer_report" |
-            sed -n 's/^Signer #1 certificate SHA-256 digest: //p' |
-            head -n 1 |
+        printf '%s\n' "$signer_pem" |
+            openssl x509 -outform DER 2>/dev/null |
+            python -c 'import hashlib, sys; print(hashlib.sha256(sys.stdin.buffer.read()).hexdigest())' |
             normalize_fingerprint
     )"
     if [[ "$actual_cert" != "$EXPECTED_CERT_SHA256" ]]; then
