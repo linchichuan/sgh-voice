@@ -252,4 +252,16 @@ struct SGHVoiceTests {
         #expect(error.errorDescription == message)
         #expect(error.localizedDescription == message)
     }
+
+    @Test func openCCPreservesJapaneseShinjitaiInsideJapaneseClauses() {
+        let source = "来週の動画を参考にしてください。"
+        #expect(OpenCCConverter.shared.convert(source) == source)
+    }
+
+    @Test func openCCStillNormalizesExplicitSimplifiedChinese() {
+        #expect(
+            OpenCCConverter.shared.convert("请确认软件设置。")
+                == "請確認軟體設定。"
+        )
+    }
 }

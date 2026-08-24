@@ -1360,6 +1360,7 @@ def test_cancel_latest_pipeline_does_not_cancel_older_inflight(monkeypatch):
     engine._processing_recording_tokens = []
     engine._active_recording_tokens = {older_token, latest_token}
     engine._cancelled_recording_tokens = set()
+    engine._pasted_recording_tokens = set()
     engine._cancel_inflight = False
     engine._inflight_transcriptions = 0
     engine._on_status_change = None

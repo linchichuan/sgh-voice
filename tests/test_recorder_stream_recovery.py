@@ -80,7 +80,7 @@ def test_record_loop_open_failure_reports_error(monkeypatch):
 
 
 def test_record_loop_read_death_sets_last_error_and_reinits(monkeypatch):
-    """stream 半路 read 失敗 → last_error 設定 + 刷新 PortAudio（下一段能重開）。"""
+    """stream 半路 read 失敗 → 回報錯誤、刷新 PortAudio，且絕不誤當自停送出。"""
     r = _make_recorder()
 
     class DyingStream:
@@ -101,7 +101,11 @@ def test_record_loop_read_death_sets_last_error_and_reinits(monkeypatch):
 
     monkeypatch.setattr(r, "_open_input_stream", lambda sr, chunk: DyingStream())
     reinits = []
+    errors = []
+    completed = []
     monkeypatch.setattr(r, "_reinit_portaudio", lambda: reinits.append(1))
+    r._on_error = errors.append
+    r._on_done = lambda *args: completed.append(args)
     r.is_recording = True
 
     r._record_loop()
@@ -109,6 +113,8 @@ def test_record_loop_read_death_sets_last_error_and_reinits(monkeypatch):
     assert r.is_recording is False
     assert r.last_error and "device unplugged" in r.last_error
     assert reinits == [1]
+    assert errors == [r.last_error]
+    assert completed == []
     assert len(r.audio_data) == 1  # 死前收到的 chunk 仍保留
 
 

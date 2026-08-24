@@ -23,11 +23,14 @@ protocol TranscriptionProgressDelegate: AnyObject {
 }
 
 /// 語音辨識處理管線
-/// 四層處理流程：
+/// 五層處理流程（對齊 Android TranscriptionPipeline.kt）：
 /// 1. Whisper STT — 語音轉文字（含三語提示詞）
 /// 2. 詞庫修正 — 自訂詞彙替換（最長匹配優先）
 /// 3. LLM 後處理 — 去填充詞、修正標點、潤稿 (支援 Claude/OpenAI/Groq)
-/// 4. 繁體中文最終防護 (iOS 版目前依賴 LLM 提示詞，後續可擴充 OpenCC)
+/// 4. OpenCC s2twp — 繁體中文最終防護（僅套用於聽寫 `.dictate`；翻譯
+///    `.translate` 輸出可能混雜日/英文 Han 字元，貿然全域套用 OpenCC
+///    有腐化日文漢字的風險，故翻譯路徑維持原樣，僅靠 LLM 提示詞）
+/// 5. 最終詞庫修正 — 防止 LLM／OpenCC 把已學會的專有詞改回去
 class TranscriptionPipeline {
     static let shared = TranscriptionPipeline()
     
@@ -77,13 +80,19 @@ class TranscriptionPipeline {
             let finalText: String
             switch intent {
             case .dictate:
+                let llmOutput: String
                 do {
-                    finalText = try await llmClient.postProcess(text: correctedText)
+                    llmOutput = try await llmClient.postProcess(text: correctedText)
                 } catch {
                     // 一般聽寫可安全降級為詞庫修正後的逐字稿。
                     print("LLM processing failed: \(error)")
-                    finalText = correctedText
+                    llmOutput = correctedText
                 }
+                // === 第四層：OpenCC s2twp 繁體中文最終防護 ===
+                // 對齊 Android processDictation()：OpenCC 之後再套一次詞庫修正，
+                // 避免 LLM／OpenCC 把使用者已學會的專有詞改回去。
+                let traditionalText = OpenCCConverter.shared.convert(llmOutput)
+                finalText = dictionaryManager.applyCorrections(to: traditionalText)
             case let .translate(targets):
                 do {
                     let normalized = try TranslationContract.normalizedTargets(targets)
@@ -107,9 +116,7 @@ class TranscriptionPipeline {
                     return result
                 }
             }
-            
-            // === 第四層：(留給 OpenCC 擴充，目前依靠 Claude prompt 強制切換繁體) ===
-            
+
             let result = TranscriptionResult(text: finalText, rawText: rawText, success: true)
             DispatchQueue.main.async { self.delegate?.onCompleted(result: result) }
             return result

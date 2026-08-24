@@ -1,0 +1,12 @@
+OpenCC dictionary data bundled with SGH Voice for iOS
+Source: https://github.com/BYVoid/OpenCC (Apache License 2.0)
+Files: STCharacters.txt, STPhrases.txt, TWPhrases.txt, TWVariants.txt
+Retrieved via the opencc-python-reimplemented distribution already used by
+the macOS build of this project (requirements.txt: opencc-python-reimplemented),
+which redistributes the same upstream OpenCC dictionary files. These are the
+canonical s2twp (Simplified -> Traditional, Taiwan standard, with idioms)
+conversion chain files: STPhrases+STCharacters (character/phrase base
+conversion), TWPhrases (Taiwan idiom substitution), TWVariants (Taiwan
+preferred character variants). No entries were hand-authored or invented for
+this app; only line endings were normalized for this repository. The complete
+Apache License 2.0 is included as LICENSE-APACHE-2.0.txt in this directory.

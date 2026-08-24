@@ -382,23 +382,30 @@ class LlmClient {
     /// - 觸發條件：raw ≥10 字，final 比 raw 長 15% 以上，且 raw 的尾段（≥2 個字元的尾段）能在
     ///   final 找到對應位置，該位置之後 final 還有 ≥4 個實質字元（去掉純標點/空白）。
     ///
-    /// ⚠️ Swift 版限制：未引入 OpenCC s2twp 簡繁正規化。若 raw 為簡體、LLM 輸出繁體擴寫，
-    /// 後 N 字反查可能 miss → 漏截。可接受的安全側失敗（不會誤截正常輸出）。
-    /// TODO: 加 OpenCC s2twp 提升簡繁混合準確度。
+    /// 用 OpenCC s2twp 正規化 raw 跟 final 後再比對（對齊 Android
+    /// `LlmClient.kt:763-765` 的 `safeToTraditional()` 用法），避免 raw 為簡體、
+    /// LLM 輸出繁體擴寫時，尾段反查因簡繁不一致而 miss → 漏截。
+    /// `OpenCCConverter` 不可用時（bundle 找不到字典）原樣回傳輸入，
+    /// 退化為先前「未正規化」的安全側失敗行為，不會誤截正常輸出。
     ///
     /// Swift 沒有 difflib，採用簡化版：取 raw 的後 N 字（N = min(10, raw.count/2)，至少 2），
     /// 用 String.range(of:options:.backwards) 在 llmResult 內反向搜尋，找最後出現位置。
     func truncateTrailingHallucination(originalText: String, llmResult: String) -> String? {
         let trimChars = CharacterSet(charactersIn: " ，。、！？.,!?\n\t")
         let oRaw = originalText.trimmingCharacters(in: .whitespacesAndNewlines)
-        let r = llmResult.trimmingCharacters(in: .whitespacesAndNewlines)
+        let rRaw = llmResult.trimmingCharacters(in: .whitespacesAndNewlines)
 
         if oRaw.count < 10 { return nil }                       // 太短易誤判
-        if Double(r.count) <= Double(oRaw.count) * 1.15 { return nil }  // 沒明顯擴寫
+        if Double(rRaw.count) <= Double(oRaw.count) * 1.15 { return nil }  // 沒明顯擴寫
+
+        // 同時用 OpenCC s2twp 正規化 raw 跟 final，避免 simplified vs traditional 比對 miss。
+        // 之後的尾段定位／截斷都在正規化後的 o／r 上操作（與 Android 版一致）。
+        let o = OpenCCConverter.shared.convert(oRaw)
+        let r = OpenCCConverter.shared.convert(rRaw)
 
         // 取 raw 結尾「去掉純標點後」的最後 N 個字元（rstrip 標點/空白）
         let trimCharSet: Set<Character> = [" ", "，", "。", "、", "！", "？", ".", ",", "!", "?", "\n", "\t"]
-        var oClean = oRaw
+        var oClean = o
         while let last = oClean.last, trimCharSet.contains(last) {
             oClean.removeLast()
         }

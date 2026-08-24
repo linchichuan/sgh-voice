@@ -624,6 +624,12 @@ class VoiceEngine:
         self._stopping_recording_token = None
         self._processing_recording_tokens = []
         self._continuous_cancel_event = None
+        # Paste idempotency：每個 recording_token（一段語音的轉錄結果）只准
+        # consume 一次 paste_text()。刻意「只增不刪」——與 _finish_recording_token
+        # 清掉的其他 token 記錄不同，這裡要在整個 process 生命週期內記住已消費過
+        # 的 token，才能擋下事後重試/重複事件造成的二次貼上。不做 content-based
+        # 時間窗 dedup：同樣文字的合法重複口述必須每次都貼。
+        self._pasted_recording_tokens = set()
         # 多段轉寫並行時序列化 paste，避免剪貼簿/Cmd+V 互踩
         self._paste_lock = threading.Lock()
         self._inflight_transcriptions = 0
@@ -775,8 +781,13 @@ class VoiceEngine:
             try:
                 # on_error：stream 開啟失敗（PortAudio 裝置清單過期等）時由 recorder
                 # thread 回呼。閉包鎖定本段 token，避免 callback 晚到時誤殺新錄音。
+                # on_done：recorder 自己偵測到 PTT 連續靜音達門檻並在 _record_loop
+                # 內部 break 時回呼（recorder.py:203-207）——安全網 finalize，
+                # 不能等 30 分鐘的 max_recording_duration watchdog。見
+                # VoiceEngine._on_recorder_autostop 的完整 race 論證。
                 started = self.recorder.start(
-                    on_error=lambda msg, _ts=recording_token: self._on_recorder_error(msg, _ts)
+                    on_error=lambda msg, _ts=recording_token: self._on_recorder_error(msg, _ts),
+                    on_done=lambda fp, dur, _ts=recording_token: self._on_recorder_autostop(fp, dur, _ts),
                 )
                 if started is False:
                     with self._state_lock:
@@ -946,6 +957,145 @@ class VoiceEngine:
             except Exception as e:
                 log("warn", f"hotkey reset callback error: {e}")
 
+    def _on_recorder_autostop(self, filepath, duration, armed_for_ts):
+        """PTT 靜音自停安全網：recorder 自己偵測到連續靜音達
+        ``ptt_silence_autostop_seconds`` 門檻，在它自己的背景 thread 內
+        break `_record_loop`、存好檔後透過 on_done 同步回呼進來
+        （recorder.py:203-207）。沒有這個 handler，engine 完全不知道
+        錄音已經停了，會一路等到 30 分鐘的 max_recording_duration
+        watchdog 才轉寫——這正是本次要修的「及時 finalize」缺口。
+
+        ⚠️ 執行緒警告：本函式跑在 recorder 的背景 thread 上，且
+        `_record_loop` 尚未返回（thread 尚未結束）。絕對不可在此呼叫
+        self.recorder.start()/stop()——兩者都會 join 目前正在執行本函式
+        的這個 thread，等於自己等自己，永久卡死。因此本函式只使用
+        on_done 帶來的 filepath/duration（recorder 已經自己存好檔），
+        不再另外呼叫 recorder.stop()。
+
+        Race 論證（與 stop_and_process 共用 _state_lock 作為唯一 finalizer
+        判定點，保證兩種競態下只 finalize 一次）：
+        - 使用者稍後才放開按鍵：key-release 分支（app.py:2183-2189）呼叫
+          stop_and_process 前會檢查 `if engine.is_recording:`。本函式已在
+          _state_lock 下把 is_recording 設回 False、_record_start_ts 設
+          None，所以之後才到達的 key-release 直接判斷 is_recording 為
+          False、不會再呼叫 stop_and_process，沒有第二次 finalize。
+        - watchdog 同時到期：`_arm_watchdog._fire()`（app.py:977-989）一開始
+          就在 _state_lock 下讀 `current_ts = self._record_start_ts` /
+          `is_recording = self.is_recording`，並比對
+          `current_ts != armed_for_ts`；本函式與 watchdog 對同一段錄音
+          只有其中一個能在鎖內看到「is_recording 仍為 True 且
+          _record_start_ts 仍等於自己的 armed_for_ts」（still_owned 判定），
+          先搶到鎖、看到條件成立的那一方才會繼續往下 finalize，另一方會
+          在自己的判定裡直接 return。
+        - 就算未來程式改動讓兩條路都真的各自跑到
+          `_transcribe_and_paste`，最終使用者是否看到「貼上」仍然由
+          `_consume_paste_token`（app.py:1055-1069）與
+          `_pasted_recording_tokens` 把關——同一 recording_token 的第二次
+          paste 一定被擋（tests/test_paste_idempotency.py 已覆蓋這條防線），
+          所以就算 still_owned 判定被繞過，也不會有第二次使用者可見的
+          自動貼上，最多只是多做一次（會被丟棄的）STT。
+        """
+        if not filepath:
+            return
+        with self._state_lock:
+            still_owned = (
+                self.is_recording
+                and self._record_start_ts == armed_for_ts
+                and not getattr(self, "_continuous_active", False)
+            )
+            if not still_owned:
+                # 使用者的放鍵 / watchdog 已經搶先透過 stop_and_process 認領了
+                # 這段錄音，那條路徑會自己去 recorder.stop() 拿音訊；這裡收到
+                # 的 filepath 是 recorder 自己另外存的重複檔，直接丟棄，不可
+                # 再進 pipeline（否則就是本任務要防的 double finalize）。
+                try:
+                    if os.path.exists(filepath):
+                        os.remove(filepath)
+                except OSError:
+                    pass
+                return
+            recording_context = dict(
+                getattr(
+                    self,
+                    "_recording_context_by_token",
+                    {},
+                ).get(
+                    armed_for_ts,
+                    {"mode": "dictate", "translation_targets": []},
+                )
+            )
+            self.is_recording = False
+            self._record_start_ts = None
+            self._stopping_recording_token = armed_for_ts
+
+        self._cancel_watchdog()
+
+        if self._discard_cancelled_recording(armed_for_ts, filepath):
+            return
+
+        mode = recording_context.get("mode", "dictate")
+        translation_targets = recording_context.get("translation_targets", [])
+        mode, edit_context = self._resolve_recording_mode(mode)
+
+        log(
+            "warn",
+            f"🔇 PTT 連續靜音已達安全網門檻（錄了 {duration:.1f}s），自動送出這段錄音",
+        )
+        # 讓使用者知道這是安全網觸發、不是自己按停——否則使用者會誤以為是
+        # bug（自己沒放鍵，文字卻自己貼出來了）。
+        notify("SGH Voice", "🔇 偵測到長時間靜音，已自動停止錄音並開始轉寫")
+        try:
+            event_ledger.user_action("ptt_autostop", phase="recording")
+        except Exception:
+            pass
+
+        threading.Thread(
+            target=self._transcribe_and_paste,
+            args=(
+                None,
+                filepath,
+                duration,
+                mode,
+                edit_context,
+                armed_for_ts,
+                translation_targets,
+            ),
+            daemon=True,
+        ).start()
+
+        # 使用者的實體按鍵事件多半整個遺失（這正是這道安全網存在的理由），
+        # 所以 hotkey closure 裡的 currently_pressed/active_recording_kind 會
+        # 卡在「還按著」的 stale 狀態，之後真正的下一次按鍵會被誤判。與
+        # _arm_watchdog._fire() 相同：只有在「沒有新錄音已經接著開始」時才
+        # 重置，避免踩掉使用者剛好在這個空檔重按 hotkey 開始的新錄音。
+        with self._state_lock:
+            new_recording_running = self.is_recording
+        if new_recording_running:
+            return
+        cb = self._on_hotkey_reset
+        if cb:
+            try: cb()
+            except Exception as e:
+                log("warn", f"hotkey reset callback error: {e}")
+
+    def _resolve_recording_mode(self, mode, edit_context=""):
+        """套用 target_language 的舊版相容設定；所有 finalize 路徑共用。"""
+        if not self.config.get("target_language") or mode != "dictate":
+            return mode, edit_context
+        target = str(self.config.get("target_language", "")).lower()
+        resolved_context = {
+            "ja": "translate_ja",
+            "japanese": "translate_ja",
+            "zh": "translate_zh",
+            "zh-tw": "translate_zh",
+            "chinese": "translate_zh",
+            "en": "translate_en",
+            "english": "translate_en",
+        }.get(target, "")
+        if resolved_context:
+            return "edit", resolved_context
+        return mode, edit_context
+
     def _arm_watchdog(self, from_hotkey=False):
         """錄音保險：超過 max 秒仍在錄音 → 強制停止。所有 path 共用同一上限：
         max_recording_duration（預設 30 分鐘）。push-to-talk 講三五分鐘是合理使用情境，
@@ -1045,6 +1195,23 @@ class VoiceEngine:
             return False
         with self._state_lock:
             return recording_token in self._cancelled_recording_tokens
+
+    def _consume_paste_token(self, recording_token):
+        """Utterance-token 只消費一次：同一 recording_token 只允許成功呼叫
+        paste_text() 一次。第二次呼叫（重試/race/重複事件）回傳 False，呼叫端
+        必須跳過 paste 並記 event log——不做 content-based 時間窗比對，使用者
+        合法的重複口述（同樣文字、不同 recording_token）永遠正常貼上。
+
+        recording_token 為 None（非錄音分段路徑，例如 Retry cache 重跑或
+        Quick-Rewrite）不受此保護，維持原行為，一律回傳 True。
+        """
+        if recording_token is None:
+            return True
+        with self._state_lock:
+            if recording_token in self._pasted_recording_tokens:
+                return False
+            self._pasted_recording_tokens.add(recording_token)
+            return True
 
     def _finish_recording_token(self, recording_token):
         if recording_token is None:
@@ -1179,15 +1346,7 @@ class VoiceEngine:
             self._finish_recording_token(recording_token)
             return None
 
-        if self.config.get("target_language") and mode == "dictate":
-            target = str(self.config.get("target_language", "")).lower()
-            edit_context = {
-                "ja": "translate_ja", "japanese": "translate_ja",
-                "zh": "translate_zh", "zh-tw": "translate_zh", "chinese": "translate_zh",
-                "en": "translate_en", "english": "translate_en",
-            }.get(target, "")
-            if edit_context:
-                mode = "edit"
+        mode, edit_context = self._resolve_recording_mode(mode, edit_context)
 
         if sync:
             return self._transcribe_and_paste(
@@ -1354,6 +1513,16 @@ class VoiceEngine:
                         cancelled_output = token_cancelled or legacy_cancelled
                         if cancelled_output:
                             log("warn", "🚫 已取消，略過最後 paste")
+                        elif not self._consume_paste_token(recording_token):
+                            # 同一段錄音的 recording_token 已經 consume 過一次 paste；
+                            # 這是重試/重複事件造成的二次呼叫，不是使用者的新口述，
+                            # 略過並記 event log（沒有 content-based 時間窗判斷）。
+                            cancelled_output = True
+                            log("warn", "🚫 recording_token 已消費過 paste，跳過重複貼上")
+                            try:
+                                event_ledger.user_action("paste", phase="dedup_skip")
+                            except Exception:
+                                pass
                         else:
                             try:
                                 paste_succeeded = paste_text(final)

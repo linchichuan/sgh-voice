@@ -705,6 +705,11 @@ DEFAULT_CONFIG = {
     "silence_threshold": 0.001,
     "silence_duration": 2.0,
     "max_recording_duration": 1800,         # 30 分鐘（長會議/長段口述用）
+    # PTT（push_to_talk）安全網：連續靜音達此秒數即自動停止麥克風串流，
+    # 防 key-release 事件遺失（切換 App、KVM 等）時一路錄到 max_recording_duration
+    # 上限。門檻刻意設寬鬆（120s），確保不會誤切正常口述中的長停頓。
+    # 0 或 None（falsy）= 停用；只在 hotkey_mode=="push_to_talk" 生效。
+    "ptt_silence_autostop_seconds": 120,
     "auto_paste": True,
     "show_notification": True,
     "typing_speed_cpm": 50,                 # 用戶打字速度（每分鐘字元數，中文約 30-60）
@@ -738,6 +743,7 @@ _CONFIG_NUMERIC_BOUNDS = {
     "max_recording_duration": (0.3, 3600),
     "silence_threshold": (0, 1),
     "silence_duration": (0.1, 60),
+    "ptt_silence_autostop_seconds": (0, 3600),
     "hybrid_audio_threshold": (0.1, 3600),
     "hybrid_text_threshold": (0, 1_000_000),
     "llm_timeout_sec": (0.1, 600),

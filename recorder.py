@@ -24,7 +24,10 @@ class Recorder:
         self._stop_event = threading.Event()
         self._start_time = None
         self._segment_lock = threading.Lock()
+        self._segment_condition = threading.Condition(self._segment_lock)
         self._pending_segments = 0
+        self._next_segment_sequence = 0
+        self._next_segment_to_deliver = 0
         # 最近一次串流錯誤（stream 開失敗 / read 中斷）。engine 在 stop 時讀取，
         # 用來把「為什麼沒錄到音訊」回報給使用者，而不是靜默丟棄。
         self.last_error = None
@@ -108,10 +111,34 @@ class Recorder:
         hotkey_mode = self.config.get("hotkey_mode", "push_to_talk")
         chunk = int(sr * 0.1)
         total = 0
-        max_chunks = int(max_dur / 0.1)
-        silence_chunks = int(silence_duration / 0.1)
+        # int(x / 0.1) 會因 IEEE-754 截斷（如 int(0.6/0.1)==5 不是 6）；
+        # round() 讓「N 秒」實際換算成文件化語意的 chunk 數，不悄悄少一格。
+        max_chunks = int(round(max_dur / 0.1))
+        silence_chunks = int(round(silence_duration / 0.1))
         consecutive_silence = 0
         has_voice = False
+
+        # PTT 靜音自停安全網（config.ptt_silence_autostop_seconds）。只在
+        # push_to_talk 模式生效；0 / None / 非數字一律停用。刻意不要求
+        # has_voice——它防的正是「按了 PTT 之後 key-release 事件整個遺失
+        # （切 App / KVM）」，包含使用者根本還沒開口就切走的情況，這種
+        # 情況 toggle 的 has_voice 閘門會讓安全網永遠不觸發。
+        # 觸發條件重用下面迴圈裡與 toggle 共用的同一條 rms/consecutive_silence
+        # 計數（不另外算一次）。只有這個明確原因可以呼叫 _on_done；一般 stop、
+        # toggle 靜音、max duration 與 stream/read error 都不能誤走 PTT 自停送出路徑。
+        ptt_silence_chunks = None
+        ptt_silence_seconds_display = None
+        ptt_autostopped = False
+        if hotkey_mode == "push_to_talk":
+            ptt_silence_raw = self.config.get("ptt_silence_autostop_seconds", 120)
+            if ptt_silence_raw:
+                try:
+                    ptt_silence_seconds = float(ptt_silence_raw)
+                except (TypeError, ValueError):
+                    ptt_silence_seconds = 0
+                if ptt_silence_seconds > 0:
+                    ptt_silence_chunks = max(1, int(round(ptt_silence_seconds / 0.1)))
+                    ptt_silence_seconds_display = ptt_silence_seconds
 
         try:
             stream = self._open_input_stream(sr, chunk)
@@ -151,6 +178,13 @@ class Recorder:
                     if hotkey_mode == "toggle" and has_voice and consecutive_silence >= silence_chunks:
                         print(f" 🔇 靜音 {silence_duration}s，自動停止錄音")
                         break
+                    if ptt_silence_chunks and consecutive_silence >= ptt_silence_chunks:
+                        ptt_autostopped = True
+                        print(
+                            f" 🔇 PTT 連續靜音 {ptt_silence_seconds_display:.0f}s，"
+                            "自動停止錄音（安全網，防 key-release 事件遺失）"
+                        )
+                        break
         except sd.PortAudioError as e:
             print(f" ⚠️ PortAudio stream error: {e}")
             stream_error = e
@@ -166,7 +200,15 @@ class Recorder:
                 # 讓「下一段」錄音能正常開啟，不用重啟 App。
                 self._reinit_portaudio()
 
-        if self._on_done and self.audio_data:
+        if stream_error is not None:
+            if self._on_error:
+                try:
+                    self._on_error(self.last_error)
+                except Exception:
+                    pass
+            return
+
+        if ptt_autostopped and self._on_done and self.audio_data:
             filepath = self._save()
             duration = time.time() - self._start_time if self._start_time else 0
             if filepath:
@@ -233,11 +275,28 @@ class Recorder:
         on_voice_change(is_voice: bool) 用於 UI 狀態（可選）。
         on_stopped() 在 loop 結束（含例外死亡，如麥克風被拔）時必定呼叫 —
         讓 engine 重置狀態，否則 stream 例外死亡後 is_recording 永久卡 True，
-        之後所有 push-to-talk 都被擋掉且無任何提示。"""
+        之後所有 push-to-talk 都被擋掉且無任何提示。
+        防 PortAudio deadlock：與 start() 同樣的守門 — 若上一段 thread（不論是
+        _record_loop 還是 _continuous_loop）還活著，會等最多 2s；超時就 raise，
+        不硬開新 stream（否則 PA 會在 Pa_OpenStream 內 deadlock）。app.py 目前
+        的呼叫路徑（start_continuous_mode / stop_continuous_mode）已經在呼叫前
+        自行 join 過一次，這裡是給任何未來繞過那層紀律的呼叫者的第二道防線，
+        對既有呼叫路徑而言應該永遠不會觸發。"""
         if self.is_recording:
             return False
         if sd is None:
             raise RuntimeError("請安裝 sounddevice: pip install sounddevice soundfile")
+
+        # 等上一段 thread 完全結束（含 InputStream 的 __exit__ tear-down）
+        if self._thread is not None and self._thread.is_alive():
+            print(" ⚠️ 上一段錄音 thread 尚未結束（PortAudio 可能還在收尾），等 2s…")
+            self._thread.join(timeout=2.0)
+            if self._thread.is_alive():
+                raise RuntimeError(
+                    "上一段 audio stream 未釋放 — 拒絕開新錄音以防 PortAudio deadlock。"
+                    "請重啟 app。"
+                )
+
         self.is_recording = True
         self._stop_event.clear()
         self.last_error = None
@@ -263,9 +322,11 @@ class Recorder:
         min_seg_dur = float(self.config.get("continuous_min_segment_duration", 0.6))
         max_seg_dur = float(self.config.get("continuous_max_segment_duration", 30.0))
         chunk = int(sr * 0.1)
-        silence_chunks = max(1, int(silence_duration / 0.1))
-        min_seg_chunks = max(1, int(min_seg_dur / 0.1))
-        max_seg_chunks = max(silence_chunks + 1, int(max_seg_dur / 0.1))
+        # int(x / 0.1) 會因 IEEE-754 截斷（如 int(0.6/0.1)==5 不是 6）；
+        # round() 讓「N 秒」實際換算成文件化語意的 chunk 數，不悄悄少一格。
+        silence_chunks = max(1, int(round(silence_duration / 0.1)))
+        min_seg_chunks = max(1, int(round(min_seg_dur / 0.1)))
+        max_seg_chunks = max(silence_chunks + 1, int(round(max_seg_dur / 0.1)))
 
         seg_buffer = []
         consecutive_silence = 0
@@ -288,11 +349,13 @@ class Recorder:
                 seg_buffer = []
                 return
             max_pending = max(1, int(self.config.get("continuous_max_pending_segments", 2)))
-            with self._segment_lock:
+            with self._segment_condition:
                 if self._pending_segments >= max_pending:
                     print(f" ⚠️ continuous segment dropped: pending={self._pending_segments}")
                     seg_buffer = []
                     return
+                sequence = self._next_segment_sequence
+                self._next_segment_sequence += 1
                 self._pending_segments += 1
             audio_array = np.concatenate(seg_buffer, axis=0).flatten()
             # 削掉尾端大部分靜音，留 200ms 緩衝供 ASR 吃（僅在尾端真的是靜音時）
@@ -305,10 +368,23 @@ class Recorder:
             duration = len(audio_array) / sr
             def _run_segment():
                 try:
+                    # STT latency varies by segment.  Independent callbacks would let a
+                    # later, shorter segment paste before an earlier slow one.  Tickets
+                    # keep user-visible delivery chronological while the pending cap
+                    # continues to keep the VAD thread non-blocking.
+                    with self._segment_condition:
+                        while sequence != self._next_segment_to_deliver:
+                            self._segment_condition.wait()
                     on_segment(audio_array, duration)
+                except Exception as exc:
+                    # A callback failure must not become an unhandled daemon-thread
+                    # exception or permanently block every later sequence ticket.
+                    print(f"Continuous segment callback error: {exc}")
                 finally:
-                    with self._segment_lock:
+                    with self._segment_condition:
+                        self._next_segment_to_deliver += 1
                         self._pending_segments = max(0, self._pending_segments - 1)
+                        self._segment_condition.notify_all()
             threading.Thread(
                 target=_run_segment, daemon=True
             ).start()
