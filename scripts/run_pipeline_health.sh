@@ -8,11 +8,17 @@ if [[ -f "$SCRIPT_PROJECT_DIR/scripts/pipeline_health.py" ]]; then
 else
     PROJECT_DIR="${SGH_VOICE_PROJECT_DIR:-/Users/lin/voice-input}"
 fi
-VENV_PYTHON="$PROJECT_DIR/venv/bin/python3"
+if [[ -n "${SGH_VOICE_PYTHON:-}" ]]; then
+    PYTHON_RUNNER="$SGH_VOICE_PYTHON"
+elif [[ -x "$PROJECT_DIR/venv/bin/python3" ]]; then
+    PYTHON_RUNNER="$PROJECT_DIR/venv/bin/python3"
+elif ! PYTHON_RUNNER="$(command -v python3)"; then
+    PYTHON_RUNNER=""
+fi
 
-if [[ ! -x "$VENV_PYTHON" ]]; then
-    echo "SGH Voice virtualenv Python is unavailable: $VENV_PYTHON" >&2
+if [[ ! -x "$PYTHON_RUNNER" ]]; then
+    echo "SGH Voice Python is unavailable: ${PYTHON_RUNNER:-not found}" >&2
     exit 78
 fi
 
-exec "$VENV_PYTHON" "$PROJECT_DIR/scripts/pipeline_health.py" "$@"
+exec "$PYTHON_RUNNER" "$PROJECT_DIR/scripts/pipeline_health.py" "$@"

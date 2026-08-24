@@ -189,9 +189,20 @@ fi
 
 echo "[iOS] Checking local and live privacy policy"
 if command -v tidy >/dev/null 2>&1; then
-    if ! tidy -errors -quiet -utf8 "$PROJECT_DIR/sgh-voice-web/privacy.html" >/dev/null 2>&1; then
+    tidy_output="$(mktemp)"
+    tidy -errors -quiet -utf8 "$PROJECT_DIR/sgh-voice-web/privacy.html" >"$tidy_output" 2>&1
+    tidy_result=$?
+    # HTML Tidy uses exit 1 for warnings and exit 2 for actual errors.  Newer
+    # macOS runners emit additional HTML5 warnings; warnings must stay visible
+    # without turning an otherwise valid privacy page into a false blocker.
+    if (( tidy_result >= 2 )); then
+        sed -n '1,80p' "$tidy_output" >&2
         add_issue "Local privacy.html failed tidy validation"
+    elif (( tidy_result == 1 )); then
+        echo "[iOS] privacy.html tidy warnings (non-blocking)"
+        sed -n '1,40p' "$tidy_output"
     fi
+    rm -f "$tidy_output"
 fi
 if [[ "$SOURCE_ONLY" == false ]]; then
     live_privacy="$(curl -fsSL --max-time 20 "$LIVE_PRIVACY_URL" 2>/dev/null || true)"

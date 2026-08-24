@@ -62,6 +62,7 @@ export const saveConfig         = (partial)    => request('POST', '/api/config',
 export const getStats           = ()           => request('GET',  '/api/stats');
 export const getUsage           = ()           => request('GET',  '/api/usage');
 export const getServiceStatus   = ()           => request('GET',  '/api/service-status');
+export const getLatencySummary  = ()           => request('GET',  '/api/latency_summary');
 
 // ---------- History ----------
 // backend reads ?n=NN; accept both n and limit for forward compat between page agents

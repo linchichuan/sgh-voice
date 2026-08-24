@@ -12,6 +12,7 @@ import {
 } from './cost-audit/pricing.js';
 import { renderChart, chartHeader } from './cost-audit/chart.js';
 import { renderAudit } from './cost-audit/audit-table.js';
+import { renderLatency } from './cost-audit/latency.js';
 
 const PREFERS_REDUCED_MOTION = typeof window !== 'undefined'
   && window.matchMedia
@@ -160,12 +161,13 @@ function renderBudget(cfg, currentSpend, onSave) {
 export default async function mount(slot) {
   slot.replaceChildren(h('div', { class: 'p-8 text-center text-[var(--text-3)]' }, 'Loading…'));
 
-  let usage = {}, audit = [], cfg = {};
+  let usage = {}, audit = [], cfg = {}, latency = {};
   try {
-    [usage, audit, cfg] = await Promise.all([
+    [usage, audit, cfg, latency] = await Promise.all([
       api.getUsage().catch(() => ({})),
       api.getAuditLog().catch(() => []),
       api.getConfig().catch(() => ({})),
+      api.getLatencySummary().catch(() => ({})),
     ]);
   } catch {
     Toast({ message: t('toast.error'), type: 'error' });
@@ -173,6 +175,7 @@ export default async function mount(slot) {
   if (!Array.isArray(audit)) audit = [];
   if (!usage || typeof usage !== 'object') usage = {};
   if (!cfg || typeof cfg !== 'object') cfg = {};
+  if (!latency || typeof latency !== 'object') latency = {};
 
   const tk = monthKey(new Date());
   const currentSpend = ENGINES.reduce((s, e) => s + costForEngine(e, usage[tk] || {}), 0);
@@ -185,6 +188,7 @@ export default async function mount(slot) {
       h('h1', { class: 'text-2xl font-semibold text-[var(--text)]' }, t('page.cost.title'))),
     chartCard,
     renderTable(usage, audit),
+    renderLatency(latency),
     renderBudget(cfg, currentSpend, async ({ monthly_budget_jpy, enable_budget_cutoff }) => {
       try {
         await api.saveConfig({ monthly_budget_jpy, enable_budget_cutoff });

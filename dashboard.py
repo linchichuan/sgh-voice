@@ -941,6 +941,44 @@ def api_audit_log():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/api/latency_summary")
+def api_latency_summary():
+    """近 7 天 / 近 30 天 pipeline latency 基準線，讓每次調參有數字可比（SGH Phone 教訓：
+    沒有 runtime 證據不能判定變更生效）。
+    重用 scripts/event_summary.py 的 load_events()/percentile()（同一條解析路徑），
+    不重寫第三份 percentile 計算邏輯——event_ledger.py 是唯一事件 schema 來源。
+    events.jsonl 不存在或為空（新安裝）→ 回 sample_count=0 的空結構，不報 500。"""
+    try:
+        import event_ledger
+        from scripts import event_summary
+    except ImportError as e:
+        return jsonify({"error": f"event_summary module unavailable: {e}"}), 500
+
+    def _window(days):
+        try:
+            events = event_summary.load_events(event_ledger.EVENTS_FILE, days, 0)
+        except Exception:
+            events = []
+        pipelines = [e for e in events if isinstance(e, dict) and e.get("type") == "pipeline_complete"]
+        totals = [e["total_ms"] for e in pipelines if isinstance(e.get("total_ms"), (int, float))]
+        stt_ms_list = [e["stt_ms"] for e in pipelines if isinstance(e.get("stt_ms"), (int, float))]
+        llm_ms_list = [e["llm_ms"] for e in pipelines if isinstance(e.get("llm_ms"), (int, float))]
+        return {
+            "sample_count": len(pipelines),
+            "pipeline_p50_ms": round(event_summary.percentile(totals, 0.5), 1),
+            "pipeline_p90_ms": round(event_summary.percentile(totals, 0.9), 1),
+            "pipeline_p95_ms": round(event_summary.percentile(totals, 0.95), 1),
+            "pipeline_p99_ms": round(event_summary.percentile(totals, 0.99), 1),
+            "stt_avg_ms": round(sum(stt_ms_list) / len(stt_ms_list), 1) if stt_ms_list else 0,
+            "llm_avg_ms": round(sum(llm_ms_list) / len(llm_ms_list), 1) if llm_ms_list else 0,
+        }
+
+    try:
+        return jsonify({"7d": _window(7), "30d": _window(30)})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/test-llm", methods=["POST"])
 def api_test_llm():
     """測試 LLM 引擎連線：發送簡短測試訊息驗證 API Key + 模型可用性"""

@@ -124,6 +124,7 @@ def test_ci_release_gates_are_fail_closed():
     assert "actions/checkout@v7" in workflow
     assert "actions/setup-python@v7" in workflow
     assert "actions/setup-node@v7" in workflow
+    assert "android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699" in workflow
     assert "actions/setup-node@v6" not in workflow
     assert "--require-hashes -r requirements-dev.lock" in workflow
     assert "ruff check . --select E9,F63,F7,F82" in workflow

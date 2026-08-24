@@ -10,6 +10,15 @@
 - Android 與 iOS 在實際送往雲端前再次確認版本化同意；即使錄音開始後撤回同意，也會清除記憶體中的錄音並中止上傳。Android 原始碼升為 2.7.3（versionCode 23），既有已簽署 2.7.2 APK 保持不可變，待原 sideload signer 從安全備份恢復後再產生 2.7.3 候選檔。
 - 新增醫療詞庫分階段規劃；本輪未載入完整醫療詞表或新增 runtime 索引。
 - 新增 Android RC 實機驗收表、一鍵 preflight 腳本與可持續追加的多語翻譯語意回歸 corpus。
+- Android RC 本機自動化驗收已執行並記錄（單元測試 122/122、lint 0 errors；release 簽章金鑰待恢復為唯一 blocker）；驗收文件新增自動化結果表與 31 條實機待驗清單。
+- 醫療詞庫 Phase 1 落地：`medical_dictionary.py` 分片/租戶/版本化 bundle 機制＋staged 種子詞庫（39 條，canonical 來自既有 medical 場景清單，`status=staged` 不觸發自動替換）＋`enable_medical_dictionary_bundles` 緊急開關；僅 `medical` 場景生效。
+- 新增 Qwen3-ASR 為實驗性、可選的本地 STT 引擎（mlx-audio + `mlx-community/Qwen3-ASR-1.7B-4bit`）；模型未就緒或載入失敗時 fail-safe 回退 whisper-turbo；預設引擎不變；Dashboard 模型下載映射修正並安全遷移舊 repo id。效能與準確度會依裝置及音訊而異，正式比較基準尚待納入可重現報告。
+- macOS 貼上防重複：每段錄音的轉錄結果以 recording token 只消費一次，杜絕同段語音被重複貼上；刻意不做內容比對去重，合法的重複口述不受影響。
+- PTT 靜音安全網：push-to-talk 連續靜音達 `ptt_silence_autostop_seconds`（預設 120 秒，可設 0 停用）自動停止並及時完成轉錄貼上（發 macOS 通知註明為安全網觸發）；與放鍵/watchdog 競態下保證只 finalize 一次。
+- 修正 recorder chunk 計算的浮點截斷（`int(x/0.1)`→`int(round(x/0.1))`）：連續模式最短分段 0.6s 不再被悄悄砍成 0.5s；`start_continuous()` 補 thread 存活守門，比照 `start()` 防 PortAudio 重入 deadlock。
+- iOS 補齊 OpenCC s2twp 最終防護層：內嵌上游 OpenCC 詞典資料（與 macOS/Android 同源）之純 Swift 實作，dictate 輸出與幻覺截斷比對均經繁中正規化；translate 輸出因跨語言漢字風險暫不套用（明確標註）。
+- Dashboard 新增 `GET /api/latency_summary` 與 Cost & Audit 延遲卡片：近 7/30 天 pipeline p50/p90/p95/p99 與 STT/LLM 分項均值（重用 `scripts/event_summary.py` 同一計算路徑）。
+- 測試基準大幅補強：LLM 五引擎 fallback 鏈、連續模式併發/backpressure、貼上 idempotency、PTT 自停競態、latency API、醫療詞庫共 70+ 新測試；全量 465 tests 通過。
 
 ## Android v2.7.1 (2026-07-27) — Japanese Translation Reliability Hotfix
 

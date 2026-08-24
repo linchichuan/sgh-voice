@@ -15,17 +15,23 @@ if [[ -d "$SCRIPT_PROJECT_DIR/scripts" ]]; then
 else
     PROJECT_DIR="${SGH_VOICE_PROJECT_DIR:-/Users/lin/voice-input}"
 fi
-VENV_PYTHON="$PROJECT_DIR/venv/bin/python3"
+if [[ -n "${SGH_VOICE_PYTHON:-}" ]]; then
+    PYTHON_RUNNER="$SGH_VOICE_PYTHON"
+elif [[ -x "$PROJECT_DIR/venv/bin/python3" ]]; then
+    PYTHON_RUNNER="$PROJECT_DIR/venv/bin/python3"
+elif ! PYTHON_RUNNER="$(command -v python3)"; then
+    PYTHON_RUNNER=""
+fi
 export SGH_VOICE_PROJECT_DIR="$PROJECT_DIR"
 
 case "$TASK" in
     dict-update)
         TARGET="$PROJECT_DIR/scripts/dict-update.py"
-        RUNNER="$VENV_PYTHON"
+        RUNNER="$PYTHON_RUNNER"
         ;;
     promote-corrections)
         TARGET="$PROJECT_DIR/scripts/dictionary_promote_from_history.py"
-        RUNNER="$VENV_PYTHON"
+        RUNNER="$PYTHON_RUNNER"
         ;;
     maintenance-loop)
         TARGET="$RUNNER_DIR/maintenance_loop.sh"
