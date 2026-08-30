@@ -1561,6 +1561,17 @@ svg {
     white-space: nowrap;
 }
 
+.download-update-note {
+    margin-top: 18px;
+    padding: 13px 15px;
+    border-left: 3px solid var(--success);
+    border-radius: 0 11px 11px 0;
+    color: var(--ink-soft);
+    background: var(--green-soft);
+    font-size: 13px;
+    line-height: 1.65;
+}
+
 .copy-button {
     min-width: 64px;
     min-height: 44px;

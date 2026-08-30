@@ -66,6 +66,7 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
         private const val MAX_RECORDING_DURATION_MS = 120_000L
         private const val MIN_WAV_SIZE_BYTES = 8_044
         private const val ZHUYIN_CANDIDATE_LIMIT = 24
+        private const val ZHUYIN_CONTEXT_CODE_POINTS = 16
         private const val JAPANESE_CANDIDATE_LIMIT = 24
         private const val ENGLISH_CANDIDATE_LIMIT = 12
         private const val SNAPSHOT_SIDE_CODE_POINTS = 600
@@ -812,15 +813,22 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
                     updateManualUi()
                 } else {
                     currentInputConnection?.deleteSurroundingTextInCodePoints(1, 0)
+                    updateManualUi()
                 }
             }
 
             KeyAction.Space -> {
-                if (!commitZhuyinBest()) currentInputConnection?.commitText(" ", 1)
+                if (!commitZhuyinBest()) {
+                    currentInputConnection?.commitText(" ", 1)
+                    updateManualUi()
+                }
             }
 
             KeyAction.Enter -> {
-                if (!commitZhuyinBest()) performEnterAction()
+                if (!commitZhuyinBest()) {
+                    performEnterAction()
+                    updateManualUi()
+                }
             }
 
             KeyAction.Shift,
@@ -921,18 +929,23 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
     }
 
     private fun selectZhuyinCandidate(candidate: String) {
-        if (!::zhuyinComposer.isInitialized || !zhuyinComposer.hasComposition) return
-        val reading = zhuyinComposer.normalizedReading
-        val selected = rankedZhuyinCandidates().firstOrNull { it == candidate } ?: return
-        if (currentInputConnection?.commitText(selected, 1) == true) {
+        if (!::zhuyinComposer.isInitialized) return
+        // Re-read the cursor context immediately before committing. This makes
+        // an associated suffix fail closed if the user moved the cursor after
+        // the candidate strip was rendered.
+        val selected = rankedZhuyinCandidateObjects()
+            .firstOrNull { it.text == candidate }
+            ?: return
+        val hadComposition = zhuyinComposer.hasComposition
+        if (currentInputConnection?.commitText(selected.text, 1) == true) {
             if (personalizationAllowed()) {
                 personalization.recordCandidateSelection(
                     LearningLanguage.ZHUYIN,
-                    reading,
-                    selected
+                    selected.reading,
+                    selected.text
                 )
             }
-            zhuyinComposer.clear()
+            if (hadComposition) zhuyinComposer.clear()
             updateManualUi()
         }
     }
@@ -1045,16 +1058,37 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
     }
 
     private fun rankedZhuyinCandidates(): List<String> {
+        return rankedZhuyinCandidateObjects().map { it.text }
+    }
+
+    private fun rankedZhuyinCandidateObjects(): List<ZhuyinCandidate> {
         if (!::zhuyinComposer.isInitialized) return emptyList()
-        val candidates = zhuyinComposer.getCandidates(
-            limit = ZHUYIN_CANDIDATE_LIMIT,
-            includeRawFallback = true
-        ).map { it.text }
-        return rankCandidates(
+        val candidates = if (zhuyinComposer.hasComposition) {
+            zhuyinComposer.getCandidates(
+                limit = ZHUYIN_CANDIDATE_LIMIT,
+                includeRawFallback = true
+            )
+        } else {
+            if (!currentLearningDecision.localSuggestionsAllowed) return emptyList()
+            val previousText = currentInputConnection?.getTextBeforeCursor(
+                ZHUYIN_CONTEXT_CODE_POINTS,
+                0
+            )?.toString().orEmpty()
+            zhuyinComposer.getContextCandidates(
+                previousText,
+                ZHUYIN_CANDIDATE_LIMIT
+            )
+        }
+        if (candidates.isEmpty()) return emptyList()
+        val inputKey = candidates.first().reading
+        val rankedTexts = rankCandidates(
             LearningLanguage.ZHUYIN,
-            zhuyinComposer.normalizedReading,
-            candidates
+            inputKey,
+            candidates.map { it.text }
         )
+        return rankedTexts.mapNotNull { text ->
+            candidates.firstOrNull { it.text == text }
+        }
     }
 
     private fun rankedJapaneseCandidates(): List<JapaneseCandidate> {
@@ -1203,6 +1237,12 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
             candidatesStart,
             candidatesEnd
         )
+        if (currentInputMode == KeyboardView.InputMode.ZHUYIN &&
+            ::zhuyinComposer.isInitialized &&
+            !zhuyinComposer.hasComposition
+        ) {
+            updateManualUi()
+        }
         if (!personalizationAllowed() ||
             !voiceCorrectionTracker.isTracking(inputSessionId)
         ) {

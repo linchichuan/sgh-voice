@@ -146,8 +146,15 @@
 
     <!-- 個人詞庫 -->
     <string name="title_dictionary_manage">個人辞書管理</string>
-    <string name="title_custom_words">カスタム単語 (認識率向上)</string>
+    <string name="title_custom_words">音声認識用カスタム単語</string>
     <string name="label_add_proper_noun">固有名詞を追加</string>
+    <string name="title_custom_zhuyin_words">注音カスタム単語</string>
+    <string name="desc_custom_zhuyin_words">内蔵辞書にない会社名、人名、専門用語を端末内に追加できます。漢字1文字ごとに完全な注音音節を1つ入力してください。</string>
+    <string name="label_zhuyin_word">繁体字中国語の単語</string>
+    <string name="label_zhuyin_reading">完全な注音読み</string>
+    <string name="hint_zhuyin_reading">例：新義豊 → ㄒㄧㄣ ㄧˋ ㄈㄥ</string>
+    <string name="btn_add_zhuyin_word">注音辞書に追加</string>
+    <string name="msg_invalid_zhuyin_entry">1～12文字の繁体字と、各文字に対応する完全な注音音節を入力してください。重複項目は追加されません。</string>
     <string name="title_corrections">エラー修正ルール</string>
     <string name="label_wrong_word">元の文字</string>
     <string name="label_correct_word">修正後</string>
@@ -163,11 +170,13 @@
     <!-- 使用說明 -->
     <string name="usage_title">使用説明</string>
     <string name="usage_step1">1. マイクをタップすると通常の音声入力、長押しすると1～4言語の翻訳先を選べます。翻訳録音中にもう一度長押しすると安全にキャンセルできます。</string>
-    <string name="usage_step2">2. 同じキーボード内で注音、日本語ローマ字、英語を切り替えられます。</string>
+    <string name="usage_step2">2. 同じキーボード内で注音、日本語ローマ字、英語を切り替えられます。注音は熟語、端末内の連想候補、ユーザー定義の読みを利用できます。</string>
     <string name="usage_step3">3. 音声は日中英の混在を自動処理し、中国語は繁体字へ変換します。</string>
     <string name="usage_step4">4. よく選ぶ候補は上位に移動し、同じ入力欄での短い音声修正も端末内で学習します。</string>
     <string name="jmdict_attribution">日本語の一般語候補データ：JMdict／EDRDG（CC BY-SA 4.0）</string>
     <string name="btn_dictionary_license">辞書の出典とライセンスを表示</string>
+    <string name="zhuyin_attribution">繁体字中国語の注音・連想語データ：McBopomofo／OpenVanilla（MIT、2026-08-28固定スナップショット）</string>
+    <string name="btn_zhuyin_license">注音辞書の出典とライセンスを表示</string>
 
     <string name="output_style_label">出力スタイルの設定</string>
     <string name="style_normal">一般テキスト（デフォルト）</string>

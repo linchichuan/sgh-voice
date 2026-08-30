@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import com.shingihou.sghvoice.api.ApiConfig
 import com.shingihou.sghvoice.api.ApiModelCatalog
 import com.shingihou.sghvoice.learning.PersonalizationRepository
+import com.shingihou.sghvoice.ime.UserZhuyinLexiconStore
 import com.shingihou.sghvoice.processing.DictionaryManager
 import com.shingihou.sghvoice.processing.RecognitionLanguage
 import com.shingihou.sghvoice.processing.TranslationLanguage
@@ -39,6 +40,7 @@ fun SetupScreen(
 ) {
     val context = LocalContext.current
     val dictionaryManager = remember { DictionaryManager(context) }
+    val userZhuyinLexicon = remember { UserZhuyinLexiconStore(context) }
     val personalization = remember { PersonalizationRepository.getInstance(context) }
     
     var selectedTab by remember { mutableIntStateOf(0) }
@@ -62,7 +64,7 @@ fun SetupScreen(
         Box(modifier = Modifier.fillMaxSize().padding(16.dp)) {
             when (selectedTab) {
                 0 -> BasicSettingsTab(apiConfig, onCloudConsentGranted)
-                1 -> DictionaryTab(dictionaryManager, personalization)
+                1 -> DictionaryTab(dictionaryManager, userZhuyinLexicon, personalization)
                 2 -> UsageTab()
             }
         }
@@ -636,11 +638,17 @@ private fun ModelSelector(
 @Composable
 private fun DictionaryTab(
     dictionaryManager: DictionaryManager,
+    userZhuyinLexicon: UserZhuyinLexiconStore,
     personalization: PersonalizationRepository
 ) {
     val scrollState = rememberScrollState()
     var newWord by remember { mutableStateOf("") }
     var customWords by remember { mutableStateOf(dictionaryManager.getCustomWords()) }
+    var newZhuyinWord by remember { mutableStateOf("") }
+    var newZhuyinReading by remember { mutableStateOf("") }
+    var zhuyinEntries by remember { mutableStateOf(userZhuyinLexicon.getEntries()) }
+    var zhuyinEntryError by remember { mutableStateOf(false) }
+    val invalidZhuyinEntryMessage = stringResource(R.string.msg_invalid_zhuyin_entry)
     
     var wrongText by remember { mutableStateOf("") }
     var correctText by remember { mutableStateOf("") }
@@ -774,6 +782,92 @@ private fun DictionaryTab(
             }
         }
 
+        // 注音詞彙需要明確讀音，避免用逐字猜音破壞多音字品質。
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    stringResource(R.string.title_custom_zhuyin_words),
+                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Text(
+                    stringResource(R.string.desc_custom_zhuyin_words),
+                    style = MaterialTheme.typography.bodySmall
+                )
+                OutlinedTextField(
+                    value = newZhuyinWord,
+                    onValueChange = {
+                        newZhuyinWord = it
+                        zhuyinEntryError = false
+                    },
+                    label = { Text(stringResource(R.string.label_zhuyin_word)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = newZhuyinReading,
+                    onValueChange = {
+                        newZhuyinReading = it
+                        zhuyinEntryError = false
+                    },
+                    label = { Text(stringResource(R.string.label_zhuyin_reading)) },
+                    supportingText = {
+                        Text(stringResource(R.string.hint_zhuyin_reading))
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    isError = zhuyinEntryError
+                )
+                Button(
+                    onClick = {
+                        if (userZhuyinLexicon.addEntry(newZhuyinWord, newZhuyinReading)) {
+                            zhuyinEntries = userZhuyinLexicon.getEntries()
+                            newZhuyinWord = ""
+                            newZhuyinReading = ""
+                            zhuyinEntryError = false
+                        } else {
+                            zhuyinEntryError = true
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(stringResource(R.string.btn_add_zhuyin_word))
+                }
+                if (zhuyinEntryError) {
+                    Text(
+                        invalidZhuyinEntryMessage,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    zhuyinEntries.forEach { entry ->
+                        InputChip(
+                            selected = false,
+                            onClick = {
+                                userZhuyinLexicon.removeEntry(entry)
+                                zhuyinEntries = userZhuyinLexicon.getEntries()
+                            },
+                            label = { Text("${entry.text} · ${entry.reading}") },
+                            trailingIcon = {
+                                Icon(
+                                    Icons.Default.Delete,
+                                    null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        )
+                    }
+                }
+            }
+        }
+
         // 錯誤修正卡片
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(16.dp)) {
@@ -885,6 +979,27 @@ private fun UsageTab() {
                     }
                 ) {
                     Text(stringResource(R.string.btn_dictionary_license))
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    stringResource(R.string.zhuyin_attribution),
+                    style = MaterialTheme.typography.bodySmall
+                )
+                TextButton(
+                    onClick = {
+                        context.startActivity(
+                            Intent(
+                                Intent.ACTION_VIEW,
+                                Uri.parse(
+                                    "https://github.com/openvanilla/McBopomofo/" +
+                                        "blob/557733124aa3192b3366f7655c5b6c93c28b4ea6/" +
+                                        "LICENSE.txt"
+                                )
+                            )
+                        )
+                    }
+                ) {
+                    Text(stringResource(R.string.btn_zhuyin_license))
                 }
             }
         }

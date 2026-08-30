@@ -21,7 +21,18 @@ data class LearningPolicyDecision(
      * text snapshots, and cloud voice submission.
      */
     val sensitiveField: Boolean
-)
+) {
+    /**
+     * Static on-device suggestions are not personalized learning. They remain
+     * available when an editor opts out of learning, but are suppressed for
+     * passwords, non-text inputs and fields that explicitly disable suggestions.
+     */
+    val localSuggestionsAllowed: Boolean
+        get() = reason in setOf(
+            LearningPolicyReason.ALLOWED,
+            LearningPolicyReason.NO_PERSONALIZED_LEARNING
+        )
+}
 
 /**
  * Central privacy gate for personalized learning.
@@ -52,9 +63,6 @@ object LearningPolicy {
                 sensitiveField = true
             )
         }
-        if (imeOptions and EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING != 0) {
-            return deny(LearningPolicyReason.NO_PERSONALIZED_LEARNING)
-        }
         if (inputClass != InputType.TYPE_CLASS_TEXT) {
             return deny(LearningPolicyReason.NON_TEXT_FIELD)
         }
@@ -74,6 +82,9 @@ object LearningPolicy {
         )
         if (!naturalLanguageVariation) {
             return deny(LearningPolicyReason.NON_NATURAL_TEXT_FIELD)
+        }
+        if (imeOptions and EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING != 0) {
+            return deny(LearningPolicyReason.NO_PERSONALIZED_LEARNING)
         }
 
         return LearningPolicyDecision(

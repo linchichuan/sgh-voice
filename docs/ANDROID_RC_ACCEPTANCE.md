@@ -1,6 +1,6 @@
 # SGH Voice Android RC 實機驗收
 
-> 適用版本：Android 2.7.3（versionCode 23）候選版
+> 適用版本：Android 2.7.3（versionCode 23）正式側載測試版
 > 文件狀態：QA／RC 驗收用途
 > 禁止事項：不得使用真實患者姓名、病歷、電話、付款或其他個人資料
 
@@ -39,7 +39,7 @@
 ./scripts/verify_mobile_rc.sh --install
 ```
 
-## 2.1 本機自動化檢查結果（2026-08-24）
+## 2.1 本機自動化檢查結果（2026-08-30）
 
 > 本機環境未安裝／未連接實機（`adb devices` 回傳 0 台已授權裝置；SDK 內建的
 > `~/Library/Android/sdk/platform-tools/adb` 存在但沒有裝置可用）。以下只是出貨前
@@ -49,25 +49,25 @@
 | 檢查項目 | 指令 | 結果 | 證據／備註 |
 |---|---|---|---|
 | Git diff 格式檢查 | `git diff --check` | ✅ PASS | 無空白或 patch 格式錯誤；工作區仍含本輪待提交變更，不宣稱 clean |
-| Python 迴歸測試 | 乾淨 Python 3.12 venv 執行 `python -m pytest -q` | ✅ PASS | 468 tests 全部通過，exit 0；Qwen3-ASR 模組可載入且環境未安裝舊 `librosa` |
+| Python 迴歸測試 | 乾淨 Python 3.12 venv 執行 `python -m pytest -q` | ✅ PASS | 469 tests 全部通過，exit 0；Qwen3-ASR 模組可載入且環境未安裝舊 `librosa` |
 | Python 靜態檢查 | `ruff check . --select E9,F63,F7,F82` | ✅ PASS | 無 release-critical Ruff 錯誤 |
 | iOS source／metadata preflight | `./scripts/verify_ios_app_store_preflight.sh --source-only` | ✅ PASS | 全部 Swift application sources type-check 通過；不包含 Xcode Archive／TestFlight／App Store 帳號 gate |
-| Android 單元測試 | `cd android/SGHVoice && ./gradlew testDebugUnitTest --no-daemon` | ✅ PASS | 122 tests，0 failures／0 errors（`app/build/test-results/testDebugUnitTest/`，2026-08-24 13:38 產出） |
-| Android Debug Lint（補充項，非 RC 門檻要求） | `./gradlew lintDebug --no-daemon` | ✅ PASS | BUILD SUCCESSFUL，0 errors／63 warnings |
-| Android Release Lint | `./gradlew lintRelease --no-daemon` | ❌ BLOCKED | `:app:verifyReleaseSigningConfig` FAILED——缺 `SGH_RELEASE_STORE_FILE`／`SGH_RELEASE_STORE_PASSWORD`／`SGH_RELEASE_KEY_ALIAS`／`SGH_RELEASE_KEY_PASSWORD`／`SGH_RELEASE_CERT_SHA256`。與 CHANGELOG 記載一致：2.7.3 的 sideload signer 待從安全備份復原，非程式碼缺陷 |
-| Android Release 組建（簽署 APK） | `./gradlew assembleRelease --no-daemon` | ❌ BLOCKED | 同上，未產生已簽署的 2.7.3 candidate APK，因此無法計算 SHA-256 供第 3 節填寫 |
-| `verify_mobile_rc.sh`（完整模式，無參數） | `./scripts/verify_mobile_rc.sh` | ❌ BLOCKED | 前段（git diff／pytest／swiftc／Android 單元測試）皆通過，於 `lintRelease` 的簽章 gate 失敗而中止（`set -e`），未進入 adb／裝置檢查階段 |
-| 已發布 2.7.2 artifact 驗證 | `./scripts/verify_mobile_rc.sh --artifact-only` | ✅ PASS | 既有正式 APK 的版本、SHA-256、簽章憑證與 metadata 一致；此項不代表 2.7.3 RC 或實機驗收通過 |
+| Android 單元測試 | `cd android/SGHVoice && ./gradlew testDebugUnitTest --no-daemon` | ✅ PASS | 129 tests，0 failures／0 errors |
+| Android Debug Lint（補充項，非 RC 門檻要求） | `./gradlew lintDebug --no-daemon` | ✅ PASS | BUILD SUCCESSFUL，0 errors／68 warnings |
+| Android Release Lint | `./scripts/build_android_sideload_release.sh` | ✅ PASS | 原 2.7.2 sideload signer 已復原並移入 macOS Keychain；`:app:verifyReleaseSigningConfig` 與 `lintRelease` 通過 |
+| Android Release 組建（簽署 APK） | `./scripts/build_android_sideload_release.sh` | ✅ PASS | 產生 2.7.3／versionCode 23；v2 簽章有效，憑證 SHA-256 與 2.7.2 完全相同 |
+| `verify_mobile_rc.sh`（完整模式，無參數） | `./scripts/verify_mobile_rc.sh` | ⚠️ PARTIAL | 全部自動化項目通過；因沒有已授權 Android 實機，無法執行安裝與第 4 節 31 個實機案例 |
+| 2.7.3 artifact 驗證 | `./scripts/verify_mobile_rc.sh --artifact-only` | ✅ PASS | APK 版本、17,324,617 bytes、SHA-256、唯一 signer、憑證與網站 metadata 一致 |
 | Android 實機連線 | `adb devices` | 不適用（N/A） | 本機 PATH 無 adb；SDK 內建 binary 可執行但 0 台已授權裝置連接 |
 
 ## 3. 測試紀錄
 
 | 欄位 | 紀錄 |
 |---|---|
-| 測試日期 |  |
-| 測試者 |  |
-| APK SHA-256 |  |
-| App 版本 |  |
+| 測試日期 | 2026-08-30（自動化項目） |
+| 測試者 | Codex（自動化）；Lin（實機項目待執行） |
+| APK SHA-256 | `e53a329f194d074d905f7d926ca5bbeff7023feba99855b8e5b7b8798adf5f07` |
+| App 版本 | 2.7.3（versionCode 23） |
 | 手機型號 |  |
 | Android 版本 |  |
 | 螢幕尺寸／縮放 |  |
@@ -96,6 +96,18 @@
 | UI-03 | 切換系統字體 100%／較大字體 | 主要操作仍可辨識，沒有關鍵按鍵消失 |
 | UI-04 | 在 Gmail 草稿、瀏覽器搜尋、一般備忘錄輸入 | 鍵盤高度合理，不遮住目前輸入欄位 |
 | UI-05 | 旋轉直向／橫向後再回直向 | 沒有空白畫面、重疊或無法操作 |
+
+### B2. 繁體中文注音字庫與聯想
+
+| ID | 操作 | 通過條件 |
+|---|---|---|
+| ZH-01 | 輸入 `ㄕㄢ` | 候選含「刪」，且「山」仍維持常用高順位 |
+| ZH-02 | 輸入 `ㄕㄢ ㄔㄨˊ` | 第一候選為「刪除」，不再只做「山＋除」逐字拼接 |
+| ZH-03 | 只輸入 `ㄕㄢ` 並選「刪」 | 組字清空後候選顯示「除」；點「除」只追加一字，結果為「刪除」而非「刪刪除」 |
+| ZH-04 | 分別輸入 `ㄔㄨ`、`ㄐㄧㄚ`、`ㄊㄨㄥˊ`、`ㄌㄜ˙` | 第一候選依序為「出、家、同、了」，不被「齣、傢、衕、瞭」取代 |
+| ZH-05 | 選「刪」後移動游標或按 Space | 舊的「除」聯想立即消失，點舊畫面不得貼到錯誤位置 |
+| ZH-06 | 在密碼欄與禁止建議欄位輸入 | 不顯示游標前文字的片語聯想 |
+| ZH-07 | 在個人詞庫新增「新義豊／`ㄒㄧㄣ ㄧˋ ㄈㄥ`」後重開鍵盤 | 該讀音第一順位可選「新義豊」；移除後不再出現 |
 
 ### C. 語言與系統鍵盤選擇
 
@@ -180,15 +192,15 @@ Issue ID:
 > 本機無 adb、無實機，第 4 節全部 31 個案例與下列項目均未執行，需 Lin 在實機上完成。
 > 自動化前置檢查結果見第 2.1 節。
 
-### 7.0 前置：解除 Release 簽章 blocker
+### 7.0 前置：從 2.7.2 直接覆蓋更新
 
-沒有這一步就無法產生可安裝的 2.7.3 candidate APK：
+2.7.3 已使用與 2.7.2 完全相同的 package name 與簽章憑證，可保留 App 資料直接更新：
 
-1. 從安全備份復原 2.7.3 的 sideload signer（CHANGELOG「Unreleased — Android v2.7.3 Candidate」已記錄此待辦）。
-2. 設定環境變數 `SGH_RELEASE_STORE_FILE`、`SGH_RELEASE_STORE_PASSWORD`、`SGH_RELEASE_KEY_ALIAS`、`SGH_RELEASE_KEY_PASSWORD`、`SGH_RELEASE_CERT_SHA256`（或寫入 `android/SGHVoice/keystore.properties`，此檔已在 `.gitignore`，不會被 commit）。
-3. 執行 `cd android/SGHVoice && ./gradlew lintRelease assembleRelease --no-daemon`，確認 BUILD SUCCESSFUL。
-4. 對 `app/build/outputs/apk/release/app-release.apk` 算 SHA-256（`shasum -a 256`），填入第 3 節「APK SHA-256」。
-5. 連接一台實機，執行 `./scripts/verify_mobile_rc.sh --install` 安裝已驗證的 release APK。
+1. 在手機瀏覽器開啟 `https://voice.shingihou.com/`，下載 `SGHVoice-Android-v2.7.3.apk`。
+2. 若 Android 要求允許來源，只對目前使用的瀏覽器或檔案管理器開啟「安裝未知的應用程式」；不要停用 Google Play Protect。
+3. 開啟 APK 後選擇「更新」。**不要先解除安裝 2.7.2**，否則裝置內設定與資料可能被刪除。
+4. 安裝後確認版本為 2.7.3，再開始第 4 節測試。
+5. 若改用 USB 且裝置已授權，可在 repo 根目錄執行 `./scripts/verify_mobile_rc.sh --install`；腳本會在安裝前重新驗證版本、SHA-256 與 signer。
 
 ### 7.1 填寫第 3 節「測試紀錄」
 
@@ -211,6 +223,15 @@ Issue ID:
 - [ ] UI-03：切換系統字體 100%／較大字體 → 主要操作仍可辨識，沒有關鍵按鍵消失
 - [ ] UI-04：在 Gmail 草稿、瀏覽器搜尋、一般備忘錄輸入 → 鍵盤高度合理，不遮住目前輸入欄位
 - [ ] UI-05：旋轉直向／橫向後再回直向 → 沒有空白畫面、重疊或無法操作
+
+**B2. 繁體中文注音字庫與聯想**
+- [ ] ZH-01：輸入 `ㄕㄢ` → 候選含「刪」，「山」仍維持常用高順位
+- [ ] ZH-02：輸入 `ㄕㄢ ㄔㄨˊ` → 第一候選為「刪除」
+- [ ] ZH-03：選「刪」後點聯想「除」 → 結果為「刪除」，不重複 prefix
+- [ ] ZH-04：測 `出／家／同／了` → 常用字第一順位正確，未被異體字取代
+- [ ] ZH-05：選「刪」後移動游標或按 Space → 舊聯想立即失效
+- [ ] ZH-06：密碼與禁止建議欄位 → 不顯示片語聯想
+- [ ] ZH-07：新增並移除「新義豊／ㄒㄧㄣ ㄧˋ ㄈㄥ」 → 自訂候選即時同步
 
 **C. 語言與系統鍵盤選擇**
 - [ ] LG-01：點目前選取的 Voice 分頁 → 顯示 Auto、繁中、日文、英文、韓文

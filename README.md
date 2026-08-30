@@ -1,4 +1,4 @@
-# 🎙 SGH Voice — 讓想法流動，不再卡在鍵盤上 (v2.7.0)
+# 🎙 SGH Voice — 讓想法流動，不再卡在鍵盤上 (v2.7.3)
 
 **[English](README.en.md) | [日本語](README.ja.md) | 繁體中文**
 
@@ -7,9 +7,21 @@
 [![macOS](https://img.shields.io/badge/macOS-Apple_Silicon-black?logo=apple)](https://github.com/linchichuan/sgh-voice/releases)
 [![iOS](https://img.shields.io/badge/iOS-17.0+-blue?logo=apple)](https://github.com/linchichuan/sgh-voice/releases)
 [![Android](https://img.shields.io/badge/Android-8.0+-green?logo=android)](https://github.com/linchichuan/sgh-voice/releases)
-[![Version](https://img.shields.io/badge/Version-2.7.0-green)]()
+[![Version](https://img.shields.io/badge/Version-2.7.3-green)]()
 
 ---
+
+## Android v2.7.3：繁中注音字庫與聯想
+
+| 重點改進 | 說明 |
+|------|------|
+| **台灣原生注音字庫** | 以固定版本的 McBopomofo 資料取代 2,869 個單字的 Unihan 小表；候選涵蓋常用單字、完整詞組與正確破音字順位。 |
+| **刪除與片語聯想** | `ㄕㄢ` 可選「刪」、`ㄕㄢ ㄔㄨˊ` 可直接選「刪除」；先選「刪」後會在本機顯示「除」等片語尾端。 |
+| **修正怪異繁體字** | 不再把「出、家、同、了」逐碼誤換成「齣、傢、衕、瞭」；候選依台灣詞頻排序。 |
+| **自訂注音詞彙** | 個人詞庫可輸入繁體詞與完整注音讀音，立即加入候選與片語聯想；最多 200 筆，只存本機。 |
+| **低記憶體索引** | 大型詞庫以唯讀映射與稀疏索引查詢，不在輸入法啟動時展開成大型記憶體 Map。 |
+
+詳細資料來源、更新方式與測試門檻見 [docs/ZHUYIN_LEXICON.md](docs/ZHUYIN_LEXICON.md)。正式側載 APK 與 2.7.2 使用相同 signer，可從官方網站直接覆蓋更新，不需先解除安裝。
 
 ## 🌟 v2.7.0：安全聽寫、多語翻譯與 Prompt 管理
 

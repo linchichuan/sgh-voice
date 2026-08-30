@@ -183,6 +183,48 @@ class ZhuyinComposerTest {
     }
 
     @Test
+    fun `selected character can offer a local phrase completion`() {
+        val customLexicon = object : ZhuyinLexicon {
+            override fun lookup(reading: String): List<ZhuyinLexiconEntry> =
+                if (reading == "ㄕㄢ") listOf(ZhuyinLexiconEntry("刪", score = 100))
+                else emptyList()
+
+            override fun lookupNext(
+                previousText: String,
+                limit: Int
+            ): List<ZhuyinLexiconEntry> =
+                if (previousText.endsWith("刪")) {
+                    listOf(ZhuyinLexiconEntry("除", score = 100))
+                } else {
+                    emptyList()
+                }
+        }
+        val composer = ZhuyinComposer(customLexicon)
+
+        val candidates = composer.getContextCandidates("請刪", limit = 5)
+
+        assertEquals(listOf("除"), candidates.map { it.text })
+        assertEquals(ZhuyinCandidateSource.CONTEXT_PREDICTION, candidates.first().source)
+        assertEquals("context:刪", candidates.first().reading)
+    }
+
+    @Test
+    fun `context prediction is unavailable while phonetic composition is active`() {
+        val customLexicon = object : ZhuyinLexicon {
+            override fun lookup(reading: String): List<ZhuyinLexiconEntry> = emptyList()
+
+            override fun lookupNext(
+                previousText: String,
+                limit: Int
+            ): List<ZhuyinLexiconEntry> = listOf(ZhuyinLexiconEntry("除", score = 100))
+        }
+        val composer = ZhuyinComposer(customLexicon)
+        assertTrue(composer.setComposition("ㄕㄢ"))
+
+        assertTrue(composer.getContextCandidates("刪").isEmpty())
+    }
+
+    @Test
     fun `unknown reading can be committed as raw Zhuyin without delimiters`() {
         val composer = ZhuyinComposer()
         assertTrue(composer.setComposition("ㄎㄨㄞˋ ㄌㄜˋ"))

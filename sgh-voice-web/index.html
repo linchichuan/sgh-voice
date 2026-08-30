@@ -21,7 +21,7 @@
     <meta property="og:site_name" content="SGH Voice">
     <meta property="og:title" content="SGH Voice — 一個輸入法，語音、注音、日文、英文都能用。">
     <meta property="og:description"
-        content="Android 個人測試版 APK v2.7.2：短按聽寫、長按選擇最多四種翻譯語言；另提供 macOS Apple Silicon v2.6.0。">
+        content="Android 個人測試版 APK v2.7.3：完整繁中注音字庫、詞組聯想、自訂詞彙、短按聽寫與最多四語翻譯；另提供 macOS Apple Silicon v2.6.0。">
     <meta property="og:url" content="https://voice.shingihou.com/">
     <meta property="og:image" content="https://voice.shingihou.com/assets/generated/og-android-v240.png">
     <meta property="og:image:type" content="image/png">
@@ -58,9 +58,9 @@
           "name": "SGH Voice for Android",
           "applicationCategory": "ProductivityApplication",
           "operatingSystem": "Android 8.0 or later",
-          "softwareVersion": "2.7.2",
+          "softwareVersion": "2.7.3",
           "url": "https://voice.shingihou.com/",
-          "downloadUrl": "https://voice.shingihou.com/downloads/SGHVoice-Android-v2.7.2.apk",
+          "downloadUrl": "https://voice.shingihou.com/downloads/SGHVoice-Android-v2.7.3.apk",
           "description": "A personal test build of a multilingual Android input method with tap-to-dictate, long-press translation into up to four languages, predictive Zhuyin, Japanese candidates, English, and local personalization.",
           "offers": {
             "@type": "Offer",
@@ -160,7 +160,7 @@
                 <div class="hero-copy">
                     <div class="eyebrow">
                         <span class="status-dot" aria-hidden="true"></span>
-                        <span data-i18n="hero.eyebrow">Android 個人測試版 · v2.7.2</span>
+                        <span data-i18n="hero.eyebrow">Android 個人測試版 · v2.7.3</span>
                     </div>
                     <h1 data-i18n="hero.title">一個輸入法，<br><span><span class="no-break">語音、</span><span
                                 class="no-break">注音、</span><span class="no-break">日文、</span><span
@@ -215,7 +215,7 @@
                     </div>
                     <div class="release-stamp" aria-hidden="true">
                         <small>ANDROID</small>
-                        <strong>2.7.2</strong>
+                        <strong>2.7.3</strong>
                     </div>
                 </div>
             </div>
@@ -572,7 +572,7 @@
                         <dl class="release-meta">
                             <div>
                                 <dt data-i18n="download.meta.version">版本</dt>
-                                <dd>2.7.2 (22)</dd>
+                                <dd>2.7.3 (23)</dd>
                             </div>
                             <div>
                                 <dt data-i18n="download.meta.requirement">系統需求</dt>
@@ -580,7 +580,7 @@
                             </div>
                             <div>
                                 <dt data-i18n="download.meta.size">檔案大小</dt>
-                                <dd>5.57 MiB</dd>
+                                <dd>16.52 MiB</dd>
                             </div>
                             <div>
                                 <dt data-i18n="download.meta.format">格式</dt>
@@ -591,10 +591,14 @@
                         <div class="hash-block">
                             <div>
                                 <span>SHA-256</span>
-                                <code id="apkHash">72516d1adbd6d23d794251e4ccb1c6d1fa5a076340ddb12d5e96884fb6db9ec4</code>
+                                <code id="apkHash">e53a329f194d074d905f7d926ca5bbeff7023feba99855b8e5b7b8798adf5f07</code>
                             </div>
                             <button type="button" class="copy-button" id="copyHashButton" data-i18n="download.hash.copy">複製</button>
                         </div>
+
+                        <p class="download-update-note" data-i18n="download.android.update">
+                            已安裝 2.7.2 時，直接開啟這個 2.7.3 APK 並選擇「更新」；請勿先解除安裝，既有設定與資料才能保留。
+                        </p>
 
                         <label class="risk-check" for="riskAck">
                             <input type="checkbox" id="riskAck">
@@ -608,15 +612,15 @@
 
                         <a class="btn btn-primary download-button disabled" id="apkDownloadButton"
                             aria-disabled="true" aria-describedby="riskDisclosure downloadRegistrationStatus"
-                            tabindex="-1" data-platform="android" data-version="2.7.2"
-                            data-filename="SGHVoice-Android-v2.7.2.apk"
-                            data-download-href="/downloads/SGHVoice-Android-v2.7.2.apk">
+                            tabindex="-1" data-platform="android" data-version="2.7.3"
+                            data-filename="SGHVoice-Android-v2.7.3.apk"
+                            data-download-href="/downloads/SGHVoice-Android-v2.7.3.apk">
                             <svg viewBox="0 0 24 24" aria-hidden="true">
                                 <path d="M12 3v12m0 0 5-5m-5 5-5-5M5 19h14"></path>
                             </svg>
                             <span data-i18n="download.android.cta">填寫資料並確認風險後下載 APK</span>
                         </a>
-                        <p class="download-file">SGHVoice-Android-v2.7.2.apk</p>
+                        <p class="download-file">SGHVoice-Android-v2.7.3.apk</p>
                     </article>
 
                     <article class="download-card download-mac">
@@ -696,7 +700,7 @@
                     </details>
                     <details>
                         <summary data-i18n="faq.q6">我口述一個問句時，模型會直接回答嗎？</summary>
-                        <p data-i18n="faq.a6">不應該。一般聽寫把整段內容視為逐字稿，即使像問句或命令也只能整理文字；翻譯模式只能翻譯。v2.7.2 另有輸出守門，若模型把問句當指令回答，會捨棄該答案。</p>
+                        <p data-i18n="faq.a6">不應該。一般聽寫把整段內容視為逐字稿，即使像問句或命令也只能整理文字；翻譯模式只能翻譯。v2.7.3 另有輸出守門，若模型把問句當指令回答，會捨棄該答案。</p>
                     </details>
                 </div>
             </div>

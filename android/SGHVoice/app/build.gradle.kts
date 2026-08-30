@@ -110,6 +110,12 @@ android {
         compose = true
     }
 
+    androidResources {
+        // Zhuyin uses read-only memory mapping plus sparse indexes so the full
+        // production lexicon never has to be expanded into the IME heap.
+        noCompress += "zlex"
+    }
+
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"

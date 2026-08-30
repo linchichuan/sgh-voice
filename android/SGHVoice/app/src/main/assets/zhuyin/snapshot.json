@@ -1,0 +1,52 @@
+{
+  "contextLexiconBytes": 766005,
+  "contextLexiconFile": "traditional_zhuyin_context.zlex",
+  "contextLexiconSha256": "b8d2b1c0eab28f249b4239e7c3ba95b6a418cbd203009f7eb2d9ca45233bd82b",
+  "dataLicence": "MIT",
+  "exactLexiconBytes": 5917330,
+  "exactLexiconFile": "traditional_zhuyin_exact.zlex",
+  "exactLexiconSha256": "ccdbe2469285da08769f94d4418c768d11fcc4eba602ec7b7682ec60811c0a8e",
+  "foldedCandidateCount": 148608,
+  "foldedLexiconBytes": 4752090,
+  "foldedLexiconFile": "traditional_zhuyin_folded.zlex",
+  "foldedLexiconSha256": "d6a7e3d22ab2ae6a0c705a6aebeb0b621c317ea94f8e0c4db7751a7cff453480",
+  "foldedReadingCount": 104706,
+  "formatVersion": 2,
+  "generatedAtUtc": "2026-08-30T01:51:04.393627+00:00",
+  "includedCandidateCount": 157683,
+  "includedContextCandidateCount": 57729,
+  "includedContextPrefixCount": 5190,
+  "includedPhraseCandidateCount": 145332,
+  "includedReadingCount": 133492,
+  "includedSingleCharacterCount": 12351,
+  "maxCandidatesPerKey": 24,
+  "skippedLowScorePhraseCount": 5,
+  "skippedNonLexicalContextRowCount": 55,
+  "skippedNonLexicalRowCount": 3854,
+  "skippedUtf8CompatibilityCharacterCount": 12262,
+  "sourceAncestryLicence": "BSD-3-Clause (libtabe tsi.src)",
+  "sourceCommit": "557733124aa3192b3366f7655c5b6c93c28b4ea6",
+  "sourceCommitUrl": "https://github.com/openvanilla/McBopomofo/tree/557733124aa3192b3366f7655c5b6c93c28b4ea6",
+  "sourceFiles": {
+    "BPMFBase.txt": {
+      "bytes": 723467,
+      "sha256": "5916b2128627a63cb04138a0ee6dd8dcca18bb8726bd0554f12253725e5d3381"
+    },
+    "associated-phrases-v2.txt": {
+      "bytes": 4122411,
+      "sha256": "e46f45f16252a7760cb71e54569039e27dd0fd8f8d3ae9ab1f352864624f0fe0"
+    },
+    "data.txt": {
+      "bytes": 7525965,
+      "sha256": "f39f541d072cb1333bb547ce0f133220eb8c2dbfc796f0e32cf3b10ff12f5cfa"
+    },
+    "phrase.occ": {
+      "bytes": 1765360,
+      "sha256": "bdbc574de1d57047fdd0f232ef86dda0a358b509b62e9654becd9945783e1979"
+    }
+  },
+  "sourceProjectUrl": "https://github.com/openvanilla/McBopomofo",
+  "sourceSnapshotDate": "2026-08-28",
+  "sparseIndexStride": 64,
+  "updateProcedure": "Build the pinned McBopomofo Source/Data target, regenerate the indexed assets, review snapshot hashes and run the generator contract tests."
+}

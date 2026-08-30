@@ -1,4 +1,4 @@
-# 🎙 SGH Voice — AI Voice Input Tool (v2.7.0)
+# 🎙 SGH Voice — AI Voice Input Tool (v2.7.3)
 
 **English** | **[日本語](README.ja.md)** | **[繁體中文](README.md)**
 
@@ -7,9 +7,16 @@
 [![macOS](https://img.shields.io/badge/macOS-Apple_Silicon-black?logo=apple)](https://github.com/linchichuan/sgh-voice/releases)
 [![iOS](https://img.shields.io/badge/iOS-17.0+-blue?logo=apple)](https://github.com/linchichuan/sgh-voice/releases)
 [![Android](https://img.shields.io/badge/Android-8.0+-green?logo=android)](https://github.com/linchichuan/sgh-voice/releases)
-[![Version](https://img.shields.io/badge/Version-2.7.0-green)]()
+[![Version](https://img.shields.io/badge/Version-2.7.3-green)]()
 
 ---
+
+## Android v2.7.3 — Traditional Chinese Zhuyin
+
+- Replaces the 2,869-character Phase 1 table with a pinned Traditional Chinese lexicon containing characters, phrases, and associated completions.
+- `ㄕㄢ` includes `刪`; `ㄕㄢ ㄔㄨˊ` selects `刪除`; choosing `刪` can offer the suffix `除` without duplicating the prefix.
+- Adds up to 200 on-device custom Zhuyin terms and memory-mapped sparse indexes for bounded IME memory use.
+- The signed sideload APK uses the same signer as 2.7.2 and can update it in place without uninstalling first.
 
 ## 🌟 What's New in v2.7.0
 

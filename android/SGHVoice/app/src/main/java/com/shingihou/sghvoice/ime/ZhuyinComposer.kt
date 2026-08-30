@@ -36,6 +36,16 @@ fun interface ZhuyinLexicon {
         readingPrefix: String,
         limit: Int
     ): List<ZhuyinLexiconEntry> = emptyList()
+
+    /**
+     * Returns suffixes that can complete a phrase ending at [previousText].
+     * Implementations must keep this local and bounded; the returned text is
+     * committed after the already-present prefix rather than replacing it.
+     */
+    fun lookupNext(
+        previousText: String,
+        limit: Int
+    ): List<ZhuyinLexiconEntry> = emptyList()
 }
 
 internal fun canonicalizeZhuyinReading(reading: String): String =
@@ -52,6 +62,7 @@ enum class ZhuyinCandidateSource {
     LEXICON,
     TONE_FOLDED,
     PREFIX_PREDICTION,
+    CONTEXT_PREDICTION,
     SEGMENTED,
     RAW_FALLBACK
 }
@@ -72,12 +83,11 @@ data class ZhuyinKey(
 )
 
 /**
- * Pure Kotlin state holder for a small, Phase 1 Zhuyin input method.
+ * Pure Kotlin state holder for the Zhuyin composition flow.
  *
- * This class handles phonetic composition and candidate selection only. It does
- * not claim to be a complete Mandarin input engine: prediction, fuzzy matching,
- * user learning and a production-size lexicon belong in a future lexicon
- * implementation injected through [lexicon].
+ * The lexicon is injected so the state machine remains independently testable;
+ * production Android uses a pinned Taiwan dictionary and local associated-word
+ * data while tests can supply small deterministic fixtures.
  */
 class ZhuyinComposer(
     private val lexicon: ZhuyinLexicon = PhaseOneZhuyinLexicon
@@ -152,6 +162,9 @@ class ZhuyinComposer(
 
     val hasComposition: Boolean
         get() = completedSyllables.isNotEmpty() || current.isNotEmpty()
+
+    val isCompleteComposition: Boolean
+        get() = hasComposition && syllables.all(::isCompleteSyllable)
 
     /**
      * Appends one Bopomofo symbol. ASCII space is accepted as a syllable
@@ -337,6 +350,39 @@ class ZhuyinComposer(
             if (seenTexts.add(raw.text)) ranked += raw
         }
         return ranked.take(limit)
+    }
+
+    /**
+     * Returns local associated-phrase suffixes when no phonetic composition is
+     * active. For example, cursor text ending in「刪」can return「除」; committing
+     * that suffix produces「刪除」without duplicating the prefix.
+     */
+    fun getContextCandidates(
+        previousText: String,
+        limit: Int = DEFAULT_CANDIDATE_LIMIT
+    ): List<ZhuyinCandidate> {
+        require(limit >= 0) { "Candidate limit cannot be negative." }
+        if (limit == 0 || hasComposition || previousText.isBlank()) return emptyList()
+        return lexicon.lookupNext(
+            previousText,
+            minOf(limit, MAX_PREDICTION_QUERY_RESULTS)
+        )
+            .asSequence()
+            .filter { it.text.isNotBlank() }
+            .sortedByDescending { it.score }
+            .distinctBy { it.text }
+            .take(limit)
+            .map { entry ->
+                ZhuyinCandidate(
+                    text = entry.text,
+                    // Candidate learning stores only the final Han prefix, not
+                    // the bounded cursor text used to validate the suggestion.
+                    reading = "context:" + trailingHanCharacter(previousText).orEmpty(),
+                    source = ZhuyinCandidateSource.CONTEXT_PREDICTION,
+                    score = entry.score
+                )
+            }
+            .toList()
     }
 
     /**
@@ -608,6 +654,7 @@ object PhaseOneZhuyinLexicon : ZhuyinLexicon {
         "ㄊㄞˊ ㄨㄢ" to ranked("台灣"),
         "ㄖˋ ㄅㄣˇ" to ranked("日本"),
         "ㄈㄢˊ ㄊㄧˇ" to ranked("繁體"),
+        "ㄈㄢˊ ㄊㄧˇ ㄓㄨㄥ ㄨㄣˊ" to ranked("繁體中文"),
         "ㄐㄧㄢˇ ㄊㄧˇ" to ranked("簡體"),
         "ㄒㄧㄝˋ ㄒㄧㄝ˙" to ranked("謝謝"),
         "ㄗㄞˋ ㄐㄧㄢˋ" to ranked("再見")

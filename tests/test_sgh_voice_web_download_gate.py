@@ -22,7 +22,7 @@ def test_download_links_start_locked_behind_registration():
     assert 'id="macDownloadButton"' in html
     assert html.count('download-button disabled') == 2
     assert not re.search(
-        r'<a\b[^>]*\shref="/downloads/SGHVoice-Android-v2\.7\.2\.apk"',
+        r'<a\b[^>]*\shref="/downloads/SGHVoice-Android-v2\.7\.3\.apk"',
         html,
     )
     assert not re.search(
@@ -54,7 +54,7 @@ def test_firestore_download_records_are_create_only():
     assert "request.resource.data.createdAt == request.time" in block
     assert "request.resource.data.consentVersion == 2" in block
     assert "request.resource.data.riskAcknowledged is bool" in block
-    assert "SGHVoice-Android-v2.7.2.apk" in block
+    assert "SGHVoice-Android-v2.7.3.apk" in block
     assert "allow read, update, delete: if false;" in block
 
 
@@ -80,7 +80,7 @@ def test_legal_pages_publish_canonical_and_language_alternates():
         assert f'<loc>{canonical}</loc>' in sitemap
         assert f'hreflang="x-default" href="{canonical}"' in sitemap
 
-    assert sitemap.count("<lastmod>2026-08-24</lastmod>") == 3
+    assert sitemap.count("<lastmod>2026-08-30</lastmod>") == 3
 
 
 def test_android_test_build_notice_preserves_platform_security_controls():
@@ -122,9 +122,9 @@ def test_generated_feature_images_are_not_presented_as_verified_release_screensh
     assert "android-zhuyin-ui.webp" in html
     for unsupported_claim in (
         "ACTUAL ANDROID BUILD",
-        "これが v2.7.2 の実画面です",
-        "這就是 v2.7.2 的實際鍵盤",
-        "This is the actual v2.7.2 keyboard",
+        "これが v2.7.3 の実画面です",
+        "這就是 v2.7.3 的實際鍵盤",
+        "This is the actual v2.7.3 keyboard",
     ):
         assert unsupported_claim not in html
         assert unsupported_claim not in translations
@@ -146,12 +146,12 @@ def test_privacy_discloses_current_anthropic_model_specific_retention_terms():
 
     assert "Claude Fable 5" in privacy
     assert "Claude Fable 5" in preflight
-    assert "2026年8月24日" in privacy
-    assert "2026 年 8 月 24 日" in privacy
-    assert "August 24, 2026" in privacy
+    assert "2026年8月30日" in privacy
+    assert "2026 年 8 月 30 日" in privacy
+    assert "August 30, 2026" in privacy
     assert "requires 30-day data retention" in privacy
     assert "platform.claude.com/docs/en/manage-claude/api-and-data-retention" in privacy
-    assert "2026年8月24日" in preflight
+    assert "2026年8月30日" in preflight
 
 
 def test_android_release_manifest_matches_public_artifact_and_copy():
@@ -160,8 +160,8 @@ def test_android_release_manifest_matches_public_artifact_and_copy():
     index = read_web_file("index.html")
     llms = read_web_file("llms.txt")
 
-    assert release["versionName"] == "2.7.2"
-    assert release["versionCode"] == 22
+    assert release["versionName"] == "2.7.3"
+    assert release["versionCode"] == 23
     assert re.fullmatch(r"[0-9a-f]{64}", release["sha256"])
     assert re.fullmatch(r"[0-9A-F]{64}", release["certificateSha256"])
     assert artifact.is_file()
@@ -172,3 +172,4 @@ def test_android_release_manifest_matches_public_artifact_and_copy():
     assert f'{release["versionName"]} ({release["versionCode"]})' in index
     assert release["fileName"] in llms
     assert release["sha256"] in llms
+    assert "直接開啟這個 2.7.3 APK 並選擇「更新」" in index

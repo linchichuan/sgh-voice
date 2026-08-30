@@ -209,8 +209,8 @@ if [[ "$SOURCE_ONLY" == false ]]; then
     if [[ -z "$live_privacy" ]]; then
         add_issue "Live privacy policy is unreachable: $LIVE_PRIVACY_URL"
     else
-        [[ "$live_privacy" == *"2026年8月24日"* ]] \
-            || add_issue "Live privacy policy is not the 2026-08-24 mobile release version"
+        [[ "$live_privacy" == *"2026年8月30日"* ]] \
+            || add_issue "Live privacy policy is not the 2026-08-30 Android Zhuyin release version"
         [[ "$live_privacy" == *"Claude Fable 5"* ]] \
             || add_issue "Live privacy policy does not disclose Fable 5 model-specific retention"
         [[ "$live_privacy" == *"platform.claude.com/docs/en/manage-claude/api-and-data-retention"* ]] \

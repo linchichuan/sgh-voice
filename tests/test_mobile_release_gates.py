@@ -12,7 +12,7 @@ PUBLIC_APK = (
     REPO_ROOT
     / "sgh-voice-web"
     / "downloads"
-    / "SGHVoice-Android-v2.7.2.apk"
+    / "SGHVoice-Android-v2.7.3.apk"
 )
 
 
@@ -46,6 +46,24 @@ def test_release_build_has_no_inline_signing_credentials():
     assert "KeyStore.getInstance" in build_script
     assert 'MessageDigest.getInstance("SHA-256")' in build_script
     assert "does not match the expected certificate fingerprint" in build_script
+
+
+def test_sideload_release_builder_reads_signing_secrets_from_keychain():
+    script = (REPO_ROOT / "scripts" / "build_android_sideload_release.sh").read_text(
+        encoding="utf-8"
+    )
+
+    assert "com.shingihou.sghvoice.android-release" in script
+    assert "security find-generic-password" in script
+    assert "SGH_RELEASE_STORE_PASSWORD" in script
+    assert "SGH_RELEASE_KEY_PASSWORD" in script
+    assert "git show" not in script
+    assert not re.search(r'(?:PASSWORD|KEY_ALIAS)="[^$]', script)
+
+    mobile_gate = (REPO_ROOT / "scripts" / "verify_mobile_rc.sh").read_text(
+        encoding="utf-8"
+    )
+    assert '"$PROJECT_DIR/scripts/build_android_sideload_release.sh"' in mobile_gate
 
 
 def test_public_apk_does_not_package_signing_material():
@@ -237,7 +255,7 @@ def test_generated_firebase_hosting_cache_is_not_tracked():
     assert tracked == []
 
 
-def test_android_rc_acceptance_tracks_the_next_source_candidate():
+def test_android_rc_acceptance_tracks_the_current_sideload_release():
     build_script = (ANDROID_ROOT / "app" / "build.gradle.kts").read_text(
         encoding="utf-8"
     )
@@ -254,9 +272,9 @@ def test_android_rc_acceptance_tracks_the_next_source_candidate():
     source_code = re.search(r"versionCode\s*=\s*(\d+)", build_script)
     assert source_name is not None
     assert source_code is not None
-    assert public_release["versionName"] == "2.7.2"
-    assert public_release["versionCode"] == 22
+    assert public_release["versionName"] == "2.7.3"
+    assert public_release["versionCode"] == 23
     assert source_name.group(1) == "2.7.3"
     assert int(source_code.group(1)) == 23
-    assert int(source_code.group(1)) > public_release["versionCode"]
+    assert int(source_code.group(1)) == public_release["versionCode"]
     assert "Android 2.7.3（versionCode 23）" in acceptance

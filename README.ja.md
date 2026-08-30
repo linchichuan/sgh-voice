@@ -1,4 +1,4 @@
-# 🎙 SGH Voice — AI 音声入力ツール (v2.7.0)
+# 🎙 SGH Voice — AI 音声入力ツール (v2.7.3)
 
 **[English](README.en.md)** | **日本語** | **[繁體中文](README.md)**
 
@@ -7,9 +7,16 @@
 [![macOS](https://img.shields.io/badge/macOS-Apple_Silicon-black?logo=apple)](https://github.com/linchichuan/sgh-voice/releases)
 [![iOS](https://img.shields.io/badge/iOS-17.0+-blue?logo=apple)](https://github.com/linchichuan/sgh-voice/releases)
 [![Android](https://img.shields.io/badge/Android-8.0+-green?logo=android)](https://github.com/linchichuan/sgh-voice/releases)
-[![Version](https://img.shields.io/badge/Version-2.7.0-green)]()
+[![Version](https://img.shields.io/badge/Version-2.7.3-green)]()
 
 ---
+
+## Android v2.7.3 — 繁体字中国語の注音辞書
+
+- 2,869 単字だけの Phase 1 表を、単字・熟語・選字後の関連語を含む固定スナップショットの繁体字注音辞書へ置き換えました。
+- `ㄕㄢ` で「刪」、`ㄕㄢ ㄔㄨˊ` で「刪除」を選択でき、「刪」の選択後は prefix を重複せず「除」を追加できます。
+- 端末内に最大 200 件の自分用注音語彙を追加でき、辞書はメモリマップと疎インデックスで読み込みます。
+- 署名済み sideload APK は 2.7.2 と同じ signer を使用し、先にアンインストールせず上書き更新できます。
 
 ## 🌟 v2.7.0 の新機能
 

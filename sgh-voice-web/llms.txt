@@ -4,13 +4,13 @@
 
 ## Current Android test release
 
-- Version: 2.7.2 (version code 22)
+- Version: 2.7.3 (version code 23)
 - Platform: Android 8.0 or later
 - Distribution status: personal test build, distributed as a versioned APK from the official SGH Voice website
 - Google Play status: not currently published through Google Play Production
-- Download: https://voice.shingihou.com/downloads/SGHVoice-Android-v2.7.2.apk
-- File size: 5.57 MiB (5,841,970 bytes)
-- SHA-256: 72516d1adbd6d23d794251e4ccb1c6d1fa5a076340ddb12d5e96884fb6db9ec4
+- Download: https://voice.shingihou.com/downloads/SGHVoice-Android-v2.7.3.apk
+- File size: 16.52 MiB (17,324,617 bytes)
+- SHA-256: e53a329f194d074d905f7d926ca5bbeff7023feba99855b8e5b7b8798adf5f07
 - App price: free
 - Cloud usage: BYOK; OpenAI, Anthropic, or Groq usage charges may apply
 
@@ -22,7 +22,8 @@
 - Multi-target translation uses one speech-recognition pass and one strict JSON LLM request
 - Dictated questions and instructions are treated as inert transcript content and must not be answered
 - Standard Zhuyin layout without requiring Pinyin
-- Zhuyin prediction from incomplete syllables, optional tone marks, and multi-syllable candidate generation
+- Pinned Traditional Chinese Zhuyin lexicon with 133,492 readings, 157,683 candidates, and 145,332 phrase candidates
+- Associated-phrase completion, including 刪 followed by 除, plus up to 200 on-device custom Zhuyin terms
 - Japanese romaji, kana, katakana, and reading-prefix candidate prediction
 - Up to 24 candidates with a horizontal strip and an expandable three-column, multi-row view
 - Selectable STT and LLM models with the actual provider model ID and a dated public-pricing reference shown in Android settings
@@ -35,6 +36,7 @@
 ### Android limitations and installation notice
 
 - This APK is a sideloaded personal test build, not a public Google Play release
+- Existing 2.7.2 installations can update directly because 2.7.3 uses the same package name and signing certificate; users should not uninstall first
 - Android requires the user to allow installation from the browser or file manager used for the download
 - Compatibility and stability can vary by device; users should evaluate sideloading risks before installation
 - Keep Google Play Protect enabled

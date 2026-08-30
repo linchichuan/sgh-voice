@@ -3,17 +3,28 @@ package com.shingihou.sghvoice.ime
 import android.content.Context
 
 /**
- * Loads common Traditional Chinese single-character candidates from the compact
- * Unicode Unihan asset, then merges SGH Voice's small phrase seed lexicon ahead
- * of those candidates.
+ * Production Traditional Chinese lexicon backed by pinned McBopomofo data.
  *
- * This keeps manual input completely offline. It does not send Zhuyin keystrokes
- * to Whisper, an LLM, or any other network service.
+ * The large sorted assets are memory-mapped and searched through sparse
+ * indexes. Manual Zhuyin stays completely on-device while avoiding the heap
+ * and startup cost of materializing more than 150,000 candidates as Maps.
  */
 class AndroidZhuyinLexicon(context: Context) : ZhuyinLexicon {
 
     companion object {
-        private const val ASSET_PATH = "zhuyin/unihan_zhuyin_candidates.tsv"
+        private const val EXACT_ASSET_PATH =
+            "zhuyin/traditional_zhuyin_exact.zlex"
+        private const val EXACT_INDEX_PATH =
+            "zhuyin/traditional_zhuyin_exact.zidx"
+        private const val FOLDED_ASSET_PATH =
+            "zhuyin/traditional_zhuyin_folded.zlex"
+        private const val FOLDED_INDEX_PATH =
+            "zhuyin/traditional_zhuyin_folded.zidx"
+        private const val CONTEXT_ASSET_PATH =
+            "zhuyin/traditional_zhuyin_context.zlex"
+        private const val CONTEXT_INDEX_PATH =
+            "zhuyin/traditional_zhuyin_context.zidx"
+
         private const val SEED_SCORE_OFFSET = 1_000_000
         private const val MAX_PREFIX_READINGS_TO_SCAN = 64
         private const val MAX_PREFIX_CANDIDATES_TO_SCAN = 256
@@ -21,25 +32,29 @@ class AndroidZhuyinLexicon(context: Context) : ZhuyinLexicon {
     }
 
     private val appContext = context.applicationContext
-    private val entriesByReading: Map<String, List<ZhuyinLexiconEntry>> by lazy(
-        LazyThreadSafetyMode.SYNCHRONIZED
-    ) {
-        loadAllAssetEntries()
-    }
-    private val entriesByToneFoldedReading: Map<String, List<ZhuyinLexiconEntry>> by lazy(
-        LazyThreadSafetyMode.SYNCHRONIZED
-    ) {
-        buildToneFoldedIndex(entriesByReading)
-    }
-    private val sortedReadings: List<String> by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
-        entriesByReading.keys.sorted()
-    }
+    private val userLexicon = UserZhuyinLexiconStore(appContext)
+    private val exactAsset = IndexedZhuyinAsset(
+        appContext,
+        EXACT_ASSET_PATH,
+        EXACT_INDEX_PATH
+    )
+    private val foldedAsset = IndexedZhuyinAsset(
+        appContext,
+        FOLDED_ASSET_PATH,
+        FOLDED_INDEX_PATH
+    )
+    private val contextAsset = IndexedZhuyinAsset(
+        appContext,
+        CONTEXT_ASSET_PATH,
+        CONTEXT_INDEX_PATH
+    )
 
     override fun lookup(reading: String): List<ZhuyinLexiconEntry> {
         val normalized = canonicalizeZhuyinReading(reading)
         return mergeRankedEntries(
-            PhaseOneZhuyinLexicon.lookup(normalized).map(::boostSeedEntry),
-            entriesByReading[normalized].orEmpty(),
+            userLexicon.lookup(normalized) +
+                PhaseOneZhuyinLexicon.lookup(normalized).map(::boostSeedEntry),
+            exactAsset.lookupExact(normalized),
             limit = Int.MAX_VALUE
         )
     }
@@ -52,9 +67,10 @@ class AndroidZhuyinLexicon(context: Context) : ZhuyinLexicon {
         val folded = foldZhuyinTones(reading)
         if (folded.isEmpty()) return emptyList()
         return mergeRankedEntries(
-            PhaseOneZhuyinLexicon.lookupToneFolded(reading, limit)
-                .map(::boostSeedEntry),
-            entriesByToneFoldedReading[folded].orEmpty(),
+            userLexicon.lookupToneFolded(reading, limit) +
+                PhaseOneZhuyinLexicon.lookupToneFolded(reading, limit)
+                    .map(::boostSeedEntry),
+            foldedAsset.lookupExact(folded),
             limit = limit
         )
     }
@@ -68,87 +84,54 @@ class AndroidZhuyinLexicon(context: Context) : ZhuyinLexicon {
         if (prefix.isEmpty() || ' ' in prefix) return emptyList()
 
         val collected = mutableMapOf<String, ZhuyinLexiconEntry>()
+        userLexicon.lookupPrefix(prefix, limit)
+            .forEach { entry -> mergeBest(collected, entry) }
         PhaseOneZhuyinLexicon.lookupPrefix(prefix, limit)
             .map(::boostSeedEntry)
             .forEach { entry -> mergeBest(collected, entry) }
 
-        var readingIndex = lowerBound(sortedReadings, prefix)
-        var readingsScanned = 0
         var candidatesScanned = 0
-        while (
-            readingIndex < sortedReadings.size &&
-            readingsScanned < MAX_PREFIX_READINGS_TO_SCAN &&
-            candidatesScanned < MAX_PREFIX_CANDIDATES_TO_SCAN
-        ) {
-            val candidateReading = sortedReadings[readingIndex]
-            if (!candidateReading.startsWith(prefix)) break
-
-            val completionPenalty = (
-                candidateReading.length - prefix.length
-                ).coerceAtLeast(0) * PREFIX_COMPLETION_PENALTY
-            for (entry in entriesByReading[candidateReading].orEmpty()) {
-                if (candidatesScanned >= MAX_PREFIX_CANDIDATES_TO_SCAN) break
-                mergeBest(
-                    collected,
-                    entry.copy(score = entry.score - completionPenalty)
-                )
-                candidatesScanned += 1
+        exactAsset.lookupPrefix(prefix, MAX_PREFIX_READINGS_TO_SCAN)
+            .forEach { row ->
+                if (candidatesScanned >= MAX_PREFIX_CANDIDATES_TO_SCAN) return@forEach
+                val completionPenalty = (
+                    row.key.length - prefix.length
+                    ).coerceAtLeast(0) * PREFIX_COMPLETION_PENALTY
+                row.entries.forEach { entry ->
+                    if (candidatesScanned >= MAX_PREFIX_CANDIDATES_TO_SCAN) {
+                        return@forEach
+                    }
+                    mergeBest(
+                        collected,
+                        entry.copy(score = entry.score - completionPenalty)
+                    )
+                    candidatesScanned += 1
+                }
             }
-            readingsScanned += 1
-            readingIndex += 1
-        }
 
         return collected.values
             .sortedByDescending { it.score }
             .take(limit)
     }
 
-    /** Loads the compact asset off the first keypress path. */
+    override fun lookupNext(
+        previousText: String,
+        limit: Int
+    ): List<ZhuyinLexiconEntry> {
+        if (limit <= 0) return emptyList()
+        val prefix = trailingHanCharacter(previousText) ?: return emptyList()
+        return mergeRankedEntries(
+            userLexicon.lookupNext(previousText, limit),
+            contextAsset.lookupExact(prefix),
+            limit
+        )
+    }
+
+    /** Maps the exact, tone-folded and associated assets off the keypress path. */
     fun warmUp() {
-        entriesByReading.size
-        entriesByToneFoldedReading.size
-        sortedReadings.size
-    }
-
-    private fun loadAllAssetEntries(): Map<String, List<ZhuyinLexiconEntry>> {
-        val result = mutableMapOf<String, List<ZhuyinLexiconEntry>>()
-        appContext.assets.open(ASSET_PATH).bufferedReader(Charsets.UTF_8).useLines { lines ->
-            lines.forEach { line ->
-                if (line.isEmpty() || line.startsWith("#")) return@forEach
-                val reading = line.substringBefore('\t')
-                if (reading.isBlank() || '\t' !in line) return@forEach
-                val entries = line
-                    .substringAfter('\t')
-                    .split('|')
-                    .mapNotNull { encoded ->
-                        val separator = encoded.lastIndexOf(':')
-                        if (separator <= 0) return@mapNotNull null
-                        val text = encoded.substring(0, separator)
-                        val score = encoded.substring(separator + 1).toIntOrNull() ?: 0
-                        if (text.isBlank()) null else ZhuyinLexiconEntry(text, score)
-                    }
-                if (entries.isNotEmpty()) {
-                    result[reading] = entries
-                }
-            }
-        }
-        return result
-    }
-
-    private fun buildToneFoldedIndex(
-        exactEntries: Map<String, List<ZhuyinLexiconEntry>>
-    ): Map<String, List<ZhuyinLexiconEntry>> {
-        val collected =
-            mutableMapOf<String, MutableMap<String, ZhuyinLexiconEntry>>()
-        exactEntries.forEach { (reading, entries) ->
-            val folded = foldZhuyinTones(reading)
-            if (folded.isEmpty()) return@forEach
-            val byText = collected.getOrPut(folded) { mutableMapOf() }
-            entries.forEach { entry -> mergeBest(byText, entry) }
-        }
-        return collected.mapValues { (_, byText) ->
-            byText.values.sortedByDescending { it.score }
-        }
+        exactAsset.warmUp()
+        foldedAsset.warmUp()
+        contextAsset.warmUp()
     }
 
     private fun boostSeedEntry(entry: ZhuyinLexiconEntry): ZhuyinLexiconEntry =
@@ -177,18 +160,15 @@ class AndroidZhuyinLexicon(context: Context) : ZhuyinLexicon {
             entries[candidate.text] = candidate
         }
     }
+}
 
-    private fun lowerBound(values: List<String>, target: String): Int {
-        var low = 0
-        var high = values.size
-        while (low < high) {
-            val middle = (low + high).ushr(1)
-            if (values[middle] < target) {
-                low = middle + 1
-            } else {
-                high = middle
-            }
-        }
-        return low
-    }
+internal fun trailingHanCharacter(text: String): String? {
+    if (text.isEmpty()) return null
+    val codepoint = text.codePointBefore(text.length)
+    val isHan = codepoint == 0x3007 ||
+        codepoint in 0x3400..0x4DBF ||
+        codepoint in 0x4E00..0x9FFF ||
+        codepoint in 0xF900..0xFAFF ||
+        codepoint in 0x20000..0x323AF
+    return if (isHan) String(Character.toChars(codepoint)) else null
 }

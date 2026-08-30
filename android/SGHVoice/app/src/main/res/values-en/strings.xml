@@ -146,8 +146,15 @@
 
     <!-- Dictionary -->
     <string name="title_dictionary_manage">Personal Dictionary</string>
-    <string name="title_custom_words">Custom Words (Enhance Recognition)</string>
+    <string name="title_custom_words">Voice Custom Words (Enhance Recognition)</string>
     <string name="label_add_proper_noun">Add proper noun</string>
+    <string name="title_custom_zhuyin_words">Custom Zhuyin words</string>
+    <string name="desc_custom_zhuyin_words">Add local company names, personal names, or specialist terms missing from the built-in dictionary. Enter one complete Zhuyin syllable per Han character.</string>
+    <string name="label_zhuyin_word">Traditional Chinese word</string>
+    <string name="label_zhuyin_reading">Complete Zhuyin reading</string>
+    <string name="hint_zhuyin_reading">Example: 新義豊 → ㄒㄧㄣ ㄧˋ ㄈㄥ</string>
+    <string name="btn_add_zhuyin_word">Add to Zhuyin dictionary</string>
+    <string name="msg_invalid_zhuyin_entry">Enter 1–12 Traditional Chinese characters with one complete Zhuyin syllable per character. Duplicate entries are not added.</string>
     <string name="title_corrections">Error Corrections</string>
     <string name="label_wrong_word">Original</string>
     <string name="label_correct_word">Corrected</string>
@@ -163,11 +170,13 @@
     <!-- Usage Guide -->
     <string name="usage_title">Usage Guide</string>
     <string name="usage_step1">1. Tap the microphone for normal dictation. Hold it to choose 1–4 translation languages. Hold again while recording to cancel safely.</string>
-    <string name="usage_step2">2. Switch between Zhuyin, Japanese romaji, and English inside the same keyboard.</string>
+    <string name="usage_step2">2. Switch between Zhuyin, Japanese romaji, and English. Zhuyin includes phrases, local completions, and user-defined readings.</string>
     <string name="usage_step3">3. Voice mode handles mixed Chinese, Japanese, and English; Chinese output is Traditional Chinese.</string>
     <string name="usage_step4">4. Frequently selected candidates move forward. Short voice-text corrections in the same field are learned locally.</string>
     <string name="jmdict_attribution">Japanese common-word candidates: JMdict / EDRDG (CC BY-SA 4.0)</string>
     <string name="btn_dictionary_license">View dictionary source and license</string>
+    <string name="zhuyin_attribution">Traditional Chinese Zhuyin and associated phrases: McBopomofo / OpenVanilla (MIT; pinned 2026-08-28 snapshot)</string>
+    <string name="btn_zhuyin_license">View Zhuyin source and license</string>
 
     <string name="output_style_label">Output Style</string>
     <string name="style_normal">Normal Text (Default)</string>

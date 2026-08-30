@@ -1,0 +1,32 @@
+SGH Voice Traditional Chinese Zhuyin Lexicon Attribution
+
+This package includes a filtered and re-indexed adaptation of dictionary data
+from McBopomofo (小麥注音輸入法).
+
+Project: https://github.com/openvanilla/McBopomofo
+Pinned source: https://github.com/openvanilla/McBopomofo/tree/557733124aa3192b3366f7655c5b6c93c28b4ea6
+Source snapshot date: 2026-08-28
+Data licence: MIT License
+Full licence file: MCBOPOMOFO_LICENSE.txt
+Upstream acknowledgements: MCBOPOMOFO_ACKNOWLEDGEMENTS.md
+libtabe source-data notice: LIBTABE_NOTICE.txt
+
+Included exact lexicon: 133492 readings /
+157683 candidates, including
+145332 multi-character phrases.
+Included associated phrases: 5190 prefixes /
+57729 commit suffixes.
+
+McBopomofo's Source/Data/README.md states that BPMFMappings.txt was originally
+simplified from libtabe's BSD-licensed tsi.src and then modified. This package
+preserves that provenance. McBopomofo, OpenVanilla and libtabe do not endorse
+SGH Voice. The data is supplied without warranty.
+
+The generated *.zlex files are sorted UTF-8 text with sparse *.zidx byte-offset
+indexes. SGH Voice's application code is separately licensed.
+
+Update procedure:
+1. Check out the pinned McBopomofo commit.
+2. Run `make all` in Source/Data using the upstream build pipeline.
+3. Run tools/generate_zhuyin_lexicon.py with --mcbopomofo-data-dir pointing to
+   Source/Data and review snapshot.json plus the generator contract tests.

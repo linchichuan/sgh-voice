@@ -1,13 +1,17 @@
 # Changelog
 
-## Unreleased — Android v2.7.3 Candidate & Release Hardening
+## Android v2.7.3 (2026-08-30) — Traditional Chinese Zhuyin & Release Hardening
+
+- 以固定 McBopomofo snapshot 取代只有 2,869 個單字的 Unihan 小表：內建 133,492 組讀音、157,683 個候選、145,332 個詞組與 57,729 個選字後聯想；`ㄕㄢ` 可選「刪」、`ㄕㄢ ㄔㄨˊ` 首選「刪除」，選「刪」後只追加「除」。
+- 注音字庫改用未壓縮唯讀映射與稀疏索引，避免把完整候選表載入 IME heap；設定畫面新增最多 200 組、只存本機的自訂「詞彙＋注音」。
+- 恢復與公開 2.7.2 相同的 sideload signer，正式 2.7.3 APK 可在不解除安裝的情況下直接覆蓋更新；release 密碼移入 macOS Keychain，keystore 權限收緊為僅擁有者可讀寫。
 
 - Android 退格鍵支援長按連續刪除並在持續按壓後加速；點按仍只刪除一個字元。
 - Android 語音辨識來源可由使用者選擇 Auto、繁體中文、日文、英文或韓文；Auto 保留混合語言辨識，指定語言時才送出 STT `language`。
 - 鍵盤切換鍵支援點按循環、長按開啟系統鍵盤選擇器；韓文與其他裝置鍵盤由使用者自行啟用與選擇。
 - 收斂手機鍵盤外框、功能列與手動輸入列比例，保留既有錄音主按鈕尺寸及至少 44dp 的主要觸控區。
 - Android、iOS 與 macOS 翻譯流程新增本機語意守門：問句必須維持問句、請求必須維持請求；合法 JSON 若含代答、已完成動作或極端擴寫，也會 fail closed。
-- Android 與 iOS 在實際送往雲端前再次確認版本化同意；即使錄音開始後撤回同意，也會清除記憶體中的錄音並中止上傳。Android 原始碼升為 2.7.3（versionCode 23），既有已簽署 2.7.2 APK 保持不可變，待原 sideload signer 從安全備份恢復後再產生 2.7.3 候選檔。
+- Android 與 iOS 在實際送往雲端前再次確認版本化同意；即使錄音開始後撤回同意，也會清除記憶體中的錄音並中止上傳。Android 版本升為 2.7.3（versionCode 23）。
 - 新增醫療詞庫分階段規劃；本輪未載入完整醫療詞表或新增 runtime 索引。
 - 新增 Android RC 實機驗收表、一鍵 preflight 腳本與可持續追加的多語翻譯語意回歸 corpus。
 - Android RC 本機自動化驗收已執行並記錄（單元測試 122/122、lint 0 errors；release 簽章金鑰待恢復為唯一 blocker）；驗收文件新增自動化結果表與 31 條實機待驗清單。

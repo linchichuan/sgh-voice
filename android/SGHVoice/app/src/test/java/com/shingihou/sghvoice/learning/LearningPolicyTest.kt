@@ -33,6 +33,7 @@ class LearningPolicyTest {
         )
 
         assertFalse(decision.personalizationAllowed)
+        assertTrue(decision.localSuggestionsAllowed)
         assertEquals(
             LearningPolicyReason.NO_PERSONALIZED_LEARNING,
             decision.reason
@@ -51,6 +52,7 @@ class LearningPolicyTest {
         inputs.forEach { inputType ->
             val decision = LearningPolicy.evaluate(inputType, 0)
             assertFalse(decision.personalizationAllowed)
+            assertFalse(decision.localSuggestionsAllowed)
             assertTrue(decision.sensitiveField)
             assertEquals(LearningPolicyReason.PASSWORD_FIELD, decision.reason)
         }
@@ -68,6 +70,18 @@ class LearningPolicyTest {
             assertFalse(decision.personalizationAllowed)
             assertEquals(LearningPolicyReason.NON_TEXT_FIELD, decision.reason)
         }
+    }
+
+    @Test
+    fun `non text fields stay disabled when no learning flag is also present`() {
+        val decision = LearningPolicy.evaluate(
+            InputType.TYPE_CLASS_NUMBER,
+            EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING
+        )
+
+        assertFalse(decision.personalizationAllowed)
+        assertFalse(decision.localSuggestionsAllowed)
+        assertEquals(LearningPolicyReason.NON_TEXT_FIELD, decision.reason)
     }
 
     @Test
@@ -97,6 +111,7 @@ class LearningPolicyTest {
             0
         )
         assertFalse(noSuggestions.personalizationAllowed)
+        assertFalse(noSuggestions.localSuggestionsAllowed)
         assertEquals(
             LearningPolicyReason.NO_SUGGESTIONS_FIELD,
             noSuggestions.reason

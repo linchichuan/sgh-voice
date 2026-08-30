@@ -11,6 +11,12 @@ RELEASE_MANIFEST="$WEB_DIR/downloads/android-release.json"
 SWIFT_CONTRACT="$PROJECT_DIR/ios/SGHVoice/SGHVoice/Processing/OutputContracts.swift"
 SWIFT_LOCALIZATION="$PROJECT_DIR/ios/SGHVoice/SGHVoice/Support/Localization.swift"
 MODE="full"
+PYTHON_BIN="${PYTHON_BIN:-python}"
+
+if [[ -x "$PROJECT_DIR/venv/bin/python" ]] && \
+    "$PROJECT_DIR/venv/bin/python" -c 'import pytest' >/dev/null 2>&1; then
+    PYTHON_BIN="$PROJECT_DIR/venv/bin/python"
+fi
 
 usage() {
     cat <<'EOF'
@@ -48,7 +54,7 @@ fail() {
 
 json_value() {
     local key="$1"
-    python - "$RELEASE_MANIFEST" "$key" <<'PY'
+    "$PYTHON_BIN" - "$RELEASE_MANIFEST" "$key" <<'PY'
 import json
 import sys
 
@@ -82,7 +88,7 @@ normalize_fingerprint() {
     # POSIX character classes are locale-sensitive and produced divergent
     # output between macOS and the Ubuntu Actions runner.  Fingerprints are
     # ASCII by definition, so normalize them with an explicit ASCII regex.
-    python -c 'import re, sys; print(re.sub(r"[^0-9A-Fa-f]", "", sys.stdin.read()).upper(), end="")'
+    "$PYTHON_BIN" -c 'import re, sys; print(re.sub(r"[^0-9A-Fa-f]", "", sys.stdin.read()).upper(), end="")'
 }
 
 sha256_file() {
@@ -156,7 +162,7 @@ verify_release_apk() {
     actual_cert="$(
         printf '%s\n' "$signer_pem" |
             openssl x509 -outform DER 2>/dev/null |
-            python -c 'import hashlib, sys; print(hashlib.sha256(sys.stdin.buffer.read()).hexdigest())' |
+            "$PYTHON_BIN" -c 'import hashlib, sys; print(hashlib.sha256(sys.stdin.buffer.read()).hexdigest())' |
             normalize_fingerprint
     )"
     if [[ "$actual_cert" != "$EXPECTED_CERT_SHA256" ]]; then
@@ -188,7 +194,7 @@ git -C "$PROJECT_DIR" diff --check
 echo "[RC] Running Python regression suite"
 (
     cd "$PROJECT_DIR"
-    python -m pytest -q
+    "$PYTHON_BIN" -m pytest -q
 )
 
 if command -v swiftc >/dev/null 2>&1; then
@@ -201,10 +207,8 @@ else
 fi
 
 echo "[RC] Running Android tests, release lint and signed release assembly"
-(
-    cd "$ANDROID_DIR"
-    ./gradlew testDebugUnitTest lintRelease assembleRelease --no-daemon
-)
+"$PROJECT_DIR/scripts/build_android_sideload_release.sh" \
+    testDebugUnitTest lintRelease assembleRelease --no-daemon
 
 verify_release_apk "$BUILT_APK"
 verify_public_copy

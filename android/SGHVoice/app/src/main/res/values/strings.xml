@@ -146,8 +146,15 @@
 
     <!-- 個人詞庫 -->
     <string name="title_dictionary_manage">個人詞庫管理</string>
-    <string name="title_custom_words">自訂詞彙 (提升辨識率)</string>
+    <string name="title_custom_words">語音自訂詞彙（提升辨識率）</string>
     <string name="label_add_proper_noun">新增專有名詞</string>
+    <string name="title_custom_zhuyin_words">自訂注音詞彙</string>
+    <string name="desc_custom_zhuyin_words">加入內建字庫沒有的公司名、人名或專有詞；資料只保存在本機。每個中文字需對應一個完整注音。</string>
+    <string name="label_zhuyin_word">繁體中文字詞</string>
+    <string name="label_zhuyin_reading">完整注音讀音</string>
+    <string name="hint_zhuyin_reading">例：新義豊 → ㄒㄧㄣ ㄧˋ ㄈㄥ</string>
+    <string name="btn_add_zhuyin_word">加入注音詞庫</string>
+    <string name="msg_invalid_zhuyin_entry">請輸入 1–12 個繁體中文字，並讓每個字對應一個完整注音；重複詞彙不會再次加入。</string>
     <string name="title_corrections">錯誤修正規則</string>
     <string name="label_wrong_word">原字</string>
     <string name="label_correct_word">修正</string>
@@ -163,11 +170,13 @@
     <!-- 使用說明 -->
     <string name="usage_title">使用說明</string>
     <string name="usage_step1">1. 點按麥克風進行一般口述；長按可選擇 1–4 種語言翻譯。翻譯錄音中再次長按可安全取消。</string>
-    <string name="usage_step2">2. 可在同一個鍵盤切換注音、日文羅馬字與英文，不必切換 Samsung 鍵盤。</string>
+    <string name="usage_step2">2. 可在同一個鍵盤切換注音、日文羅馬字與英文。注音支援片語與選字後聯想，也可在個人詞庫加入自訂讀音。</string>
     <string name="usage_step3">3. 語音會自動處理中、日、英混合，中文結果轉為繁體中文。</string>
     <string name="usage_step4">4. 常選的字會自動提高順位；語音文字在同一欄位被短範圍修正時，也會在本機學習。</string>
     <string name="jmdict_attribution">日文常用詞候選資料：JMdict／EDRDG（CC BY-SA 4.0）</string>
     <string name="btn_dictionary_license">查看字典來源與授權</string>
+    <string name="zhuyin_attribution">繁體中文注音與聯想詞資料：McBopomofo／OpenVanilla（MIT；固定 2026-08-28 快照）</string>
+    <string name="btn_zhuyin_license">查看注音字庫來源與授權</string>
 
     <string name="output_style_label">預設防護語氣風格</string>
     <string name="style_normal">一般文字（預設）</string>
