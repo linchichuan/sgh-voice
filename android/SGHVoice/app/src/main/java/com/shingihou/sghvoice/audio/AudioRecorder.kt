@@ -56,8 +56,23 @@ class AudioRecorder {
     @Volatile
     private var readJob: Job? = null
 
+    @Volatile
+    private var levelListener: ((Float) -> Unit)? = null
+
     val recording: Boolean
         get() = recordingFlag.get()
+
+    fun setLevelListener(listener: ((Float) -> Unit)?) {
+        levelListener = listener
+    }
+
+    private fun publishLevel(level: Float) {
+        try {
+            levelListener?.invoke(level.coerceIn(0f, 1f))
+        } catch (_: Exception) {
+            // The visual meter is best-effort and must never break recording.
+        }
+    }
 
     /**
      * 初始化並啟動麥克風。重複開始會明確失敗，避免產生兩個讀取 job。
@@ -126,20 +141,27 @@ class AudioRecorder {
             recordingFlag.set(true)
             readJob = recorderScope.launch {
                 val buffer = ByteArray(bufferSize)
-                while (recordingFlag.get() && isActive) {
-                    val bytesRead = try {
-                        recorder.read(buffer, 0, buffer.size)
-                    } catch (_: IllegalStateException) {
-                        break
-                    }
-
-                    if (bytesRead > 0) {
-                        synchronized(pcmBuffer) {
-                            pcmBuffer.write(buffer, 0, bytesRead)
+                try {
+                    while (recordingFlag.get() && isActive) {
+                        val bytesRead = try {
+                            recorder.read(buffer, 0, buffer.size)
+                        } catch (_: IllegalStateException) {
+                            break
                         }
-                    } else if (bytesRead < 0) {
-                        break
+
+                        if (bytesRead > 0) {
+                            synchronized(pcmBuffer) {
+                                pcmBuffer.write(buffer, 0, bytesRead)
+                            }
+                            publishLevel(
+                                AudioLevelMeter.normalizedPcm16(buffer, bytesRead)
+                            )
+                        } else if (bytesRead < 0) {
+                            break
+                        }
                     }
+                } finally {
+                    publishLevel(0f)
                 }
             }
         }
@@ -160,6 +182,7 @@ class AudioRecorder {
     }
 
     private suspend fun stopLocked(discard: Boolean): ByteArray? {
+        publishLevel(0f)
         val (recorder, reader) = synchronized(resourceLock) {
             recordingFlag.set(false)
             val activeRecorder = audioRecord
@@ -230,6 +253,7 @@ class AudioRecorder {
      * 最終同步防線；onDestroy 可立即解除麥克風，不等待 coroutine。
      */
     fun release() {
+        publishLevel(0f)
         val (recorder, reader) = synchronized(resourceLock) {
             released = true
             recordingFlag.set(false)
@@ -256,6 +280,7 @@ class AudioRecorder {
         synchronized(pcmBuffer) {
             pcmBuffer.reset()
         }
+        levelListener = null
         recorderScope.cancel()
     }
 }

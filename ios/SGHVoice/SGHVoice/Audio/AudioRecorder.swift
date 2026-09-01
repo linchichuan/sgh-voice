@@ -25,8 +25,35 @@ class AudioRecorder: NSObject, AVAudioRecorderDelegate {
     private static let temporaryFilePrefix = "sgh-voice-"
     private var audioRecorder: AVAudioRecorder?
     private var recordingURL: URL?
+    private var meterTimer: Timer?
+
+    var onLevel: ((Float) -> Void)?
     
     private(set) var isRecording = false
+
+    private func startMetering() {
+        stopMetering()
+        audioRecorder?.isMeteringEnabled = true
+        let timer = Timer(timeInterval: 0.08, repeats: true) { [weak self] _ in
+            guard let self, let recorder = self.audioRecorder, self.isRecording else {
+                return
+            }
+            recorder.updateMeters()
+            self.onLevel?(
+                AudioLevelMeter.normalizedPower(
+                    decibels: recorder.averagePower(forChannel: 0)
+                )
+            )
+        }
+        meterTimer = timer
+        RunLoop.main.add(timer, forMode: .common)
+    }
+
+    private func stopMetering() {
+        meterTimer?.invalidate()
+        meterTimer = nil
+        onLevel?(0)
+    }
 
     override init() {
         super.init()
@@ -127,6 +154,7 @@ class AudioRecorder: NSObject, AVAudioRecorderDelegate {
                 throw AudioRecorderError.recordingFailed(L10n.text("無法開始錄音"))
             }
             isRecording = true
+            startMetering()
         } catch let error as AudioRecorderError {
             audioRecorder = nil
             removeTemporaryRecording()
@@ -147,6 +175,7 @@ class AudioRecorder: NSObject, AVAudioRecorderDelegate {
         
         recorder.stop()
         isRecording = false
+        stopMetering()
         audioRecorder = nil
         deactivateAudioSession()
 
@@ -160,6 +189,7 @@ class AudioRecorder: NSObject, AVAudioRecorderDelegate {
     
     /// 釋放資源
     func release() {
+        stopMetering()
         if isRecording {
             audioRecorder?.stop()
         }

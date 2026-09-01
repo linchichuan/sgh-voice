@@ -4,13 +4,13 @@
 
 ## Current Android test release
 
-- Version: 2.7.3 (version code 23)
+- Version: 2.7.4 (version code 24)
 - Platform: Android 8.0 or later
 - Distribution status: personal test build, distributed as a versioned APK from the official SGH Voice website
 - Google Play status: not currently published through Google Play Production
-- Download: https://voice.shingihou.com/downloads/SGHVoice-Android-v2.7.3.apk
-- File size: 16.52 MiB (17,324,617 bytes)
-- SHA-256: e53a329f194d074d905f7d926ca5bbeff7023feba99855b8e5b7b8798adf5f07
+- Download: https://voice.shingihou.com/downloads/SGHVoice-Android-v2.7.4.apk
+- File size: 16.53 MiB (17,327,757 bytes)
+- SHA-256: 3469b5b9fc52bc373af8f2a256f668d88acbd3020198dcb703d2065556e7b7cd
 - App price: free
 - Cloud usage: BYOK; OpenAI, Anthropic, or Groq usage charges may apply
 
@@ -19,8 +19,9 @@
 - Four modes in one Android input method: Voice, Zhuyin, Japanese, and English
 - SGH Voice brand and icon remain visible at the top left of the keyboard
 - Tap for normal dictation; long-press to select 1–4 translation targets from Traditional Chinese, Japanese, English, and Korean
+- Live microphone waveform moves only when audio is received and remains flat during silence
 - Multi-target translation uses one speech-recognition pass and one strict JSON LLM request
-- Dictated questions and instructions are treated as inert transcript content and must not be answered
+- Dictated questions and instructions are treated as inert transcript content and must not be answered; added AI-identity or refusal chatter is rejected and falls back to the source transcript
 - Standard Zhuyin layout without requiring Pinyin
 - Pinned Traditional Chinese Zhuyin lexicon with 133,492 readings, 157,683 candidates, and 145,332 phrase candidates
 - Associated-phrase completion, including 刪 followed by 除, plus up to 200 on-device custom Zhuyin terms
@@ -36,7 +37,7 @@
 ### Android limitations and installation notice
 
 - This APK is a sideloaded personal test build, not a public Google Play release
-- Existing 2.7.2 installations can update directly because 2.7.3 uses the same package name and signing certificate; users should not uninstall first
+- Existing 2.7.3 installations can update directly because 2.7.4 uses the same package name and signing certificate; users should not uninstall first
 - Android requires the user to allow installation from the browser or file manager used for the download
 - Compatibility and stability can vary by device; users should evaluate sideloading risks before installation
 - Keep Google Play Protect enabled

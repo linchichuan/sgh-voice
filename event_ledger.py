@@ -67,6 +67,7 @@ _KNOWN_REASONS = {
     "edit_mode_chat_reply",
     "code_switch_span_changed",
     "full_segment_hallucination",
+    "assistant_identity_or_refusal",
     "trailing_extension",
     "translation target must be a string",
     "select at least one translation target",

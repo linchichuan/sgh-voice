@@ -231,6 +231,15 @@ struct MainView: View {
                 onLongPress: handleRecordLongPress
             )
 
+            LiveAudioWaveform(
+                level: viewModel.isRecording ? viewModel.audioLevel : 0,
+                isActive: viewModel.isRecording,
+                tint: viewModel.activeIntent.isTranslation ? .orange : brandColor
+            )
+            .frame(height: 34)
+            .opacity(viewModel.isRecording ? 1 : 0)
+            .accessibilityHidden(!viewModel.isRecording)
+
             Text(L10n.text(
                 viewModel.isRecording
                     ? "點一下停止並送出處理"
@@ -373,6 +382,58 @@ struct MainView: View {
         NSPasteboard.general.setString(viewModel.transcribedText, forType: .string)
         #endif
         viewModel.setCopiedStatus()
+    }
+}
+
+private struct LiveAudioWaveform: View {
+    let level: Float
+    let isActive: Bool
+    let tint: Color
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private let envelope: [CGFloat] = [
+        0.48, 0.72, 0.56, 0.88, 0.64, 1.00, 0.78, 0.58, 0.92,
+        0.62, 0.84, 0.54, 0.96, 0.68, 0.82, 0.52, 0.74, 0.46
+    ]
+
+    var body: some View {
+        GeometryReader { geometry in
+            let centerY = geometry.size.height / 2
+            ZStack {
+                Capsule()
+                    .fill(Color.secondary.opacity(0.24))
+                    .frame(height: 1)
+
+                HStack(spacing: 3) {
+                    ForEach(envelope.indices, id: \.self) { index in
+                        Capsule()
+                            .fill(tint)
+                            .frame(
+                                width: 3,
+                                height: barHeight(
+                                    envelope: envelope[index],
+                                    availableHeight: centerY * 2
+                                )
+                            )
+                            .opacity(level > 0.015 ? 1 : 0)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .animation(
+            reduceMotion ? nil : .easeOut(duration: 0.10),
+            value: level
+        )
+        .accessibilityLabel(L10n.text("即時麥克風音量波形"))
+        .accessibilityValue(
+            L10n.text(level > 0.015 && isActive ? "已收到聲音" : "目前沒有聲音")
+        )
+    }
+
+    private func barHeight(envelope: CGFloat, availableHeight: CGFloat) -> CGFloat {
+        max(2, CGFloat(level) * envelope * max(2, availableHeight - 4))
     }
 }
 

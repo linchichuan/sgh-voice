@@ -180,7 +180,7 @@
                 <p>本アプリは、マイクを使用して音声を録音します。この録音データは、音声認識（Speech-to-Text）処理のためにのみ使用されます。</p>
                 <ul>
                     <li>iOS版の録音ファイルは端末の一時領域にのみ作成され、読み込み後、キャンセル時、またはアプリがバックグラウンドへ移行した時に削除されます。macOS版で音声バックアップを有効にした場合は10項をご確認ください。</li>
-                    <li>音声データは、選択された <strong>STT (Speech-to-Text) プロバイダー</strong>（OpenAI 音声認識 API / Groq 音声認識 API）にのみ送信されます。Android v2.7.3 では設定画面で実際のモデル ID を確認・選択できます。</li>
+                    <li>音声データは、選択された <strong>STT (Speech-to-Text) プロバイダー</strong>（OpenAI 音声認識 API / Groq 音声認識 API）にのみ送信されます。Android v2.7.4 では設定画面で実際のモデル ID を確認・選択できます。</li>
                     <li>LLM 後処理（Anthropic / OpenAI / Groq / OpenRouter / Ollama）には音声ではなく、文字起こし後のテキストのみが送信されます。</li>
                     <li>当社のサーバーに音声データを保存することはありません。</li>
                 </ul>
@@ -192,7 +192,7 @@
                 <p>カスタム辞書、候補頻度および短い修正ルールの保存先は端末内です。音声認識精度を高めるため、iOS版ではプリセット語彙、ユーザーが追加した語彙および選択中のシーンに関するプロンプトを、録音音声とともに選択されたSTTプロバイダー（OpenAIまたはGroq）へ送信します。Android版でも、プリセット語彙、ユーザーが追加した語彙および選択中のシーンに関するプロンプトを、録音音声とともに選択されたSTTプロバイダーへ送信します。短い修正ルールと候補頻度は送信せず、端末上で処理します。Android版はパスワード欄で音声入力と学習を無効にし、パーソナライズ禁止欄では学習だけを無効にします。Android版では、初回のクラウド処理前にこれらの送信内容をアプリ内で説明し、版管理された同意を取得します。</p>
 
                 <h3>2.4 発話履歴</h3>
-                <p>macOS版では、各回の音声認識結果と最終出力テキストを <code>~/.voice-input/history.json</code> に保存し、Dashboardで参照・編集・削除できます。iOS版は発話履歴ファイルを作成せず、現在の結果を画面上に一時表示します。Android v2.7.3も完全な発話履歴ファイルを作成せず、候補頻度、短い修正ルール、およびユーザーが明示的に追加した注音の語彙と読みだけを端末内に保持します。いずれも当社のサーバーには送信されません。</p>
+                <p>macOS版では、各回の音声認識結果と最終出力テキストを <code>~/.voice-input/history.json</code> に保存し、Dashboardで参照・編集・削除できます。iOS版は発話履歴ファイルを作成せず、現在の結果を画面上に一時表示します。Android v2.7.4も完全な発話履歴ファイルを作成せず、候補頻度、短い修正ルール、およびユーザーが明示的に追加した注音の語彙と読みだけを端末内に保持します。いずれも当社のサーバーには送信されません。</p>
                 <p>macOS版のスタイルプロファイル再生成は、直近最大100件を端末内で集計し、文章の長さ・句読点・言語混在等の特徴だけを保存します。本文を外部AIへ送信したり、プロファイルに原文を転載したりしません。端末内の診断レポートは内容プレビューを保存せずメタデータのみを記録します。自動トリアージレポートには、ユーザーが編集した短い修正候補が含まれる場合があります。</p>
 
                 <h3>2.5 ウェブサイトでのダウンロード登録</h3>
@@ -327,7 +327,7 @@
                 <p>本應用程式使用麥克風錄製語音。該錄音資料僅用於語音辨識（Speech-to-Text）處理。</p>
                 <ul>
                     <li>iOS 版只會在裝置暫存目錄建立錄音檔，讀取完成、取消錄音或 App 進入背景時即刪除。macOS 版若啟用音訊備份，請參閱第 10 項。</li>
-                    <li>語音資料僅傳送至所選之 <strong>STT (Speech-to-Text) 服務商</strong>（OpenAI 語音辨識 API / Groq 語音辨識 API）。Android v2.7.3 可在設定畫面確認並選擇實際 model ID。</li>
+                    <li>語音資料僅傳送至所選之 <strong>STT (Speech-to-Text) 服務商</strong>（OpenAI 語音辨識 API / Groq 語音辨識 API）。Android v2.7.4 可在設定畫面確認並選擇實際 model ID。</li>
                     <li>LLM 後處理（Anthropic / OpenAI / Groq / OpenRouter / Ollama）收到的是文字轉譯結果，並非原始語音。</li>
                     <li>本公司不會在伺服器上儲存任何語音資料。</li>
                 </ul>
@@ -339,7 +339,7 @@
                 <p>自訂詞庫、候選頻率及短修正規則儲存在裝置本機。為提高語音辨識正確率，iOS 版會將預載詞彙、使用者新增詞彙及所選場景提示，與錄音一起傳送至使用者選擇的 STT 服務商（OpenAI 或 Groq）。Android 版也會將預載詞彙、使用者新增詞彙及所選場景提示，與錄音一起傳送至所選 STT 服務商。短修正規則與候選頻率不會上傳，而是在裝置上處理。Android 版會在密碼欄位停用語音與學習，在禁止個人化欄位只停用學習。Android 版會在首次雲端處理前於 App 內說明上述傳送內容，並取得版本化同意。</p>
 
                 <h3>2.4 發話歷史</h3>
-                <p>macOS 版會將每次語音辨識結果與最終輸出文字儲存於 <code>~/.voice-input/history.json</code>，可從 Dashboard 檢視、編輯、刪除。iOS 版不建立發話歷史檔案，只在目前畫面暫時顯示結果。Android v2.7.3 也不建立完整發話歷史檔案，只在裝置內保存候選頻率、短修正規則，以及使用者明確加入的注音詞彙與讀音。上述資料皆不會傳送至本公司伺服器。</p>
+                <p>macOS 版會將每次語音辨識結果與最終輸出文字儲存於 <code>~/.voice-input/history.json</code>，可從 Dashboard 檢視、編輯、刪除。iOS 版不建立發話歷史檔案，只在目前畫面暫時顯示結果。Android v2.7.4 也不建立完整發話歷史檔案，只在裝置內保存候選頻率、短修正規則，以及使用者明確加入的注音詞彙與讀音。上述資料皆不會傳送至本公司伺服器。</p>
                 <p>macOS 版重新生成風格 Profile 時，只會在裝置本機彙整最近最多 100 筆紀錄，並保存句長、標點及語言混用等整體特徵；不會將原文傳送給外部 AI，也不會在 Profile 內重現原文。本機健康報告不保存逐字稿預覽，只記錄後設資料；自動分類報告可能包含使用者已編輯的短修正候選。</p>
 
                 <h3>2.5 網站下載登記</h3>
@@ -475,7 +475,7 @@
                 <p>The App uses the microphone to record audio. This recording data is used solely for speech-to-text processing.</p>
                 <ul>
                     <li>On iOS, the recording file is created only in the temporary directory and is deleted after it is read, when recording is cancelled, or when the app enters the background. See Section 10 for optional audio backup on macOS.</li>
-                    <li>Audio data is sent <strong>only to the selected STT (Speech-to-Text) provider</strong> (OpenAI Speech Recognition API / Groq Speech Recognition API). Android v2.7.3 shows and lets the user select the actual model ID in Settings.</li>
+                    <li>Audio data is sent <strong>only to the selected STT (Speech-to-Text) provider</strong> (OpenAI Speech Recognition API / Groq Speech Recognition API). Android v2.7.4 shows and lets the user select the actual model ID in Settings.</li>
                     <li>LLM post-processing (Anthropic / OpenAI / Groq / OpenRouter / Ollama) receives <strong>only the transcribed text, not the audio</strong>.</li>
                     <li>We do not store any audio data on our servers.</li>
                 </ul>
@@ -487,7 +487,7 @@
                 <p>Custom dictionaries, candidate frequency, and short correction rules are stored on the device. To improve speech-recognition accuracy, the iOS version sends built-in vocabulary, user-added vocabulary, and the selected scene prompt to the selected STT provider (OpenAI or Groq) together with the recording. The Android version also sends built-in vocabulary, user-added vocabulary, and the selected scene prompt to the selected STT provider with the recording. Short correction rules and candidate frequency are processed on-device and are not sent. Android disables voice and learning in password fields, and disables learning only in no-personalization fields. Before the first cloud request, Android shows these data categories in the app and records versioned consent.</p>
 
                 <h3>2.4 Transcription History</h3>
-                <p>On macOS, each speech-recognition result and final output text is stored locally in <code>~/.voice-input/history.json</code> and can be viewed, edited, and deleted from the Dashboard. The iOS version does not create an utterance-history file and displays the current result only in memory. Android v2.7.3 also does not create a complete dictation-history file; it stores only candidate frequency, short correction rules, and Zhuyin terms and readings explicitly added by the user. None of these platforms send this local data to our servers.</p>
+                <p>On macOS, each speech-recognition result and final output text is stored locally in <code>~/.voice-input/history.json</code> and can be viewed, edited, and deleted from the Dashboard. The iOS version does not create an utterance-history file and displays the current result only in memory. Android v2.7.4 also does not create a complete dictation-history file; it stores only candidate frequency, short correction rules, and Zhuyin terms and readings explicitly added by the user. None of these platforms send this local data to our servers.</p>
                 <p>On macOS, style-profile regeneration aggregates at most 100 recent entries locally and stores only broad traits such as sentence length, punctuation, and language mixing. It does not send source text to an external AI or reproduce source text in the profile. Local health reports store metadata without transcript previews. The local auto-triage report may contain short correction candidates from entries the user edited.</p>
 
                 <h3>2.5 Website Download Registration</h3>

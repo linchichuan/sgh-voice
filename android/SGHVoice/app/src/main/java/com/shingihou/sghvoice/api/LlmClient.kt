@@ -57,7 +57,7 @@ class LlmClient(private val apiConfig: ApiConfig) {
                 "4. 口語自我修正→只保留最終版本。\n" +
                 "5. 加上正確標點並適當分段，但不改寫核心句意；中/日/英混合保持原樣。\n" +
                 "6. 所有輸出都必須有逐字稿依據，不得新增事實。\n" +
-                "7. 只輸出整理結果，不加解釋。\n" +
+                "7. 只輸出整理結果，不加解釋。絕不可自稱 AI、人工智慧、語言模型、助手或機器人，也不得拒絕逐字稿內容；「作為人工智慧語言模型，我無法…」屬於禁止輸出。\n" +
                 "8. 所有中文必須是繁體中文。\n"
         
         private const val LINE_PROMPT =
@@ -91,6 +91,24 @@ class LlmClient(private val apiConfig: ApiConfig) {
             "當然", "当然", "可以", "答案", "以下", "這是", "这是", "目前", "我會", "我将",
             "もちろん", "はい", "答え", "以下", "sure", "certainly", "of course",
             "the answer", "here is", "here are", "i can", "i will"
+        )
+        private val ASSISTANT_IDENTITY_REFUSAL_PATTERNS = listOf(
+            Regex(
+                """(?:很?抱歉[,，。\s]*)?(?:作為|身為|我是(?:一個)?|本模型是)\s*(?:AI|人工智慧|人工智能|語言模型|聊天機器人|虛擬助理|智能助手).{0,80}?(?:無法|不能|沒辦法|拒絕|不便)""",
+                setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL)
+            ),
+            Regex(
+                """(?:很抱歉|抱歉|對不起)[,，。\s]*(?:我|(?:作為|身為).{0,24}).{0,40}?(?:無法|不能|沒辦法|拒絕|不便)""",
+                RegexOption.DOT_MATCHES_ALL
+            ),
+            Regex(
+                """(?:AI(?:アシスタント)?|言語モデル|チャットボット)として.{0,80}?(?:できません|対応できません|お答えできません|拒否)""",
+                setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL)
+            ),
+            Regex(
+                """(?:as|being)\s+(?:an?\s+)?(?:AI|artificial intelligence|language model|chatbot|assistant).{0,100}?(?:cannot|can't|unable|won't|not able|refus)""",
+                setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL)
+            )
         )
         private val QUESTION_TERMINATOR = Regex("""[?？][\s"'’”」』）)\]]*$""")
         private val CHINESE_SOURCE_QUESTION = Regex(
@@ -689,9 +707,17 @@ class LlmClient(private val apiConfig: ApiConfig) {
     internal fun validateLlmResult(rawInput: String, llmResult: String, mode: String): String? {
         if (llmResult.isBlank()) return null
         if (mode != "dictate") return llmResult
+        if (addsAssistantIdentityOrRefusal(rawInput, llmResult)) return null
         if (looksLikeAnsweredInstruction(rawInput, llmResult)) return null
         val truncated = truncateTrailingHallucination(rawInput, llmResult)
         return truncated ?: llmResult
+    }
+
+    private fun addsAssistantIdentityOrRefusal(
+        rawInput: String,
+        llmResult: String
+    ): Boolean = ASSISTANT_IDENTITY_REFUSAL_PATTERNS.any { pattern ->
+        pattern.containsMatchIn(llmResult) && !pattern.containsMatchIn(rawInput)
     }
 
     /**

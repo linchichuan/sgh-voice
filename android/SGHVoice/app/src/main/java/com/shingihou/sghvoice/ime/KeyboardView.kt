@@ -94,6 +94,7 @@ class KeyboardView @JvmOverloads constructor(
     private lateinit var micButton: TextView
     private lateinit var statusText: TextView
     private lateinit var voiceStateDot: View
+    private lateinit var audioWaveform: AudioWaveformView
     private lateinit var voiceHint: TextView
     private lateinit var translationPanel: View
     private lateinit var translationCancelButton: TextView
@@ -201,6 +202,10 @@ class KeyboardView @JvmOverloads constructor(
         )
     }
 
+    fun setAudioLevel(level: Float) {
+        audioWaveform.setAudioLevel(level)
+    }
+
     fun setTranslationRecordingMode() {
         micButton.setText(R.string.mic_action_translation_recording)
         micButton.contentDescription =
@@ -282,6 +287,7 @@ class KeyboardView @JvmOverloads constructor(
     fun updateState(state: VoiceInputIME.ImeState) {
         when (state) {
             VoiceInputIME.ImeState.IDLE -> {
+                audioWaveform.setRecordingActive(false)
                 statusText.setText(R.string.status_idle)
                 statusText.setTextColor(ContextCompat.getColor(context, R.color.status_text))
                 applyMicState(
@@ -294,6 +300,8 @@ class KeyboardView @JvmOverloads constructor(
             }
 
             VoiceInputIME.ImeState.STARTING -> {
+                audioWaveform.setRecordingActive(true)
+                audioWaveform.setAudioLevel(0f)
                 statusText.setText(R.string.status_starting)
                 statusText.setTextColor(ContextCompat.getColor(context, R.color.status_text))
                 applyMicState(
@@ -306,6 +314,7 @@ class KeyboardView @JvmOverloads constructor(
             }
 
             VoiceInputIME.ImeState.RECORDING -> {
+                audioWaveform.setRecordingActive(true)
                 statusText.setText(R.string.status_recording)
                 statusText.setTextColor(ContextCompat.getColor(context, R.color.status_recording))
                 applyMicState(
@@ -318,6 +327,7 @@ class KeyboardView @JvmOverloads constructor(
             }
 
             VoiceInputIME.ImeState.STOPPING -> {
+                audioWaveform.setRecordingActive(false)
                 statusText.setText(R.string.status_stopping)
                 statusText.setTextColor(ContextCompat.getColor(context, R.color.status_text))
                 applyMicState(
@@ -330,6 +340,7 @@ class KeyboardView @JvmOverloads constructor(
             }
 
             VoiceInputIME.ImeState.PROCESSING -> {
+                audioWaveform.setRecordingActive(false)
                 statusText.setText(R.string.status_processing)
                 statusText.setTextColor(ContextCompat.getColor(context, R.color.status_text))
                 applyMicState(
@@ -342,6 +353,7 @@ class KeyboardView @JvmOverloads constructor(
             }
 
             VoiceInputIME.ImeState.DONE -> {
+                audioWaveform.setRecordingActive(false)
                 statusText.setText(R.string.status_done)
                 statusText.setTextColor(ContextCompat.getColor(context, R.color.status_success))
                 applyMicState(
@@ -354,6 +366,7 @@ class KeyboardView @JvmOverloads constructor(
             }
 
             VoiceInputIME.ImeState.ERROR -> {
+                audioWaveform.setRecordingActive(false)
                 statusText.setTextColor(ContextCompat.getColor(context, R.color.status_recording))
                 applyMicState(
                     enabled = true,
@@ -379,6 +392,7 @@ class KeyboardView @JvmOverloads constructor(
         micButton = findViewById(R.id.btn_mic)
         statusText = findViewById(R.id.tv_status)
         voiceStateDot = findViewById(R.id.voice_state_dot)
+        audioWaveform = findViewById(R.id.audio_waveform)
         voiceHint = findViewById(R.id.tv_voice_hint)
         translationPanel = findViewById(R.id.translation_panel)
         translationCancelButton = findViewById(R.id.btn_translation_cancel)

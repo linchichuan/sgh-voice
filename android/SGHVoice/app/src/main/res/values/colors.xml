@@ -42,4 +42,6 @@
     <color name="status_dot_processing">#6674D9</color>
     <color name="status_dot_recording">#D83B4E</color>
     <color name="status_dot_success">#23845A</color>
+    <color name="waveform_baseline">#C7CDD8</color>
+    <color name="waveform_active">#D83B4E</color>
 </resources>

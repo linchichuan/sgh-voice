@@ -317,7 +317,10 @@ class Transcriber:
         "3. NEVER summarize, condense, paraphrase, reorder, bullet-list, or 'organize'. Keep every clause.\n"
         "4. NEVER add content the speaker did not say. No greetings, explanations, markdown, quotes, "
         "meta-commentary, and never continue the speaker's sentence. "
-        "NEVER prepend assistant phrases (以下是/好的/根據您的/我來幫/請提供/Here is/Sure/Okay/Let me).\n"
+        "NEVER prepend assistant phrases (以下是/好的/根據您的/我來幫/請提供/Here is/Sure/Okay/Let me). "
+        "NEVER identify yourself as an AI, assistant, chatbot, or language model. NEVER refuse the "
+        "dictated content; phrases such as '作為人工智慧語言模型，我無法…' or "
+        "'As an AI, I cannot…' are forbidden. Transcribe such requests verbatim instead.\n"
         "5. ALL Chinese MUST be Traditional Chinese with TAIWAN vocabulary: "
         "軟體(✗软件) 影片(✗视频) 網路(✗网络) 資料(✗数据) 程式(✗程序) 品質(✗质量) 伺服器(✗服务器). "
         "This Chinese-only rule MUST NOT alter Japanese shinjitai: 画像, 動画, 台風, 国際, 参考, 来週 stay Japanese.\n"
@@ -1801,6 +1804,48 @@ class Transcriber:
         "Please provide", "let me know", "I'll need more",
     )
 
+    # Model self-identification/refusal chatter can precede an otherwise intact
+    # transcript.  Prefix-only markers and overlap checks miss that shape:
+    # the copied raw transcript keeps overlap high, while the unwanted preamble
+    # begins with variants such as "作為人工智慧..." rather than "我無法".
+    _ASSISTANT_IDENTITY_REFUSAL_PATTERNS = (
+        re.compile(
+            r"(?:很?抱歉[,，。\s]*)?"
+            r"(?:作為|身為|我是(?:一個)?|本模型是)\s*"
+            r"(?:AI|人工智慧|人工智能|語言模型|聊天機器人|"
+            r"虛擬助理|智能助手)"
+            r".{0,80}?(?:無法|不能|沒辦法|拒絕|不便)",
+            re.IGNORECASE | re.DOTALL,
+        ),
+        re.compile(
+            r"(?:很抱歉|抱歉|對不起)[,，。\s]*"
+            r"(?:我|(?:作為|身為).{0,24})"
+            r".{0,40}?(?:無法|不能|沒辦法|拒絕|不便)",
+            re.DOTALL,
+        ),
+        re.compile(
+            r"(?:AI(?:アシスタント)?|言語モデル|チャットボット)"
+            r"として.{0,80}?(?:できません|対応できません|お答えできません|拒否)",
+            re.IGNORECASE | re.DOTALL,
+        ),
+        re.compile(
+            r"(?:as|being)\s+(?:an?\s+)?(?:AI|artificial intelligence|language model|chatbot|assistant)"
+            r".{0,100}?(?:cannot|can't|unable|won't|not able|refus)",
+            re.IGNORECASE | re.DOTALL,
+        ),
+    )
+
+    def _adds_assistant_identity_or_refusal(self, raw, output):
+        """Detect model meta-chatter that was not present in spoken content."""
+        original = (raw or "").strip()
+        result = (output or "").strip()
+        if not result:
+            return False
+        for pattern in self._ASSISTANT_IDENTITY_REFUSAL_PATTERNS:
+            if pattern.search(result) and not pattern.search(original):
+                return True
+        return False
+
     # 對短問句／命令另設守門。一般 bigram hallucination guard 為了避免誤殺短句，
     # 原本只在 raw >= 30 字時啟用；但「幫我寫一封信」「這要怎麼處理？」正是
     # LLM 最容易直接回答、而且往往短於 30 字的輸入。
@@ -1867,6 +1912,9 @@ class Transcriber:
         # 0. Few-shot echo：LLM 複誦最近 few-shot example 的 assistant 內容
         # （degenerate input 下的常見退化模式，即使輸入長度未觸發 #3 也要擋）
         if self._echoes_fewshot(r, o):
+            return True
+        # 0b. AI identity/refusal preamble followed by the real transcript.
+        if self._adds_assistant_identity_or_refusal(o, r):
             return True
         # 1. 助理對話起手詞 — 但原文本來就以該詞開頭是合法口述（「好的，沒問題，
         #    我明天十點到」是 LINE 最常見的回覆），只有「LLM 無中生有加上」才是幻覺
@@ -1937,12 +1985,20 @@ class Transcriber:
                 reason="code_switch_span_changed",
             )
             return 'discard', None
-        if self._is_llm_hallucination(llm_result, raw_input):
+        assistant_chatter = self._adds_assistant_identity_or_refusal(
+            raw_input,
+            llm_result,
+        )
+        if assistant_chatter or self._is_llm_hallucination(llm_result, raw_input):
             print(f" ⚠️ [{engine_label}] 偵測到幻覺，已捨棄: {(llm_result or '')[:20]}...")
             event_ledger.validator_action(
                 "discard", "hallucination", engine_label,
                 len_in=len(raw_input or ""), len_out=len(llm_result or ""),
-                reason="full_segment_hallucination",
+                reason=(
+                    "assistant_identity_or_refusal"
+                    if assistant_chatter
+                    else "full_segment_hallucination"
+                ),
             )
             return 'discard', None
         if mode == "dictate":

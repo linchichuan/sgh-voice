@@ -1,5 +1,10 @@
 # Changelog
 
+## v2.7.4 (2026-09-01) — Live Audio Feedback & Dictation Safety
+
+- macOS、Android 與 iOS 錄音介面新增由真實麥克風音量驅動的即時波形；收到聲音時才跳動，靜音時維持中央平線，停止或錯誤時立即歸零，且波形 UI 失敗不會中斷錄音。
+- 三平台逐字稿 Prompt 與輸出守門新增 AI 身分／拒絕前言防護；模型若自行加上「作為人工智慧語言模型，我無法…」再接原逐字稿，會丟棄污染輸出並回退原逐字稿；使用者真正口述這些文字時仍原樣保留。
+
 ## Android v2.7.3 (2026-08-30) — Traditional Chinese Zhuyin & Release Hardening
 
 - 以固定 McBopomofo snapshot 取代只有 2,869 個單字的 Unihan 小表：內建 133,492 組讀音、157,683 個候選、145,332 個詞組與 57,729 個選字後聯想；`ㄕㄢ` 可選「刪」、`ㄕㄢ ㄔㄨˊ` 首選「刪除」，選「刪」後只追加「除」。

@@ -48,6 +48,16 @@ class LlmClientDictationSafetyTest {
     }
 
     @Test
+    fun `ai refusal preamble before intact transcript is rejected`() {
+        val raw =
+            "今天早上先整理客戶資料，接著確認合約內容與付款日期，下午再把會議紀錄寄給相關同事。"
+        val contaminated =
+            "作為人工智慧語言模型，我無法實際執行這些工作，但可以協助保留文字。以下是轉錄內容：$raw"
+
+        assertNull(client.validateLlmResult(raw, contaminated, "dictate"))
+    }
+
+    @Test
     fun `non dictation mode does not apply dictation answer guard`() {
         val raw = "你可以告訴我，現在後處理用的是哪一個模型嗎？"
         val answer = "目前後處理使用的是 Claude Sonnet 模型。"

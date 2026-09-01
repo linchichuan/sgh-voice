@@ -1,7 +1,7 @@
 const translations = {
     ja: {
         "meta.title": "SGH Voice — Android 多言語キーボードと macOS 音声入力",
-        "meta.description": "SGH Voice は、音声・注音・日本語・英語を一つにまとめた Android 入力キーボードです。v2.7.3 は繁体字注音辞書、関連語、自分用語彙、音声入力と最大4言語翻訳に対応します。",
+        "meta.description": "SGH Voice は、音声・注音・日本語・英語を一つにまとめた Android 入力キーボードです。v2.7.4 はリアルタイム音声波形、AI 返答の混入防止、繁体字注音辞書と最大4言語翻訳に対応します。",
         "accessibility.skip": "メインコンテンツへ",
 
         "nav.features": "入力方法",
@@ -11,7 +11,7 @@ const translations = {
         "nav.download": "APK ダウンロード",
         "nav.cta": "Android テスト版を入手",
 
-        "hero.eyebrow": "Android 個人テスト版 · v2.7.3",
+        "hero.eyebrow": "Android 個人テスト版 · v2.7.4",
         "hero.title": "一つのキーボードで、<br><span><span class=\"no-break\">音声・</span><span class=\"no-break\">注音・</span><span class=\"no-break\">日本語・</span><span class=\"no-break\">英語</span></span><br>をそのまま入力。",
         "hero.subtitle": "Samsung キーボードへ戻る必要はありません。話す、ㄅㄆㄇㄈを打つ、かなや English を入力する。そのすべてを SGH Voice 内で行えます。",
         "hero.cta": "APK とリスク説明を見る",
@@ -34,7 +34,7 @@ const translations = {
         "modes.title": "一つの言語を選ぶのではなく、<br>今の入力方法を選ぶ。",
         "modes.subtitle": "Voice、注音、日本語、英語はいつも同じ列にあります。切り替えるのは入力方法であり、システムキーボード全体ではありません。",
         "modes.voice.title": "短押しで文字起こし、長押しで翻訳",
-        "modes.voice.desc": "短押しで通常の文字起こしを開始し、もう一度で完了。長押しでは繁体字中国語・日本語・英語・韓国語から1〜4言語を選び、録音を翻訳します。",
+        "modes.voice.desc": "短押しで通常の文字起こしを開始し、もう一度で完了。マイクが音を受けるとリアルタイム波形が動き、無音時は水平線に戻ります。長押しでは1〜4言語へ翻訳できます。",
         "modes.zhuyin.title": "標準注音配列",
         "modes.zhuyin.desc": "固定スナップショットの繁体字注音辞書から単字・熟語を検索し、選字後の関連語と端末内の自分用語彙にも対応します。ピンインは不要です。",
         "modes.japanese.title": "かなと常用漢字候補",
@@ -97,7 +97,7 @@ const translations = {
         "download.subtitle": "Android は個人テスト版 APK、macOS は公開安定版を提供しています。",
         "download.alert.badge": "インストール前に必ず確認",
         "download.alert.title": "Android 個人テスト／サイドロード版",
-        "download.alert.desc": "本バージョンは Google Play Production で公開されていません。APK は直接ダウンロードでき、既存の 2.7.2 には同じ署名で上書き更新できます。特定の提供元からのインストール許可と、サイドロード版の互換性・安定性・第三者 API 料金などのリスクを確認してください。",
+        "download.alert.desc": "本バージョンは Google Play Production で公開されていません。APK は直接ダウンロードでき、既存の 2.7.3 には同じ署名で上書き更新できます。特定の提供元からのインストール許可と、サイドロード版の互換性・安定性・第三者 API 料金などのリスクを確認してください。",
         "download.alert.responsibility": "<strong>責任範囲と安全上の注意：</strong>本 APK は Google Play の審査・認証を受けていないため、Android に「不明なアプリ」または「未確認」等の警告が表示される場合があります。本バージョンはテスト用途であり、機能、互換性、安定性を保証しません。適用法令で認められる範囲において、インストールおよび利用に伴うリスクは利用者ご自身の責任となります。テストする場合は、本ページの公式 URL、ファイル名、SHA-256 を確認したうえで、現在使用中のブラウザに限り「不明なアプリのインストール」を許可してください。Google Play Protect は無効にしないでください。悪意のあるアプリとして検出された場合、または警告を解消できない場合は、インストールを中止してください。",
         "download.alert.item1": "ファイル名、バージョン、権限、下記 SHA-256 を確認",
         "download.alert.item2": "Google Play Protect を無効にしない",
@@ -120,7 +120,7 @@ const translations = {
         "download.registration.error": "登録できなかったため、ダウンロードは開始されていません。時間をおいて再度お試しください。",
         "download.android.badge": "PERSONAL TEST BUILD",
         "download.android.title": "SGH Voice for Android",
-        "download.android.update": "2.7.2 をインストール済みの場合は、この 2.7.3 APK を開いて「更新」を選択してください。先にアンインストールしないことで、既存の設定とデータを保持できます。",
+        "download.android.update": "2.7.3 をインストール済みの場合は、この 2.7.4 APK を開いて「更新」を選択してください。先にアンインストールしないことで、既存の設定とデータを保持できます。",
         "download.meta.version": "バージョン",
         "download.meta.requirement": "システム要件",
         "download.meta.size": "ファイルサイズ",
@@ -151,7 +151,7 @@ const translations = {
         "faq.q5": "日本語入力は一般的な日本語キーボードと同等ですか？",
         "faq.a5": "現在は Phase 1 です。ローマ字、かな、読みの前方一致予測、最大24件の展開候補に対応しますが、Mozc など成熟した入力法のような文全体の文脈変換にはまだ達していません。",
         "faq.q6": "質問を話すと、モデルがそのまま回答しますか？",
-        "faq.a6": "回答してはいけません。通常の文字起こしでは、質問や命令もすべて不活性な発話内容として扱い、文字だけを整えます。翻訳モードは翻訳だけを行います。v2.7.3 はモデルが回答を生成した場合に破棄する出力ガードも備えています。",
+        "faq.a6": "回答してはいけません。通常の文字起こしでは、質問や命令も発話内容として文字だけを整えます。v2.7.4 は「AI のため対応できません」といった自己紹介・拒否文をモデルが追加した場合も破棄し、元の文字起こしに戻します。",
 
         "footer.desc": "新義豊株式会社が開発する、多言語の音声・キーボード入力ツール。",
         "footer.product": "製品",
@@ -164,7 +164,7 @@ const translations = {
 
     zh: {
         "meta.title": "SGH Voice — Android 多語輸入法與 macOS 語音輸入",
-        "meta.description": "SGH Voice 將語音、注音、日文與英文整合在同一個 Android 輸入法。v2.7.3 加入完整繁中注音字庫、詞組聯想、自訂詞彙、聽寫與最多四語翻譯。",
+        "meta.description": "SGH Voice 將語音、注音、日文與英文整合在同一個 Android 輸入法。v2.7.4 加入即時麥克風波形、AI 回覆贅字防護、完整繁中注音字庫與最多四語翻譯。",
         "accessibility.skip": "跳到主要內容",
 
         "nav.features": "輸入方式",
@@ -174,7 +174,7 @@ const translations = {
         "nav.download": "下載 APK",
         "nav.cta": "取得 Android 測試版",
 
-        "hero.eyebrow": "Android 個人測試版 · v2.7.3",
+        "hero.eyebrow": "Android 個人測試版 · v2.7.4",
         "hero.title": "一個輸入法，<br><span><span class=\"no-break\">語音、</span><span class=\"no-break\">注音、</span><span class=\"no-break\">日文、</span><span class=\"no-break\">英文</span></span><br>都能直接用。",
         "hero.subtitle": "不用再切回 Samsung 鍵盤。說話、打ㄅㄆㄇㄈ、輸入かな或 English，都留在 SGH Voice 裡完成。",
         "hero.cta": "查看 APK 下載與風險說明",
@@ -197,7 +197,7 @@ const translations = {
         "modes.title": "不必選擇一種語言，<br>只要選擇現在怎麼輸入。",
         "modes.subtitle": "Voice、注音、日文、英文固定放在同一列。切換的是輸入方式，不是整套系統鍵盤。",
         "modes.voice.title": "短按聽寫，長按翻譯",
-        "modes.voice.desc": "短按開始一般聽寫，再按一次完成；長按則可選繁中、日文、英文、韓文 1–4 種目標，再錄音翻譯。",
+        "modes.voice.desc": "短按開始一般聽寫，再按一次完成；麥克風收到聲音時即時波形會跳動，靜音時維持水平線。長按可選 1–4 種目標語言進行翻譯。",
         "modes.zhuyin.title": "標準注音排列",
         "modes.zhuyin.desc": "以固定版本的繁中注音字庫提供單字、詞組與選字後聯想，也能在手機內加入自己的字詞與注音，不必學拼音。",
         "modes.japanese.title": "假名與常用漢字候選",
@@ -260,7 +260,7 @@ const translations = {
         "download.subtitle": "Android 目前提供個人測試版 APK；macOS 則維持公開穩定版。",
         "download.alert.badge": "安裝前必讀",
         "download.alert.title": "Android 個人測試／側載版本",
-        "download.alert.desc": "本版本尚未透過 Google Play Production 公開發佈。APK 可直接下載，並以相同簽章覆蓋更新既有 2.7.2。請手動允許特定來源安裝，並確認側載版本的裝置相容性、穩定性與第三方 API 費用等風險。",
+        "download.alert.desc": "本版本尚未透過 Google Play Production 公開發佈。APK 可直接下載，並以相同簽章覆蓋更新既有 2.7.3。請手動允許特定來源安裝，並確認側載版本的裝置相容性、穩定性與第三方 API 費用等風險。",
         "download.alert.responsibility": "<strong>責任與安全提示：</strong>此 APK 尚未經 Google Play 審核或認證，Android 可能顯示「未知應用程式」或「未經驗證」等安全提示。本版本僅供測試，不保證功能、相容性或穩定性；在適用法令允許範圍內，安裝與使用風險由使用者自行承擔。若選擇測試，僅在確認本頁官方網址、檔名與 SHA-256 後，允許目前瀏覽器安裝未知應用程式；請勿關閉 Google Play Protect。若系統判定為惡意程式或持續封鎖，請停止安裝。",
         "download.alert.item1": "確認檔名、版本、權限與下方 SHA-256",
         "download.alert.item2": "不要關閉 Google Play Protect",
@@ -283,7 +283,7 @@ const translations = {
         "download.registration.error": "登記失敗，尚未開始下載。請稍後再試。",
         "download.android.badge": "PERSONAL TEST BUILD",
         "download.android.title": "SGH Voice for Android",
-        "download.android.update": "已安裝 2.7.2 時，直接開啟這個 2.7.3 APK 並選擇「更新」；請勿先解除安裝，既有設定與資料才能保留。",
+        "download.android.update": "已安裝 2.7.3 時，直接開啟這個 2.7.4 APK 並選擇「更新」；請勿先解除安裝，既有設定與資料才能保留。",
         "download.meta.version": "版本",
         "download.meta.requirement": "系統需求",
         "download.meta.size": "檔案大小",
@@ -314,7 +314,7 @@ const translations = {
         "faq.q5": "日文輸入和一般日本手機鍵盤一樣嗎？",
         "faq.a5": "目前為 Phase 1，支援 Romaji、假名、讀音前綴預測，以及最多 24 個可展開候選；尚不是 Mozc 等成熟輸入法的整句文脈轉換等級。",
         "faq.q6": "我口述一個問句時，模型會直接回答嗎？",
-        "faq.a6": "不應該。一般聽寫把整段內容視為逐字稿，即使像問句或命令也只能整理文字；翻譯模式只能翻譯。v2.7.3 另有輸出守門，若模型把問句當指令回答，會捨棄該答案。",
+        "faq.a6": "不應該。一般聽寫把問句或命令都當成逐字稿，只能整理文字。v2.7.4 若偵測到模型新增「作為 AI，我無法…」等自我介紹或拒絕贅字，會捨棄污染輸出並回退原逐字稿。",
 
         "footer.desc": "新義豊株式会社開發的多語音聲與鍵盤輸入工具。",
         "footer.product": "產品",
@@ -327,7 +327,7 @@ const translations = {
 
     en: {
         "meta.title": "SGH Voice — Multilingual Android keyboard and macOS voice input",
-        "meta.description": "SGH Voice combines voice, Zhuyin, Japanese, and English in one Android keyboard. v2.7.3 adds a full Traditional Chinese Zhuyin lexicon, associated phrases, custom terms, dictation, and translation into up to four languages.",
+        "meta.description": "SGH Voice combines voice, Zhuyin, Japanese, and English in one Android keyboard. v2.7.4 adds live microphone waveforms, AI-reply contamination protection, full Traditional Chinese Zhuyin, and translation into up to four languages.",
         "accessibility.skip": "Skip to main content",
 
         "nav.features": "Input modes",
@@ -337,7 +337,7 @@ const translations = {
         "nav.download": "Download APK",
         "nav.cta": "Get the Android test build",
 
-        "hero.eyebrow": "Android personal test build · v2.7.3",
+        "hero.eyebrow": "Android personal test build · v2.7.4",
         "hero.title": "One keyboard for<br><span><span class=\"no-break\">voice, </span><span class=\"no-break\">Zhuyin, </span><span class=\"no-break\">Japanese, </span><span class=\"no-break\">and English.</span></span>",
         "hero.subtitle": "No need to switch back to Samsung Keyboard. Speak, type ㄅㄆㄇㄈ, enter かな, or write English without leaving SGH Voice.",
         "hero.cta": "See the APK and risk notice",
@@ -360,7 +360,7 @@ const translations = {
         "modes.title": "Do not choose one language.<br>Choose how you want to input right now.",
         "modes.subtitle": "Voice, Zhuyin, Japanese, and English stay in the same row. You switch the input mode, not the entire system keyboard.",
         "modes.voice.title": "Tap to dictate, long-press to translate",
-        "modes.voice.desc": "Tap for normal dictation and tap again to finish. Long-press to choose 1–4 targets from Traditional Chinese, Japanese, English, and Korean, then record once to translate.",
+        "modes.voice.desc": "Tap for normal dictation and tap again to finish. The live waveform responds to microphone input and stays flat during silence. Long-press to choose 1–4 translation targets.",
         "modes.zhuyin.title": "Standard Zhuyin layout",
         "modes.zhuyin.desc": "Uses a pinned Traditional Chinese Zhuyin lexicon for characters, phrases, associated completions, and on-device custom terms—no Pinyin required.",
         "modes.japanese.title": "Kana and common kanji candidates",
@@ -423,7 +423,7 @@ const translations = {
         "download.subtitle": "Android is available as a personal test APK; macOS remains a public stable release.",
         "download.alert.badge": "READ BEFORE INSTALLING",
         "download.alert.title": "Android personal test / sideload build",
-        "download.alert.desc": "This build has not been published through Google Play Production. You can download it directly and update an existing 2.7.2 installation because both APKs use the same signer. Allow installation only for the browser or file manager you use, and review the compatibility, stability, and third-party API cost risks.",
+        "download.alert.desc": "This build has not been published through Google Play Production. You can download it directly and update an existing 2.7.3 installation because both APKs use the same signer. Allow installation only for the browser or file manager you use, and review the compatibility, stability, and third-party API cost risks.",
         "download.alert.responsibility": "<strong>Responsibility and security notice:</strong> This APK has not been reviewed or certified by Google Play, so Android may display “unknown app,” “unverified,” or similar security prompts. This build is provided for testing only, without guarantees of functionality, compatibility, or stability. To the extent permitted by applicable law, you assume the risks of installation and use. If you choose to test it, verify this page’s official URL, file name, and SHA-256 before allowing unknown-app installation for your current browser only. Do not disable Google Play Protect. Stop the installation if Android identifies the file as malicious or continues to block it.",
         "download.alert.item1": "Verify the file name, version, permissions, and SHA-256 below",
         "download.alert.item2": "Do not disable Google Play Protect",
@@ -446,7 +446,7 @@ const translations = {
         "download.registration.error": "Registration failed, so the download did not start. Please try again later.",
         "download.android.badge": "PERSONAL TEST BUILD",
         "download.android.title": "SGH Voice for Android",
-        "download.android.update": "If 2.7.2 is already installed, open this 2.7.3 APK and choose Update. Do not uninstall first if you want to keep existing settings and data.",
+        "download.android.update": "If 2.7.3 is already installed, open this 2.7.4 APK and choose Update. Do not uninstall first if you want to keep existing settings and data.",
         "download.meta.version": "Version",
         "download.meta.requirement": "Requirement",
         "download.meta.size": "File size",
@@ -477,7 +477,7 @@ const translations = {
         "faq.q5": "Is Japanese input equivalent to a mature Japanese IME?",
         "faq.a5": "This is Phase 1. It supports romaji, kana, reading-prefix prediction, and up to 24 expandable candidates, but it does not yet offer sentence-level contextual conversion at the level of a mature IME such as Mozc.",
         "faq.q6": "Will the model answer a question that I dictate?",
-        "faq.a6": "It should not. Normal dictation treats questions and instructions as inert transcript content and only cleans the text; translation mode only translates. v2.7.3 also rejects model output that answers the dictated question.",
+        "faq.a6": "It should not. Normal dictation treats questions and instructions as transcript content and only cleans the text. v2.7.4 also rejects added AI-identity or refusal chatter such as \"As an AI, I cannot…\" and falls back to the original transcript.",
 
         "footer.desc": "A multilingual voice and keyboard input tool by Shingihou Co., Ltd.",
         "footer.product": "Product",

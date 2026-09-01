@@ -7,6 +7,7 @@ class MainViewModel: ObservableObject, TranscriptionProgressDelegate {
     private static let maximumRecordingDurationSeconds = 600
     
     @Published var isRecording = false
+    @Published private(set) var audioLevel: Float = 0
     @Published var transcribedText = ""
     @Published var rawText = ""
     @Published private(set) var statusMessage = L10n.text("準備就緒")
@@ -44,6 +45,12 @@ class MainViewModel: ObservableObject, TranscriptionProgressDelegate {
         self.selectedScene = DictionaryManager.shared.activeScene
         self.outputStyle = ApiConfig.shared.outputStyle
         self.selectedTranslationTargets = ApiConfig.shared.translationTargets
+        audioRecorder.onLevel = { [weak self] level in
+            Task { @MainActor [weak self] in
+                guard let self, self.isRecording else { return }
+                self.audioLevel = level
+            }
+        }
         pipeline.delegate = self
     }
     
@@ -80,6 +87,7 @@ class MainViewModel: ObservableObject, TranscriptionProgressDelegate {
         recordingLimitTask?.cancel()
         recordingLimitTask = nil
         audioRecorder.release()
+        audioLevel = 0
         isRecording = false
         isPreparingRecording = false
         setLocalizedStatus("App 進入背景，已停止並刪除暫存錄音")
@@ -98,6 +106,7 @@ class MainViewModel: ObservableObject, TranscriptionProgressDelegate {
                 try await audioRecorder.startRecording()
                 try Task.checkCancellation()
                 self.isRecording = true
+                self.audioLevel = 0
                 self.setLocalizedStatus(intent.isTranslation ? "翻譯錄音中..." : "聽寫錄音中...")
                 self.transcribedText = ""
                 self.rawText = ""
@@ -116,6 +125,7 @@ class MainViewModel: ObservableObject, TranscriptionProgressDelegate {
                     isError: true
                 )
                 self.isRecording = false
+                self.audioLevel = 0
             }
             self.recordingPreparationTask = nil
         }
@@ -139,6 +149,7 @@ class MainViewModel: ObservableObject, TranscriptionProgressDelegate {
     private func stopActiveRecording(limitReached: Bool = false) {
         recordingLimitTask?.cancel()
         recordingLimitTask = nil
+        audioLevel = 0
         Task {
             if limitReached {
                 self.setLocalizedStatus("錄音已達 10 分鐘上限，正在處理...")

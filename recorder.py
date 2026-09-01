@@ -5,6 +5,7 @@ import os
 import tempfile
 import threading
 import time
+import math
 import numpy as np
 
 try:
@@ -13,6 +14,26 @@ try:
 except ImportError:
     sd = None
     sf = None
+
+
+def normalize_audio_level(rms, noise_floor=0.001, speech_ceiling=0.12):
+    """Map linear RMS to an ephemeral 0...1 waveform intensity."""
+    try:
+        value = float(rms)
+    except (TypeError, ValueError):
+        return 0.0
+    if not math.isfinite(value) or value <= noise_floor:
+        return 0.0
+    if value >= speech_ceiling:
+        return 1.0
+    return max(
+        0.0,
+        min(
+            1.0,
+            math.log(value / noise_floor)
+            / math.log(speech_ceiling / noise_floor),
+        ),
+    )
 
 
 class Recorder:
@@ -33,6 +54,21 @@ class Recorder:
         self.last_error = None
         self._on_error = None
         self._on_done = None
+        self._on_level = None
+
+    def set_level_listener(self, listener):
+        """Receive normalized 0...1 levels; ``None`` disables feedback."""
+        self._on_level = listener if callable(listener) else None
+
+    def _emit_level(self, level):
+        callback = self._on_level
+        if callback is None:
+            return
+        try:
+            callback(max(0.0, min(1.0, float(level))))
+        except Exception:
+            # The meter is cosmetic and must never interrupt recording.
+            pass
 
     def start(self, on_done=None, on_error=None):
         """開始錄音。
@@ -151,6 +187,7 @@ class Recorder:
             if self._on_error:
                 try: self._on_error(self.last_error)
                 except Exception: pass
+            self._emit_level(0.0)
             return
 
         stream_error = None
@@ -168,7 +205,8 @@ class Recorder:
                     self.audio_data.append(data.copy())
                     total += 1
 
-                    rms = np.sqrt(np.mean(data ** 2))
+                    rms = float(np.sqrt(np.mean(data ** 2)))
+                    self._emit_level(normalize_audio_level(rms))
                     if rms > silence_threshold:
                         has_voice = True
                         consecutive_silence = 0
@@ -194,6 +232,7 @@ class Recorder:
         finally:
             # 確保旗標被重置，即使 stream 開失敗 / read 拋 exception 也一樣
             self.is_recording = False
+            self._emit_level(0.0)
             if stream_error is not None:
                 self.last_error = f"音訊串流中斷: {stream_error}"
                 # 串流死在半路通常是裝置被切換/拔除 — 刷新 PortAudio，
@@ -394,6 +433,7 @@ class Recorder:
                 while not self._stop_event.is_set():
                     data, _ = stream.read(chunk)
                     rms = float(np.sqrt(np.mean(data ** 2)))
+                    self._emit_level(normalize_audio_level(rms))
                     is_voice = rms > silence_threshold
 
                     if is_voice:
@@ -439,6 +479,7 @@ class Recorder:
             self._reinit_portaudio()
         finally:
             self.is_recording = False
+            self._emit_level(0.0)
             # 通知 engine：loop 已結束（正常 stop 或例外死亡都要通知，
             # 否則 engine 端 _continuous_active / is_recording 永久卡死）
             if on_stopped:

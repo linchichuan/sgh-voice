@@ -372,6 +372,9 @@ struct DictationContract {
         - use Traditional Chinese characters for Chinese while preserving Japanese shinjitai.
         NEVER translate, summarize, paraphrase, add an answer, add a greeting, use Markdown,
         or prepend assistant phrases such as 好的、以下是、根據您的、請提供、Sure、Here is、もちろん.
+        NEVER identify yourself as an AI, assistant, chatbot, or language model, and NEVER refuse
+        dictated content. Preambles such as "作為人工智慧語言模型，我無法…" or "As an AI, I cannot…"
+        are forbidden; transcribe the source request verbatim instead.
         Return only the cleaned transcript. If unsure, return the source verbatim with punctuation.
         """
 
@@ -398,6 +401,12 @@ struct DictationContract {
             .union(.symbols)
         let sourceForPrefix = sourceLower.trimmingCharacters(in: prefixTrimSet)
         let candidateForPrefix = candidateLower.trimmingCharacters(in: prefixTrimSet)
+        if addsAssistantIdentityOrRefusal(
+            source: sourceTrimmed,
+            candidate: candidateTrimmed
+        ) {
+            return nil
+        }
         let assistantPrefixes = [
             "好的", "當然", "以下是", "根據您的", "你好，我", "您好，我",
             "我可以", "我需要更清楚",
@@ -435,6 +444,23 @@ struct DictationContract {
             return nil
         }
         return candidateTrimmed
+    }
+
+    private static let assistantIdentityRefusalPatterns = [
+        #"(?is)(?:很?抱歉[,，。\s]*)?(?:作為|身為|我是(?:一個)?|本模型是)\s*(?:AI|人工智慧|人工智能|語言模型|聊天機器人|虛擬助理|智能助手).{0,80}?(?:無法|不能|沒辦法|拒絕|不便)"#,
+        #"(?s)(?:很抱歉|抱歉|對不起)[,，。\s]*(?:我|(?:作為|身為).{0,24}).{0,40}?(?:無法|不能|沒辦法|拒絕|不便)"#,
+        #"(?is)(?:AI(?:アシスタント)?|言語モデル|チャットボット)として.{0,80}?(?:できません|対応できません|お答えできません|拒否)"#,
+        #"(?is)(?:as|being)\s+(?:an?\s+)?(?:AI|artificial intelligence|language model|chatbot|assistant).{0,100}?(?:cannot|can't|unable|won't|not able|refus)"#
+    ]
+
+    private static func addsAssistantIdentityOrRefusal(
+        source: String,
+        candidate: String
+    ) -> Bool {
+        assistantIdentityRefusalPatterns.contains { pattern in
+            candidate.range(of: pattern, options: .regularExpression) != nil
+                && source.range(of: pattern, options: .regularExpression) == nil
+        }
     }
 
     private static func substantiveCharacters(in text: String) -> [Character] {

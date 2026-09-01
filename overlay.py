@@ -4,6 +4,7 @@ overlay.py — 浮動狀態窗口
 顯示錄音中 / 處理中 / 完成狀態
 """
 import threading
+import math
 import objc
 
 try:
@@ -16,6 +17,69 @@ except ImportError:
 
 # 用於跨執行緒 UI 更新的 helper class
 if HAS_APPKIT:
+    class _WaveformView(AppKit.NSView):
+        """Ephemeral audio-level bars; silence is an actual flat center line."""
+
+        def initWithFrame_(self, frame):
+            self = objc.super(_WaveformView, self).initWithFrame_(frame)
+            if self is None:
+                return None
+            self._samples = [0.0] * 25
+            self._active = False
+            return self
+
+        def setActive_(self, active):
+            self._active = bool(active)
+            if not self._active:
+                self._samples = [0.0] * len(self._samples)
+            self.setNeedsDisplay_(True)
+
+        def pushLevel_(self, level):
+            if not self._active:
+                return
+            try:
+                normalized = max(0.0, min(1.0, float(level)))
+            except (TypeError, ValueError):
+                normalized = 0.0
+            self._samples = self._samples[1:] + [normalized]
+            self.setNeedsDisplay_(True)
+
+        def drawRect_(self, _dirty_rect):
+            bounds = self.bounds()
+            width = bounds.size.width
+            height = bounds.size.height
+            center_y = height / 2.0
+            padding = 3.0
+
+            baseline = AppKit.NSBezierPath.bezierPath()
+            baseline.moveToPoint_(Foundation.NSMakePoint(padding, center_y))
+            baseline.lineToPoint_(Foundation.NSMakePoint(width - padding, center_y))
+            baseline.setLineWidth_(1.0)
+            AppKit.NSColor.colorWithCalibratedWhite_alpha_(1.0, 0.24).setStroke()
+            baseline.stroke()
+
+            slot = max(1.0, (width - padding * 2.0) / len(self._samples))
+            bar_width = max(1.5, slot * 0.46)
+            max_half_height = max(1.0, height / 2.0 - 2.0)
+            AppKit.NSColor.colorWithCalibratedRed_green_blue_alpha_(
+                1.0, 0.38, 0.46, 0.96
+            ).setFill()
+            for index, sample in enumerate(self._samples):
+                if sample <= 0.015:
+                    continue
+                envelope = 0.62 + 0.38 * abs(math.sin((index + 1) * 0.79))
+                half_height = max(1.5, sample * envelope * max_half_height)
+                center_x = padding + slot * (index + 0.5)
+                rect = Foundation.NSMakeRect(
+                    center_x - bar_width / 2.0,
+                    center_y - half_height,
+                    bar_width,
+                    half_height * 2.0,
+                )
+                AppKit.NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(
+                    rect, bar_width / 2.0, bar_width / 2.0
+                ).fill()
+
     class _Updater(AppKit.NSObject):
         """NSObject 子類，用 performSelectorOnMainThread 安全更新 UI"""
 
@@ -25,6 +89,7 @@ if HAS_APPKIT:
                 return None
             self._overlay = overlay
             self._pending_status = None
+            self._pending_level = 0.0
             return self
 
         def setStatus_(self, status):
@@ -46,6 +111,15 @@ if HAS_APPKIT:
         def applyUpdate_(self, _sender):
             self._apply()
 
+        def setAudioLevel_(self, level):
+            self._pending_level = level
+            self.performSelectorOnMainThread_withObject_waitUntilDone_(
+                "applyAudioLevel:", None, False
+            )
+
+        def applyAudioLevel_(self, _sender):
+            self._overlay._do_update_audio_level(self._pending_level)
+
 
 class StatusOverlay:
     """浮動狀態視窗（macOS only，需要 PyObjC）"""
@@ -53,6 +127,7 @@ class StatusOverlay:
     def __init__(self):
         self._window = None
         self._label = None
+        self._waveform = None
         self._timer = None
         self._dot_count = 0
         self._updater = None
@@ -171,6 +246,12 @@ class StatusOverlay:
         self._label.setStringValue_("")
         content.addSubview_(self._label)
 
+        self._waveform = _WaveformView.alloc().initWithFrame_(
+            Foundation.NSMakeRect(16, 8, w - 32, 24)
+        )
+        self._waveform.setHidden_(True)
+        content.addSubview_(self._waveform)
+
         # 建立跨執行緒 updater
         self._updater = _Updater.alloc().initWithOverlay_(self)
 
@@ -187,11 +268,13 @@ class StatusOverlay:
     def _do_update(self, status):
         """實際更新 UI（必須在主執行緒）"""
         if status == "recording":
+            self._set_status_layout(recording=True)
             self._label.setStringValue_(self.texts["recording"] + "...")
             self._label.setTextColor_(AppKit.NSColor.whiteColor())
             self._window.orderFront_(None)
             self._start_animation(status)
         elif status == "processing":
+            self._set_status_layout(recording=False)
             self._label.setStringValue_(self.texts["processing"] + "...")
             self._label.setTextColor_(
                 AppKit.NSColor.colorWithCalibratedRed_green_blue_alpha_(0.65, 0.82, 1.0, 1.0)
@@ -199,6 +282,7 @@ class StatusOverlay:
             self._window.orderFront_(None)
             self._start_animation(status)
         elif status == "done":
+            self._set_status_layout(recording=False)
             self._stop_animation()
             # Pipeline 結束 → 清掉 stage 殘留，下次 processing 才不會殘留上輪的 "貼上中"
             self._pending_stage_prefix = None
@@ -212,6 +296,7 @@ class StatusOverlay:
                 1.5, False, lambda t: self._window.orderOut_(None) if self._window else None
             )
         elif status in {"paste_failed", "translation_failed"}:
+            self._set_status_layout(recording=False)
             self._stop_animation()
             self._pending_stage_prefix = None
             self._label.setStringValue_(self.texts[status])
@@ -224,8 +309,52 @@ class StatusOverlay:
             )
         else:  # idle / hide
             self._stop_animation()
+            self._set_status_layout(recording=False)
             self._pending_stage_prefix = None
             self._window.orderOut_(None)
+
+    def _set_status_layout(self, recording=False):
+        """Switch between the compact status pill and live-meter recording pill."""
+        if not self._window or not self._label:
+            return
+        screen = AppKit.NSScreen.mainScreen()
+        if not screen:
+            return
+        sf = screen.frame()
+        w, h = (248, 64) if recording else (180, 40)
+        x = (sf.size.width - w) / 2
+        y = sf.size.height * 0.10
+        self._window.setFrame_display_(Foundation.NSMakeRect(x, y, w, h), False)
+        if recording:
+            self._label.setFrame_(Foundation.NSMakeRect(0, 37, w, 20))
+            self._label.setFont_(
+                AppKit.NSFont.systemFontOfSize_weight_(13, AppKit.NSFontWeightMedium)
+            )
+            if self._waveform:
+                self._waveform.setFrame_(Foundation.NSMakeRect(16, 8, w - 32, 24))
+                self._waveform.setHidden_(False)
+                self._waveform.setActive_(True)
+        else:
+            self._label.setFrame_(Foundation.NSMakeRect(0, 10, w, 20))
+            self._label.setFont_(
+                AppKit.NSFont.systemFontOfSize_weight_(15, AppKit.NSFontWeightMedium)
+            )
+            if self._waveform:
+                self._waveform.setActive_(False)
+                self._waveform.setHidden_(True)
+
+    def update_audio_level(self, level):
+        """Push an ephemeral normalized microphone level from any thread."""
+        if not HAS_APPKIT or not self._window or not self._updater:
+            return
+        if threading.current_thread() is threading.main_thread():
+            self._do_update_audio_level(level)
+        else:
+            self._updater.setAudioLevel_(level)
+
+    def _do_update_audio_level(self, level):
+        if self._waveform:
+            self._waveform.pushLevel_(level)
 
     def _start_animation(self, status):
         """動畫效果：... 跳動。_current_prefix 由 update_stage() 動態更新而不中斷動畫。"""
@@ -288,6 +417,9 @@ class StatusOverlay:
         Pipeline 結束 → 清掉 stage 殘留，下次 processing（例如 Quick-Rewrite）才不會
         從前一次的 "貼上中" 開始顯示。"""
         self._pending_stage_prefix = None
+        if self._waveform:
+            self._waveform.setActive_(False)
+            self._waveform.setHidden_(True)
         snippet = text.strip().replace("\n", " ")
         if len(snippet) > 70:
             snippet = snippet[:68] + "…"

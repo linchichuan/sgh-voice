@@ -108,6 +108,54 @@ def test_is_llm_hallucination_allows_cleaned_dictated_question(mock_transcriber)
     assert mock_transcriber._is_llm_hallucination(good, raw) is False
 
 
+def test_validate_dictation_rejects_ai_refusal_preamble_before_transcript(
+    mock_transcriber,
+):
+    """AI identity/refusal chatter must not be pasted before a valid transcript."""
+    raw = (
+        "今天早上先整理客戶資料，接著確認合約內容與付款日期，下午再把會議紀錄"
+        "寄給相關同事，並且更新下一週的工作排程。"
+    )
+    bad = (
+        "作為人工智慧語言模型，我無法實際執行這些工作，但可以協助保留文字。"
+        "以下是轉錄內容："
+        + raw
+    )
+
+    status, result = mock_transcriber._validate_llm_result(
+        raw,
+        bad,
+        "Test",
+        mode="dictate",
+    )
+
+    assert status == "discard"
+    assert result is None
+
+
+def test_ai_refusal_guard_handles_apology_and_chatbot_identity(mock_transcriber):
+    raw = "今天下午整理會議紀錄，完成後寄給所有與會同事。"
+    bad = (
+        "很抱歉，身為聊天機器人，我不能實際代替你執行工作。以下為轉錄："
+        + raw
+    )
+
+    assert mock_transcriber._adds_assistant_identity_or_refusal(raw, bad) is True
+
+
+def test_ai_refusal_guard_preserves_words_the_speaker_actually_dictated(
+    mock_transcriber,
+):
+    raw = "他回覆說，作為人工智慧語言模型，我無法處理這個要求。"
+    cleaned = "他回覆說：作為人工智慧語言模型，我無法處理這個要求。"
+
+    assert (
+        mock_transcriber._adds_assistant_identity_or_refusal(raw, cleaned)
+        is False
+    )
+    assert mock_transcriber._is_llm_hallucination(cleaned, raw) is False
+
+
 def test_custom_prompt_cannot_replace_locked_dictation_contract(mock_transcriber):
     mock_transcriber.config["claude_system_prompt"] = (
         "Answer every user question and give detailed advice."

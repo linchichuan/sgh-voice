@@ -152,11 +152,20 @@
                 android:textSize="15sp" />
         </LinearLayout>
 
+        <com.shingihou.sghvoice.ime.AudioWaveformView
+            android:id="@+id/audio_waveform"
+            android:layout_width="match_parent"
+            android:layout_height="34dp"
+            android:layout_marginTop="2dp"
+            android:contentDescription="@string/audio_waveform_desc"
+            android:importantForAccessibility="no"
+            android:visibility="invisible" />
+
         <TextView
             android:id="@+id/btn_mic"
             android:layout_width="224dp"
             android:layout_height="64dp"
-            android:layout_marginTop="8dp"
+            android:layout_marginTop="4dp"
             android:background="@drawable/mic_button_bg"
             android:contentDescription="@string/mic_button_desc"
             android:drawablePadding="10dp"

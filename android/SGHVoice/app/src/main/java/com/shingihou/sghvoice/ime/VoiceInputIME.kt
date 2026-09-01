@@ -120,7 +120,16 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
 
         try {
             apiConfig = ApiConfig(this)
-            audioRecorder = AudioRecorder()
+            audioRecorder = AudioRecorder().also { recorder ->
+                recorder.setLevelListener { level ->
+                    val view = keyboardView ?: return@setLevelListener
+                    view.post {
+                        if (keyboardView === view && currentState == ImeState.RECORDING) {
+                            view.setAudioLevel(level)
+                        }
+                    }
+                }
+            }
             dictionaryManager = DictionaryManager(this)
             personalization = PersonalizationRepository.getInstance(this)
             zhuyinLexicon = AndroidZhuyinLexicon(this)

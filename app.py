@@ -779,6 +779,21 @@ class VoiceEngine:
 
             recorder_started = False
             try:
+                # Keep audio feedback tied to this exact recording token.  A
+                # late PortAudio callback from an older stream must never move
+                # the waveform for a newer recording.
+                set_level_listener = getattr(
+                    self.recorder,
+                    "set_level_listener",
+                    None,
+                )
+                if callable(set_level_listener):
+                    set_level_listener(
+                        lambda level, _ts=recording_token: self._on_recording_level(
+                            level,
+                            _ts,
+                        )
+                    )
                 # on_error：stream 開啟失敗（PortAudio 裝置清單過期等）時由 recorder
                 # thread 回呼。閉包鎖定本段 token，避免 callback 晚到時誤殺新錄音。
                 # on_done：recorder 自己偵測到 PTT 連續靜音達門檻並在 _record_loop
@@ -892,6 +907,7 @@ class VoiceEngine:
             except TranslationError as exc:
                 log("warn", f"翻譯目標無效: {exc}")
                 return False
+
         with self._state_lock:
             token = self._record_start_ts
             if not self.is_recording or token not in self._active_recording_tokens:
@@ -916,6 +932,23 @@ class VoiceEngine:
             else "錄音意圖切換為一般口述",
         )
         return True
+
+    def _on_recording_level(self, level, recording_token):
+        """Forward microphone energy only while its recording is current."""
+        with self._state_lock:
+            if not (
+                self.is_recording
+                and self._record_start_ts == recording_token
+                and recording_token in self._active_recording_tokens
+            ):
+                return
+        update_level = getattr(self.overlay, "update_audio_level", None)
+        if callable(update_level):
+            try:
+                update_level(level)
+            except Exception:
+                # Audio feedback is informative; it must not break capture.
+                pass
 
     def active_recording_intent(self):
         with self._state_lock:
@@ -1930,10 +1963,32 @@ class VoiceEngine:
         def _on_voice(is_voice):
             if cancel_event.is_set():
                 return
-            try:
-                self.overlay.show("recording" if is_voice else "idle")
-            except Exception:
-                pass
+            # Continuous listening stays visibly active while silent.  The
+            # waveform becomes a flat baseline instead of disappearing, so
+            # users can distinguish "listening, no sound" from "not running".
+            if not is_voice:
+                update_level = getattr(self.overlay, "update_audio_level", None)
+                if callable(update_level):
+                    try:
+                        update_level(0.0)
+                    except Exception:
+                        pass
+
+        def _on_level(level):
+            with self._state_lock:
+                is_current = (
+                    not cancel_event.is_set()
+                    and getattr(self, "_continuous_active", False)
+                    and self._continuous_cancel_event is cancel_event
+                )
+            if not is_current:
+                return
+            update_level = getattr(self.overlay, "update_audio_level", None)
+            if callable(update_level):
+                try:
+                    update_level(level)
+                except Exception:
+                    pass
 
         def _on_stopped():
             # 連續模式 stream 死亡（麥克風被拔 / PortAudioError）時的自動復原：
@@ -1975,6 +2030,13 @@ class VoiceEngine:
                 cancel_event = threading.Event()
                 self._continuous_cancel_event = cancel_event
             try:
+                set_level_listener = getattr(
+                    self.recorder,
+                    "set_level_listener",
+                    None,
+                )
+                if callable(set_level_listener):
+                    set_level_listener(_on_level)
                 started = self.recorder.start_continuous(
                     on_segment=_on_segment,
                     on_voice_change=_on_voice,

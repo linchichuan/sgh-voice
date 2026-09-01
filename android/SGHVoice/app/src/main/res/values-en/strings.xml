@@ -29,6 +29,7 @@
     <string name="status_idle">Tap to start speaking</string>
     <string name="status_starting">Preparing microphone…</string>
     <string name="status_recording">Recording — tap again to send</string>
+    <string name="audio_waveform_desc">Live microphone level waveform</string>
     <string name="status_stopping">Finishing recording…</string>
     <string name="status_processing">Processing…</string>
     <string name="status_done">Done</string>
