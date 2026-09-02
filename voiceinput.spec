@@ -11,7 +11,17 @@ _target_arch = os.environ.get(
     'SGH_PYI_TARGET_ARCH',
     'arm64' if platform.machine() == 'arm64' else 'x86_64',
 )
-_build_version = os.environ.get('SGH_BUILD_VERSION', '2.7.0')
+def _read_app_version():
+    # 版本唯一來源是 config.py 的 APP_VERSION；這裡不硬編 fallback，
+    # 否則 build 產物會再度出現「殼 2.7.0、內容 2.7.4」的矛盾。
+    import re
+    with open(os.path.join(os.path.dirname(os.path.abspath('voiceinput.spec')), 'config.py'), encoding='utf-8') as _f:
+        _m = re.search(r'^APP_VERSION\s*=\s*"([^"]+)"', _f.read(), re.M)
+    if not _m:
+        raise SystemExit('voiceinput.spec: config.py 找不到 APP_VERSION')
+    return _m.group(1)
+
+_build_version = os.environ.get('SGH_BUILD_VERSION') or _read_app_version()
 
 block_cipher = None
 

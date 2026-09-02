@@ -559,3 +559,18 @@ def test_app_version_is_single_sourced_from_config():
 
     assert app.APP_VERSION is config.APP_VERSION
     assert dashboard.APP_VERSION is config.APP_VERSION
+
+
+def test_index_html_has_no_hardcoded_version_literal():
+    """Dashboard header 的版本 badge 曾硬編 "v2.7.0"（Python 端統一
+    APP_VERSION 後仍顯示舊版）。index.html 一律不得含版本字面值；badge
+    由 app.js 打 /api/feedback/meta 動態填入。"""
+    import re
+    from pathlib import Path
+
+    html = (Path(__file__).parent.parent / "static" / "index.html").read_text(
+        encoding="utf-8"
+    )
+    hits = re.findall(r"v\d+\.\d+\.\d+", html)
+    assert hits == [], f"index.html 含硬編版本字串: {hits}"
+    assert 'id="app-version"' in html

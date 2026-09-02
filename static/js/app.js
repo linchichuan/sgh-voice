@@ -260,6 +260,19 @@ async function shouldRedirectToOnboarding() {
   }
 }
 
+// header 的版本 badge 由 /api/feedback/meta 動態填入——index.html 不得再硬編
+// 版本字串（test_dashboard_b1_b2_b3 有守門測試）。
+async function loadAppVersion() {
+  const el = document.getElementById('app-version');
+  if (!el) return;
+  try {
+    const meta = await api.getFeedbackMeta();
+    if (meta && meta.app_version) el.textContent = `v${meta.app_version}`;
+  } catch {
+    // 拿不到就留白，不顯示過時的猜測值
+  }
+}
+
 // ---------- Boot ----------
 window.addEventListener('hashchange', mount);
 window.addEventListener('load', async () => {
@@ -273,6 +286,7 @@ window.addEventListener('load', async () => {
 
   await mount();
   initRecordingPolling();
+  loadAppVersion();
   loadServiceStatus();
   // refresh service status every 30s
   setInterval(loadServiceStatus, 30000);
