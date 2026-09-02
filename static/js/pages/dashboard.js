@@ -4,7 +4,7 @@
 
 import * as api from '../lib/api.js';
 import { t } from '../lib/i18n.js';
-import { h, classes, Stat, Toast } from '../lib/components.js';
+import { h, classes, Stat, Toast, Button } from '../lib/components.js';
 
 const REDUCE_MOTION = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const HOTKEY_LABELS = {
@@ -297,16 +297,179 @@ function RecentList(items) {
   return h('section', { class: 'col-span-12 ' + classes.card }, head, h('ul', null, rows));
 }
 
+// ---------- Insights heatmap (B2) ----------
+function heatOpacity(count, max) {
+  if (!count) return '1'; // count===0 cells use the muted surface color below, opacity is moot
+  if (max <= 0) return '1';
+  const ratio = count / max;
+  if (ratio > 0.75) return '1';
+  if (ratio > 0.5) return '0.75';
+  if (ratio > 0.25) return '0.5';
+  return '0.3';
+}
+
+// Renders a GitHub-style week×day heatmap from backend `daily_counts`
+// ([{date:'YYYY-MM-DD', count, future}], oldest→newest, already week-aligned
+// Sunday→Saturday and padded to exactly weeks*7 entries — see
+// memory.py:get_activity_summary()). The grid's date range and "is this cell
+// in the future" decision both come straight from the backend; this used to
+// recompute `today`/`endOfWeek` client-side too, which only matched the
+// server's window when today happened to be a Saturday — any other day of
+// the week silently dropped the oldest few days of real data and padded in
+// extra "future" cells. Plain divs + CSS vars only, no chart library.
+function InsightsHeatmap(dailyCounts, weeks) {
+  const cells = (dailyCounts || []).map((d) => ({
+    date: d.date,
+    count: Number(d.count) || 0,
+    future: !!d.future,
+  }));
+
+  const maxCount = Math.max(0, ...cells.map((c) => c.count));
+
+  const cols = [];
+  for (let w = 0; w < weeks; w++) {
+    cols.push(cells.slice(w * 7, w * 7 + 7));
+  }
+
+  const grid = h('div', {
+    class: 'flex gap-[3px] overflow-x-auto pb-1',
+    role: 'img',
+    'aria-label': t('dash.insights.title'),
+  },
+    cols.map((col) => h('div', { class: 'flex flex-col gap-[3px]' },
+      col.map((cell) => (
+        !cell || cell.future
+          ? h('span', { class: 'w-[11px] h-[11px] rounded-[2px]', 'aria-hidden': 'true' })
+          : h('span', {
+            class: 'w-[11px] h-[11px] rounded-[2px]',
+            style: {
+              background: cell.count ? 'var(--brand-blue)' : 'var(--surface-2)',
+              opacity: cell.count ? heatOpacity(cell.count, maxCount) : '1',
+            },
+            title: t('dash.insights.heatmap.tooltip', { date: cell.date, n: cell.count }),
+          })
+      )),
+    )),
+  );
+
+  const legend = h('div', { class: 'mt-2 flex items-center gap-1.5 text-xs text-[var(--text-3)]' },
+    h('span', null, t('dash.insights.legend.less')),
+    h('span', { class: 'w-[11px] h-[11px] rounded-[2px]', style: { background: 'var(--surface-2)' } }),
+    ...[0.3, 0.5, 0.75, 1].map((op) => h('span', {
+      class: 'w-[11px] h-[11px] rounded-[2px]',
+      style: { background: 'var(--brand-blue)', opacity: String(op) },
+    })),
+    h('span', null, t('dash.insights.legend.more')),
+  );
+
+  return h('div', null, grid, legend);
+}
+
+function InsightsCard(insights) {
+  insights = insights || {};
+  const dailyCounts = Array.isArray(insights.daily_counts) ? insights.daily_counts : [];
+  const weeks = Number(insights.weeks) || 26;
+  const hasData = dailyCounts.some((d) => Number(d.count) > 0);
+
+  return h('section', { class: 'col-span-12 ' + classes.card },
+    h('header', { class: 'mb-4' },
+      h('h2', { class: 'text-lg font-semibold text-[var(--text)]' }, t('dash.insights.title')),
+    ),
+    h('div', { class: 'grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5' },
+      h('div', null, Stat({
+        label: t('dash.insights.streak.current'),
+        value: `${fmtNumber(insights.current_streak_days || 0)} ${t('dash.insights.unit.days')}`,
+        icon: 'flame', accent: 'orange',
+      })),
+      h('div', null, Stat({
+        label: t('dash.insights.streak.longest'),
+        value: `${fmtNumber(insights.longest_streak_days || 0)} ${t('dash.insights.unit.days')}`,
+        icon: 'trophy', accent: 'purple',
+      })),
+      h('div', null, Stat({
+        label: t('dash.insights.active_days'),
+        value: fmtNumber(insights.total_active_days || 0),
+        icon: 'calendar-check', accent: 'blue',
+      })),
+    ),
+    hasData
+      ? InsightsHeatmap(dailyCounts, weeks)
+      : h('div', { class: 'py-10 text-center text-sm text-[var(--text-3)]' }, t('dash.insights.heatmap.empty')),
+  );
+}
+
+// ---------- Feedback (B3) ----------
+const FEEDBACK_CATEGORIES = ['bug', 'suggestion', 'other'];
+
+function FeedbackCard(appVersion) {
+  const version = appVersion || '';
+  const textarea = h('textarea', {
+    class: classes.input + ' min-h-[6rem] resize-y',
+    placeholder: t('feedback.message.placeholder'),
+  });
+  const categorySel = h('select', { class: classes.input },
+    ...FEEDBACK_CATEGORIES.map((c) => h('option', { value: c }, t(`feedback.category.${c}`))),
+  );
+
+  // mailto is a plain link the user clicks themselves — this page never sends
+  // anything over the network on its own besides the local-save POST below.
+  const mailLink = h('a', { class: 'text-sm text-[var(--brand-blue)] hover:underline', href: '#' }, t('feedback.mailto.label'));
+  const updateMailto = () => {
+    const category = categorySel.value;
+    const subject = t('feedback.mailto.subject', { version, category: t(`feedback.category.${category}`) });
+    mailLink.setAttribute('href', `mailto:service@shingihou.com?subject=${encodeURIComponent(subject)}`);
+  };
+  categorySel.addEventListener('change', updateMailto);
+  updateMailto();
+
+  const submitBtn = Button({
+    variant: 'primary',
+    icon: 'send',
+    label: t('feedback.submit'),
+    onClick: async () => {
+      const message = textarea.value.trim();
+      if (!message) { Toast({ message: t('feedback.error.empty'), type: 'error' }); return; }
+      try {
+        await api.submitFeedback({ category: categorySel.value, message });
+        textarea.value = '';
+        Toast({ message: t('feedback.submitted'), type: 'success' });
+      } catch (e) {
+        Toast({ message: e.message || t('toast.error'), type: 'error' });
+      }
+    },
+  });
+
+  return h('section', { class: 'col-span-12 ' + classes.card },
+    h('header', { class: 'mb-3' },
+      h('h2', { class: 'text-lg font-semibold text-[var(--text)]' }, t('feedback.title')),
+      h('p', { class: 'text-sm text-[var(--text-3)] mt-1' }, t('feedback.desc')),
+    ),
+    h('div', { class: 'space-y-3 max-w-2xl' },
+      h('div', null,
+        h('label', { class: classes.label }, t('feedback.category.label')),
+        categorySel,
+      ),
+      textarea,
+      h('div', { class: 'flex items-center justify-between gap-3 flex-wrap' },
+        submitBtn,
+        mailLink,
+      ),
+    ),
+  );
+}
+
 // ---------- Mount ----------
 export default async function mount(slot) {
   const grid = h('div', { class: 'grid grid-cols-12 gap-4 p-6 max-w-7xl mx-auto' });
   slot.appendChild(grid);
 
-  const [statsRes, recRes, histRes, configRes] = await Promise.allSettled([
+  const [statsRes, recRes, histRes, configRes, insightsRes, feedbackMetaRes] = await Promise.allSettled([
     api.getStats(),
     api.getRecordingStatus(),
     api.getHistory({ n: 5 }),
     api.getConfig(),
+    api.getInsights(),
+    api.getFeedbackMeta(),
   ]);
 
   const statsPayload   = statsRes.status === 'fulfilled' ? (statsRes.value || {}) : {};
@@ -319,6 +482,8 @@ export default async function mount(slot) {
   const history        = histRes.status === 'fulfilled' && Array.isArray(histRes.value) ? histRes.value : [];
   const lastIso        = history.length ? (history[history.length - 1].timestamp || null) : null;
   const hotkey         = configRes.status === 'fulfilled' ? configRes.value?.hotkey : '';
+  const insights       = insightsRes.status === 'fulfilled' ? insightsRes.value : null;
+  const appVersion     = feedbackMetaRes.status === 'fulfilled' ? feedbackMetaRes.value?.app_version : '';
 
   let currentState = initialRecState;
   let cta;
@@ -352,7 +517,9 @@ export default async function mount(slot) {
   grid.appendChild(StatsRow(stats, monthJpy));
   grid.appendChild(BarChart7d(stats));
   grid.appendChild(PersonalizationCard(personalization));
+  grid.appendChild(InsightsCard(insights));
   grid.appendChild(RecentList(history));
+  grid.appendChild(FeedbackCard(appVersion));
 
   // Sync CTA with global recording state.
   const localPoll = setInterval(async () => {

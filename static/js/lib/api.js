@@ -63,6 +63,7 @@ export const getStats           = ()           => request('GET',  '/api/stats');
 export const getUsage           = ()           => request('GET',  '/api/usage');
 export const getServiceStatus   = ()           => request('GET',  '/api/service-status');
 export const getLatencySummary  = ()           => request('GET',  '/api/latency_summary');
+export const getInsights        = (weeks)      => request('GET',  `/api/insights${weeks ? `?weeks=${encodeURIComponent(weeks)}` : ''}`);
 
 // ---------- History ----------
 // backend reads ?n=NN; accept both n and limit for forward compat between page agents
@@ -93,6 +94,41 @@ export const addAppCorrection           = (body)    => request('POST',   '/api/d
 export const removeAppCorrection        = (body)    => request('DELETE', '/api/dictionary/app_correction', body);
 export const cleanupDictionary          = ()        => request('POST',   '/api/dictionary/cleanup');
 export const promoteFromHistory         = (body)    => request('POST',   '/api/dictionary/promote_from_history', body);
+
+// ---------- Dictionary batch import (B1, multipart — bypasses request()'s JSON body) ----------
+// `excluded` (not `selected`): apply always re-parses the full re-uploaded file and
+// imports everything importable except the words the user explicitly unchecked.
+// Preview only ever shows/lets you check the first 500 rows (see dashboard.py:
+// api_dictionary_import), so a "selected" (inclusion) list could never represent
+// row 501+ and would silently cap large imports at 500. "excluded" defaults every
+// importable word to "included" and only the (small) deselected set is sent.
+async function _dictionaryImportRequest(file, { apply = false, excluded } = {}) {
+  const fd = new FormData();
+  fd.append('file', file, file.name);
+  fd.append('apply', apply ? 'true' : 'false');
+  if (apply && Array.isArray(excluded)) fd.append('excluded', JSON.stringify(excluded));
+
+  let res;
+  try {
+    res = await fetch('/api/dictionary/import', { method: 'POST', body: fd, credentials: 'same-origin' });
+  } catch (e) {
+    const err = new Error(`Network error: ${e.message}`);
+    err.status = 0;
+    err.body = null;
+    throw err;
+  }
+  const payload = await res.json().catch(() => null);
+  if (!res.ok) {
+    const msg = (payload && typeof payload === 'object' && payload.error) || `POST /api/dictionary/import → ${res.status}`;
+    const err = new Error(msg);
+    err.status = res.status;
+    err.body = payload;
+    throw err;
+  }
+  return payload;
+}
+export const previewDictionaryImport = (file)             => _dictionaryImportRequest(file, { apply: false });
+export const applyDictionaryImport   = (file, excluded)   => _dictionaryImportRequest(file, { apply: true, excluded });
 
 // ---------- Smart Replace ----------
 export const getSmartReplace    = ()           => request('GET',  '/api/smart_replace');
@@ -144,6 +180,10 @@ export const regenerateStyleProfile = ()       => request(
   { n: 100, apply: true },
 );
 export const getAuditLog            = ()       => request('GET',  '/api/audit-log');
+
+// ---------- Feedback (B3) ----------
+export const getFeedbackMeta    = ()           => request('GET',  '/api/feedback/meta');
+export const submitFeedback     = (body)       => request('POST', '/api/feedback', body);
 
 // ---------- GDPR ----------
 // v2.4.0：兩步驟 — 先要 token、再帶 token 執行刪除（防 JS 攻擊者直接 wipeAll() bypass UI 守門）

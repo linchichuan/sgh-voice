@@ -46,6 +46,15 @@ class Recorder:
         self._start_time = None
         self._segment_lock = threading.Lock()
         self._segment_condition = threading.Condition(self._segment_lock)
+        # 序列化「動 PortAudio 全域/裝置狀態」的三個路徑：warm_up() 的
+        # open+close、_reinit_portaudio() 的 terminate+initialize、以及真正
+        # 錄音的 _open_input_stream()。Pa_Terminate() 會強制關閉所有仍開著
+        # 的 stream——若跟另一個 thread 正在執行中的 Pa_OpenStream/Close
+        # 重疊，是未定義行為（可能讓整個 PortAudio/process 掛掉）。用 RLock
+        # 是因為 _open_input_stream() 失敗重試時會在持鎖狀態下呼叫
+        # _reinit_portaudio()，需要同一 thread 可重入。見 warm_up() /
+        # _reinit_portaudio() / _open_input_stream() 的個別註解。
+        self._pa_lock = threading.RLock()
         self._pending_segments = 0
         self._next_segment_sequence = 0
         self._next_segment_to_deliver = 0
@@ -55,10 +64,28 @@ class Recorder:
         self._on_error = None
         self._on_done = None
         self._on_level = None
+        # hotkey→first-frame 延遲觀測（見 _record_loop / set_hotkey_press_ts）。
+        self._first_frame_listener = None
+        self._pending_hotkey_ts = None
 
     def set_level_listener(self, listener):
         """Receive normalized 0...1 levels; ``None`` disables feedback."""
         self._on_level = listener if callable(listener) else None
+
+    def set_first_frame_listener(self, listener):
+        """Receive ``elapsed_ms`` (float) — the time between the physical
+        hotkey press (see ``set_hotkey_press_ts``) and the first audio frame
+        actually captured for the recording that follows. ``None`` disables."""
+        self._first_frame_listener = listener if callable(listener) else None
+
+    def set_hotkey_press_ts(self, ts):
+        """Stash the ``time.perf_counter()`` timestamp of the physical hotkey
+        press that is about to trigger ``start()``, so ``_record_loop`` can
+        report keydown→first-frame latency. Call this immediately before every
+        ``start()`` — pass ``None`` for non-hotkey callers (CLI/Dashboard/menu
+        click) so a stale timestamp from an earlier press is never reused.
+        ``_record_loop`` consumes (and clears) this value once per recording."""
+        self._pending_hotkey_ts = ts
 
     def _emit_level(self, level):
         callback = self._on_level
@@ -140,6 +167,12 @@ class Recorder:
         return audio_array, filepath, duration
 
     def _record_loop(self):
+        # 消費（並清空）本段錄音的 hotkey keydown 時間戳，越早越好——thread
+        # 排程本身的延遲也算在「hotkey 按下→第一個 audio frame」量測裡。
+        # None（非熱鍵觸發，如 CLI/Dashboard）時完全跳過量測與 log。
+        hotkey_ts = self._pending_hotkey_ts
+        self._pending_hotkey_ts = None
+
         sr = self.config.get("sample_rate", 16000)
         max_dur = self.config.get("max_recording_duration", 1800)
         silence_threshold = self.config.get("silence_threshold", 0.001)
@@ -147,6 +180,22 @@ class Recorder:
         hotkey_mode = self.config.get("hotkey_mode", "push_to_talk")
         chunk = int(sr * 0.1)
         total = 0
+        # 第一個 0.1s chunk 改用一次小 probe read 取樣，量測/回報用的「第一個
+        # audio frame」時間點才不會被「湊滿 100ms 才回傳」的 blocking read
+        # 拖慢（實測：同一支 InputStream，100ms read 平均 ~110ms 才返回，
+        # 20ms read 平均 ~18ms；差額純粹是量測延遲，音訊本身早已在
+        # PortAudio 的環狀緩衝區內、不會遺失，見 docs/recorder-ptt-latency.md）。
+        # 0 或未設定 → 停用，退回單次 100ms read（相容既有行為 / 測試）。
+        # ⚠️ 刻意不把預設值放這裡：DEFAULT_CONFIG（config.py）才是「正式產品
+        # 預設」；這裡的 fallback=0 是給裸 dict config（測試/嵌入式呼叫端）
+        # 用的保守預設，避免在沒有明確 opt-in 時改變既有 read() 呼叫次數。
+        try:
+            probe_ms = float(self.config.get("recorder_first_frame_probe_ms", 0) or 0)
+        except (TypeError, ValueError):
+            probe_ms = 0
+        probe_frames = 0
+        if probe_ms > 0:
+            probe_frames = max(1, min(chunk - 1, int(round(sr * probe_ms / 1000))))
         # int(x / 0.1) 會因 IEEE-754 截斷（如 int(0.6/0.1)==5 不是 6）；
         # round() 讓「N 秒」實際換算成文件化語意的 chunk 數，不悄悄少一格。
         max_chunks = int(round(max_dur / 0.1))
@@ -197,11 +246,42 @@ class Recorder:
             with stream:
                 while not self._stop_event.is_set() and total < max_chunks:
                     try:
-                        data, _ = stream.read(chunk)
+                        if total == 0 and probe_frames and probe_frames < chunk:
+                            # 先讀一小段（predefined probe_frames），標記「第一個
+                            # audio frame 已捕捉」的真實時間點，再讀完這個 0.1s
+                            # chunk 剩下的部分；兩段合併後跟平常單次 100ms read
+                            # 拿到的陣列逐 byte 相同，VAD/RMS/chunk 計數完全不變。
+                            probe, _ = stream.read(probe_frames)
+                            first_frame_ts = time.perf_counter()
+                            try:
+                                rest, _ = stream.read(chunk - probe_frames)
+                            except sd.PortAudioError as e:
+                                print(f" ⚠️ PortAudio read error: {e}")
+                                stream_error = e
+                                # probe 已經成功讀到、只有 remainder 這半段失敗
+                                # ——已到手的音訊（往往就是使用者開口的第一個
+                                # 字）不能因為後半段 read 出錯就被默默丟棄。
+                                self.audio_data.append(probe.copy())
+                                break
+                            data = np.concatenate([probe, rest], axis=0)
+                        else:
+                            data, _ = stream.read(chunk)
+                            if total == 0:
+                                first_frame_ts = time.perf_counter()
                     except sd.PortAudioError as e:
                         print(f" ⚠️ PortAudio read error: {e}")
                         stream_error = e
                         break
+                    if total == 0 and hotkey_ts is not None:
+                        elapsed_ms = (first_frame_ts - hotkey_ts) * 1000
+                        print(f" ⚡ hotkey→第一個 audio frame: {elapsed_ms:.0f}ms")
+                        listener = self._first_frame_listener
+                        if listener is not None:
+                            try:
+                                listener(elapsed_ms)
+                            except Exception:
+                                # 純觀測用途，絕不能打斷錄音。
+                                pass
                     self.audio_data.append(data.copy())
                     total += 1
 
@@ -259,25 +339,143 @@ class Recorder:
         PortAudio 內部的裝置清單會過期 — 之後每次 Pa_OpenStream 都失敗且
         永遠不會自癒，唯一解法是 Pa_Terminate + Pa_Initialize 刷新。
         2026-06-13 實際案例：app 長跑 + 凌晨裝置變更後，每段錄音都收到
-        0 個 chunk，使用者只看到「錄音中…」之後毫無下文。"""
-        kwargs = dict(samplerate=sr, channels=1, dtype="float32", blocksize=chunk)
+        0 個 chunk，使用者只看到「錄音中…」之後毫無下文。
+
+        latency 明確傳 'low'（可由 config 覆寫）：sounddevice 預設是
+        'high'，會用裝置的 default_high_input_latency 排一顆較大的緩衝。
+        實測（本機 webcam mic, 2026-09）：open()/start() 本身耗時不受影響，
+        但緩衝越小，PortAudio 內部越早有資料可讀。"""
+        kwargs = dict(
+            samplerate=sr, channels=1, dtype="float32", blocksize=chunk,
+            latency=self._resolve_input_latency(),
+        )
+        # 熱鍵路徑：非阻塞地確認 warm_up()/_reinit_portaudio() 有沒有正在動
+        # PortAudio 全域狀態。平常這個鎖是空的，acquire 幾乎零成本，不拖慢
+        # 熱鍵；只有真的被搶線（warm-up 剛好在跑）才等一個很短、有界的時間
+        # ——warm_up() 的 open+close 沒有任何人工延遲，最壞情況只有 app 剛
+        # 啟動的第一次冷啟動 open（實測 300-900ms）。寧可等這一下，也不要
+        # 讓自己的 Pa_OpenStream 跟 _reinit_portaudio() 的 Pa_Terminate()（或
+        # 另一個 warm-up 的 Pa_OpenStream）同時發生。拿不到鎖也不放棄開
+        # 錄音——recording 優先權高於預熱，不能讓 warm-up 卡住使用者錄音。
+        got_lock = self._pa_lock.acquire(timeout=0.05)
         try:
-            return sd.InputStream(**kwargs)
-        except sd.PortAudioError as e:
-            print(f" ⚠️ InputStream 開啟失敗（{e}），重新初始化 PortAudio 後重試…")
-            self._reinit_portaudio()
-            return sd.InputStream(**kwargs)
+            try:
+                return sd.InputStream(**kwargs)
+            except sd.PortAudioError as e:
+                print(f" ⚠️ InputStream 開啟失敗（{e}），重新初始化 PortAudio 後重試…")
+                self._reinit_portaudio()
+                return sd.InputStream(**kwargs)
+        finally:
+            if got_lock:
+                self._pa_lock.release()
+
+    def _resolve_input_latency(self):
+        """讀取 config.recorder_input_latency（'low' | 'high'），非法值一律
+        安全退回 'low' 並印出警告，不讓錄音因設定錯誤而開不了 stream。"""
+        raw = self.config.get("recorder_input_latency", "low")
+        if isinstance(raw, str) and raw.strip().lower() in ("low", "high"):
+            return raw.strip().lower()
+        print(f" ⚠️ recorder_input_latency 設定無效（{raw!r}），退回 'low'")
+        return "low"
 
     def _reinit_portaudio(self):
         """刷新 PortAudio 裝置清單。只能在沒有任何 stream 開著時呼叫
         （Pa_Terminate 會強制關閉所有 stream）— 本 class 同時間只有一個
-        錄音 thread，呼叫點都在 stream 已關閉/開啟失敗之後，安全。"""
+        錄音 thread，呼叫點都在 stream 已關閉/開啟失敗之後，安全。
+
+        ⚠️ 但「本 thread 自己的 stream」安全，不代表跟*另一個* thread 的
+        warm_up() 安全：warm_up_async() 會在背景 thread 呼叫 sd.InputStream()
+        （見該方法），如果這裡的 sd._terminate() 跟它同時發生，等於在另一個
+        thread 還在用 PortAudio 的全域/裝置狀態時把它整個拆掉——未定義行為，
+        可能讓整個 PortAudio/process 掛掉。用 self._pa_lock 跟 warm_up() 互斥
+        （blocking 等待可以接受：這條路徑本來就是 stream 開失敗/中斷後的
+        錯誤復原，不是熱鍵路徑，warm_up() 的臨界區也很短）。
+
+        Pa_Terminate/Pa_Initialize 會讓 process 對 coreaudiod 的連線回到
+        「未熱身」狀態（見 warm_up() docstring 的實測數據）；重新初始化成功後
+        補一次背景 warm-up，避免使用者下一次按熱鍵時重新吃到 cold-start
+        的開流延遲。warm_up_async() 本身不啟動任何 stream（不會點亮麥克風
+        使用指示），失敗也只是印警告，不影響裝置清單已刷新的結果。刻意在
+        釋放鎖之後才呼叫（它會自己重新 acquire），避免新 warm-up thread 一
+        啟動就卡在等鎖。"""
+        ok = False
+        with self._pa_lock:
+            try:
+                sd._terminate()
+                sd._initialize()
+                print(" 🔄 PortAudio 已重新初始化（音訊裝置清單已刷新）")
+                ok = True
+            except Exception as e:
+                print(f" ⚠️ PortAudio 重新初始化失敗: {e}")
+        if ok:
+            self.warm_up_async()
+
+    def warm_up(self):
+        """預熱 PortAudio/CoreAudio 的裝置協商路徑，但**絕不啟動音訊擷取**。
+
+        背景（2026-09 實測，見 docs/recorder-ptt-latency.md）：同一個
+        process 內第一次 ``sd.InputStream(...)``（Pa_OpenStream）平均耗時
+        300–900ms；之後每次重開只要 35–90ms。這個「冷啟動稅」只需要付一次
+        （即使中間關閉 stream、隔數十秒再開，「熱」的狀態仍會保留），所以
+        在 app 啟動時（或 PortAudio 被 _reinit_portaudio() 刷新後）主動
+        open()+close() 一次可以把這筆成本從「使用者第一次按熱鍵」搬到
+        「App 啟動當下」，且完全不需要保留一個常駐的 input stream：
+        ``Pa_OpenStream`` 只協商格式/配置緩衝，並不會呼叫
+        ``Pa_StartStream``（不會觸發 CoreAudio 的 IO engine），因此 macOS
+        選單列的麥克風使用指示（橘點）不會被點亮，也不構成「idle 時持續
+        開啟音訊輸入 stream」。
+
+        Config: enable_recorder_prewarm（預設 True）關閉此行為；純粹
+        best-effort，任何失敗都只印警告、不拋例外、不影響後續真正錄音
+        （錄音路徑有自己完整的重試/自癒邏輯，見 _open_input_stream）。
+
+        併發安全：跟真正錄音（_open_input_stream）與 _reinit_portaudio() 共用
+        self._pa_lock。(a) 錄音已在進行/即將開始就直接跳過——沒有意義再開
+        一個預熱用的 stream，而且會平白製造一次不必要的並行 Pa_OpenStream；
+        (b) 用非阻塞 acquire，搶不到鎖（代表 _reinit_portaudio() 或另一個
+        warm-up 正在動 PortAudio）就直接放棄本次——warm-up 本來就是
+        best-effort，沒有任何一次呼叫非成功不可，不值得等待或製造競爭。"""
+        if sd is None:
+            return False
+        if not self.config.get("enable_recorder_prewarm", True):
+            return False
+        if self.is_recording:
+            return False
+        if not self._pa_lock.acquire(blocking=False):
+            return False
         try:
-            sd._terminate()
-            sd._initialize()
-            print(" 🔄 PortAudio 已重新初始化（音訊裝置清單已刷新）")
-        except Exception as e:
-            print(f" ⚠️ PortAudio 重新初始化失敗: {e}")
+            # 拿到鎖之後再確認一次：拿鎖前到拿到鎖之間，錄音有可能剛好開始。
+            if self.is_recording:
+                return False
+            stream = None
+            try:
+                sr = self.config.get("sample_rate", 16000)
+                chunk = int(sr * 0.1)
+                try:
+                    stream = sd.InputStream(
+                        samplerate=sr, channels=1, dtype="float32", blocksize=chunk,
+                        latency=self._resolve_input_latency(),
+                    )
+                finally:
+                    # close() 一定要嘗試：即使未來這裡在 open 之後、close 之前
+                    # 插入新程式碼並拋例外，也不能讓 stream 停留在打開狀態。
+                    if stream is not None:
+                        try:
+                            stream.close()
+                        except Exception:
+                            pass
+                print(" 🔥 PortAudio 已預熱（未啟動串流，麥克風未啟用）")
+                return True
+            except Exception as e:
+                print(f" ⚠️ PortAudio 預熱失敗（不影響正常錄音，下次熱鍵會正常重試開流）: {e}")
+                return False
+        finally:
+            self._pa_lock.release()
+
+    def warm_up_async(self):
+        """warm_up() 的背景執行版本；呼叫端（app 啟動 / _reinit_portaudio）
+        不應被這個 best-effort 動作卡住。"""
+        threading.Thread(target=self.warm_up, daemon=True, name="recorder-warmup").start()
 
     def _save(self, audio_array=None):
         """儲存音訊檔（供 fallback 和 SSD 備份使用）。

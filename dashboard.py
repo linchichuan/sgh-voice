@@ -7,7 +7,7 @@ import sys
 import json
 import config as config_store
 from flask import Flask, request, jsonify, send_from_directory, Response
-from config import ConfigSaveError, load_config, save_config, load_stats, update_stats, load_smart_replace, save_smart_replace, DEFAULT_APP_STYLES, BASE_CORRECTIONS as BASE_CORRECTIONS_REF, KEYCHAIN_KEYS, _keychain_available, _keychain_delete
+from config import APP_VERSION, ConfigSaveError, load_config, save_config, load_stats, update_stats, load_smart_replace, save_smart_replace, DEFAULT_APP_STYLES, BASE_CORRECTIONS as BASE_CORRECTIONS_REF, KEYCHAIN_KEYS, _keychain_available, _keychain_delete
 from memory import Memory
 from multilingual import (
     convert_traditional_preserving_japanese,
@@ -474,6 +474,14 @@ def api_clear_history():
     return jsonify({"ok": True})
 
 
+@app.route("/api/insights")
+def api_insights():
+    """B2：使用洞察前台化 — 目前連續天數 / 最長連續天數 / 累計活躍天數 /
+    近 12–26 週每日次數（GitHub 風格熱點圖用）。純本機聚合，不含逐字稿內容。"""
+    weeks = request.args.get("weeks", 26)
+    return jsonify(memory.get_activity_summary(weeks=weeks))
+
+
 @app.route("/api/dictionary")
 def api_dictionary():
     """支援 ?layer=global|scene:medical|app:com.apple.mail 切換檢視。
@@ -555,6 +563,169 @@ def api_remove_word():
     if word:
         memory.remove_custom_word(word)
     return jsonify({"ok": True})
+
+
+_DICTIONARY_IMPORT_MAX_BYTES = 2 * 1024 * 1024  # 2MB — generous for a personal word list
+# 詞彙裡不該出現的控制字元（含換行/回車/NUL/其他 C0 控制碼與 DEL）。CSV 欄位可以
+# 用引號包住換行（合法 CSV 語法），.strip() 只清掉頭尾空白、清不掉字串中間的這些
+# 字元；混進詞庫或之後被當成 Whisper prompt/UI 顯示內容都不安全，一律歸類 invalid。
+import re as _re
+_CONTROL_CHAR_RE = _re.compile(r'[\x00-\x1f\x7f]')
+
+
+@app.route("/api/dictionary/import", methods=["POST"])
+def api_dictionary_import():
+    """B1：字典批次匯入（.txt 一行一詞 / .csv 第一欄為詞，其餘欄忽略）。
+
+    兩段式，仿照 promote_from_history 的 apply=false/true 模式：
+    - apply=false（預設）：只解析＋分類，不寫入，回傳 preview（截斷顯示前
+      500/200 筆，counts 仍是全量）。
+    - apply=true：重新上傳同一個檔案、全量重解析，對每一筆 importable
+      （排除 excluded 明確指定的詞）呼叫 memory.add_custom_word()——與單筆
+      新增（POST /api/dictionary/word）走同一條程式路徑，不另寫一套解析/
+      驗證邏輯，因此守門語意（去重）完全一致。
+
+    ⚠️ 語意是「排除清單」不是「選取清單」：preview 只能顯示/勾選前 500 筆，
+    若用「selected=使用者勾選的詞」，使用者對第 501 筆以後（從未顯示過）的
+    詞完全無從勾選，apply 時這些詞就會被排除清單邏輯永遠排除在外、靜默
+    漏匯入——即使使用者本來是想「全部匯入，只有手動取消勾選的極少數除
+    外」。改成「excluded=使用者主動取消勾選的詞」（通常很小、幾乎不會超過
+    500 筆），語意上預設是「全部匯入」，使用者的取消勾選才是例外，不管
+    excluded 有沒有涵蓋第 500 筆以後都不影響「其餘全部匯入」這個預期。
+
+    Multipart form fields: file（必填）、apply（"true"/"false"，預設 false）、
+    excluded（apply=true 時可選，JSON array of words；未提供或空陣列＝
+    全部 importable 都匯入；excluded 內若有檔案中不存在的詞，直接忽略，
+    不視為錯誤）。
+    """
+    if "file" not in request.files:
+        return jsonify({"ok": False, "error": "沒有上傳檔案", "code": "missing_file"}), 400
+    upload = request.files["file"]
+    filename = upload.filename or ""
+    ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+    if ext not in {"txt", "csv"}:
+        return jsonify({
+            "ok": False,
+            "error": "只支援 .txt 或 .csv 檔案",
+            "code": "unsupported_type",
+        }), 400
+
+    # 最多讀 MAX+1 bytes 就能判定「是否超限」，不必先把整個（可能巨大的）
+    # 檔案讀進記憶體才檢查長度——upload 是 werkzeug FileStorage，read(n) 會
+    # proxy 到底層 stream.read(n)，不會被逼著一次吃下整檔。
+    raw = upload.read(_DICTIONARY_IMPORT_MAX_BYTES + 1)
+    if not raw:
+        return jsonify({"ok": False, "error": "檔案是空的", "code": "empty_file"}), 400
+    if len(raw) > _DICTIONARY_IMPORT_MAX_BYTES:
+        return jsonify({
+            "ok": False,
+            "error": f"檔案過大（上限 {_DICTIONARY_IMPORT_MAX_BYTES // (1024 * 1024)}MB）",
+            "code": "too_large",
+        }), 400
+    try:
+        text = raw.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        return jsonify({
+            "ok": False,
+            "error": "檔案編碼有誤，請另存為 UTF-8 文字檔",
+            "code": "bad_encoding",
+        }), 400
+
+    candidates = []
+    if ext == "csv":
+        import csv
+        import io
+        try:
+            # strict=True：CSV 語法本身有問題（例如未終止的引號欄位）直接
+            # 回錯誤，不要讓 csv 模組默默用寬鬆規則猜著解析。
+            for row in csv.reader(io.StringIO(text), strict=True):
+                if row:
+                    candidates.append(row[0])
+        except csv.Error:
+            return jsonify({"ok": False, "error": "CSV 格式無法解析", "code": "bad_csv"}), 400
+    else:
+        candidates = text.splitlines()
+
+    if not any((c or "").strip() for c in candidates):
+        return jsonify({"ok": False, "error": "檔案是空的", "code": "empty_file"}), 400
+
+    apply_flag = str(request.form.get("apply", "false")).strip().lower() in {"1", "true", "yes"}
+    excluded_set = set()
+    if apply_flag:
+        excluded_raw = request.form.get("excluded")
+        if excluded_raw:
+            try:
+                excluded_list = json.loads(excluded_raw)
+            except (TypeError, ValueError):
+                return jsonify({
+                    "ok": False, "error": "excluded must be a JSON array of strings",
+                    "code": "invalid_excluded",
+                }), 400
+            if not isinstance(excluded_list, list) or not all(isinstance(x, str) for x in excluded_list):
+                return jsonify({
+                    "ok": False, "error": "excluded must be a JSON array of strings",
+                    "code": "invalid_excluded",
+                }), 400
+            # excluded 內若有檔案中不存在的詞，之後比對時自然無效果——不需要
+            # 特別驗證/報錯，這是刻意的（見上方 docstring）。
+            excluded_set = set(excluded_list)
+
+    # 與單筆新增同一個真實來源比對，確保「重跑匯入不產生重複」。
+    existing_manual = set(memory.get_dictionary_words().get("manual_added", []))
+    seen_in_file = set()
+    importable, duplicates, imported = [], [], []
+    invalid_count = 0
+
+    write_blocked = False
+    for raw_word in candidates:
+        word = (raw_word or "").strip()
+        if not word or _CONTROL_CHAR_RE.search(word):
+            invalid_count += 1
+            continue
+        if word in existing_manual or word in seen_in_file:
+            duplicates.append(word)
+            continue
+        seen_in_file.add(word)
+        importable.append(word)
+        if apply_flag and word not in excluded_set:
+            # 唯一寫入路徑：與 POST /api/dictionary/word 完全相同的 memory 方法。
+            # add_custom_word() 回傳 False 在這裡只可能代表 save_dictionary()
+            # 寫入失敗（word 不會是既有重複——existing_manual/seen_in_file 已
+            # 濾掉），最常見原因是 wipe_all 正在進行、runtime_data_write_guard
+            # 擋下寫入；這種情況不能回報「已匯入」。
+            if memory.add_custom_word(word):
+                imported.append(word)
+                existing_manual.add(word)
+            else:
+                write_blocked = True
+
+    counts = {
+        "importable": len(importable),
+        "duplicates": len(duplicates),
+        "invalid": invalid_count,
+    }
+    if apply_flag and write_blocked:
+        return jsonify({
+            "ok": False,
+            "applied": apply_flag,
+            "filename": filename,
+            "counts": counts,
+            "importable": importable[:500],
+            "duplicates": duplicates[:200],
+            "imported": imported,
+            "error": "資料清除進行中，暫時無法寫入詞庫；已成功匯入的詞彙不受影響，其餘請稍後再試一次",
+            "code": "wipe_not_quiescent",
+        }), 503
+
+    return jsonify({
+        "ok": True,
+        "applied": apply_flag,
+        "filename": filename,
+        "counts": counts,
+        "importable": importable[:500],
+        "duplicates": duplicates[:200],
+        "imported": imported,
+    })
 
 
 @app.route("/api/dictionary/correction", methods=["POST"])
@@ -939,6 +1110,95 @@ def api_audit_log():
         return jsonify(entries)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+import threading as _threading
+_FEEDBACK_LOCK = _threading.Lock()
+
+
+def _append_feedback_entry(entry):
+    """B3：append-only 寫入 ~/.voice-input/feedback.jsonl（0700 目錄 / 0600 檔案），
+    仿照 event_ledger.py 的本機 append 慣例。**不對外發送任何內容**——
+    寄信是使用者自己點 mailto 連結完成的動作，這裡只落地本機檔案。
+    回傳 False 代表資料刪除（wipe_all）已封鎖寫入，caller 需回 503。
+
+    fail-closed：目錄/檔案的權限收緊（chmod/fchmod）失敗、或 feedback_path
+    是 symlink（O_NOFOLLOW），都不可以吞掉例外後繼續寫——那樣會把使用者
+    填寫的內容寫進權限不對、或不受控制的目的地。任何一步失敗都讓例外往上
+    傳，caller 沒有 try/except，Flask 會回 500，而不是靜默「寫成功」。"""
+    with config_store.runtime_data_write_guard() as allowed:
+        if not allowed:
+            return False
+        with _FEEDBACK_LOCK:
+            feedback_path = os.path.join(config_store.DATA_DIR, "feedback.jsonl")
+            parent = os.path.dirname(feedback_path)
+            os.makedirs(parent, mode=0o700, exist_ok=True)
+            os.chmod(parent, 0o700)
+            # O_NOFOLLOW：feedback_path 若被換成指向別處的 symlink，直接失敗
+            # （ELOOP）而不是跟著連結寫到未預期的檔案。
+            fd = os.open(
+                feedback_path,
+                os.O_WRONLY | os.O_CREAT | os.O_APPEND | os.O_NOFOLLOW,
+                0o600,
+            )
+            try:
+                # fchmod（對已開啟的 fd）而非 chmod（對路徑）：避免 open()
+                # 之後、chmod 之前的 TOCTOU 窗口；失敗就整段放棄，不要在權限
+                # 沒收緊的檔案上繼續寫。
+                os.fchmod(fd, 0o600)
+            except Exception:
+                os.close(fd)
+                raise
+            with os.fdopen(fd, "a", encoding="utf-8") as fh:
+                fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
+        return True
+
+
+_FEEDBACK_CATEGORIES = {"bug", "suggestion", "other"}
+
+
+@app.route("/api/feedback", methods=["POST"])
+def api_add_feedback():
+    """B3：app 內回饋入口。只寫入本機 feedback.jsonl，絕不主動對外送出任何內容。"""
+    body = request.get_json(force=True, silent=True) or {}
+    category = body.get("category", "")
+    message = body.get("message", "")
+    if category not in _FEEDBACK_CATEGORIES:
+        return jsonify({
+            "ok": False,
+            "error": "category must be one of bug, suggestion, other",
+            "code": "invalid_category",
+        }), 400
+    if not isinstance(message, str) or not message.strip():
+        return jsonify({"ok": False, "error": "message is required", "code": "empty_message"}), 400
+    message = message.strip()
+    if len(message) > 4000:
+        return jsonify({
+            "ok": False,
+            "error": "message must be 4000 characters or fewer",
+            "code": "message_too_long",
+        }), 400
+
+    from datetime import datetime as _datetime
+    entry = {
+        "ts": _datetime.now().isoformat(timespec="seconds"),
+        "category": category,
+        "message": message,
+        "app_version": APP_VERSION,
+    }
+    if not _append_feedback_entry(entry):
+        return jsonify({
+            "ok": False,
+            "error": "local write blocked (data wipe in progress)",
+            "code": "wipe_not_quiescent",
+        }), 503
+    return jsonify({"ok": True})
+
+
+@app.route("/api/feedback/meta")
+def api_feedback_meta():
+    """B3：提供前端組 mailto 連結主旨用的 app 版本號。"""
+    return jsonify({"app_version": APP_VERSION})
 
 
 @app.route("/api/latency_summary")

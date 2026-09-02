@@ -173,6 +173,7 @@ import argparse
 import webbrowser
 
 from config import (
+    APP_VERSION,
     load_config,
     register_audio_backup,
     save_config,
@@ -598,11 +599,19 @@ class VoiceEngine:
     """語音輸入核心引擎，被 CLI / MenuBar / Dashboard 共用"""
 
     def __init__(self):
-        self.version = "2.7.0"
+        self.version = APP_VERSION
         self.config = load_config()
         self.memory = Memory()
         self.transcriber = Transcriber(self.config, self.memory)
         self.recorder = Recorder(self.config)
+        set_first_frame_listener = getattr(self.recorder, "set_first_frame_listener", None)
+        if callable(set_first_frame_listener):
+            set_first_frame_listener(self._on_first_frame_captured)
+        # 熱鍵按下的 perf_counter 時間戳，供 start_recording() 轉交給
+        # recorder 計算「hotkey 按下→第一個 audio frame」延遲。只由
+        # setup_hotkey() 的按下瞬間寫入、只由 start_recording() 讀取後清空，
+        # 避免舊值誤植到非熱鍵觸發的錄音（CLI/Dashboard/選單點擊）。
+        self._hotkey_press_perf_ts = None
         self.overlay = StatusOverlay()
         self.is_recording = False
         self.is_processing = False
@@ -794,6 +803,17 @@ class VoiceEngine:
                             _ts,
                         )
                     )
+                # 把本段錄音的 hotkey keydown 時間戳轉交給 recorder（只在
+                # from_hotkey=True 且 setup_hotkey() 真的寫過值時才非 None），
+                # 讓 _record_loop 能算出「hotkey 按下→第一個 audio frame」。
+                # 讀完立刻清空，避免下一段非熱鍵觸發的錄音誤用舊值。
+                hotkey_press_ts = None
+                if from_hotkey:
+                    hotkey_press_ts = getattr(self, "_hotkey_press_perf_ts", None)
+                self._hotkey_press_perf_ts = None
+                set_hotkey_ts = getattr(self.recorder, "set_hotkey_press_ts", None)
+                if callable(set_hotkey_ts):
+                    set_hotkey_ts(hotkey_press_ts)
                 # on_error：stream 開啟失敗（PortAudio 裝置清單過期等）時由 recorder
                 # thread 回呼。閉包鎖定本段 token，避免 callback 晚到時誤殺新錄音。
                 # on_done：recorder 自己偵測到 PTT 連續靜音達門檻並在 _record_loop
@@ -949,6 +969,12 @@ class VoiceEngine:
             except Exception:
                 # Audio feedback is informative; it must not break capture.
                 pass
+
+    def _on_first_frame_captured(self, elapsed_ms):
+        """recorder 回呼：本段錄音「hotkey 按下→第一個 audio frame」的實測
+        毫秒數（見 recorder.py:_record_loop / set_hotkey_press_ts）。純觀測，
+        跑在 recorder 的背景 thread 上，只能做無鎖、不拋例外的輕量動作。"""
+        log("info", f"⚡ hotkey→首個音框: {elapsed_ms:.0f}ms")
 
     def active_recording_intent(self):
         with self._state_lock:
@@ -2349,6 +2375,11 @@ def setup_hotkey(engine):
         if mode == "push_to_talk":
             if active_recording_kind is None and physical_kind is not None:
                 if not engine.is_recording:
+                    # 按鍵瞬間的時間戳，供 start_recording() 轉交給 recorder
+                    # 量測「hotkey 按下→第一個 audio frame」。純觀測用途，
+                    # 不影響任何錄音邏輯；engine 是 duck-typed（測試會塞假
+                    # Engine），設一個未使用的屬性對它們無害。
+                    engine._hotkey_press_perf_ts = time.perf_counter()
                     if physical_kind == "translate":
                         started = engine.start_recording(
                             from_hotkey=True,
@@ -2399,6 +2430,7 @@ def setup_hotkey(engine):
                         daemon=True,
                     ).start()
                 else:
+                    engine._hotkey_press_perf_ts = time.perf_counter()
                     if physical_kind == "translate":
                         engine.start_recording(
                             from_hotkey=True,
@@ -2932,6 +2964,11 @@ def _setup_hotkey_pynput(engine):
         if mode == "push_to_talk":
             if active_recording_kind is None and physical_kind is not None:
                 if not engine.is_recording:
+                    # 按鍵瞬間的時間戳，供 start_recording() 轉交給 recorder
+                    # 量測「hotkey 按下→第一個 audio frame」。純觀測用途，
+                    # 不影響任何錄音邏輯；engine 是 duck-typed（測試會塞假
+                    # Engine），設一個未使用的屬性對它們無害。
+                    engine._hotkey_press_perf_ts = time.perf_counter()
                     if physical_kind == "translate":
                         started = engine.start_recording(
                             from_hotkey=True,
@@ -2974,6 +3011,7 @@ def _setup_hotkey_pynput(engine):
                     daemon=True,
                 ).start()
             else:
+                engine._hotkey_press_perf_ts = time.perf_counter()
                 if physical_kind == "translate":
                     engine.start_recording(
                         from_hotkey=True,
@@ -3232,6 +3270,11 @@ def run_menubar():
 
     engine = VoiceEngine()
     _register_engine_for_cleanup(engine)
+    # 背景預熱 PortAudio（開流不啟動，麥克風不會亮）：把第一次按熱鍵才會
+    # 付的「冷啟動」開流延遲（實測 300-900ms）提前搬到 App 啟動當下，跟
+    # 下面的輔助使用權限檢查等其他啟動工作平行跑，不拖慢選單列出現的時間。
+    # 見 recorder.py:Recorder.warm_up()。
+    engine.recorder.warm_up_async()
     config = engine.config
 
     # 啟動時檢查輔助使用權限（自動貼上必需）

@@ -398,13 +398,20 @@ class Memory:
 
     @_dictionary_synchronized
     def add_custom_word(self, word):
-        """手動新增詞彙到詞庫"""
+        """手動新增詞彙到詞庫。回傳 True 只代表「已加入且成功落盤」——
+        save_dictionary() 在 wipe_all 進行中會回 False 而不拋例外，這裡若
+        不檢查回傳值，就會把只存在記憶體、實際上沒寫進磁碟的字回報成功
+        （呼叫端如 dashboard.py 的批次匯入會照這個回傳值算「已匯入」）。
+        寫入失敗時把剛加進 RAM 的項目復原，維持「回傳 True 才是真的存在」
+        的不變量。"""
         manual = self.dictionary.setdefault("manual_added", [])
-        if word not in manual:
-            manual.append(word)
-            save_dictionary(self.dictionary)
-            return True
-        return False
+        if word in manual:
+            return False
+        manual.append(word)
+        if not save_dictionary(self.dictionary):
+            manual.remove(word)
+            return False
+        return True
 
     @_dictionary_synchronized
     def add_auto_word(self, word):
@@ -706,3 +713,86 @@ class Memory:
             self.history = []
             save_history(self.history)
             self._history_write_count = 0
+
+    # ─── B2: Usage Insights（連續天數 / 熱點圖）───────────────
+
+    def get_activity_summary(self, weeks=26):
+        """使用洞察（Typeless v2.3 式）：目前連續天數、最長連續天數、累計活躍
+        天數、近 N 週每日次數（GitHub 風格熱點圖用）。
+
+        只聚合 timestamp 的日期部分（YYYY-MM-DD），從不外洩逐字稿內容。
+        ``weeks`` 限制在 12–26 之間（過短沒意義、過長熱點圖會太寬）。
+        """
+        from datetime import date, timedelta
+
+        try:
+            weeks = int(weeks)
+        except (TypeError, ValueError):
+            weeks = 26
+        weeks = max(12, min(26, weeks))
+
+        with self._history_lock:
+            items = list(self.history)
+
+        counts = {}
+        for h in items:
+            ts = (h.get("timestamp") or "")[:10]
+            if len(ts) != 10:
+                continue
+            counts[ts] = counts.get(ts, 0) + 1
+
+        # 最長連續天數：對所有已知活躍日期排序後掃描連續 run（全歷史，不限熱點圖視窗）
+        longest_streak = 0
+        parsed_dates = []
+        for key in counts:
+            try:
+                parsed_dates.append(date.fromisoformat(key))
+            except ValueError:
+                continue
+        parsed_dates.sort()
+        run = 0
+        prev = None
+        for d in parsed_dates:
+            run = run + 1 if (prev is not None and (d - prev).days == 1) else 1
+            longest_streak = max(longest_streak, run)
+            prev = d
+
+        # 目前連續天數：從今天往回數；今天還沒使用時，允許從昨天起算（habit-tracker
+        # 慣例——用戶還沒到今天結束前，連續紀錄不算斷）。
+        today = date.today()
+        cursor = today if today.isoformat() in counts else today - timedelta(days=1)
+        current_streak = 0
+        while cursor.isoformat() in counts:
+            current_streak += 1
+            cursor -= timedelta(days=1)
+
+        # 熱點圖視窗：對齊到「週」（週日為週起點，GitHub 熱點圖慣例），從
+        # 「本週六」往回數 weeks*7 天到「對齊的週日」，回傳整個週日→週六網格。
+        # ⚠️ 之前是固定回溯 182 天、由前端自己再算一次「補到本週六」的網格——
+        # 兩邊只有在「今天剛好是週六」時起訖點才會一致；其餘 6/7 的日子，
+        # 前端算出的視窗會比後端這裡晚 1-6 天，導致視窗最舊的幾天（後端有算
+        # 但前端範圍之外）被悄悄漏顯示，尾端又補出使用者根本還沒發生的
+        # 「未來」格。這裡把週對齊算好、連本週尚未到來的日子也一起回傳
+        # （count 一律 0，並標記 future=True），前端只管照陣列順序切格，
+        # 不再自己重算日期範圍。
+        days_since_sunday = (today.weekday() + 1) % 7  # Python Monday=0…Sunday=6
+        end_of_week = today + timedelta(days=6 - days_since_sunday)  # 本週六（可能是未來）
+        window_start = end_of_week - timedelta(days=weeks * 7 - 1)   # 對齊的週日
+        daily_counts = []
+        for i in range(weeks * 7):
+            d = window_start + timedelta(days=i)
+            key = d.isoformat()
+            is_future = d > today
+            daily_counts.append({
+                "date": key,
+                "count": 0 if is_future else counts.get(key, 0),
+                "future": is_future,
+            })
+
+        return {
+            "current_streak_days": current_streak,
+            "longest_streak_days": longest_streak,
+            "total_active_days": len(counts),
+            "weeks": weeks,
+            "daily_counts": daily_counts,
+        }

@@ -225,3 +225,37 @@ def test_history_is_persisted_immediately(empty_memory, isolated_data_dir):
     with open(isolated_data_dir / "history.json", "r", encoding="utf-8") as handle:
         saved = json.load(handle)
     assert saved[-1] == entry
+
+
+# ───── add_custom_word: 回傳值必須等於「真的落盤」───────────────
+
+def test_add_custom_word_returns_true_and_persists(empty_memory, isolated_data_dir):
+    import json
+
+    assert empty_memory.add_custom_word("Claude") is True
+    assert "Claude" in empty_memory.get_dictionary_words()["manual_added"]
+    with open(isolated_data_dir / "dictionary.json", "r", encoding="utf-8") as handle:
+        saved = json.load(handle)
+    assert "Claude" in saved["manual_added"]
+
+
+def test_add_custom_word_returns_false_for_existing_word_without_rewriting(empty_memory):
+    assert empty_memory.add_custom_word("Claude") is True
+    assert empty_memory.add_custom_word("Claude") is False
+    assert empty_memory.get_dictionary_words()["manual_added"].count("Claude") == 1
+
+
+def test_add_custom_word_rolls_back_in_memory_state_when_save_fails(empty_memory):
+    """save_dictionary() 在 wipe_all 進行中會回 False 而不拋例外——
+    add_custom_word() 若不檢查回傳值，會把只存在 RAM、實際上沒有落盤的字
+    回報成功給呼叫端（例如 dashboard.py 的批次匯入會照這個回傳值算「已
+    匯入」）。這裡直接封鎖 runtime data writes 模擬 wipe 進行中，驗證：
+    (a) 回傳 False，(b) 剛加進去的字從記憶體復原，不留半吊子狀態。"""
+    import config as config_store
+
+    config_store.block_runtime_data_writes()
+    try:
+        assert empty_memory.add_custom_word("Claude") is False
+    finally:
+        config_store.resume_runtime_data_writes()
+    assert "Claude" not in empty_memory.get_dictionary_words()["manual_added"]

@@ -4,8 +4,11 @@ import { h, classes, Button, EmptyState } from '../../lib/components.js';
 import { t } from '../../lib/i18n.js';
 import * as api from '../../lib/api.js';
 import { Section, LabeledInput, confirmRemove, filterStrings, toastOk, toastErr } from './util.js';
+import { openImportModal } from './import-modal.js';
 
 export default async function mount(container) {
+  container.replaceChildren(); // safe to call again after B1 import applies (see importBtn below)
+
   // Fetch fresh data so this tab reflects latest server state.
   let payload;
   try { payload = await api.getDictionary(); }
@@ -94,6 +97,15 @@ export default async function mount(container) {
   });
   wordInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') addBtn.click(); });
 
+  // B1: batch import (.txt / .csv) — opens a preview/apply modal; re-mounts this
+  // tab on success so imported words + existing state reflect the server's truth.
+  const importBtn = Button({
+    variant: 'outline',
+    icon: 'upload',
+    label: t('dict.action.import'),
+    onClick: () => openImportModal(() => mount(container)),
+  });
+
   // Search row.
   const { wrap: searchWrap, input: searchInput } = LabeledInput({
     label: t('dict.placeholder.search'),
@@ -106,7 +118,7 @@ export default async function mount(container) {
     title: t('dict.tab.words'),
     headerRight: h('div', { class: 'min-w-[10rem]' }, searchWrap),
     children: [
-      h('div', { class: 'flex gap-2 items-end' }, wordWrap, addBtn),
+      h('div', { class: 'flex gap-2 items-end' }, wordWrap, addBtn, importBtn),
       listHost,
     ],
   });

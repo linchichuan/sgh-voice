@@ -23,6 +23,14 @@ from hotkey_config import (
     RECOMMENDED_TRANSLATION_HOTKEY,
 )
 
+# App 發行版本號的單一來源。CHANGELOG.md 是人類可讀的版本紀錄（本輪任務禁止
+# 改動），這裡是程式碼唯一該讀取版本號的地方——app.py（CLI banner）與
+# dashboard.py（/api/feedback、/api/feedback/meta 的 mailto 主旨）都應該
+# `from config import APP_VERSION`，不要各自硬編一份字串（曾經各寫各的，
+# app.py 停在 2.7.0、dashboard.py 已到 2.7.4，兩邊回報的版本互相矛盾）。
+# 手動與 CHANGELOG.md 最新版本同步。
+APP_VERSION = "2.7.4"
+
 # 跨 thread 序列化 stats.json 的 read-modify-write，避免 update_stats 與 _track_usage race
 _STATS_LOCK = threading.RLock()
 _AUDIO_BACKUP_MANIFEST_LOCK = threading.RLock()
@@ -710,6 +718,10 @@ DEFAULT_CONFIG = {
     # 上限。門檻刻意設寬鬆（120s），確保不會誤切正常口述中的長停頓。
     # 0 或 None（falsy）= 停用；只在 hotkey_mode=="push_to_talk" 生效。
     "ptt_silence_autostop_seconds": 120,
+    # PTT 啟動延遲最佳化（2026-09）：見 docs/recorder-ptt-latency.md
+    "enable_recorder_prewarm": True,        # App 啟動/裝置刷新後背景預熱 PortAudio（只 open+close，不啟動串流，不會點亮麥克風指示）
+    "recorder_input_latency": "low",        # 傳給 sd.InputStream 的 latency（low/high）；low 用裝置最小緩衝，縮短可讀資料的等待
+    "recorder_first_frame_probe_ms": 20,    # 錄音第一個 0.1s chunk 先用小 probe read 取樣，讓「hotkey按下→第一個音框」的量測與回饋更準；0=停用（退回單次 100ms read）
     "auto_paste": True,
     "show_notification": True,
     "typing_speed_cpm": 50,                 # 用戶打字速度（每分鐘字元數，中文約 30-60）
@@ -744,6 +756,7 @@ _CONFIG_NUMERIC_BOUNDS = {
     "silence_threshold": (0, 1),
     "silence_duration": (0.1, 60),
     "ptt_silence_autostop_seconds": (0, 3600),
+    "recorder_first_frame_probe_ms": (0, 100),
     "hybrid_audio_threshold": (0.1, 3600),
     "hybrid_text_threshold": (0, 1_000_000),
     "llm_timeout_sec": (0.1, 600),
