@@ -40,8 +40,8 @@
     <string name="status_learning_saved">端末内で学習しました「%1$s → %2$s」</string>
     <string name="status_learning_disabled">この入力欄では個人学習が無効です</string>
     <string name="mic_action_start">音声入力を開始</string>
-    <string name="mic_action_recording">停止して文字に変換</string>
-    <string name="mic_action_translation_recording">停止して翻訳</string>
+    <string name="mic_action_recording">完了して入力</string>
+    <string name="mic_action_translation_recording">完了して翻訳</string>
     <string name="mic_action_processing">文字に変換中…</string>
     <string name="voice_toggle_hint">タップで音声入力、長押しで1～4言語の翻訳先を選択</string>
     <string name="translation_picker_title">翻訳先を選択（1～4言語）</string>

@@ -4,13 +4,13 @@
 
 ## Current Android test release
 
-- Version: 2.7.4 (version code 24)
+- Version: 2.7.5 (version code 25)
 - Platform: Android 8.0 or later
 - Distribution status: personal test build, distributed as a versioned APK from the official SGH Voice website
 - Google Play status: not currently published through Google Play Production
-- Download: https://voice.shingihou.com/downloads/SGHVoice-Android-v2.7.4.apk
-- File size: 16.53 MiB (17,327,757 bytes)
-- SHA-256: 3469b5b9fc52bc373af8f2a256f668d88acbd3020198dcb703d2065556e7b7cd
+- Download: https://voice.shingihou.com/downloads/SGHVoice-Android-v2.7.5.apk
+- File size: 16.53 MiB (17,328,877 bytes)
+- SHA-256: bc77b7ac7486039ba0f2733d171974868d0bbd35c1a8adda4525580b121c6054
 - App price: free
 - Cloud usage: BYOK; OpenAI, Anthropic, or Groq usage charges may apply
 
@@ -37,7 +37,7 @@
 ### Android limitations and installation notice
 
 - This APK is a sideloaded personal test build, not a public Google Play release
-- Existing 2.7.3 installations can update directly because 2.7.4 uses the same package name and signing certificate; users should not uninstall first
+- Existing 2.7.3 installations can update directly because 2.7.5 uses the same package name and signing certificate; users should not uninstall first
 - Android requires the user to allow installation from the browser or file manager used for the download
 - Compatibility and stability can vary by device; users should evaluate sideloading risks before installation
 - Keep Google Play Protect enabled

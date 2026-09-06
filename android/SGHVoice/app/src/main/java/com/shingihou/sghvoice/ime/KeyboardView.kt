@@ -210,6 +210,16 @@ class KeyboardView @JvmOverloads constructor(
         micButton.setText(R.string.mic_action_translation_recording)
         micButton.contentDescription =
             context.getString(R.string.translation_recording_mic_desc)
+        micButton.setCompoundDrawablesRelativeWithIntrinsicBounds(
+            R.drawable.ic_check,
+            0,
+            0,
+            0
+        )
+        TextViewCompat.setCompoundDrawableTintList(
+            micButton,
+            ColorStateList.valueOf(ContextCompat.getColor(context, R.color.mic_text_recording))
+        )
     }
 
     fun showTranslationPanel(targets: List<TranslationLanguage>) {
@@ -321,8 +331,9 @@ class KeyboardView @JvmOverloads constructor(
                     enabled = true,
                     colorRes = R.color.mic_bg_recording,
                     labelRes = R.string.mic_action_recording,
-                    iconRes = R.drawable.ic_stop,
-                    dotColorRes = R.color.status_dot_recording
+                    iconRes = R.drawable.ic_check,
+                    dotColorRes = R.color.status_dot_recording,
+                    contentColorRes = R.color.mic_text_recording
                 )
             }
 
@@ -902,7 +913,8 @@ class KeyboardView @JvmOverloads constructor(
         colorRes: Int,
         labelRes: Int,
         iconRes: Int,
-        dotColorRes: Int
+        dotColorRes: Int,
+        contentColorRes: Int = R.color.mic_icon
     ) {
         micButton.isEnabled = enabled
         micButton.alpha = 1f
@@ -912,9 +924,10 @@ class KeyboardView @JvmOverloads constructor(
         TextViewCompat.setCompoundDrawableTintList(
             micButton,
             ColorStateList.valueOf(
-                ContextCompat.getColor(context, R.color.mic_icon)
+                ContextCompat.getColor(context, contentColorRes)
             )
         )
+        micButton.setTextColor(ContextCompat.getColor(context, contentColorRes))
         micButton.backgroundTintList = ColorStateList.valueOf(
             ContextCompat.getColor(context, colorRes)
         )

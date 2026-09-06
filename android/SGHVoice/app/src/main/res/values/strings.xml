@@ -40,8 +40,8 @@
     <string name="status_learning_saved">已在本機學習「%1$s → %2$s」</string>
     <string name="status_learning_disabled">此欄位已停用個人化學習</string>
     <string name="mic_action_start">開始說話</string>
-    <string name="mic_action_recording">停止並轉成文字</string>
-    <string name="mic_action_translation_recording">停止並翻譯</string>
+    <string name="mic_action_recording">完成並輸入</string>
+    <string name="mic_action_translation_recording">完成並翻譯</string>
     <string name="mic_action_processing">正在轉成文字…</string>
     <string name="voice_toggle_hint">點按一般口述；長按選擇 1–4 種翻譯語言</string>
     <string name="translation_picker_title">選擇翻譯目標（可複選 1–4 種）</string>

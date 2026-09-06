@@ -30,18 +30,21 @@
 
     <!-- 麥克風按鈕色彩 -->
     <color name="mic_bg">#202434</color>
-    <color name="mic_bg_recording">#D83B4E</color>
+    <color name="mic_bg_recording">#DDF4E9</color>
     <color name="mic_bg_processing">#72798A</color>
     <color name="mic_icon">#FFFFFF</color>
+    <color name="mic_text_recording">#237A57</color>
 
     <!-- 狀態文字色彩 -->
     <color name="status_text">#3D4352</color>
-    <color name="status_recording">#BE2F41</color>
+    <color name="status_recording">#237A57</color>
     <color name="status_success">#23845A</color>
     <color name="status_dot_idle">#8D96A8</color>
     <color name="status_dot_processing">#6674D9</color>
-    <color name="status_dot_recording">#D83B4E</color>
+    <color name="status_dot_recording">#35A875</color>
     <color name="status_dot_success">#23845A</color>
-    <color name="waveform_baseline">#C7CDD8</color>
-    <color name="waveform_active">#D83B4E</color>
+    <color name="waveform_baseline">#A8D5BE</color>
+    <color name="waveform_active">#35A875</color>
+    <color name="waveform_surface">#F0FBF5</color>
+    <color name="waveform_surface_border">#B9E4CB</color>
 </resources>

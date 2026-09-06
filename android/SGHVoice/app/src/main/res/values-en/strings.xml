@@ -40,8 +40,8 @@
     <string name="status_learning_saved">Learned locally: “%1$s → %2$s”</string>
     <string name="status_learning_disabled">Personalized learning is disabled for this field</string>
     <string name="mic_action_start">Start speaking</string>
-    <string name="mic_action_recording">Stop and convert</string>
-    <string name="mic_action_translation_recording">Stop and translate</string>
+    <string name="mic_action_recording">Finish and insert</string>
+    <string name="mic_action_translation_recording">Finish and translate</string>
     <string name="mic_action_processing">Converting to text…</string>
     <string name="voice_toggle_hint">Tap to dictate; press and hold to choose 1–4 translation languages</string>
     <string name="translation_picker_title">Translation targets (choose 1–4)</string>
