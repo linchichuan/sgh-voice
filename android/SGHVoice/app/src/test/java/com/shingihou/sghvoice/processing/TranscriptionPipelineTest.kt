@@ -50,9 +50,11 @@ class TranscriptionPipelineTest {
         `when`(dictionaryManager.applyCorrections("我的公司是新義豊，在 Fukuoka。"))
             .thenReturn("我的公司是新義豊，在 Fukuoka。")
         `when`(dictionaryManager.getSceneSystemPromptExtra()).thenReturn("")
+        `when`(dictionaryManager.buildLlmVocabularyHint(any(), any())).thenReturn("[]")
         
         // 3. 模擬 LLM 潤稿：加上標點、去填充詞
-        `when`(llmClient.postProcess("我的公司是新義豊，在fukuoka。", "")).thenReturn("我的公司是新義豊，在 Fukuoka。")
+        `when`(llmClient.refineDictation("我的公司是新義豊，在fukuoka。", "", "[]"))
+            .thenReturn(LlmClient.RefinementResult("我的公司是新義豊，在 Fukuoka。", LlmClient.RefinementStatus.APPLIED))
 
         // 執行管線
         val result = pipeline.process(rawWav)
@@ -60,6 +62,7 @@ class TranscriptionPipelineTest {
         // 4. 驗證結果 (OpenCC 會將 "Fukuoka" 保持原樣，並確保中文部分正確)
         assertEquals("我的公司是新義豊，在 Fukuoka。", result.text)
         assertEquals(true, result.success)
+        assertEquals(LlmClient.RefinementStatus.APPLIED, result.refinementStatus)
     }
 
     @Test

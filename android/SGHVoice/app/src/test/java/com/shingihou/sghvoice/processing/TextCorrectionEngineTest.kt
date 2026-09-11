@@ -30,6 +30,17 @@ class TextCorrectionEngineTest {
     }
 
     @Test
+    fun `ascii names can touch cjk but must not replace part of a longer english phrase`() {
+        assertEquals(
+            "請用GitHub推送，git hubby 不要改，cloud coder 也不要改。",
+            TextCorrectionEngine.apply(
+                "請用github推送，git hubby 不要改，cloud coder 也不要改。",
+                mapOf("github" to "GitHub", "git hub" to "GitHub", "cloud code" to "Claude Code")
+            )
+        )
+    }
+
+    @Test
     fun `cjk correction can match inside a sentence`() {
         assertEquals(
             "這是語音辨識測試",

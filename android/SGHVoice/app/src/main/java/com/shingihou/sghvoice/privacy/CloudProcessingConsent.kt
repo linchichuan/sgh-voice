@@ -8,7 +8,7 @@ package com.shingihou.sghvoice.privacy
  * value must always fail closed before recording starts.
  */
 object CloudProcessingConsent {
-    const val CURRENT_VERSION = 2
+    const val CURRENT_VERSION = 3
 
     fun isAccepted(storedVersion: Int?): Boolean =
         storedVersion != null && storedVersion >= CURRENT_VERSION

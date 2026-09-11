@@ -11,7 +11,14 @@ import org.json.JSONObject
  * 管理自訂詞彙與修正規則，用於提升辨識精確度
  * 以最長匹配優先原則進行詞彙修正
  */
-class DictionaryManager(context: Context) {
+class DictionaryManager internal constructor(
+    private val prefs: SharedPreferences,
+    personalizationProvider: () -> PersonalizationRepository
+) {
+    constructor(context: Context) : this(
+        context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE),
+        { PersonalizationRepository.getInstance(context.applicationContext) }
+    )
 
     companion object {
         private const val PREF_NAME = "sgh_voice_dictionary"
@@ -102,9 +109,8 @@ class DictionaryManager(context: Context) {
         )
     }
 
-    private val prefs: SharedPreferences =
-        context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
-    private val personalization = PersonalizationRepository.getInstance(context)
+    // A denied field must not initialize/read the learned repository just to build a prompt.
+    private val personalization by lazy(personalizationProvider)
 
     /** 自訂詞彙清單（用於 Whisper prompt 提升辨識率） */
     private var customWords: MutableList<String> = mutableListOf()
@@ -124,17 +130,32 @@ class DictionaryManager(context: Context) {
 
     /**
      * 建立 Whisper 提示詞
-     * 合併基礎詞庫 + 場景詞彙 + 使用者自訂詞彙，幫助 Whisper 辨識專有名詞
-     * 上限 50 個（醫療術語較多）
+     * 合併使用者詞彙、人工修正學到的完整詞與場景詞彙，幫助 Whisper 辨識專有名詞。
+     * 最多 50 個完整詞、800 字元。
      */
-    fun buildWhisperPrompt(): String {
+    fun buildWhisperPrompt(includePersonalization: Boolean = false): String {
         refreshFromDisk()
         val sceneWords = SCENE_PRESETS[activeScene]?.customWords ?: emptyList()
-        // 使用者明確加入的詞應優先於大型場景詞庫，避免在 50 詞上限前被截掉。
-        val allWords = (customWords + sceneWords + BASE_CUSTOM_WORDS).toSet().take(50)
-        if (allWords.isEmpty()) return ""
-        val prompt = allWords.joinToString("、")
-        return if (prompt.length > 800) prompt.take(800) else prompt
+        return VocabularyHintPolicy.buildWhisperPrompt(
+            customWords = customWords + corrections.values,
+            learnedWords = if (includePersonalization) personalization.getPromptWords(limit = 50) else emptyList(),
+            sceneWords = sceneWords,
+            baseWords = BASE_CUSTOM_WORDS
+        )
+    }
+
+    /** 拼字參考 JSON；只讀人工新增／人工編輯確認的詞，不把 AI 輸出寫回詞庫。 */
+    fun buildLlmVocabularyHint(text: String, includePersonalization: Boolean = false): String {
+        refreshFromDisk()
+        val scene = SCENE_PRESETS[activeScene]
+        return VocabularyHintPolicy.buildLlmVocabularyHint(
+            text = text,
+            customWords = customWords + corrections.values,
+            learnedWords = if (includePersonalization) personalization.getPromptWords(limit = 50) else emptyList(),
+            sceneWords = scene?.customWords ?: emptyList(),
+            baseWords = BASE_CUSTOM_WORDS,
+            corrections = BASE_CORRECTIONS + (scene?.corrections ?: emptyMap()) + corrections
+        )
     }
 
     /**
@@ -145,21 +166,21 @@ class DictionaryManager(context: Context) {
      * @param text 需要修正的文字
      * @return 修正後的文字
      */
-    fun applyCorrections(text: String): String {
+    fun applyCorrections(text: String, includePersonalization: Boolean = false): String {
         refreshFromDisk()
         val sceneCorrections = SCENE_PRESETS[activeScene]?.corrections ?: emptyMap()
         val learnedCorrections = linkedMapOf<String, String>().apply {
             // Repository 已依信心、證據與最近使用排序；同一錯字只採最高順位。
-            personalization.getActiveVoiceCorrections().forEach { rule ->
-                putIfAbsent(rule.wrongText, rule.correctedText)
+            if (includePersonalization && personalization.isEnabled()) {
+                personalization.getActiveVoiceCorrections().forEach { rule ->
+                    putIfAbsent(rule.wrongText, rule.correctedText)
+                }
             }
         }
-        // 合併修正規則：自動學習 > 使用者自訂 > 場景 > 基底
+        // 合併修正規則：人工編輯學習 > 使用者自訂 > 場景 > 基底
         val merged = BASE_CORRECTIONS + sceneCorrections + corrections + learnedCorrections
-        if (merged.isEmpty()) return text
-
         // 單次由左至右掃描可避免 A→B、B→C 產生非預期連鎖替換。
-        return TextCorrectionEngine.apply(text, merged)
+        return VocabularyHintPolicy.applyCorrections(text, merged)
     }
 
     /**
@@ -272,18 +293,38 @@ class DictionaryManager(context: Context) {
  * 單次、非連鎖的最長詞彙替換器。獨立成純 Kotlin 物件以便 JVM 測試。
  */
 internal object TextCorrectionEngine {
+    private val literalToken = Regex(
+        "`[^`\\r\\n]+`|(?:https?://|www\\.)[^\\s<>]+|" +
+            "[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}|" +
+            "[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)+|" +
+            "(?:[A-Za-z]:[\\\\/]|(?:\\.\\.?|~)?/)[^\\s<>]+",
+        RegexOption.IGNORE_CASE
+    )
+
     fun apply(text: String, corrections: Map<String, String>): String {
         val sortedCorrections = corrections.entries
             .filter { it.key.isNotEmpty() && it.key != it.value }
             .sortedByDescending { it.key.length }
         if (sortedCorrections.isEmpty()) return text
+        val protectedRanges = literalRanges(text)
 
         return buildString(text.length) {
             var offset = 0
+            var rangeIndex = 0
             while (offset < text.length) {
+                while (rangeIndex < protectedRanges.size && protectedRanges[rangeIndex].last < offset) {
+                    rangeIndex += 1
+                }
+                val protectedRange = protectedRanges.getOrNull(rangeIndex)
+                if (protectedRange != null && offset in protectedRange) {
+                    append(text, offset, protectedRange.last + 1)
+                    offset = protectedRange.last + 1
+                    continue
+                }
                 val match = sortedCorrections.firstOrNull { (wrong, _) ->
                     text.regionMatches(offset, wrong, 0, wrong.length) &&
-                        hasSafeAsciiWordBoundary(text, offset, wrong)
+                        hasSafeAsciiWordBoundary(text, offset, wrong) &&
+                        (protectedRange == null || offset + wrong.length <= protectedRange.first)
                 }
                 if (match == null) {
                     append(text[offset])
@@ -296,17 +337,37 @@ internal object TextCorrectionEngine {
         }
     }
 
-    /**
-     * 純 ASCII 英數詞必須落在單字邊界，避免例如 `cloud` 誤改
-     * `cloudflare`。中日文規則維持連續字串比對。
-     */
+    internal fun containsUnprotectedTerm(text: String, word: String): Boolean {
+        if (word.isEmpty()) return false
+        val protectedRanges = literalRanges(text)
+        var start = text.indexOf(word, ignoreCase = true)
+        while (start >= 0) {
+            if (hasSafeAsciiWordBoundary(text, start, word) &&
+                protectedRanges.none { start <= it.last && start + word.length > it.first }
+            ) return true
+            start = text.indexOf(word, start + 1, ignoreCase = true)
+        }
+        return false
+    }
+
+    private fun literalRanges(text: String): List<IntRange> = literalToken.findAll(text)
+        // CI/CD is also shaped like a relative path; retain the explicitly supported acronym.
+        .filterNot { it.value.equals("ci/cd", ignoreCase = true) }
+        .map { it.range }
+        .toList()
+
+    /** ASCII 詞的首尾各自守門；CJK 可直接相鄰，多詞片語也不能吃掉英文單字的一半。 */
     private fun hasSafeAsciiWordBoundary(text: String, start: Int, wrong: String): Boolean {
-        if (!wrong.all { it.code < 128 && (it.isLetterOrDigit() || it == '_') }) return true
         val end = start + wrong.length
         val leftSafe =
-            start == 0 || (!text[start - 1].isLetterOrDigit() && text[start - 1] != '_')
+            !isAsciiWordCharacter(wrong.first()) || start == 0 ||
+                !isAsciiWordCharacter(text[start - 1])
         val rightSafe =
-            end == text.length || (!text[end].isLetterOrDigit() && text[end] != '_')
+            !isAsciiWordCharacter(wrong.last()) || end == text.length ||
+                !isAsciiWordCharacter(text[end])
         return leftSafe && rightSafe
     }
+
+    private fun isAsciiWordCharacter(char: Char): Boolean =
+        char in 'A'..'Z' || char in 'a'..'z' || char in '0'..'9' || char == '_'
 }

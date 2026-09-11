@@ -29,7 +29,7 @@
     <string name="status_idle">タップして音声入力を開始</string>
     <string name="status_starting">マイクを準備中…</string>
     <string name="status_recording">録音中・もう一度タップして送信</string>
-    <string name="audio_waveform_desc">マイク入力のリアルタイム波形</string>
+    <string name="audio_waveform_desc">マイクの音量に反応する円形の光</string>
     <string name="status_stopping">録音を終了中…</string>
     <string name="status_processing">処理中…</string>
     <string name="status_done">入力完了</string>
@@ -64,7 +64,9 @@
     <string name="msg_record_too_short">録音時間が短すぎます。もう一度お試しください</string>
     <string name="msg_recognizing">音声認識中…</string>
     <string name="msg_post_processing">認識完了、後処理中…</string>
-    <string name="msg_ai_processing">AI 校正中…</string>
+    <string name="msg_ai_processing">AI が文脈と表現を確認中…</string>
+    <string name="msg_ai_unavailable">認識した原文を入力しました。AI 校正のモデル設定をご確認ください。</string>
+    <string name="msg_ai_rejected">認識した原文を保持しました。内容をご確認ください。</string>
     <string name="msg_no_speech">音声が検出されませんでした。もう一度お試しください</string>
     <string name="msg_process_failed">処理失敗：</string>
     <string name="msg_error">エラー：</string>
@@ -134,7 +136,7 @@
     <string name="cloud_consent_summary">音声認識、文章整理、翻訳を行うため、SGH Voiceは選択した外部AIサービスへデータを送信します。</string>
     <string name="cloud_consent_audio">• 録音音声は、選択したOpenAIまたはGroqの音声認識APIへ送信されます。</string>
     <string name="cloud_consent_transcript">• 文字起こし結果は、選択したAnthropic、OpenAIまたはGroqのモデルへ送信されます。</string>
-    <string name="cloud_consent_dictionary">• 認識精度向上のため、プリセット語彙、ユーザー追加語彙およびシーンプロンプトも音声認識リクエストとともに送信されます。</string>
+    <string name="cloud_consent_dictionary">• プリセット語彙、追加した語彙とシーン情報は、選択した音声認識・AI 校正サービスに送信されます。個人化学習が有効な場合、手動修正で確認された正しい単語も表記の参考として送信されます。修正記録全体と候補の使用頻度は端末内に保存されます。</string>
     <string name="cloud_consent_provider_terms">データは利用者のプロバイダーアカウントと関連付けられる場合があり、各社の保存・削除・料金条件に従って処理されます。新義豊のサーバーへは送信されません。特定の患者を識別できる情報は入力しないでください。</string>
     <string name="cloud_consent_checkbox">上記の外部処理を確認し、同意します</string>
     <string name="cloud_consent_privacy_link">プライバシーポリシー全文を確認</string>

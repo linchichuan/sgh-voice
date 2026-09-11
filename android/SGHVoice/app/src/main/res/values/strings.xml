@@ -29,7 +29,7 @@
     <string name="status_idle">點一下開始說話</string>
     <string name="status_starting">正在準備麥克風…</string>
     <string name="status_recording">錄音中，再點一下送出</string>
-    <string name="audio_waveform_desc">即時麥克風音量波形</string>
+    <string name="audio_waveform_desc">隨收音音量變化的圓形光暈</string>
     <string name="status_stopping">正在結束錄音…</string>
     <string name="status_processing">處理中…</string>
     <string name="status_done">輸入完成</string>
@@ -64,7 +64,9 @@
     <string name="msg_record_too_short">錄音時間太短，請再試一次</string>
     <string name="msg_recognizing">語音辨識中…</string>
     <string name="msg_post_processing">辨識完成，後處理中…</string>
-    <string name="msg_ai_processing">AI 潤稿中…</string>
+    <string name="msg_ai_processing">AI 檢查語句與前後文…</string>
+    <string name="msg_ai_unavailable">已輸入辨識原文；AI 修句未完成，請查看模型設定</string>
+    <string name="msg_ai_rejected">已保留辨識原文，請確認文字</string>
     <string name="msg_no_speech">未偵測到語音，請再試一次</string>
     <string name="msg_process_failed">處理失敗：</string>
     <string name="msg_error">錯誤：</string>
@@ -134,7 +136,7 @@
     <string name="cloud_consent_summary">SGH Voice 必須將資料傳送到你選擇的外部 AI 服務，才能進行語音辨識、文字整理與翻譯。</string>
     <string name="cloud_consent_audio">• 錄音音訊會傳送至所選的 OpenAI 或 Groq 語音辨識 API。</string>
     <string name="cloud_consent_transcript">• 逐字稿文字會傳送至所選的 Anthropic、OpenAI 或 Groq 模型。</string>
-    <string name="cloud_consent_dictionary">• 預載詞彙、自訂詞彙與場景提示會隨語音辨識請求傳送，以提升辨識正確率。</string>
+    <string name="cloud_consent_dictionary">• 預載詞彙、自訂詞彙與場景提示會傳至所選語音辨識及 AI 修句服務。開啟個人化學習時，您手動修正後確認的正確詞也可作為拼字提示傳送；完整修正紀錄與候選頻率留在本機。</string>
     <string name="cloud_consent_provider_terms">資料可能與你的供應商帳號關聯，並依各供應商的保存、刪除與費用條款處理；不會傳送至新義豊伺服器。請勿輸入可識別特定患者的資料。</string>
     <string name="cloud_consent_checkbox">我已閱讀並同意上述外部處理</string>
     <string name="cloud_consent_privacy_link">查看完整隱私權政策</string>

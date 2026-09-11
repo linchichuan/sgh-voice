@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The visible strip is 32 dp high; mode buttons keep their 44 dp hit area. -->
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+    android:insetTop="6dp"
+    android:insetBottom="6dp">
+    <shape android:shape="rectangle">
+        <solid android:color="@color/keyboard_secondary_bg" />
+        <corners android:radius="12dp" />
+    </shape>
+</inset>

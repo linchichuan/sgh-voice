@@ -1,7 +1,7 @@
 const translations = {
     ja: {
         "meta.title": "SGH Voice — Android 多言語キーボードと macOS 音声入力",
-        "meta.description": "SGH Voice は、音声・注音・日本語・英語を一つにまとめた Android 入力キーボードです。v2.7.5 は浅いミント色の音声波形、AI 返答の混入防止、繁体字注音辞書と最大4言語翻訳に対応します。",
+        "meta.description": "SGH Voice は、音声・注音・日本語・英語を一つにまとめた Android キーボードです。v2.7.6 は文全体の文字起こし整理、技術用語、淡いミント色の録音リングを改善します。",
         "accessibility.skip": "メインコンテンツへ",
 
         "nav.features": "入力方法",
@@ -11,7 +11,7 @@ const translations = {
         "nav.download": "APK ダウンロード",
         "nav.cta": "Android テスト版を入手",
 
-        "hero.eyebrow": "Android 個人テスト版 · v2.7.5",
+        "hero.eyebrow": "Android 個人テスト版 · v2.7.6",
         "hero.title": "一つのキーボードで、<br><span><span class=\"no-break\">音声・</span><span class=\"no-break\">注音・</span><span class=\"no-break\">日本語・</span><span class=\"no-break\">英語</span></span><br>をそのまま入力。",
         "hero.subtitle": "Samsung キーボードへ戻る必要はありません。話す、ㄅㄆㄇㄈを打つ、かなや English を入力する。そのすべてを SGH Voice 内で行えます。",
         "hero.cta": "APK とリスク説明を見る",
@@ -34,7 +34,7 @@ const translations = {
         "modes.title": "一つの言語を選ぶのではなく、<br>今の入力方法を選ぶ。",
         "modes.subtitle": "Voice、注音、日本語、英語はいつも同じ列にあります。切り替えるのは入力方法であり、システムキーボード全体ではありません。",
         "modes.voice.title": "短押しで文字起こし、長押しで翻訳",
-        "modes.voice.desc": "短押しで通常の文字起こしを開始し、もう一度で完了。マイクが音を受けるとリアルタイム波形が動き、無音時は水平線に戻ります。長押しでは1〜4言語へ翻訳できます。",
+        "modes.voice.desc": "短押しで録音を開始し、もう一度で完了。淡いミント色のリングが実際の音量に合わせて穏やかに変化し、無音時は静止します。選択した AI が文全体の句読点とつながりを原意を保って整えます。長押しでは1〜4言語へ翻訳できます。",
         "modes.zhuyin.title": "標準注音配列",
         "modes.zhuyin.desc": "固定スナップショットの繁体字注音辞書から単字・熟語を検索し、選字後の関連語と端末内の自分用語彙にも対応します。ピンインは不要です。",
         "modes.japanese.title": "かなと常用漢字候補",
@@ -44,7 +44,7 @@ const translations = {
 
         "showcase.kicker": "ANDROID FEATURE UI",
         "showcase.title": "翻訳と注音の機能画面",
-        "showcase.desc": "掲載画像は機能説明用です。左上に SGH Voice ブランドを表示し、候補は最大24件まで展開できます。",
+        "showcase.desc": "掲載画像は以前のバージョンを基にした機能説明用で、v2.7.6 の実機画面ではありません。現在のキーボードは上部の切替をコンパクトにし、Enter の記号を大きくしています。",
         "showcase.item1": "左上に SGH Voice のブランドとアイコンを表示",
         "showcase.item2": "最大24件の候補を3列・複数行へ展開",
         "showcase.item3": "短押しは通常入力、長押しは最大4言語への翻訳",
@@ -55,12 +55,12 @@ const translations = {
 
         "learning.kicker": "LOCAL PERSONALIZATION",
         "learning.title": "直した言葉を、<br>次回はもっと正しく。",
-        "learning.subtitle": "信頼度の高い短い修正と候補選択を端末内で記録し、よく使う人名、会社名、専門用語を徐々に優先します。",
+        "learning.subtitle": "GitHub Actions、CI/CD、git push などの技術用語を追加。ユーザーが確認した短い修正と自分の辞書を、次回の音声認識と文章整理にも活用します。",
         "learning.before.label": "初回の認識",
         "learning.after.label": "手動修正して学習",
         "learning.after.note": "次回から優先",
         "learning.local.title": "学習データは端末内",
-        "learning.local.desc": "候補頻度と短い修正を端末内に保存し、クラウドアカウントは作成しません。",
+        "learning.local.desc": "候補頻度と短い修正は端末内に保存します。確認済みの語彙は次回の文字起こし時に選択した STT／AI へ送信されます。AI の出力を自動で確認済み語彙にはしません。",
         "learning.safe.title": "機密フィールドでは学習しない",
         "learning.safe.desc": "パスワード欄では音声入力と学習を無効にし、パーソナライズ禁止欄では学習だけを無効にします。",
         "learning.control.title": "元に戻す・消去が可能",
@@ -89,7 +89,7 @@ const translations = {
         "privacy.key.title": "API キーは端末内で暗号化保存",
         "privacy.key.desc": "キーは Android の暗号化ストレージに保存され、このサイトや新義豊のサーバーへ送信されません。",
         "privacy.learn.title": "必要なパーソナライズのみ保存",
-        "privacy.learn.desc": "候補頻度と短い修正規則を端末内に保存します。全文や録音からクラウド学習プロフィールを作成しません。",
+        "privacy.learn.desc": "候補頻度と短い修正ルールを端末内に保存します。確認済みの語彙は選択した STT／AI のヒントに使い、全文や録音からクラウド学習ファイルは作成しません。",
         "privacy.note": "第三者 AI を利用する場合、データ処理と料金は選択したプロバイダーの規約に従います。重要情報や機密情報は送信前に必ず確認してください。",
 
         "download.kicker": "DOWNLOAD WITH CONTEXT",
@@ -120,7 +120,7 @@ const translations = {
         "download.registration.error": "登録できなかったため、ダウンロードは開始されていません。時間をおいて再度お試しください。",
         "download.android.badge": "PERSONAL TEST BUILD",
         "download.android.title": "SGH Voice for Android",
-        "download.android.update": "2.7.3 をインストール済みの場合は、この 2.7.5 APK を開いて「更新」を選択してください。先にアンインストールしないことで、既存の設定とデータを保持できます。",
+        "download.android.update": "公式サイドロード版 2.7.3〜2.7.5 は、この 2.7.6 APK を開いて「更新」を選択してください。アンインストールせず、キーと辞書を保持できます。更新後は設定で改訂版のクラウド処理説明を確認し、再度同意してください。Google Play テスト版は元のインストール経路から更新してください。",
         "download.meta.version": "バージョン",
         "download.meta.requirement": "システム要件",
         "download.meta.size": "ファイルサイズ",
@@ -151,7 +151,7 @@ const translations = {
         "faq.q5": "日本語入力は一般的な日本語キーボードと同等ですか？",
         "faq.a5": "現在は Phase 1 です。ローマ字、かな、読みの前方一致予測、最大24件の展開候補に対応しますが、Mozc など成熟した入力法のような文全体の文脈変換にはまだ達していません。",
         "faq.q6": "質問を話すと、モデルがそのまま回答しますか？",
-        "faq.a6": "回答してはいけません。通常の文字起こしでは、質問や命令も発話内容として文字だけを整えます。v2.7.5 は「AI のため対応できません」といった自己紹介・拒否文をモデルが追加した場合も破棄し、元の文字起こしに戻します。",
+        "faq.a6": "回答してはいけません。v2.7.6 は選択した AI に文全体の句読点、明らかな言いよどみ、文章のつながりを整えるよう依頼し、質問や命令の原意を保ちます。助手の返答、無関係な書き換え、数字や否定の変更を検出した場合は元の文字起こしに戻し、通知を表示します。誤りは残る可能性があるため、重要な内容はご確認ください。",
 
         "footer.desc": "新義豊株式会社が開発する、多言語の音声・キーボード入力ツール。",
         "footer.product": "製品",
@@ -164,7 +164,7 @@ const translations = {
 
     zh: {
         "meta.title": "SGH Voice — Android 多語輸入法與 macOS 語音輸入",
-        "meta.description": "SGH Voice 將語音、注音、日文與英文整合在同一個 Android 輸入法。v2.7.5 加入淺綠收音波形、AI 回覆贅字防護、完整繁中注音字庫與最多四語翻譯。",
+        "meta.description": "SGH Voice 將語音、注音、日文與英文整合在同一個 Android 輸入法。v2.7.6 改善整句聽寫整理、常用技術詞與淺綠收音光暈；個人測試版 APK 可直接下載。",
         "accessibility.skip": "跳到主要內容",
 
         "nav.features": "輸入方式",
@@ -174,7 +174,7 @@ const translations = {
         "nav.download": "下載 APK",
         "nav.cta": "取得 Android 測試版",
 
-        "hero.eyebrow": "Android 個人測試版 · v2.7.5",
+        "hero.eyebrow": "Android 個人測試版 · v2.7.6",
         "hero.title": "一個輸入法，<br><span><span class=\"no-break\">語音、</span><span class=\"no-break\">注音、</span><span class=\"no-break\">日文、</span><span class=\"no-break\">英文</span></span><br>都能直接用。",
         "hero.subtitle": "不用再切回 Samsung 鍵盤。說話、打ㄅㄆㄇㄈ、輸入かな或 English，都留在 SGH Voice 裡完成。",
         "hero.cta": "查看 APK 下載與風險說明",
@@ -197,7 +197,7 @@ const translations = {
         "modes.title": "不必選擇一種語言，<br>只要選擇現在怎麼輸入。",
         "modes.subtitle": "Voice、注音、日文、英文固定放在同一列。切換的是輸入方式，不是整套系統鍵盤。",
         "modes.voice.title": "短按聽寫，長按翻譯",
-        "modes.voice.desc": "短按開始一般聽寫，再按一次完成；麥克風收到聲音時即時波形會跳動，靜音時維持水平線。長按可選 1–4 種目標語言進行翻譯。",
+        "modes.voice.desc": "短按開始聽寫，再按完成。淺綠圓形光暈隨實際收音輕柔變化，靜音時保持固定；完成後由所選 AI 整理整句標點與語意連貫，保留原意。長按可翻譯成 1–4 種語言。",
         "modes.zhuyin.title": "標準注音排列",
         "modes.zhuyin.desc": "以固定版本的繁中注音字庫提供單字、詞組與選字後聯想，也能在手機內加入自己的字詞與注音，不必學拼音。",
         "modes.japanese.title": "假名與常用漢字候選",
@@ -207,7 +207,7 @@ const translations = {
 
         "showcase.kicker": "ANDROID FEATURE UI",
         "showcase.title": "翻譯與注音功能介面",
-        "showcase.desc": "以下為功能說明用介面；左上固定 SGH Voice 品牌，候選最多 24 個。",
+        "showcase.desc": "圖片為既有版本的功能示意，並非 v2.7.6 實機截圖；目前鍵盤已縮小上方模式切換，並放大 Enter 符號。",
         "showcase.item1": "左上顯示 SGH Voice 品牌與識別圖示",
         "showcase.item2": "最多 24 個候選，可展開成三欄多列",
         "showcase.item3": "短按一般聽寫；長按選擇最多四種翻譯目標",
@@ -218,12 +218,12 @@ const translations = {
 
         "learning.kicker": "LOCAL PERSONALIZATION",
         "learning.title": "你改過的字，<br>下次應該更懂你。",
-        "learning.subtitle": "SGH Voice 會記錄高可信度的短修正與候選選擇，讓常用人名、公司名與專有詞逐步排到前面。",
+        "learning.subtitle": "新增 GitHub Actions、CI/CD、git push 等技術詞；你人工確認的短修正與自訂字典，也會用於下一次語音辨識與整句整理。",
         "learning.before.label": "第一次辨識",
         "learning.after.label": "手動修正並學習",
         "learning.after.note": "下次優先套用",
         "learning.local.title": "學習資料留在手機",
-        "learning.local.desc": "候選頻率與短修正儲存在裝置內，不建立雲端帳號。",
+        "learning.local.desc": "候選頻率與短修正儲存在手機；人工確認的詞彙可隨下次聽寫送至所選 STT／AI 協助辨識，AI 輸出不會自動成為已確認詞。",
         "learning.safe.title": "敏感欄位不學習",
         "learning.safe.desc": "密碼欄位會停用語音與學習；禁止個人化欄位只停用學習。",
         "learning.control.title": "可以復原或清除",
@@ -252,7 +252,7 @@ const translations = {
         "privacy.key.title": "API 金鑰加密保存在裝置",
         "privacy.key.desc": "金鑰使用 Android 加密儲存，不會提交到本網站或新義豊伺服器。",
         "privacy.learn.title": "只保留必要的個人化資料",
-        "privacy.learn.desc": "本機保存候選頻率與短修正規則；不以完整句子或錄音建立雲端學習檔案。",
+        "privacy.learn.desc": "本機保存候選頻率與短修正規則；人工確認的詞彙會用於所選 STT／AI 提示，不以完整句子或錄音建立雲端學習檔案。",
         "privacy.note": "使用第三方 AI 時，資料處理與費用仍依你選擇的服務商條款為準。重要或敏感內容請在送出前自行確認。",
 
         "download.kicker": "DOWNLOAD WITH CONTEXT",
@@ -283,7 +283,7 @@ const translations = {
         "download.registration.error": "登記失敗，尚未開始下載。請稍後再試。",
         "download.android.badge": "PERSONAL TEST BUILD",
         "download.android.title": "SGH Voice for Android",
-        "download.android.update": "已安裝 2.7.3 時，直接開啟這個 2.7.5 APK 並選擇「更新」；請勿先解除安裝，既有設定與資料才能保留。",
+        "download.android.update": "已安裝官方側載版 2.7.3–2.7.5 時，直接開啟這個 2.7.6 APK 並選擇「更新」；請勿先解除安裝，以保留金鑰與詞庫。升級後請到設定閱讀新版雲端處理說明並重新同意。Google Play 測試版請從原安裝管道更新。",
         "download.meta.version": "版本",
         "download.meta.requirement": "系統需求",
         "download.meta.size": "檔案大小",
@@ -314,7 +314,7 @@ const translations = {
         "faq.q5": "日文輸入和一般日本手機鍵盤一樣嗎？",
         "faq.a5": "目前為 Phase 1，支援 Romaji、假名、讀音前綴預測，以及最多 24 個可展開候選；尚不是 Mozc 等成熟輸入法的整句文脈轉換等級。",
         "faq.q6": "我口述一個問句時，模型會直接回答嗎？",
-        "faq.a6": "不應該。一般聽寫把問句或命令都當成逐字稿，只能整理文字。v2.7.5 若偵測到模型新增「作為 AI，我無法…」等自我介紹或拒絕贅字，會捨棄污染輸出並回退原逐字稿。",
+        "faq.a6": "不應該。v2.7.6 會請所選 AI 整理整句標點、明確口吃與語意連貫；問句和命令仍保留原意。若偵測到新增助手回覆、無關改寫或數字與否定語意改動，會回退原逐字稿並顯示提示。辨識與整理仍可能有誤，重要內容請先核對。",
 
         "footer.desc": "新義豊株式会社開發的多語音聲與鍵盤輸入工具。",
         "footer.product": "產品",
@@ -327,7 +327,7 @@ const translations = {
 
     en: {
         "meta.title": "SGH Voice — Multilingual Android keyboard and macOS voice input",
-        "meta.description": "SGH Voice combines voice, Zhuyin, Japanese, and English in one Android keyboard. v2.7.5 adds a pale mint recording surface, AI-reply contamination protection, full Traditional Chinese Zhuyin, and translation into up to four languages.",
+        "meta.description": "SGH Voice combines voice, Zhuyin, Japanese, and English in one Android keyboard. v2.7.6 improves whole-sentence dictation cleanup, technical vocabulary, and a soft mint audio halo.",
         "accessibility.skip": "Skip to main content",
 
         "nav.features": "Input modes",
@@ -337,7 +337,7 @@ const translations = {
         "nav.download": "Download APK",
         "nav.cta": "Get the Android test build",
 
-        "hero.eyebrow": "Android personal test build · v2.7.5",
+        "hero.eyebrow": "Android personal test build · v2.7.6",
         "hero.title": "One keyboard for<br><span><span class=\"no-break\">voice, </span><span class=\"no-break\">Zhuyin, </span><span class=\"no-break\">Japanese, </span><span class=\"no-break\">and English.</span></span>",
         "hero.subtitle": "No need to switch back to Samsung Keyboard. Speak, type ㄅㄆㄇㄈ, enter かな, or write English without leaving SGH Voice.",
         "hero.cta": "See the APK and risk notice",
@@ -360,7 +360,7 @@ const translations = {
         "modes.title": "Do not choose one language.<br>Choose how you want to input right now.",
         "modes.subtitle": "Voice, Zhuyin, Japanese, and English stay in the same row. You switch the input mode, not the entire system keyboard.",
         "modes.voice.title": "Tap to dictate, long-press to translate",
-        "modes.voice.desc": "Tap for normal dictation and tap again to finish. The live waveform responds to microphone input and stays flat during silence. Long-press to choose 1–4 translation targets.",
+        "modes.voice.desc": "Tap to record and tap again to finish. A soft mint ring gently responds to actual audio and stays still during silence. Your selected AI cleans up punctuation and sentence flow while preserving your meaning. Long-press to translate into 1–4 languages.",
         "modes.zhuyin.title": "Standard Zhuyin layout",
         "modes.zhuyin.desc": "Uses a pinned Traditional Chinese Zhuyin lexicon for characters, phrases, associated completions, and on-device custom terms—no Pinyin required.",
         "modes.japanese.title": "Kana and common kanji candidates",
@@ -370,7 +370,7 @@ const translations = {
 
         "showcase.kicker": "ANDROID FEATURE UI",
         "showcase.title": "Translation and Zhuyin feature interface",
-        "showcase.desc": "These images illustrate the feature interface. SGH Voice branding stays at top left, and up to 24 candidates can expand into a multi-row panel.",
+        "showcase.desc": "These illustrations are based on an earlier version, not v2.7.6 device screenshots. The current keyboard has a smaller mode selector and a larger Enter symbol.",
         "showcase.item1": "SGH Voice brand and icon at top left",
         "showcase.item2": "Up to 24 candidates in an expandable three-column grid",
         "showcase.item3": "Tap for dictation; long-press for up to four translation targets",
@@ -381,12 +381,12 @@ const translations = {
 
         "learning.kicker": "LOCAL PERSONALIZATION",
         "learning.title": "Words you correct<br>should be better next time.",
-        "learning.subtitle": "SGH Voice keeps high-confidence short corrections and candidate choices on device, gradually prioritizing names, companies, and specialist terms you use often.",
+        "learning.subtitle": "Adds technical terms such as GitHub Actions, CI/CD, and git push. Your confirmed short corrections and custom dictionary also guide later speech recognition and sentence cleanup.",
         "learning.before.label": "First recognition",
         "learning.after.label": "Corrected and learned",
         "learning.after.note": "Prioritized next time",
         "learning.local.title": "Learning stays on your phone",
-        "learning.local.desc": "Candidate frequency and short corrections are stored on device. No cloud account is created.",
+        "learning.local.desc": "Candidate frequency and short corrections stay on your phone. Confirmed terms can be sent to your selected STT/AI with later dictation. AI output never automatically becomes confirmed vocabulary.",
         "learning.safe.title": "No learning in sensitive fields",
         "learning.safe.desc": "Password fields disable voice and learning; no-personalization fields disable learning only.",
         "learning.control.title": "Undo or clear it",
@@ -415,7 +415,7 @@ const translations = {
         "privacy.key.title": "API keys are encrypted on device",
         "privacy.key.desc": "Keys use Android encrypted storage and are not submitted to this website or a Shingihou server.",
         "privacy.learn.title": "Only necessary personalization is saved",
-        "privacy.learn.desc": "Candidate frequency and short correction rules stay on device. No cloud learning profile is built from full sentences or recordings.",
+        "privacy.learn.desc": "Candidate frequency and short correction rules stay on device. Confirmed terms guide your selected STT/AI; no cloud learning file is built from full sentences or recordings.",
         "privacy.note": "When you use third-party AI, data handling and charges follow the provider you select. Review important or sensitive text before sending it.",
 
         "download.kicker": "DOWNLOAD WITH CONTEXT",
@@ -446,7 +446,7 @@ const translations = {
         "download.registration.error": "Registration failed, so the download did not start. Please try again later.",
         "download.android.badge": "PERSONAL TEST BUILD",
         "download.android.title": "SGH Voice for Android",
-        "download.android.update": "If 2.7.3 is already installed, open this 2.7.5 APK and choose Update. Do not uninstall first if you want to keep existing settings and data.",
+        "download.android.update": "For official sideload versions 2.7.3–2.7.5, open this 2.7.6 APK and choose Update. Keep the existing app installed to preserve keys and vocabulary. After updating, review and accept the revised cloud-processing notice in Settings. Update Google Play test builds through their original install channel.",
         "download.meta.version": "Version",
         "download.meta.requirement": "Requirement",
         "download.meta.size": "File size",
@@ -477,7 +477,7 @@ const translations = {
         "faq.q5": "Is Japanese input equivalent to a mature Japanese IME?",
         "faq.a5": "This is Phase 1. It supports romaji, kana, reading-prefix prediction, and up to 24 expandable candidates, but it does not yet offer sentence-level contextual conversion at the level of a mature IME such as Mozc.",
         "faq.q6": "Will the model answer a question that I dictate?",
-        "faq.a6": "It should not. Normal dictation treats questions and instructions as transcript content and only cleans the text. v2.7.5 also rejects added AI-identity or refusal chatter such as \"As an AI, I cannot…\" and falls back to the original transcript.",
+        "faq.a6": "It should not. v2.7.6 asks your selected AI to clean up punctuation, clear stutters, and sentence flow while preserving questions and instructions. Detected assistant replies, unrelated rewrites, or changes to numbers or negation trigger a fallback to the original transcript with a notice. Errors can still occur, so check important text.",
 
         "footer.desc": "A multilingual voice and keyboard input tool by Shingihou Co., Ltd.",
         "footer.product": "Product",

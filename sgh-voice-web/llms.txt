@@ -4,13 +4,13 @@
 
 ## Current Android test release
 
-- Version: 2.7.5 (version code 25)
+- Version: 2.7.6 (version code 26)
 - Platform: Android 8.0 or later
 - Distribution status: personal test build, distributed as a versioned APK from the official SGH Voice website
 - Google Play status: not currently published through Google Play Production
-- Download: https://voice.shingihou.com/downloads/SGHVoice-Android-v2.7.5.apk
-- File size: 16.53 MiB (17,328,877 bytes)
-- SHA-256: bc77b7ac7486039ba0f2733d171974868d0bbd35c1a8adda4525580b121c6054
+- Download: https://voice.shingihou.com/downloads/SGHVoice-Android-v2.7.6.apk
+- File size: 16.54 MiB (17,339,573 bytes)
+- SHA-256: 9440f2eb170a7bd93510e14aa38e219b47617ef8c598be5c08093ed608a49168
 - App price: free
 - Cloud usage: BYOK; OpenAI, Anthropic, or Groq usage charges may apply
 
@@ -19,9 +19,12 @@
 - Four modes in one Android input method: Voice, Zhuyin, Japanese, and English
 - SGH Voice brand and icon remain visible at the top left of the keyboard
 - Tap for normal dictation; long-press to select 1–4 translation targets from Traditional Chinese, Japanese, English, and Korean
-- Live microphone waveform moves only when audio is received and remains flat during silence
+- Soft mint circular audio halo responds gently to actual microphone input and remains still during silence
+- Compact mode selector and a larger Enter symbol
+- Short and long dictation both use one cleanup request to the selected AI, considering the recorded passage for punctuation, clear stutters, and sentence flow while preserving meaning
 - Multi-target translation uses one speech-recognition pass and one strict JSON LLM request
-- Dictated questions and instructions are treated as inert transcript content and must not be answered; added AI-identity or refusal chatter is rejected and falls back to the source transcript
+- Dictated questions and instructions remain transcript content; detected assistant chatter, unrelated rewrites, or changes to protected numbers and negation trigger a source-transcript fallback with a visible notice
+- Built-in technical vocabulary includes GitHub Actions, CI/CD, and git push; custom terms and human-confirmed correction vocabulary guide later STT and AI cleanup
 - Standard Zhuyin layout without requiring Pinyin
 - Pinned Traditional Chinese Zhuyin lexicon with 133,492 readings, 157,683 candidates, and 145,332 phrase candidates
 - Associated-phrase completion, including 刪 followed by 除, plus up to 200 on-device custom Zhuyin terms
@@ -37,7 +40,10 @@
 ### Android limitations and installation notice
 
 - This APK is a sideloaded personal test build, not a public Google Play release
-- Existing 2.7.3 installations can update directly because 2.7.5 uses the same package name and signing certificate; users should not uninstall first
+- Official sideload installations of 2.7.3–2.7.5 can update directly to 2.7.6 with the same package name and signing certificate; users should not uninstall first
+- Google Play test installations should update through their original install channel
+- After upgrading, open Settings and review and accept the revised cloud-processing notice (consent version 3); existing keys and vocabulary are retained
+- Automated checks and emulator inspection do not establish real-device dictation accuracy; the physical-device acceptance checklist remains pending
 - Android requires the user to allow installation from the browser or file manager used for the download
 - Compatibility and stability can vary by device; users should evaluate sideloading risks before installation
 - Keep Google Play Protect enabled
@@ -66,6 +72,8 @@
 
 - Android API keys use encrypted on-device storage
 - Android learning data is stored locally on the device
+- Human-confirmed correction targets and custom terms may be sent as vocabulary hints to the selected STT and AI; full correction records and candidate frequency stay on device
+- AI output does not automatically become confirmed vocabulary, and Android does not create a complete dictation-history file
 - Android recording begins only after the user taps the recording control
 - When cloud speech recognition is selected, audio is sent directly to the provider configured by the user
 - Shingihou does not store Android audio on an intermediate relay server

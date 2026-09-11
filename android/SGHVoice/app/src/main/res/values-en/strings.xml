@@ -29,7 +29,7 @@
     <string name="status_idle">Tap to start speaking</string>
     <string name="status_starting">Preparing microphone…</string>
     <string name="status_recording">Recording — tap again to send</string>
-    <string name="audio_waveform_desc">Live microphone level waveform</string>
+    <string name="audio_waveform_desc">Circular halo showing live microphone level</string>
     <string name="status_stopping">Finishing recording…</string>
     <string name="status_processing">Processing…</string>
     <string name="status_done">Done</string>
@@ -64,7 +64,9 @@
     <string name="msg_record_too_short">Recording too short, try again.</string>
     <string name="msg_recognizing">Recognizing speech…</string>
     <string name="msg_post_processing">Recognizing done, processing…</string>
-    <string name="msg_ai_processing">AI refining text…</string>
+    <string name="msg_ai_processing">Checking wording and context…</string>
+    <string name="msg_ai_unavailable">Transcript entered; AI cleanup unavailable. Check model settings.</string>
+    <string name="msg_ai_rejected">Original transcript kept. Please review the text.</string>
     <string name="msg_no_speech">No speech detected, try again.</string>
     <string name="msg_process_failed">Processing failed: </string>
     <string name="msg_error">Error: </string>
@@ -134,7 +136,7 @@
     <string name="cloud_consent_summary">SGH Voice must send data to the external AI services you select to provide speech recognition, text processing, and translation.</string>
     <string name="cloud_consent_audio">• Recorded audio is sent to the selected OpenAI or Groq speech-recognition API.</string>
     <string name="cloud_consent_transcript">• Transcribed text is sent to the selected Anthropic, OpenAI, or Groq model.</string>
-    <string name="cloud_consent_dictionary">• Built-in terms, terms you add, and the selected scene prompt are sent with the speech-recognition request to improve recognition.</string>
+    <string name="cloud_consent_dictionary">• Built-in terms, custom terms and scene hints are sent to your selected speech-recognition and AI cleanup services. When personalized learning is enabled, words confirmed through your manual corrections may also be sent as spelling hints. Full correction records and candidate frequencies stay on this device.</string>
     <string name="cloud_consent_provider_terms">Data may be linked to your provider account and is handled under each provider’s retention, deletion, and pricing terms. It is not sent to Shingihou servers. Do not enter information that identifies a patient.</string>
     <string name="cloud_consent_checkbox">I have read and agree to the external processing above</string>
     <string name="cloud_consent_privacy_link">View the full Privacy Policy</string>

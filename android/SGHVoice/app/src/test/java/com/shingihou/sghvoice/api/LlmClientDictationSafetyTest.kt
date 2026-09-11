@@ -64,4 +64,75 @@ class LlmClientDictationSafetyTest {
 
         assertEquals(answer, client.validateLlmResult(raw, answer, "edit"))
     }
+
+    @Test
+    fun `unrelated fluent replacement of a statement is rejected`() {
+        assertNull(client.validateLlmResult(
+            "今天已經修好 GitHub Actions，接著要檢查 CI/CD。",
+            "明天我們會一起去東京參加活動，順便吃晚餐。",
+            "dictate"
+        ))
+    }
+
+    @Test
+    fun `cleanup cannot change a version or a quantity`() {
+        assertNull(client.validateLlmResult(
+            "版本 2.7.5 有 12 個測試者。",
+            "版本 2.7.6 有 20 個測試者。",
+            "dictate"
+        ))
+    }
+
+    @Test
+    fun `cleanup cannot silently remove negation`() {
+        assertNull(client.validateLlmResult(
+            "這個版本不要部署到正式環境。",
+            "這個版本要部署到正式環境。",
+            "dictate"
+        ))
+    }
+
+    @Test
+    fun `unsolicited transcription wrapper is rejected`() {
+        val raw = "今天已經修好 GitHub Actions，接著要檢查 CI/CD。"
+        assertNull(client.validateLlmResult(raw, "以下是整理後的內容：$raw", "dictate"))
+    }
+
+    @Test
+    fun `cleanup cannot swap amounts or modify literal paths`() {
+        assertNull(client.validateLlmResult("收 20 元，退 50 元。", "收 50 元，退 20 元。", "dictate"))
+        assertNull(client.validateLlmResult("使用 /tmp/GitPush。", "使用 /tmp/gitpush。", "dictate"))
+        assertNull(client.validateLlmResult("使用 /tmp/foo_。", "使用 /tmp/foo。", "dictate"))
+        assertNull(client.validateLlmResult(
+            "請開啟 https://example.com/MyRepo/。",
+            "請開啟 https://example.com/myrepo/。", "dictate"
+        ))
+    }
+
+    @Test
+    fun `model acknowledgment before intact dictation is rejected`() {
+        val raw = "請檢查 GitHub Actions，今天先跑測試。"
+        assertNull(client.validateLlmResult(raw, "好的，我會處理。$raw", "dictate"))
+        assertNull(client.validateLlmResult(raw, "收到，我會協助。$raw", "dictate"))
+        val spoken = "好的，我會處理。今天先跑測試。"
+        assertEquals(spoken, client.validateLlmResult(spoken, spoken, "dictate"))
+    }
+
+    @Test
+    fun `explicit stutter and temporal self correction can be cleaned`() {
+        assertEquals("GitHub Actions", client.validateLlmResult(
+            "GitHub GitHub Actions", "GitHub Actions", "dictate"
+        ))
+        assertEquals("明天再開會。", client.validateLlmResult(
+            "今天，不，明天再開會", "明天再開會。", "dictate"
+        ))
+        val unchanged = "今天，不，明天再開會。"
+        assertEquals(unchanged, client.validateLlmResult(unchanged, unchanged, "dictate"))
+        assertNull(client.validateLlmResult(
+            "今天不要開會，明天再開會。", "今天要開會，明天再開會。", "dictate"
+        ))
+        assertNull(client.validateLlmResult(
+            "GitHub 先測試，GitHub 再部署。", "GitHub 先測試，再部署。", "dictate"
+        ))
+    }
 }

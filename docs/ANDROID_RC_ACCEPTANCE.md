@@ -1,6 +1,6 @@
 # SGH Voice Android RC 實機驗收
 
-> 適用版本：Android 2.7.5（versionCode 25）正式側載測試版
+> 適用版本：Android 2.7.6（versionCode 26）正式側載測試版
 > 文件狀態：QA／RC 驗收用途
 > 禁止事項：不得使用真實患者姓名、病歷、電話、付款或其他個人資料
 
@@ -14,6 +14,7 @@
 4. 翻譯不得回答原文中的問題或執行原文中的請求。
 5. 既有錄音、轉寫、插入與翻譯流程沒有回歸。
 6. 使用者在錄音後撤回雲端處理同意時，音訊不會送出。
+7. 整句聽寫整理、技術詞彙、人工確認詞提示與圓形收音光暈；新增驗收案例見 [本輪改善紀錄](reviews/2026-09-11-android-dictation-refinement.md)。
 
 醫療詞庫不在本次 RC 驗收範圍，本輪也不得匯入完整醫療詞表。
 
@@ -39,35 +40,34 @@
 ./scripts/verify_mobile_rc.sh --install
 ```
 
-## 2.1 本機自動化檢查結果（2026-08-30）
+## 2.1 本輪自動化與模擬器檢查（2026-09-11）
 
-> 本機環境未安裝／未連接實機（`adb devices` 回傳 0 台已授權裝置；SDK 內建的
-> `~/Library/Android/sdk/platform-tools/adb` 存在但沒有裝置可用）。以下只是出貨前
-> 「本機可自動化」項目的執行紀錄，**不能取代第 4 節必測案例**——第 4 節全部
-> 31 個案例都需要實機操作，本輪未執行，清單見第 7 節。
+> 本輪未連接 Android 實機。模擬器檢查不能取代真實麥克風與手機實測。
+> 第 4 節包含 **31 個基礎實機案例，另加 7 個注音案例，合計 38 個**，全部尚待實機操作。
+> 先前版本的 475 個 Python／132 個 Android 測試結果不作為本版通過證據。
+> 本輪結果隨執行證據填寫；未完成的檢查維持待驗，不宣稱 RC 已通過。
 
 | 檢查項目 | 指令 | 結果 | 證據／備註 |
 |---|---|---|---|
-| Git diff 格式檢查 | `git diff --check` | ✅ PASS | 無空白或 patch 格式錯誤；工作區仍含本輪待提交變更，不宣稱 clean |
-| Python 迴歸測試 | 乾淨 Python 3.12 venv 執行 `python -m pytest -q` | ✅ PASS | 475 tests 全部通過，exit 0；含即時波形與 AI 拒絕贅字守門回歸測試 |
-| Python 靜態檢查 | `ruff check . --select E9,F63,F7,F82` | ✅ PASS | 無 release-critical Ruff 錯誤 |
-| iOS source／metadata preflight | `./scripts/verify_ios_app_store_preflight.sh --source-only` | ✅ PASS | 全部 Swift application sources type-check 通過；不包含 Xcode Archive／TestFlight／App Store 帳號 gate |
-| Android 單元測試 | `cd android/SGHVoice && ./gradlew testDebugUnitTest --no-daemon` | ✅ PASS | 132 tests，0 failures／0 errors |
-| Android Debug Lint（補充項，非 RC 門檻要求） | `./gradlew lintDebug --no-daemon` | ✅ PASS | BUILD SUCCESSFUL，0 errors／68 warnings |
-| Android Release Lint | `./scripts/build_android_sideload_release.sh` | ✅ PASS | 原 2.7.3 sideload signer 已復原並移入 macOS Keychain；`:app:verifyReleaseSigningConfig` 與 `lintRelease` 通過 |
-| Android Release 組建（簽署 APK） | `./scripts/build_android_sideload_release.sh` | ✅ PASS | 產生 2.7.5／versionCode 25；v2 簽章有效，憑證 SHA-256 與 2.7.3 完全相同 |
-| `verify_mobile_rc.sh`（完整模式，無參數） | `./scripts/verify_mobile_rc.sh` | ⚠️ PARTIAL | 全部自動化項目通過；因沒有已授權 Android 實機，無法執行安裝與第 4 節 31 個實機案例 |
-| 2.7.5 artifact 驗證 | `./scripts/verify_mobile_rc.sh --artifact-only` | ✅ PASS | APK 版本、17,328,877 bytes、SHA-256、唯一 signer、憑證與網站 metadata 一致 |
-| Android 實機連線 | `adb devices` | 不適用（N/A） | 本機 PATH 無 adb；SDK 內建 binary 可執行但 0 台已授權裝置連接 |
+| Git diff 格式檢查 | `git diff --check` | PASS | 無 diff 格式錯誤；不推定工作區 clean |
+| Python 迴歸測試 | `venv/bin/python -m pytest tests/ -o addopts='' -q` | PASS | 534 passed in 6.11s；在新版 APK 與 metadata 完成後重跑通過 |
+| Python 靜態檢查 | `ruff check . --select E9,F63,F7,F82` | PASS | Release-critical 規則通過 |
+| iOS source／metadata preflight | `./scripts/verify_ios_app_store_preflight.sh --source-only` | PASS | source-only 通過；不包含 Xcode Archive／TestFlight／App Store 帳號 gate |
+| Android 單元測試 | `./gradlew testDebugUnitTest --no-daemon` | PASS | 164 tests，0 failures／0 errors／0 skipped；包含短句修句、輸出守門、詞彙提示與光暈包絡測試 |
+| Android Debug Lint | `./gradlew lintDebug --no-daemon` | PASS | 0 errors／88 warnings |
+| Android Release 組建與 Lint | `./scripts/build_android_sideload_release.sh` | PASS | 2.7.6／versionCode 26；BUILD SUCCESSFUL；Release Lint 0 errors／76 warnings，產物 signer 另由 artifact-only 核對 |
+| 2.7.6 artifact 驗證 | `./scripts/verify_mobile_rc.sh --artifact-only` | PASS | ARTIFACT VERIFIED：APK 版本、大小、SHA-256、唯一 signer 憑證與網站 metadata 一致 |
+| Android 模擬器 | Debug 2.7.6／26 安裝、合成收音與四模式 UI smoke | PASS（模擬器限定） | 5 張最新實際 View 截圖已檢視，無重疊爆版，24dp Enter 置中；SGH crash buffer 無 crash；不代表實機收音、延遲、準確度或 38 個實機案例通過 |
+| Android 實機 | 真實手機與第 4 節案例 | 未執行 | 未連接實機；31 個基礎案例與 7 個注音案例全部待驗 |
 
 ## 3. 測試紀錄
 
 | 欄位 | 紀錄 |
 |---|---|
-| 測試日期 | 2026-08-30（自動化項目） |
+| 測試日期 | 2026-09-11（自動化／模擬器；實機待驗） |
 | 測試者 | Codex（自動化）；Lin（實機項目待執行） |
-| APK SHA-256 | `bc77b7ac7486039ba0f2733d171974868d0bbd35c1a8adda4525580b121c6054` |
-| App 版本 | 2.7.5（versionCode 25） |
+| APK SHA-256 | `9440f2eb170a7bd93510e14aa38e219b47617ef8c598be5c08093ed608a49168`（17,339,573 bytes） |
+| App 版本 | 2.7.6（versionCode 26） |
 | 手機型號 |  |
 | Android 版本 |  |
 | 螢幕尺寸／縮放 |  |
@@ -181,7 +181,7 @@ Issue ID:
 ## 6. RC 通過門檻
 
 - `verify_mobile_rc.sh` 全部自動化檢查通過。
-- BK、LG、TR、RG、CT 全部必測案例通過。
+- BK、UI、ZH、LG、TR、RG、CT 全部必測案例與本輪新增案例通過。
 - Android 實機沒有空白、重疊、爆版或背景持續刪除。
 - 沒有翻譯代答、來源文字冒充翻譯、重複插入或資料外洩 blocker。
 - high severity 問題為 0；medium 問題已有明確處理決定。
@@ -189,17 +189,17 @@ Issue ID:
 
 ## 7. 實機待驗清單（需 Lin 執行）
 
-> 本機無 adb、無實機，第 4 節全部 31 個案例與下列項目均未執行，需 Lin 在實機上完成。
+> 本輪未連接實機，第 4 節 31 個基礎案例及另 7 個注音案例（合計 38 個）均未執行，需 Lin 在實機上完成。
 > 自動化前置檢查結果見第 2.1 節。
 
-### 7.0 前置：從 2.7.3 直接覆蓋更新
+### 7.0 前置：從官方側載版 2.7.3–2.7.5 直接覆蓋更新
 
-2.7.5 已使用與 2.7.3 完全相同的 package name 與簽章憑證，可保留 App 資料直接更新：
+確認 2.7.6 產物與既有官方側載版的 package name、簽章憑證一致後，可保留 App 資料直接更新。Google Play 測試版請沿原安裝管道更新；不得以解除安裝作為預設解法：
 
-1. 在手機瀏覽器開啟 `https://voice.shingihou.com/`，下載 `SGHVoice-Android-v2.7.5.apk`。
+1. 在手機瀏覽器開啟 `https://voice.shingihou.com/`，下載 `SGHVoice-Android-v2.7.6.apk`。
 2. 若 Android 要求允許來源，只對目前使用的瀏覽器或檔案管理器開啟「安裝未知的應用程式」；不要停用 Google Play Protect。
-3. 開啟 APK 後選擇「更新」。**不要先解除安裝 2.7.3**，否則裝置內設定與資料可能被刪除。
-4. 安裝後確認版本為 2.7.5，再開始第 4 節測試。
+3. 開啟 APK 後選擇「更新」。**不要先解除安裝既有 App**，否則裝置內設定與資料可能被刪除。
+4. 安裝後確認版本為 2.7.6；開啟 App 設定，閱讀新版雲端處理說明並重新同意（同意版本 3）。核對原金鑰與詞庫仍存在，再開始第 4 節測試。
 5. 若改用 USB 且裝置已授權，可在 repo 根目錄執行 `./scripts/verify_mobile_rc.sh --install`；腳本會在安裝前重新驗證版本、SHA-256 與 signer。
 
 ### 7.1 填寫第 3 節「測試紀錄」
@@ -265,4 +265,4 @@ Issue ID:
 ### 7.3 收尾
 
 - 依第 5 節格式回報任何未通過案例（患者資料先去識別化）。
-- 對照第 6 節「RC 通過門檻」逐條確認後才能放行 2.7.5。
+- 對照第 6 節「RC 通過門檻」逐條確認後才能放行 2.7.6。

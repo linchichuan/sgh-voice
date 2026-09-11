@@ -8,7 +8,7 @@
     <meta name="author" content="Shingihou Co., Ltd.">
     <title>SGH Voice — Android 多語輸入法與 macOS 語音輸入</title>
     <meta name="description"
-        content="SGH Voice 將語音、注音、日文與英文整合在同一個 Android 輸入法。Android 個人測試版 APK 可直接下載；macOS Apple Silicon 版亦持續提供。">
+        content="SGH Voice 將語音、注音、日文與英文整合在同一個 Android 輸入法。v2.7.6 改善整句聽寫整理、常用技術詞與淺綠收音光暈；個人測試版 APK 可直接下載。">
     <link rel="canonical" href="https://voice.shingihou.com/">
 
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
@@ -21,7 +21,7 @@
     <meta property="og:site_name" content="SGH Voice">
     <meta property="og:title" content="SGH Voice — 一個輸入法，語音、注音、日文、英文都能用。">
     <meta property="og:description"
-        content="Android 個人測試版 APK v2.7.5：淺綠收音波形、AI 回覆贅字防護、完整繁中注音字庫與最多四語翻譯；另提供 macOS Apple Silicon v2.6.0。">
+        content="Android 個人測試版 APK v2.7.6：整句聽寫整理、常用技術詞與淺綠收音光暈，保留繁中注音與最多四語翻譯；另提供 macOS Apple Silicon v2.6.0。">
     <meta property="og:url" content="https://voice.shingihou.com/">
     <meta property="og:image" content="https://voice.shingihou.com/assets/generated/og-android-v240.png">
     <meta property="og:image:type" content="image/png">
@@ -58,9 +58,9 @@
           "name": "SGH Voice for Android",
           "applicationCategory": "ProductivityApplication",
           "operatingSystem": "Android 8.0 or later",
-          "softwareVersion": "2.7.5",
+          "softwareVersion": "2.7.6",
           "url": "https://voice.shingihou.com/",
-          "downloadUrl": "https://voice.shingihou.com/downloads/SGHVoice-Android-v2.7.5.apk",
+          "downloadUrl": "https://voice.shingihou.com/downloads/SGHVoice-Android-v2.7.6.apk",
           "description": "A personal test build of a multilingual Android input method with tap-to-dictate, long-press translation into up to four languages, predictive Zhuyin, Japanese candidates, English, and local personalization.",
           "offers": {
             "@type": "Offer",
@@ -160,7 +160,7 @@
                 <div class="hero-copy">
                     <div class="eyebrow">
                         <span class="status-dot" aria-hidden="true"></span>
-                        <span data-i18n="hero.eyebrow">Android 個人測試版 · v2.7.5</span>
+                        <span data-i18n="hero.eyebrow">Android 個人測試版 · v2.7.6</span>
                     </div>
                     <h1 data-i18n="hero.title">一個輸入法，<br><span><span class="no-break">語音、</span><span
                                 class="no-break">注音、</span><span class="no-break">日文、</span><span
@@ -176,7 +176,7 @@
                             <span data-i18n="hero.cta">查看 APK 下載與風險說明</span>
                         </a>
                         <a class="btn btn-secondary" href="#features">
-                            <span data-i18n="hero.secondary">先看實際介面</span>
+                            <span data-i18n="hero.secondary">查看功能介面</span>
                             <svg viewBox="0 0 24 24" aria-hidden="true">
                                 <path d="m9 18 6-6-6-6"></path>
                             </svg>
@@ -215,7 +215,7 @@
                     </div>
                     <div class="release-stamp" aria-hidden="true">
                         <small>ANDROID</small>
-                        <strong>2.7.5</strong>
+                        <strong>2.7.6</strong>
                     </div>
                 </div>
             </div>
@@ -257,7 +257,7 @@
                         <div>
                             <span>VOICE</span>
                             <h3 data-i18n="modes.voice.title">短按聽寫，長按翻譯</h3>
-                            <p data-i18n="modes.voice.desc">短按開始一般聽寫，再按一次完成；長按則可選繁中、日文、英文、韓文 1–4 種目標，再錄音翻譯。</p>
+                            <p data-i18n="modes.voice.desc">短按開始聽寫，再按完成。淺綠圓形光暈隨實際收音輕柔變化，靜音時保持固定；完成後由所選 AI 整理整句標點與語意連貫，保留原意。長按可翻譯成 1–4 種語言。</p>
                         </div>
                     </article>
                     <article class="mode-card mode-zhuyin">
@@ -291,7 +291,7 @@
                         <span class="section-kicker" data-i18n="showcase.kicker">ANDROID FEATURE UI</span>
                         <h3 data-i18n="showcase.title">翻譯與注音功能介面</h3>
                         <p data-i18n="showcase.desc">
-                            以下為功能說明用介面；左上固定 SGH Voice 品牌，候選最多 24 個。
+                            圖片為既有版本的功能示意，並非 v2.7.6 實機截圖；目前鍵盤已縮小上方模式切換，並放大 Enter 符號。
                         </p>
                         <ul>
                             <li data-i18n="showcase.item1">左上顯示 SGH Voice 品牌與識別圖示</li>
@@ -323,7 +323,7 @@
                     <span class="section-kicker" data-i18n="learning.kicker">LOCAL PERSONALIZATION</span>
                     <h2 data-i18n="learning.title">你改過的字，<br>下次應該更懂你。</h2>
                     <p data-i18n="learning.subtitle">
-                        SGH Voice 會記錄高可信度的短修正與候選選擇，讓常用人名、公司名與專有詞逐步排到前面。
+                        新增 GitHub Actions、CI/CD、git push 等技術詞；你人工確認的短修正與自訂字典，也會用於下一次語音辨識與整句整理。
                     </p>
                 </div>
 
@@ -350,7 +350,7 @@
                             <path d="M4 7h16M7 4v6M17 4v6M6 14h12M9 11v6M15 11v6"></path>
                         </svg>
                         <h3 data-i18n="learning.local.title">學習資料留在手機</h3>
-                        <p data-i18n="learning.local.desc">候選頻率與短修正儲存在裝置內，不建立雲端帳號。</p>
+                        <p data-i18n="learning.local.desc">候選頻率與短修正儲存在手機；人工確認的詞彙可隨下次聽寫送至所選 STT／AI 協助辨識，AI 輸出不會自動成為已確認詞。</p>
                     </article>
                     <article>
                         <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -470,7 +470,7 @@
                     <article>
                         <span class="privacy-number">03</span>
                         <h3 data-i18n="privacy.learn.title">只保留必要的個人化資料</h3>
-                        <p data-i18n="privacy.learn.desc">本機保存候選頻率與短修正規則；不以完整句子或錄音建立雲端學習檔案。</p>
+                        <p data-i18n="privacy.learn.desc">本機保存候選頻率與短修正規則；人工確認的詞彙會用於所選 STT／AI 提示，不以完整句子或錄音建立雲端學習檔案。</p>
                     </article>
                 </div>
                 <p class="privacy-note" data-i18n="privacy.note">使用第三方 AI 時，資料處理與費用仍依你選擇的服務商條款為準。重要或敏感內容請在送出前自行確認。</p>
@@ -572,7 +572,7 @@
                         <dl class="release-meta">
                             <div>
                                 <dt data-i18n="download.meta.version">版本</dt>
-                                <dd>2.7.5 (25)</dd>
+                                <dd>2.7.6 (26)</dd>
                             </div>
                             <div>
                                 <dt data-i18n="download.meta.requirement">系統需求</dt>
@@ -580,7 +580,7 @@
                             </div>
                             <div>
                                 <dt data-i18n="download.meta.size">檔案大小</dt>
-                                <dd>16.53 MiB</dd>
+                                <dd>16.54 MiB</dd>
                             </div>
                             <div>
                                 <dt data-i18n="download.meta.format">格式</dt>
@@ -591,13 +591,13 @@
                         <div class="hash-block">
                             <div>
                                 <span>SHA-256</span>
-                                <code id="apkHash">bc77b7ac7486039ba0f2733d171974868d0bbd35c1a8adda4525580b121c6054</code>
+                                <code id="apkHash">9440f2eb170a7bd93510e14aa38e219b47617ef8c598be5c08093ed608a49168</code>
                             </div>
                             <button type="button" class="copy-button" id="copyHashButton" data-i18n="download.hash.copy">複製</button>
                         </div>
 
                         <p class="download-update-note" data-i18n="download.android.update">
-                            已安裝 2.7.3 時，直接開啟這個 2.7.5 APK 並選擇「更新」；請勿先解除安裝，既有設定與資料才能保留。
+                            已安裝官方側載版 2.7.3–2.7.5 時，直接開啟這個 2.7.6 APK 並選擇「更新」；請勿先解除安裝，以保留金鑰與詞庫。升級後請到設定閱讀新版雲端處理說明並重新同意。Google Play 測試版請從原安裝管道更新。
                         </p>
 
                         <label class="risk-check" for="riskAck">
@@ -612,15 +612,15 @@
 
                         <a class="btn btn-primary download-button disabled" id="apkDownloadButton"
                             aria-disabled="true" aria-describedby="riskDisclosure downloadRegistrationStatus"
-                            tabindex="-1" data-platform="android" data-version="2.7.5"
-                            data-filename="SGHVoice-Android-v2.7.5.apk"
-                            data-download-href="/downloads/SGHVoice-Android-v2.7.5.apk">
+                            tabindex="-1" data-platform="android" data-version="2.7.6"
+                            data-filename="SGHVoice-Android-v2.7.6.apk"
+                            data-download-href="/downloads/SGHVoice-Android-v2.7.6.apk">
                             <svg viewBox="0 0 24 24" aria-hidden="true">
                                 <path d="M12 3v12m0 0 5-5m-5 5-5-5M5 19h14"></path>
                             </svg>
                             <span data-i18n="download.android.cta">填寫資料並確認風險後下載 APK</span>
                         </a>
-                        <p class="download-file">SGHVoice-Android-v2.7.5.apk</p>
+                        <p class="download-file">SGHVoice-Android-v2.7.6.apk</p>
                     </article>
 
                     <article class="download-card download-mac">
@@ -700,7 +700,7 @@
                     </details>
                     <details>
                         <summary data-i18n="faq.q6">我口述一個問句時，模型會直接回答嗎？</summary>
-                        <p data-i18n="faq.a6">不應該。一般聽寫把問句或命令都當成逐字稿，只能整理文字。v2.7.5 若偵測到模型新增「作為 AI，我無法…」等自我介紹或拒絕贅字，會捨棄污染輸出並回退原逐字稿。</p>
+                        <p data-i18n="faq.a6">不應該。v2.7.6 會請所選 AI 整理整句標點、明確口吃與語意連貫；問句和命令仍保留原意。若偵測到新增助手回覆、無關改寫或數字與否定語意改動，會回退原逐字稿並顯示提示。辨識與整理仍可能有誤，重要內容請先核對。</p>
                     </details>
                 </div>
             </div>
@@ -740,7 +740,7 @@
         </div>
     </footer>
 
-    <script src="i18n.js?v=20260730-download-registration"></script>
+    <script src="i18n.js?v=20260911-android-276"></script>
     <script src="firebase.js?v=20260730-download-registration"></script>
     <script src="main.js?v=20260730-download-registration"></script>
 </body>

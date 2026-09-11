@@ -535,6 +535,13 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
                     }
                     return@launch
                 }
+                if (!isCurrentOperation(sessionId, operationId) || currentInputConnection !== targetConnection) {
+                    wavData.fill(0)
+                    return@launch
+                }
+                // Capture this editor's decision only after asynchronous recorder/pipeline
+                // work has completed. A later editor switch cancels the operation.
+                val includePersonalization = personalizationAllowed()
                 activePipeline.process(
                     wavData,
                     task,
@@ -568,7 +575,7 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
                         }
 
                         override fun onCompleted(result: TranscriptionPipeline.Result) {
-                            if (!isCurrentOperation(sessionId, operationId)) return
+                            if (!isCurrentOperation(sessionId, operationId) || currentInputConnection !== targetConnection) return
 
                             val textToCommit = when (task) {
                                 VoiceTask.Dictation -> result.text
@@ -579,6 +586,13 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
                                 if (targetConnection.commitText(textToCommit, 1)) {
                                     setState(ImeState.DONE)
                                     if (task == VoiceTask.Dictation) {
+                                        when (result.refinementStatus) {
+                                            LlmClient.RefinementStatus.UNAVAILABLE ->
+                                                keyboardView?.setStatusText(getString(R.string.msg_ai_unavailable))
+                                            LlmClient.RefinementStatus.REJECTED ->
+                                                keyboardView?.setStatusText(getString(R.string.msg_ai_rejected))
+                                            else -> Unit
+                                        }
                                         beginVoiceCorrectionTracking(
                                             sessionId = sessionId,
                                             connection = targetConnection,
@@ -625,7 +639,8 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
                                 )
                             }
                         }
-                    }
+                    },
+                    includePersonalization = includePersonalization
                 )
             } catch (error: CancellationException) {
                 throw error

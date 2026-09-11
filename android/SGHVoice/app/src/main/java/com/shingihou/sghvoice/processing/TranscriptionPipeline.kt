@@ -3,6 +3,8 @@ package com.shingihou.sghvoice.processing
 import com.shingihou.sghvoice.api.LlmClient
 import com.shingihou.sghvoice.api.WhisperClient
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 
 /**
  * 語音辨識處理管線
@@ -33,7 +35,8 @@ class TranscriptionPipeline(
         val rawText: String = "",
         val translations: List<TranslationOutput> = emptyList(),
         val success: Boolean = true,
-        val error: String? = null
+        val error: String? = null,
+        val refinementStatus: LlmClient.RefinementStatus? = null
     )
 
     /**
@@ -64,23 +67,33 @@ class TranscriptionPipeline(
      * @param callback 進度回呼（可選）
      * @return 處理結果
      */
-    suspend fun process(wavData: ByteArray, callback: ProgressCallback? = null): Result =
-        process(wavData, VoiceTask.Dictation, callback)
+    suspend fun process(
+        wavData: ByteArray,
+        callback: ProgressCallback? = null,
+        includePersonalization: Boolean = false
+    ): Result =
+        process(wavData, VoiceTask.Dictation, callback, includePersonalization)
 
     /**
      * 依任務明確分流口述與翻譯。翻譯只在來源文字套一次詞庫修正，目標文字不再
      * 套來源修正；OpenCC 也只套用在 zh-Hant 目標。
+     * 個人化必須由當次欄位明確允許；未提供欄位決策的呼叫端預設不讀取學習資料。
      */
     suspend fun process(
         wavData: ByteArray,
         task: VoiceTask,
-        callback: ProgressCallback? = null
+        callback: ProgressCallback? = null,
+        includePersonalization: Boolean = false
     ): Result {
         try {
+            currentCoroutineContext().ensureActive()
             // === 第一層：Whisper 語音辨識 ===
             callback?.onWhisperStarted()
-            val whisperPrompt = dictionaryManager.buildWhisperPrompt()
+            val whisperPrompt = dictionaryManager.buildWhisperPrompt(includePersonalization)
             val rawText = whisperClient.transcribe(wavData, whisperPrompt)
+            // Switching editors cancels this operation. Even a late/non-cooperative STT
+            // completion must not read learned words or start a follow-up LLM request.
+            currentCoroutineContext().ensureActive()
 
             if (rawText.isBlank()) {
                 val result = Result(text = "", rawText = "", success = true)
@@ -90,13 +103,14 @@ class TranscriptionPipeline(
             callback?.onWhisperCompleted(rawText)
 
             // === 第二層：詞庫修正 ===
-            val correctedText = dictionaryManager.applyCorrections(rawText)
+            val correctedText = dictionaryManager.applyCorrections(rawText, includePersonalization)
 
             val result = when (task) {
-                VoiceTask.Dictation -> processDictation(correctedText, rawText, callback)
+                VoiceTask.Dictation -> processDictation(correctedText, rawText, callback, includePersonalization)
                 is VoiceTask.Translation ->
                     processTranslation(correctedText, rawText, task.request, callback)
             }
+            currentCoroutineContext().ensureActive()
             callback?.onCompleted(result)
             return result
 
@@ -117,25 +131,31 @@ class TranscriptionPipeline(
     private suspend fun processDictation(
         correctedText: String,
         rawText: String,
-        callback: ProgressCallback?
+        callback: ProgressCallback?,
+        includePersonalization: Boolean
     ): Result {
         callback?.onLlmStarted()
         val sceneExtra = dictionaryManager.getSceneSystemPromptExtra()
-        val processedText = try {
-            llmClient.postProcess(correctedText, sceneExtra)
+        val refinement = try {
+            llmClient.refineDictation(
+                correctedText, sceneExtra,
+                vocabularyHint = dictionaryManager.buildLlmVocabularyHint(correctedText, includePersonalization)
+            )
         } catch (error: CancellationException) {
             throw error
         } catch (_: Exception) {
             // 一般口述維持既有降級策略：LLM 失敗仍可輸出詞庫修正後文字。
-            correctedText
+            LlmClient.RefinementResult(correctedText, LlmClient.RefinementStatus.UNAVAILABLE)
         }
 
-        val traditionalText = openCCConverter.convert(processedText)
-        val finalText = dictionaryManager.applyCorrections(traditionalText)
+        currentCoroutineContext().ensureActive()
+        val traditionalText = openCCConverter.convert(refinement.text)
+        val finalText = dictionaryManager.applyCorrections(traditionalText, includePersonalization)
         return Result(
             text = finalText,
             rawText = rawText,
-            success = true
+            success = true,
+            refinementStatus = refinement.status
         )
     }
 
@@ -166,10 +186,12 @@ class TranscriptionPipeline(
      * 僅執行 Whisper 辨識（不進行後處理）
      * 用於快速模式或除錯
      */
-    suspend fun transcribeOnly(wavData: ByteArray): Result {
+    suspend fun transcribeOnly(wavData: ByteArray, includePersonalization: Boolean = false): Result {
         return try {
-            val whisperPrompt = dictionaryManager.buildWhisperPrompt()
+            currentCoroutineContext().ensureActive()
+            val whisperPrompt = dictionaryManager.buildWhisperPrompt(includePersonalization)
             val rawText = whisperClient.transcribe(wavData, whisperPrompt)
+            currentCoroutineContext().ensureActive()
             Result(text = rawText, rawText = rawText, success = true)
         } catch (error: CancellationException) {
             throw error

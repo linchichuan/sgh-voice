@@ -3,9 +3,14 @@ package com.shingihou.sghvoice.ime
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.res.ColorStateList
+import android.graphics.Canvas
+import android.graphics.Paint
 import android.graphics.Typeface
 import android.graphics.drawable.InsetDrawable
+import android.text.SpannableString
+import android.text.Spanned
 import android.text.TextUtils
+import android.text.style.ReplacementSpan
 import android.util.AttributeSet
 import android.view.HapticFeedbackConstants
 import android.view.LayoutInflater
@@ -428,6 +433,7 @@ class KeyboardView @JvmOverloads constructor(
         periodButton = findViewById(R.id.btn_period)
         backspaceButton = findViewById(R.id.btn_backspace)
         enterButton = findViewById(R.id.btn_enter)
+        setEnterIcon(enterButton)
     }
 
     private fun installNavigationBarInsets() {
@@ -647,6 +653,7 @@ class KeyboardView @JvmOverloads constructor(
             includeFontPadding = false
             maxLines = 1
             textSize = when {
+                key.action == KeyAction.Enter -> 27f
                 displayLabel.length > 4 -> 12f
                 key.role == KeyRole.CHARACTER -> 18f
                 else -> 13f
@@ -678,6 +685,7 @@ class KeyboardView @JvmOverloads constructor(
                     if (key.role == KeyRole.CHARACTER) Typeface.NORMAL else Typeface.BOLD
                 )
             )
+            if (key.action == KeyAction.Enter) setEnterIcon(this)
             layoutParams = LayoutParams(0, dp(48), key.widthWeight)
             setOnClickListener {
                 hapticTap(it)
@@ -827,11 +835,67 @@ class KeyboardView @JvmOverloads constructor(
         )
     }
 
+    private fun setEnterIcon(button: TextView) {
+        val icon = ContextCompat.getDrawable(context, R.drawable.ic_key_enter)?.mutate()
+            ?: return
+        val size = dp(24)
+        icon.setBounds(0, 0, size, size)
+        icon.setTint(ContextCompat.getColor(context, R.color.key_text_enter))
+        // A fixed-size span keeps the existing TextView, localized accessibility
+        // label and click action, without relying on each font's tiny ↵ glyph.
+        button.text = SpannableString("\uFFFC").apply {
+            setSpan(object : ReplacementSpan() {
+                override fun getSize(
+                    paint: Paint,
+                    text: CharSequence,
+                    start: Int,
+                    end: Int,
+                    fm: Paint.FontMetricsInt?
+                ): Int {
+                    fm?.let {
+                        val metrics = paint.fontMetricsInt
+                        val center = (metrics.ascent + metrics.descent) / 2
+                        it.ascent = center - size / 2
+                        it.descent = it.ascent + size
+                        it.top = it.ascent
+                        it.bottom = it.descent
+                    }
+                    return size
+                }
+
+                override fun draw(
+                    canvas: Canvas,
+                    text: CharSequence,
+                    start: Int,
+                    end: Int,
+                    x: Float,
+                    top: Int,
+                    y: Int,
+                    bottom: Int,
+                    paint: Paint
+                ) {
+                    val checkpoint = canvas.save()
+                    canvas.translate(x, (top + bottom - size) / 2f)
+                    icon.draw(canvas)
+                    canvas.restoreToCount(checkpoint)
+                }
+            }, 0, length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        }
+    }
+
     private fun styleModeButton(button: TextView, selected: Boolean) {
-        button.background = if (selected) {
+        val surface = if (selected) {
             ContextCompat.getDrawable(context, R.drawable.mode_selected_bg)
         } else {
             ContextCompat.getDrawable(context, R.drawable.mode_unselected_bg)
+        }
+        val isKeyboardMode = button === voiceModeButton || button === zhuyinModeButton ||
+            button === japaneseModeButton || button === englishModeButton
+        // Compact the visible pill, while retaining the full 44 dp touch area.
+        button.background = if (isKeyboardMode) {
+            InsetDrawable(surface, 0, dp(6), 0, dp(6))
+        } else {
+            surface
         }
         button.setTextColor(
             ContextCompat.getColor(
