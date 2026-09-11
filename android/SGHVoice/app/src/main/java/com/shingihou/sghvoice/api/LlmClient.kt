@@ -134,7 +134,9 @@ class LlmClient(
             """(?:今天|明天|後天|昨天|前天)[，,]\s*(?:不|不對)[，,]\s*(?:是\s*)?(今天|明天|後天|昨天|前天)"""
         )
         private val PROTECTED_SPAN = Regex(
-            """https?://[^\s\p{IsHan}，。！？、]+|[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}|(?:/|[A-Za-z]:\\)[A-Za-z0-9_./\\-]+|[0-9]+(?:[.,:/-][0-9]+)*|[A-Za-z][A-Za-z0-9]*(?:[./_-][A-Za-z0-9]+)+|[A-Za-z]+"""
+            // The Is-prefixed script alias requires Android 10; explicit script
+            // syntax also supports our API 26/27/28 devices.
+            """https?://[^\s\p{script=Han}，。！？、]+|[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}|(?:/|[A-Za-z]:\\)[A-Za-z0-9_./\\-]+|[0-9]+(?:[.,:/-][0-9]+)*|[A-Za-z][A-Za-z0-9]*(?:[./_-][A-Za-z0-9]+)+|[A-Za-z]+"""
         )
         private val OPTIONAL_ENGLISH_FILLERS = setOf("um", "uh")
         private val TECHNICAL_WORDS = setOf(

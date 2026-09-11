@@ -12,8 +12,18 @@ PUBLIC_APK = (
     REPO_ROOT
     / "sgh-voice-web"
     / "downloads"
-    / "SGHVoice-Android-v2.7.6.apk"
+    / "SGHVoice-Android-v2.7.7.apk"
 )
+
+
+def test_android_dictation_regex_keeps_min_sdk_unicode_compatibility():
+    # Android's Is-prefixed script syntax requires Android 10; the app supports
+    # API 26. The explicit script property is portable across that range.
+    source = (
+        REPO_ROOT / "android/SGHVoice/app/src/main/java/com/shingihou/sghvoice/api/LlmClient.kt"
+    ).read_text(encoding="utf-8")
+    assert r"\p{IsHan}" not in source
+    assert r"\p{script=Han}" in source
 
 
 def test_private_android_signing_material_is_not_tracked():
@@ -272,9 +282,9 @@ def test_android_rc_acceptance_tracks_the_current_sideload_release():
     source_code = re.search(r"versionCode\s*=\s*(\d+)", build_script)
     assert source_name is not None
     assert source_code is not None
-    assert public_release["versionName"] == "2.7.6"
-    assert public_release["versionCode"] == 26
-    assert source_name.group(1) == "2.7.6"
-    assert int(source_code.group(1)) == 26
+    assert public_release["versionName"] == "2.7.7"
+    assert public_release["versionCode"] == 27
+    assert source_name.group(1) == "2.7.7"
+    assert int(source_code.group(1)) == 27
     assert int(source_code.group(1)) == public_release["versionCode"]
-    assert "Android 2.7.6（versionCode 26）" in acceptance
+    assert "Android 2.7.7（versionCode 27）" in acceptance

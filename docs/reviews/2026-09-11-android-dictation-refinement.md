@@ -70,3 +70,35 @@ Android 本輪沿用現有 STT／LLM 選項，沒有加入 macOS 的 Qwen3 引�
 - 本輪模擬器畫面：`/Volumes/Satechi_SSD/voice-input/release-output/android-2.7.6/screenshots/synthetic-{voice-active,voice-silent,zhuyin,english,japanese}.png`。這些是使用合成音量的實際 View，並非真實手機錄音截圖。
 
 從官方側載版更新時保留原 App，不先解除安裝。Google Play 安裝版沿原管道更新，以避免簽章差異造成資料遺失。正式商店上架與 12 人封閉測試不列為本輪手機功能改善的完成證據。
+
+## 6. 2.7.7 相容性修補與當前交付
+
+當前交付改為 **2.7.7（versionCode 27）**；第 1–5 節保留 2.7.6 的功能、測試與產物歷史，不改寫為新版證據。
+
+發布後的最後官方文件複核發現，Android `Pattern` 的 Unicode script `Is` 前綴從 Android 10 才支援；本 App 最低支援 Android 8（API 26），因此 Han script 判斷改用 `script=Han`。本修補保留相同的漢字比對目的，避免 Android 8／9 不支援新前綴的問題。[Android Pattern 官方文件](https://developer.android.com/reference/java/util/regex/Pattern.html)
+
+- 保留 2.7.6 的公開 APK、hash 與歷史產物，不覆寫原 immutable 下載網址。
+- 2.7.7 保留上述聽寫整理、詞彙、光暈與 Enter 改善；沒有新增供應商或雲端資料種類。
+- 雲端處理同意仍為版本 3；已在 2.7.6 同意者不需再次同意，尚未同意者仍須閱讀並接受新版說明。
+- Google Play 新版仍未提交；Firebase 由本版 main CI 通過後發布，另查提交、workflow 與 live hash。
+
+| 本版檢查 | 結果 |
+|---|---|
+| 最低支援版本相容性回歸 gate | source guard 修補前失敗、修補後通過；不代表 Android 8／9 runtime 實測 |
+| Android 單元測試、Debug／Release Lint | 164 tests 通過；Debug 0 errors／88 warnings、Release 0 errors／76 warnings |
+| Python 全套、Firestore Rules、JavaScript | 535 passed in 6.06s；Rules Emulator 3／3 通過；i18n JavaScript 語法與 release-critical Ruff 通過 |
+| 簽署 APK／AAB 與 artifact-only | BUILD SUCCESSFUL（2m38s）；ARTIFACT VERIFIED；AAB jarsigner 驗證通過，Release APK manifest 無 Debug fixture |
+| Android 8／9 實機 | 未執行；31 個基礎＋7 個注音案例亦仍待實機 |
+| 新版 UI／安裝實測 | UI 程式與 2.7.6 相同，沿用第 3 節相同 UI 的視覺證據；未重新安裝 2.7.7 到模擬器或實機 |
+
+當前 APK：`https://voice.shingihou.com/downloads/SGHVoice-Android-v2.7.7.apk`
+
+當前 APK SHA-256：`c8d1b42b9f1cba7b95053e2439a44906f98d6d6ac538f8736c5747530b62ce3b`
+
+當前 APK 大小：17,339,565 bytes（16.54 MiB）。
+
+當前 AAB：`/Volumes/Satechi_SSD/voice-input/release-output/android-2.7.7/SGHVoice-Android-v2.7.7.aab`
+
+當前 AAB SHA-256：`cc88b88deb371629788aecd1e5267482e0de9432748e8fcd8da5c144e66ffeeb`
+
+版本化產物目錄：`/Volumes/Satechi_SSD/voice-input/release-output/android-2.7.7/`。
