@@ -29,9 +29,9 @@
     <color name="candidate_primary_text">#3345C2</color>
 
     <!-- 麥克風按鈕色彩 -->
-    <color name="mic_bg">#202434</color>
+    <color name="mic_bg">#E5F5EC</color>
     <color name="mic_bg_recording">#DDF4E9</color>
-    <color name="mic_bg_processing">#72798A</color>
+    <color name="mic_bg_processing">#E9EEE9</color>
     <color name="mic_icon">#FFFFFF</color>
     <color name="mic_text_recording">#237A57</color>
 

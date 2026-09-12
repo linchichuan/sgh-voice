@@ -29,7 +29,7 @@
     <string name="status_idle">Tap to start speaking</string>
     <string name="status_starting">Preparing microphone…</string>
     <string name="status_recording">Recording — tap again to send</string>
-    <string name="audio_waveform_desc">Circular halo showing live microphone level</string>
+    <string name="audio_waveform_desc">Waves inside the circle respond to sound and stay flat in silence</string>
     <string name="status_stopping">Finishing recording…</string>
     <string name="status_processing">Processing…</string>
     <string name="status_done">Done</string>
@@ -44,6 +44,7 @@
     <string name="mic_action_translation_recording">Finish and translate</string>
     <string name="mic_action_processing">Converting to text…</string>
     <string name="voice_toggle_hint">Tap to dictate; press and hold to choose 1–4 translation languages</string>
+    <string name="voice_recording_hint">Waves respond to sound and stay flat in silence</string>
     <string name="translation_picker_title">Translation targets (choose 1–4)</string>
     <string name="translation_picker_status">Translation mode: choose languages, then record</string>
     <string name="translation_picker_accessibility">Translation language picker opened</string>
@@ -101,6 +102,8 @@
     <string name="key_enter">↵</string>
     <string name="key_enter_desc">Enter or send</string>
     <string name="key_at">@</string>
+    <string name="key_ideographic_comma">、</string>
+    <string name="key_ideographic_comma_desc">Ideographic comma</string>
     <string name="key_numbers">\?123</string>
     <string name="key_letters">ABC</string>
     <string name="key_shift_desc">Change letter case</string>

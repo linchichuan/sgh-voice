@@ -12,7 +12,7 @@ PUBLIC_APK = (
     REPO_ROOT
     / "sgh-voice-web"
     / "downloads"
-    / "SGHVoice-Android-v2.7.7.apk"
+    / "SGHVoice-Android-v2.7.8.apk"
 )
 
 
@@ -282,9 +282,9 @@ def test_android_rc_acceptance_tracks_the_current_sideload_release():
     source_code = re.search(r"versionCode\s*=\s*(\d+)", build_script)
     assert source_name is not None
     assert source_code is not None
-    assert public_release["versionName"] == "2.7.7"
-    assert public_release["versionCode"] == 27
-    assert source_name.group(1) == "2.7.7"
-    assert int(source_code.group(1)) == 27
+    assert public_release["versionName"] == "2.7.8"
+    assert public_release["versionCode"] == 28
+    assert source_name.group(1) == "2.7.8"
+    assert int(source_code.group(1)) == 28
     assert int(source_code.group(1)) == public_release["versionCode"]
-    assert "Android 2.7.7（versionCode 27）" in acceptance
+    assert "Android 2.7.8（versionCode 28）" in acceptance

@@ -4,13 +4,13 @@
 
 ## Current Android test release
 
-- Version: 2.7.7 (version code 27)
+- Version: 2.7.8 (version code 28)
 - Platform: Android 8.0 or later
 - Distribution status: personal test build, distributed as a versioned APK from the official SGH Voice website
 - Google Play status: not currently published through Google Play Production
-- Download: https://voice.shingihou.com/downloads/SGHVoice-Android-v2.7.7.apk
-- File size: 16.54 MiB (17,339,565 bytes)
-- SHA-256: c8d1b42b9f1cba7b95053e2439a44906f98d6d6ac538f8736c5747530b62ce3b
+- Download: https://voice.shingihou.com/downloads/SGHVoice-Android-v2.7.8.apk
+- File size: 16.54 MiB (17,340,997 bytes)
+- SHA-256: 8bef85433723474ea017de1b45a4af29777631d2e3730e95a27ce7dc93809049
 - App price: free
 - Cloud usage: BYOK; OpenAI, Anthropic, or Groq usage charges may apply
 
@@ -19,7 +19,8 @@
 - Four modes in one Android input method: Voice, Zhuyin, Japanese, and English
 - SGH Voice brand and icon remain visible at the top left of the keyboard
 - Tap for normal dictation; long-press to select 1–4 translation targets from Traditional Chinese, Japanese, English, and Korean
-- Soft mint circular audio halo responds gently to actual microphone input and remains still during silence
+- One large soft-mint circle handles recording start, recording state, and stop; ripples inside respond gently to actual audio and remain calm during silence
+- Voice mode replaces the bottom-row @ key with the ideographic comma 、 and keeps the ， (comma) and 。 (full stop) keys
 - Compact mode selector and a larger Enter symbol
 - Short and long dictation both use one cleanup request to the selected AI, considering the recorded passage for punctuation, clear stutters, and sentence flow while preserving meaning
 - Multi-target translation uses one speech-recognition pass and one strict JSON LLM request
@@ -40,10 +41,11 @@
 ### Android limitations and installation notice
 
 - This APK is a sideloaded personal test build, not a public Google Play release
-- Official sideload installations of 2.7.3–2.7.6 can update directly to 2.7.7 with the same package name and signing certificate; users should not uninstall first
+- Official sideload installations of 2.7.3–2.7.7 can update directly to 2.7.8 with the same package name and signing certificate; users should not uninstall first
 - Google Play test installations should update through their original install channel
 - Review and accept cloud-processing consent version 3 in Settings if not yet accepted; consent already accepted in 2.7.6 remains valid, and existing keys and vocabulary are retained
-- 2.7.7 preserves the dictation and interface improvements from 2.7.6 and fixes Unicode script syntax compatibility for Android 8 and 9
+- Includes the Android 8 and 9 Unicode script syntax compatibility fix from 2.7.7
+- 2.7.8 changes the recording interface and punctuation shortcut only; speech recognition, AI processing, providers, and cloud consent version 3 are unchanged
 - Automated checks and emulator inspection do not establish real-device dictation accuracy; the physical-device acceptance checklist remains pending
 - Android requires the user to allow installation from the browser or file manager used for the download
 - Compatibility and stability can vary by device; users should evaluate sideloading risks before installation

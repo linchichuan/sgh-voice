@@ -1,6 +1,6 @@
 # SGH Voice Android RC 實機驗收
 
-> 適用版本：Android 2.7.7（versionCode 27）正式側載測試版
+> 適用版本：Android 2.7.8（versionCode 28）正式側載測試版
 > 文件狀態：QA／RC 驗收用途
 > 禁止事項：不得使用真實患者姓名、病歷、電話、付款或其他個人資料
 
@@ -15,6 +15,7 @@
 5. 既有錄音、轉寫、插入與翻譯流程沒有回歸。
 6. 使用者在錄音後撤回雲端處理同意時，音訊不會送出。
 7. 整句聽寫整理、技術詞彙、人工確認詞提示與圓形收音光暈；新增驗收案例見 [本輪改善紀錄](reviews/2026-09-11-android-dictation-refinement.md)。
+8. 單一淺綠大圓完成開始／錄音／結束，以及語音底列「、」「，」「。」；本版驗收案例見 [2.7.8 單一圓形控制紀錄](reviews/2026-09-12-android-single-circle-review.md)。
 
 醫療詞庫不在本次 RC 驗收範圍，本輪也不得匯入完整醫療詞表。
 
@@ -61,7 +62,7 @@
 | Android 模擬器 | Debug 2.7.6／26 安裝、合成收音與四模式 UI smoke | PASS（模擬器限定） | 5 張最新實際 View 截圖已檢視，無重疊爆版，24dp Enter 置中；SGH crash buffer 無 crash；不代表實機收音、延遲、準確度或 38 個實機案例通過 |
 | Android 實機 | 真實手機與第 4 節案例 | 未執行 | 未連接實機；31 個基礎案例與 7 個注音案例全部待驗 |
 
-## 2.2 2.7.7 相容性修補與當前驗證
+## 2.2 2.7.7 相容性修補驗證（歷史紀錄）
 
 2.7.7 將 Unicode Han script 正則表達式改為 Android 8／9 可用的 `script=Han` 語法；功能與雲端處理同意版本 3 不變。2.7.6 APK 保留原檔與原 hash，不覆寫已公開的 immutable URL。
 
@@ -74,14 +75,28 @@
 | Android 8／9 實機 | 未執行；官方語法依據與單元測試不能取代實機 |
 | 31 個基礎＋7 個注音實機案例 | 全部仍待驗 |
 
+## 2.3 2.7.8 單一圓形錄音控制（2026-09-12；當前驗證）
+
+本版只調整錄音控制介面及語音底列標點：`@` 改為頓號 `、`，逗號 `，`、句號 `。` 保留。STT、AI 整理、供應商、隱私及雲端處理同意版本 3 均不變；第 2.1、2.2 節是先前版本證據，不視為本版已通過。
+
+| 檢查 | 本版結果 |
+|---|---|
+| Firestore 下載登記規則 | 紅綠驗證完成：舊規則拒絕 2.7.8；同步後 Emulator 3／3 通過 |
+| JavaScript 語法與 Python release gates | 最終產物完整驗證：Python 535 passed in 5.88s；JavaScript 語法、release-critical Ruff 通過；production npm audit 0 vulnerabilities |
+| Android 單元測試與 Lint | 167 tests 通過；Debug Lint 0 errors／95 warnings，Release Lint 0 errors／78 warnings |
+| 簽署 APK／AAB 與 artifact-only | 字體裁字修正後最後組建 BUILD SUCCESSFUL（2m50s）；最終 APK `8bef8543…93809049` 的 artifact-only PASS，版本、大小、hash 與 signer 符合 metadata |
+| 模擬器與 UI 畫面 | active／silent／processing 三圖已目視檢視；最終 `ui-final-contract.xml` PASS，200% zh-TW 字體截圖確認狀態列與圓內文字無裁切；屬 synthetic UI 驗證，不等同實機收音驗證 |
+| 31 個基礎＋7 個注音實機案例 | 全部仍待驗；另須完成本版單一圓形及標點案例 |
+| Firebase／Google Play | Firebase 由本版 main CI 通過後發布；須另查提交、workflow 與 live hash 回執，不將原始碼變更視為部署完成。Google Play 本輪未操作 |
+
 ## 3. 測試紀錄
 
 | 欄位 | 紀錄 |
 |---|---|
-| 測試日期 | 2026-09-11（自動化／模擬器；實機待驗） |
+| 測試日期 | 2026-09-12（本版自動化／模擬器與實機狀態依第 2.3 節） |
 | 測試者 | Codex（自動化）；Lin（實機項目待執行） |
-| APK SHA-256 | `c8d1b42b9f1cba7b95053e2439a44906f98d6d6ac538f8736c5747530b62ce3b`（17,339,565 bytes） |
-| App 版本 | 2.7.7（versionCode 27） |
+| APK SHA-256 | `8bef85433723474ea017de1b45a4af29777631d2e3730e95a27ce7dc93809049`（17,340,997 bytes） |
+| App 版本 | 2.7.8（versionCode 28） |
 | 手機型號 |  |
 | Android 版本 |  |
 | 螢幕尺寸／縮放 |  |
@@ -206,14 +221,14 @@ Issue ID:
 > 本輪未連接實機，第 4 節 31 個基礎案例及另 7 個注音案例（合計 38 個）均未執行，需 Lin 在實機上完成。
 > 自動化前置檢查結果見第 2.1 節。
 
-### 7.0 前置：從官方側載版 2.7.3–2.7.6 直接覆蓋更新
+### 7.0 前置：從官方側載版 2.7.3–2.7.7 直接覆蓋更新
 
-確認 2.7.7 產物與既有官方側載版的 package name、簽章憑證一致後，可保留 App 資料直接更新。Google Play 測試版請沿原安裝管道更新；不得以解除安裝作為預設解法：
+確認 2.7.8 產物與既有官方側載版的 package name、簽章憑證一致後，可保留 App 資料直接更新。Google Play 測試版請沿原安裝管道更新；不得以解除安裝作為預設解法：
 
-1. 在手機瀏覽器開啟 `https://voice.shingihou.com/`，下載 `SGHVoice-Android-v2.7.7.apk`。
+1. 在手機瀏覽器開啟 `https://voice.shingihou.com/`，下載 `SGHVoice-Android-v2.7.8.apk`。
 2. 若 Android 要求允許來源，只對目前使用的瀏覽器或檔案管理器開啟「安裝未知的應用程式」；不要停用 Google Play Protect。
 3. 開啟 APK 後選擇「更新」。**不要先解除安裝既有 App**，否則裝置內設定與資料可能被刪除。
-4. 安裝後確認版本為 2.7.7；若尚未接受同意版本 3，請到 App 設定閱讀新版雲端處理說明並同意；已於 2.7.6 同意版本 3 者不需再次同意。核對原金鑰與詞庫仍存在，再開始第 4 節測試。
+4. 安裝後確認版本為 2.7.8；若尚未接受同意版本 3，請到 App 設定閱讀雲端處理說明並同意；已接受版本 3 者不需再次同意。核對原金鑰與詞庫仍存在，再開始第 4 節測試。
 5. 若改用 USB 且裝置已授權，可在 repo 根目錄執行 `./scripts/verify_mobile_rc.sh --install`；腳本會在安裝前重新驗證版本、SHA-256 與 signer。
 
 ### 7.1 填寫第 3 節「測試紀錄」
@@ -279,4 +294,4 @@ Issue ID:
 ### 7.3 收尾
 
 - 依第 5 節格式回報任何未通過案例（患者資料先去識別化）。
-- 對照第 6 節「RC 通過門檻」逐條確認後才能放行 2.7.7。
+- 對照第 6 節「RC 通過門檻」逐條確認後才能放行 2.7.8。

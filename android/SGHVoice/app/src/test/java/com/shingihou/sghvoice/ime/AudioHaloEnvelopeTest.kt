@@ -6,6 +6,53 @@ import org.junit.Test
 
 class AudioHaloEnvelopeTest {
     @Test
+    fun silenceAndReducedMotionProduceOnlyFlatLines() {
+        for (line in 0..2) {
+            for (point in 0..20) {
+                val position = point / 20f
+                assertEquals(0f, GentleWaveGeometry.offsetAt(position, line, 0f, 1.4f, false), 0f)
+                assertEquals(0f, GentleWaveGeometry.offsetAt(position, line, 1f, 1.4f, true), 0f)
+            }
+        }
+    }
+
+    @Test
+    fun audibleWavesStayGentleAndLeaveTheCaptionAreaClear() {
+        for (line in 0..2) {
+            val loud = (0..40).map { point ->
+                GentleWaveGeometry.offsetAt(point / 40f, line, 1f, 0.9f, false)
+            }
+            val quiet = (0..40).map { point ->
+                GentleWaveGeometry.offsetAt(point / 40f, line, 0.2f, 0.9f, false)
+            }
+            assertTrue(loud.maxOf { kotlin.math.abs(it) } > 0.005f)
+            assertTrue(loud.maxOf { kotlin.math.abs(it) } > quiet.maxOf { kotlin.math.abs(it) })
+            assertTrue(loud.all { it in -0.065f..0.065f })
+            assertTrue(loud.all { 0.42f + it < 0.65f })
+            assertEquals(0f, loud.first(), 0f)
+            assertEquals(0f, loud.last(), 0f)
+        }
+    }
+
+    @Test
+    fun wavesProgressOnlyWhenAudibleSamplesArriveAndResetWithSilence() {
+        val envelope = AudioHaloEnvelope()
+        envelope.update(0.7f, 100L)
+        val firstPhase = envelope.phase
+        assertTrue(firstPhase > 0f)
+        envelope.update(0.7f, 150L)
+        assertTrue(envelope.phase > firstPhase)
+        envelope.update(0f, 200L)
+        assertEquals(0f, envelope.phase, 0f)
+        envelope.update(0f, 1200L)
+        assertEquals(0f, envelope.phase, 0f)
+        envelope.update(0.7f, 1250L)
+        envelope.reset()
+        assertEquals(0f, envelope.phase, 0f)
+        assertEquals(0f, envelope.level, 0f)
+    }
+
+    @Test
     fun silenceAndInvalidSamplesNeverProduceMotion() {
         val envelope = AudioHaloEnvelope()
         listOf(0f, -1f, 0.01f, Float.NaN, Float.POSITIVE_INFINITY).forEachIndexed { index, sample ->

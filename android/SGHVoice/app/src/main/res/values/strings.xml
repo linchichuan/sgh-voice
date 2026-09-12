@@ -29,7 +29,7 @@
     <string name="status_idle">點一下開始說話</string>
     <string name="status_starting">正在準備麥克風…</string>
     <string name="status_recording">錄音中，再點一下送出</string>
-    <string name="audio_waveform_desc">隨收音音量變化的圓形光暈</string>
+    <string name="audio_waveform_desc">圓內波紋隨收音變化，靜音時保持平直</string>
     <string name="status_stopping">正在結束錄音…</string>
     <string name="status_processing">處理中…</string>
     <string name="status_done">輸入完成</string>
@@ -44,6 +44,7 @@
     <string name="mic_action_translation_recording">完成並翻譯</string>
     <string name="mic_action_processing">正在轉成文字…</string>
     <string name="voice_toggle_hint">點按一般口述；長按選擇 1–4 種翻譯語言</string>
+    <string name="voice_recording_hint">有聲音時圓內波紋起伏，靜音時保持平直</string>
     <string name="translation_picker_title">選擇翻譯目標（可複選 1–4 種）</string>
     <string name="translation_picker_status">翻譯模式：選好語言後開始錄音</string>
     <string name="translation_picker_accessibility">已開啟翻譯語言選擇</string>
@@ -101,6 +102,8 @@
     <string name="key_enter">↵</string>
     <string name="key_enter_desc">換行或送出</string>
     <string name="key_at">@</string>
+    <string name="key_ideographic_comma">、</string>
+    <string name="key_ideographic_comma_desc">頓號</string>
     <string name="key_numbers">\?123</string>
     <string name="key_letters">ABC</string>
     <string name="key_shift_desc">切換大小寫</string>

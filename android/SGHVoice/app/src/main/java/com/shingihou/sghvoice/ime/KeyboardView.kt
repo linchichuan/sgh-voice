@@ -20,16 +20,18 @@ import android.view.View.OnAttachStateChangeListener
 import android.widget.GridLayout
 import android.widget.HorizontalScrollView
 import android.widget.ImageButton
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.PopupMenu
 import android.widget.TextView
 import androidx.core.content.ContextCompat
+import androidx.core.view.AccessibilityDelegateCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.doOnAttach
 import androidx.core.view.isVisible
 import androidx.core.view.updatePadding
-import androidx.core.widget.TextViewCompat
+import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
 import com.shingihou.sghvoice.R
 import com.shingihou.sghvoice.ime.japanese.JapaneseScriptMode
 import com.shingihou.sghvoice.ime.manual.KeyAction
@@ -96,7 +98,9 @@ class KeyboardView @JvmOverloads constructor(
     private lateinit var voicePanel: View
     private lateinit var manualPanel: View
     private lateinit var voiceActionRow: View
-    private lateinit var micButton: TextView
+    private lateinit var micButton: View
+    private lateinit var micActionLabel: TextView
+    private lateinit var micActionIcon: ImageView
     private lateinit var statusText: TextView
     private lateinit var voiceStateDot: View
     private lateinit var audioWaveform: AudioWaveformView
@@ -212,19 +216,9 @@ class KeyboardView @JvmOverloads constructor(
     }
 
     fun setTranslationRecordingMode() {
-        micButton.setText(R.string.mic_action_translation_recording)
+        micActionLabel.setText(R.string.mic_action_translation_recording)
         micButton.contentDescription =
             context.getString(R.string.translation_recording_mic_desc)
-        micButton.setCompoundDrawablesRelativeWithIntrinsicBounds(
-            R.drawable.ic_check,
-            0,
-            0,
-            0
-        )
-        TextViewCompat.setCompoundDrawableTintList(
-            micButton,
-            ColorStateList.valueOf(ContextCompat.getColor(context, R.color.mic_text_recording))
-        )
     }
 
     fun showTranslationPanel(targets: List<TranslationLanguage>) {
@@ -315,7 +309,7 @@ class KeyboardView @JvmOverloads constructor(
             }
 
             VoiceInputIME.ImeState.STARTING -> {
-                audioWaveform.setRecordingActive(true)
+                audioWaveform.setRecordingActive(false)
                 audioWaveform.setAudioLevel(0f)
                 statusText.setText(R.string.status_starting)
                 statusText.setTextColor(ContextCompat.getColor(context, R.color.status_text))
@@ -393,6 +387,11 @@ class KeyboardView @JvmOverloads constructor(
                 )
             }
         }
+        micActionIcon.isVisible = state != VoiceInputIME.ImeState.RECORDING
+        voiceHint.setText(
+            if (state == VoiceInputIME.ImeState.RECORDING) R.string.voice_recording_hint
+            else R.string.voice_toggle_hint
+        )
     }
 
     private fun bindViews() {
@@ -406,6 +405,14 @@ class KeyboardView @JvmOverloads constructor(
         manualPanel = findViewById(R.id.panel_manual)
         voiceActionRow = findViewById(R.id.voice_action_row)
         micButton = findViewById(R.id.btn_mic)
+        micActionLabel = findViewById(R.id.mic_action_label)
+        micActionIcon = findViewById(R.id.mic_action_icon)
+        ViewCompat.setAccessibilityDelegate(micButton, object : AccessibilityDelegateCompat() {
+            override fun onInitializeAccessibilityNodeInfo(host: View, info: AccessibilityNodeInfoCompat) {
+                super.onInitializeAccessibilityNodeInfo(host, info)
+                info.className = "android.widget.Button"
+            }
+        })
         statusText = findViewById(R.id.tv_status)
         voiceStateDot = findViewById(R.id.voice_state_dot)
         audioWaveform = findViewById(R.id.audio_waveform)
@@ -499,7 +506,7 @@ class KeyboardView @JvmOverloads constructor(
             hideTranslationPanel()
             listener?.onTranslationRequested(request)
         }
-        layerButton.setOnClickListener { dispatchVoiceAction(it, KeyAction.InsertText("@")) }
+        layerButton.setOnClickListener { dispatchVoiceAction(it, KeyAction.InsertText("、")) }
         commaButton.setOnClickListener { dispatchVoiceAction(it, KeyAction.InsertText("，")) }
         spaceButton.setOnClickListener { dispatchVoiceAction(it, KeyAction.Space) }
         periodButton.setOnClickListener { dispatchVoiceAction(it, KeyAction.InsertText("。")) }
@@ -527,7 +534,7 @@ class KeyboardView @JvmOverloads constructor(
     }
 
     private fun configureVoiceActions() {
-        layerButton.text = "@"
+        layerButton.setText(R.string.key_ideographic_comma)
         commaButton.text = "，"
         periodButton.text = "。"
     }
@@ -978,20 +985,15 @@ class KeyboardView @JvmOverloads constructor(
         labelRes: Int,
         iconRes: Int,
         dotColorRes: Int,
-        contentColorRes: Int = R.color.mic_icon
+        contentColorRes: Int = R.color.mic_text_recording
     ) {
         micButton.isEnabled = enabled
         micButton.alpha = 1f
-        micButton.setText(labelRes)
+        micActionLabel.setText(labelRes)
         micButton.contentDescription = context.getString(labelRes)
-        micButton.setCompoundDrawablesRelativeWithIntrinsicBounds(iconRes, 0, 0, 0)
-        TextViewCompat.setCompoundDrawableTintList(
-            micButton,
-            ColorStateList.valueOf(
-                ContextCompat.getColor(context, contentColorRes)
-            )
-        )
-        micButton.setTextColor(ContextCompat.getColor(context, contentColorRes))
+        micActionIcon.setImageResource(iconRes)
+        micActionIcon.imageTintList = ColorStateList.valueOf(ContextCompat.getColor(context, contentColorRes))
+        micActionLabel.setTextColor(ContextCompat.getColor(context, contentColorRes))
         micButton.backgroundTintList = ColorStateList.valueOf(
             ContextCompat.getColor(context, colorRes)
         )

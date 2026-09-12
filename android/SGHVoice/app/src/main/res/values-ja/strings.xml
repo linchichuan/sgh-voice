@@ -29,7 +29,7 @@
     <string name="status_idle">タップして音声入力を開始</string>
     <string name="status_starting">マイクを準備中…</string>
     <string name="status_recording">録音中・もう一度タップして送信</string>
-    <string name="audio_waveform_desc">マイクの音量に反応する円形の光</string>
+    <string name="audio_waveform_desc">円内の波が音声に反応し、無音時は水平に静止します</string>
     <string name="status_stopping">録音を終了中…</string>
     <string name="status_processing">処理中…</string>
     <string name="status_done">入力完了</string>
@@ -44,6 +44,7 @@
     <string name="mic_action_translation_recording">完了して翻訳</string>
     <string name="mic_action_processing">文字に変換中…</string>
     <string name="voice_toggle_hint">タップで音声入力、長押しで1～4言語の翻訳先を選択</string>
+    <string name="voice_recording_hint">音声に合わせて波が動き、無音時は水平に静止します</string>
     <string name="translation_picker_title">翻訳先を選択（1～4言語）</string>
     <string name="translation_picker_status">翻訳モード：言語を選んで録音を開始</string>
     <string name="translation_picker_accessibility">翻訳言語の選択画面を開きました</string>
@@ -101,6 +102,8 @@
     <string name="key_enter">↵</string>
     <string name="key_enter_desc">改行または送信</string>
     <string name="key_at">@</string>
+    <string name="key_ideographic_comma">、</string>
+    <string name="key_ideographic_comma_desc">読点</string>
     <string name="key_numbers">\?123</string>
     <string name="key_letters">ABC</string>
     <string name="key_shift_desc">大文字・小文字を切り替え</string>
