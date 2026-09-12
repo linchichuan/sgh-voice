@@ -38,6 +38,9 @@
     <string name="status_translation_recording_elapsed">翻譯錄音中 %1$s；點按送出，長按取消</string>
     <string name="status_recording_limit">已達兩分鐘上限，正在送出</string>
     <string name="status_learning_saved">已在本機學習「%1$s → %2$s」</string>
+    <string name="status_learning_pending">已記下修正「%1$s → %2$s」，再次確認後才會套用</string>
+    <string name="status_learning_pending_short">已記下修正，待確認</string>
+    <string name="status_learning_saved_short">已更新個人詞庫</string>
     <string name="status_learning_disabled">此欄位已停用個人化學習</string>
     <string name="mic_action_start">開始說話</string>
     <string name="mic_action_recording">完成並輸入</string>
@@ -166,7 +169,7 @@
     <string name="label_correct_word">修正</string>
     <string name="title_personalized_learning">本機個人化學習</string>
     <string name="label_personalized_learning">自動學習候選字與語音修正</string>
-    <string name="desc_personalized_learning">只保存短詞、候選使用次數與錯字對照，不保存完整句子或音訊。密碼及禁止個人化的欄位不會學習。</string>
+    <string name="desc_personalized_learning">在本機保存候選使用次數與短範圍錯字對照；短片段仍可能含個人內容，音訊不作為學習資料。密碼及禁止個人化的欄位不會學習。可撤銷最近學習或清除全部。</string>
     <string name="learning_stats">已學習 %1$d 個候選、%2$d 組修正</string>
     <string name="btn_undo_learning">撤銷最近學習</string>
     <string name="btn_clear_learning">清除學習資料</string>

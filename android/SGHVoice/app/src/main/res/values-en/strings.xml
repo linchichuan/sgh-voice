@@ -38,6 +38,9 @@
     <string name="status_translation_recording_elapsed">Translation recording %1$s — tap to send, hold to cancel</string>
     <string name="status_recording_limit">Two-minute limit reached — sending</string>
     <string name="status_learning_saved">Learned locally: “%1$s → %2$s”</string>
+    <string name="status_learning_pending">Noted correction: %1$s → %2$s. It will apply after another confirmation.</string>
+    <string name="status_learning_pending_short">Correction pending</string>
+    <string name="status_learning_saved_short">Dictionary updated</string>
     <string name="status_learning_disabled">Personalized learning is disabled for this field</string>
     <string name="mic_action_start">Start speaking</string>
     <string name="mic_action_recording">Finish and insert</string>
@@ -166,7 +169,7 @@
     <string name="label_correct_word">Corrected</string>
     <string name="title_personalized_learning">On-device personalization</string>
     <string name="label_personalized_learning">Learn candidate choices and voice corrections</string>
-    <string name="desc_personalized_learning">Only short terms, candidate counts, and correction pairs are stored. Full sentences and audio are not saved. Password fields and editors that disable personalization are excluded.</string>
+    <string name="desc_personalized_learning">Candidate counts and short correction pairs are stored on this device; short excerpts may still contain personal information. Audio is not used as learning data. Password fields and editors that disable personalization are excluded. You can undo the latest learning or clear all learning data.</string>
     <string name="learning_stats">%1$d candidates and %2$d corrections learned</string>
     <string name="btn_undo_learning">Undo last learning</string>
     <string name="btn_clear_learning">Clear learned data</string>

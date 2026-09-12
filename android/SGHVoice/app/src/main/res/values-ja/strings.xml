@@ -38,6 +38,9 @@
     <string name="status_translation_recording_elapsed">翻訳録音中 %1$s・タップで送信、長押しでキャンセル</string>
     <string name="status_recording_limit">2分の上限に達したため送信します</string>
     <string name="status_learning_saved">端末内で学習しました「%1$s → %2$s」</string>
+    <string name="status_learning_pending">修正を記録しました「%1$s → %2$s」。再度確認できた場合に適用します。</string>
+    <string name="status_learning_pending_short">修正を記録・確認待ち</string>
+    <string name="status_learning_saved_short">個人辞書を更新しました</string>
     <string name="status_learning_disabled">この入力欄では個人学習が無効です</string>
     <string name="mic_action_start">音声入力を開始</string>
     <string name="mic_action_recording">完了して入力</string>
@@ -166,7 +169,7 @@
     <string name="label_correct_word">修正後</string>
     <string name="title_personalized_learning">端末内の個人学習</string>
     <string name="label_personalized_learning">候補選択と音声修正を自動学習</string>
-    <string name="desc_personalized_learning">短い単語、候補の使用回数、誤字修正のみを保存し、文章全体や音声は保存しません。パスワード欄および個人学習禁止の入力欄は対象外です。</string>
+    <string name="desc_personalized_learning">候補の使用回数と短い修正対照を端末内に保存します。短い断片にも個人情報が含まれる場合があります。音声は学習データに使用しません。パスワード欄と個人学習禁止の入力欄は対象外です。直近の学習の取り消しや学習データの全削除ができます。</string>
     <string name="learning_stats">候補 %1$d 件、修正 %2$d 件を学習済み</string>
     <string name="btn_undo_learning">直前の学習を取り消す</string>
     <string name="btn_clear_learning">学習データを消去</string>

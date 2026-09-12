@@ -4,13 +4,13 @@
 
 ## Current Android test release
 
-- Version: 2.7.8 (version code 28)
+- Version: 2.7.9 (version code 29)
 - Platform: Android 8.0 or later
 - Distribution status: personal test build, distributed as a versioned APK from the official SGH Voice website
 - Google Play status: not currently published through Google Play Production
-- Download: https://voice.shingihou.com/downloads/SGHVoice-Android-v2.7.8.apk
-- File size: 16.54 MiB (17,340,997 bytes)
-- SHA-256: 8bef85433723474ea017de1b45a4af29777631d2e3730e95a27ce7dc93809049
+- Download: https://voice.shingihou.com/downloads/SGHVoice-Android-v2.7.9.apk
+- File size: 17,345,085 bytes (16.54 MiB)
+- SHA-256: 62292210cdcbb7e75b2a8148b24245dc578f91f491f3d626fbe0c5d86fefbe3d
 - App price: free
 - Cloud usage: BYOK; OpenAI, Anthropic, or Groq usage charges may apply
 
@@ -35,17 +35,20 @@
 - Groq GPT OSS post-processing uses low reasoning effort to limit latency and reasoning-token consumption
 - English QWERTY input
 - On-device candidate-frequency learning and short correction rules
+- Eligible delete-then-retype edits can form one short manual correction; deletion alone is not recorded as a learned replacement
+- English vocabulary hints use complete terms instead of isolated changed characters; this is bounded personalization, not STT or LLM model retraining
 - Personalization disabled in password and no-personalization fields
 - Undo and clear controls for local learning
 
 ### Android limitations and installation notice
 
 - This APK is a sideloaded personal test build, not a public Google Play release
-- Official sideload installations of 2.7.3–2.7.7 can update directly to 2.7.8 with the same package name and signing certificate; users should not uninstall first
+- Official sideload installations of 2.7.3–2.7.8 can update directly to 2.7.9 with the same package name and signing certificate; users should not uninstall first
+- Previously mistaken learning records are not automatically erased by the update; users can undo the latest learning or clear local learning data from the personal dictionary screen
 - Google Play test installations should update through their original install channel
 - Review and accept cloud-processing consent version 3 in Settings if not yet accepted; consent already accepted in 2.7.6 remains valid, and existing keys and vocabulary are retained
 - Includes the Android 8 and 9 Unicode script syntax compatibility fix from 2.7.7
-- 2.7.8 changes the recording interface and punctuation shortcut only; speech recognition, AI processing, providers, and cloud consent version 3 are unchanged
+- 2.7.9 improves capture of short manual corrections and full English vocabulary hints; the 2.7.8 recording circle, providers, data categories, and consent version 3 are retained
 - Automated checks and emulator inspection do not establish real-device dictation accuracy; the physical-device acceptance checklist remains pending
 - Android requires the user to allow installation from the browser or file manager used for the download
 - Compatibility and stability can vary by device; users should evaluate sideloading risks before installation

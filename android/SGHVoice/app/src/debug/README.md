@@ -19,6 +19,9 @@ extra accepts the IME state names (`idle`, `starting`, `recording`, `stopping`,
 Optional `--es locale zh-TW` renders the keyboard in Traditional Chinese (force
 stop/relaunch when changing locale). `--ef fontScale 1.5` changes only this
 synthetic keyboard's font scale (0.85–2.0), not the device setting.
+`--es learning pending` or `--es learning saved` previews the short learning
+status with synthetic state only; it never records a correction or touches the
+personal dictionary. Combine with `--es state done` for post-dictation UI.
 `--ez verify true` runs device-side checks
 of the large single control, busy-state gating, one tap/one action, actual
 `、` / `，` / `。` dispatch, and the translation picker. The preview header reports

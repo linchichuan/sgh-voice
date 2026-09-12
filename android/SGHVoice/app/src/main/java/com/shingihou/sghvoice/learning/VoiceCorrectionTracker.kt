@@ -233,8 +233,9 @@ data class VoiceCorrectionTrackingResult(
  * It identifies the committed range again using short anchors immediately
  * before and after the result. A correction is high-confidence only when both
  * sides are anchored, or when a missing anchor is a verified window boundary.
- * The tracker consumes the session after the first accepted or rejected edit,
- * because Phase 1 intentionally learns at most one replacement per voice turn.
+ * The tracker learns at most one replacement per voice turn. A bounded deletion
+ * may be the first half of a delete-then-type correction;
+ * it is never learned, but keeps the original deadline while awaiting replacement.
  */
 class VoiceCorrectionTracker(
     private val clockElapsedMillis: () -> Long = {
@@ -362,7 +363,13 @@ class VoiceCorrectionTracker(
             }
 
             is CorrectionDiffResult.Rejected -> {
-                session = null
+                val deletedCodePoints = active.committedText.codePointLength() -
+                    editedText.codePointLength()
+                val pendingReplacement =
+                    diff.reason == CorrectionDiffRejection.PURE_DELETION &&
+                        editedText.isNotBlank() &&
+                        deletedCodePoints in 1..maxReplacementCodePoints
+                if (!pendingReplacement) session = null
                 VoiceCorrectionTrackingResult(
                     status = VoiceCorrectionTrackingStatus.REJECTED_EDIT,
                     rejection = diff.reason

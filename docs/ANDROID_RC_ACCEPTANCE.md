@@ -1,6 +1,6 @@
 # SGH Voice Android RC 實機驗收
 
-> 適用版本：Android 2.7.8（versionCode 28）正式側載測試版
+> 適用版本：Android 2.7.9（versionCode 29）正式側載測試版
 > 文件狀態：QA／RC 驗收用途
 > 禁止事項：不得使用真實患者姓名、病歷、電話、付款或其他個人資料
 
@@ -16,6 +16,7 @@
 6. 使用者在錄音後撤回雲端處理同意時，音訊不會送出。
 7. 整句聽寫整理、技術詞彙、人工確認詞提示與圓形收音光暈；新增驗收案例見 [本輪改善紀錄](reviews/2026-09-11-android-dictation-refinement.md)。
 8. 單一淺綠大圓完成開始／錄音／結束，以及語音底列「、」「，」「。」；本版驗收案例見 [2.7.8 單一圓形控制紀錄](reviews/2026-09-12-android-single-circle-review.md)。
+9. 先刪除再輸入的短修正追蹤、完整英文詞提示及安全匹配；本版驗收見 [2.7.9 個人化改善紀錄](reviews/2026-09-12-android-personalization-review.md)。
 
 醫療詞庫不在本次 RC 驗收範圍，本輪也不得匯入完整醫療詞表。
 
@@ -75,7 +76,7 @@
 | Android 8／9 實機 | 未執行；官方語法依據與單元測試不能取代實機 |
 | 31 個基礎＋7 個注音實機案例 | 全部仍待驗 |
 
-## 2.3 2.7.8 單一圓形錄音控制（2026-09-12；當前驗證）
+## 2.3 2.7.8 單一圓形錄音控制（2026-09-12；已發布歷史）
 
 本版只調整錄音控制介面及語音底列標點：`@` 改為頓號 `、`，逗號 `，`、句號 `。` 保留。STT、AI 整理、供應商、隱私及雲端處理同意版本 3 均不變；第 2.1、2.2 節是先前版本證據，不視為本版已通過。
 
@@ -87,16 +88,31 @@
 | 簽署 APK／AAB 與 artifact-only | 字體裁字修正後最後組建 BUILD SUCCESSFUL（2m50s）；最終 APK `8bef8543…93809049` 的 artifact-only PASS，版本、大小、hash 與 signer 符合 metadata |
 | 模擬器與 UI 畫面 | active／silent／processing 三圖已目視檢視；最終 `ui-final-contract.xml` PASS，200% zh-TW 字體截圖確認狀態列與圓內文字無裁切；屬 synthetic UI 驗證，不等同實機收音驗證 |
 | 31 個基礎＋7 個注音實機案例 | 全部仍待驗；另須完成本版單一圓形及標點案例 |
-| Firebase／Google Play | Firebase 由本版 main CI 通過後發布；須另查提交、workflow 與 live hash 回執，不將原始碼變更視為部署完成。Google Play 本輪未操作 |
+| Firebase／Google Play | 2.7.8 Firebase Rules／Hosting [34668475395](https://github.com/linchichuan/sgh-voice/actions/runs/34668475395) 已成功；live APK bytes、hash 與本機 `cmp` 通過。Google Play 未操作 |
+
+## 2.4 2.7.9 個人化修正追蹤（2026-09-12；當前驗證）
+
+本版修正先刪除再輸入的短修正漏記，及完整英文詞的提示與匹配。2.7.8 單一大圓與標點介面保留；沒有新增供應商或資料類型，雲端同意維持版本 3。個人化是受限短修正规則與詞彙參考，不是模型訓練，也不保證每次辨識正確。手機上的啟用方式、60 秒追蹤、兩次低信心確認及撤銷／清除限制見[本版紀錄](reviews/2026-09-12-android-personalization-review.md#手機上的使用方式)。
+
+| 檢查 | 本版結果 |
+|---|---|
+| Firestore 下載登記規則 | 紅綠驗證：舊 2.7.8 規則拒絕新版本；更新後 Emulator 3／3 通過 |
+| Python release gates／JavaScript | 兩項產物 gate 先在舊 manifest 下取得失敗；本版 APK 與 metadata 更新後，兩份 release gates 完整 27 passed in 0.96s；i18n 語法與 diff 檢查通過 |
+| Android 功能與邊界測試／Lint | 178 tests，0 failures／errors／skips；新增 tracker 4＋helper 7 項，已取得修補前失敗與修補後通過。Debug Lint 0 errors／95 warnings，Release Lint 0 errors／78 warnings；完整測試與 APK／AAB 建置成功（1m53s） |
+| 簽署 APK／AAB 與 artifact-only | 本版 APK／AAB 已簽署建置，獨立核對 APK 17,345,085 bytes、SHA-256 與 metadata 相符；artifact-only 由主 agent 最終整合 |
+| Synthetic UI | 200% 字體下「待確認」／「已更新」短狀態經模擬器目視無裁切；`ui-pending-contract.xml` PASS，不代表真實語音／手動修正 E2E |
+| 個人化實際手機 E2E | 未執行；單元測試與 synthetic fixture 不視為實機端到端通過 |
+| 31 個基礎＋7 個注音實機案例 | 仍待驗；另須完成本版個人化新增案例 |
+| Firebase／Google Play | 本機驗證與實際發布分開；本版提交／workflow／live hash 收據另記 repo 上層 `release-output/android-2.7.9/RELEASE_RECEIPT.md`，不沿用 2.7.8 成功結果；Play 本版未操作 |
 
 ## 3. 測試紀錄
 
 | 欄位 | 紀錄 |
 |---|---|
-| 測試日期 | 2026-09-12（本版自動化／模擬器與實機狀態依第 2.3 節） |
+| 測試日期 | 2026-09-12（本版狀態依第 2.4 節） |
 | 測試者 | Codex（自動化）；Lin（實機項目待執行） |
-| APK SHA-256 | `8bef85433723474ea017de1b45a4af29777631d2e3730e95a27ce7dc93809049`（17,340,997 bytes） |
-| App 版本 | 2.7.8（versionCode 28） |
+| APK SHA-256 | `62292210cdcbb7e75b2a8148b24245dc578f91f491f3d626fbe0c5d86fefbe3d` |
+| App 版本 | 2.7.9（versionCode 29） |
 | 手機型號 |  |
 | Android 版本 |  |
 | 螢幕尺寸／縮放 |  |
@@ -221,14 +237,14 @@ Issue ID:
 > 本輪未連接實機，第 4 節 31 個基礎案例及另 7 個注音案例（合計 38 個）均未執行，需 Lin 在實機上完成。
 > 自動化前置檢查結果見第 2.1 節。
 
-### 7.0 前置：從官方側載版 2.7.3–2.7.7 直接覆蓋更新
+### 7.0 前置：從官方側載版 2.7.3–2.7.8 直接覆蓋更新
 
-確認 2.7.8 產物與既有官方側載版的 package name、簽章憑證一致後，可保留 App 資料直接更新。Google Play 測試版請沿原安裝管道更新；不得以解除安裝作為預設解法：
+確認 2.7.9 產物與既有官方側載版的 package name、簽章憑證一致後，可保留 App 資料直接更新。Google Play 測試版請沿原安裝管道更新；不得以解除安裝作為預設解法：
 
-1. 在手機瀏覽器開啟 `https://voice.shingihou.com/`，下載 `SGHVoice-Android-v2.7.8.apk`。
+1. 在手機瀏覽器開啟 `https://voice.shingihou.com/`，下載 `SGHVoice-Android-v2.7.9.apk`。
 2. 若 Android 要求允許來源，只對目前使用的瀏覽器或檔案管理器開啟「安裝未知的應用程式」；不要停用 Google Play Protect。
 3. 開啟 APK 後選擇「更新」。**不要先解除安裝既有 App**，否則裝置內設定與資料可能被刪除。
-4. 安裝後確認版本為 2.7.8；若尚未接受同意版本 3，請到 App 設定閱讀雲端處理說明並同意；已接受版本 3 者不需再次同意。核對原金鑰與詞庫仍存在，再開始第 4 節測試。
+4. 安裝後確認版本為 2.7.9；若尚未接受同意版本 3，請到 App 設定閱讀雲端處理說明並同意；已接受版本 3 者不需再次同意。核對原金鑰與詞庫仍存在。更新不會自動清空舊有誤學紀錄；可在 App →「個人詞庫」→「本機個人化學習」撤銷最近學習或清除學習資料，再開始第 4 節測試。
 5. 若改用 USB 且裝置已授權，可在 repo 根目錄執行 `./scripts/verify_mobile_rc.sh --install`；腳本會在安裝前重新驗證版本、SHA-256 與 signer。
 
 ### 7.1 填寫第 3 節「測試紀錄」
@@ -294,4 +310,4 @@ Issue ID:
 ### 7.3 收尾
 
 - 依第 5 節格式回報任何未通過案例（患者資料先去識別化）。
-- 對照第 6 節「RC 通過門檻」逐條確認後才能放行 2.7.8。
+- 對照第 6 節「RC 通過門檻」逐條確認後才能放行 2.7.9。

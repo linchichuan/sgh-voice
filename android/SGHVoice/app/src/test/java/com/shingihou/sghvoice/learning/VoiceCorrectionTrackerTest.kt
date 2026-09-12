@@ -153,6 +153,88 @@ class VoiceCorrectionTrackerTest {
             result.status
         )
         assertEquals(CorrectionDiffRejection.PURE_INSERTION, result.rejection)
+        assertFalse(tracker.isTracking())
+    }
+
+    @Test
+    fun `backspace followed by a replacement still learns the final correction`() {
+        var elapsed = 0L
+        val tracker = VoiceCorrectionTracker(clockElapsedMillis = { elapsed })
+        fun snapshot(text: String) = BoundedTextSnapshot(
+            beforeCursor = "前文：$text",
+            afterCursor = "：後文",
+            windowStartOffset = 0
+        )
+        tracker.begin(12L, "我使用 Fyrebase 進行部署", snapshot("我使用 Fyrebase 進行部署"))
+
+        // A real phone edit arrives in separate selection callbacks: delete,
+        // pause beyond the IME debounce, then type the replacement.
+        elapsed = 1_000L
+        val deleting = tracker.inspect(12L, snapshot("我使用  進行部署"))
+        assertEquals(VoiceCorrectionTrackingStatus.REJECTED_EDIT, deleting.status)
+        assertEquals(CorrectionDiffRejection.PURE_DELETION, deleting.rejection)
+        assertTrue("An unfinished bounded deletion must not consume the voice turn", tracker.isTracking(12L))
+
+        elapsed = 2_000L
+        val corrected = tracker.inspect(12L, snapshot("我使用 Firebase 進行部署"))
+        assertEquals(VoiceCorrectionTrackingStatus.CORRECTION_FOUND, corrected.status)
+        assertEquals("Firebase", corrected.replacement?.suggestedPromptText)
+        assertTrue(corrected.highConfidence)
+        assertFalse(tracker.isTracking())
+    }
+
+    @Test
+    fun `pending deletion never extends the original deadline`() {
+        var elapsed = 0L
+        val tracker = VoiceCorrectionTracker(clockElapsedMillis = { elapsed })
+        fun snapshot(text: String) = BoundedTextSnapshot(
+            beforeCursor = "前：$text", afterCursor = "：後"
+        )
+        tracker.begin(13L, "我使用 Fyrebase", snapshot("我使用 Fyrebase"))
+        elapsed = 59_000L
+        assertEquals(
+            CorrectionDiffRejection.PURE_DELETION,
+            tracker.inspect(13L, snapshot("我使用 ")).rejection
+        )
+        assertTrue(tracker.isTracking())
+        elapsed = 60_001L
+        assertEquals(
+            VoiceCorrectionTrackingStatus.EXPIRED,
+            tracker.inspect(13L, snapshot("我使用 Firebase")).status
+        )
+        assertFalse(tracker.isTracking())
+    }
+
+    @Test
+    fun `clearing the whole result or deleting a large range cancels learning`() {
+        val tracker = VoiceCorrectionTracker(clockElapsedMillis = { 0L })
+        fun snapshot(text: String) = BoundedTextSnapshot(
+            beforeCursor = "前：$text", afterCursor = "：後"
+        )
+        tracker.begin(14L, "這一段不需要了", snapshot("這一段不需要了"))
+        assertEquals(
+            CorrectionDiffRejection.PURE_DELETION,
+            tracker.inspect(14L, snapshot("")).rejection
+        )
+        assertFalse(tracker.isTracking())
+
+        val original = "a".repeat(65) + "保留"
+        tracker.begin(15L, original, snapshot(original))
+        tracker.inspect(15L, snapshot("保留"))
+        assertFalse(tracker.isTracking())
+    }
+
+    @Test
+    fun `delete then type in a boundary-limited editor never upgrades confidence`() {
+        val tracker = VoiceCorrectionTracker(clockElapsedMillis = { 0L })
+        tracker.begin(16L, "我使用 Fyrebase", BoundedTextSnapshot("我使用 Fyrebase", afterCursor = ""))
+        val result = tracker.inspect(16L, BoundedTextSnapshot("我使用 ", afterCursor = ""))
+        assertEquals(CorrectionDiffRejection.PURE_DELETION, result.rejection)
+        assertTrue(tracker.isTracking())
+        val corrected = tracker.inspect(16L, BoundedTextSnapshot("我使用 Firebase", afterCursor = ""))
+        assertEquals(VoiceCorrectionTrackingStatus.CORRECTION_FOUND, corrected.status)
+        assertFalse(corrected.highConfidence)
+        assertFalse(tracker.isTracking())
     }
 
     @Test

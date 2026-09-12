@@ -30,6 +30,7 @@ import com.shingihou.sghvoice.learning.LearningLanguage
 import com.shingihou.sghvoice.learning.LearningPolicy
 import com.shingihou.sghvoice.learning.LearningPolicyDecision
 import com.shingihou.sghvoice.learning.PersonalizationRepository
+import com.shingihou.sghvoice.learning.VoiceCorrectionLearning
 import com.shingihou.sghvoice.learning.VoiceCorrectionTracker
 import com.shingihou.sghvoice.learning.VoiceCorrectionTrackingStatus
 import com.shingihou.sghvoice.processing.DictionaryManager
@@ -1298,66 +1299,39 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
         val replacement = result.replacement?.let(::expandShortCorrection) ?: return
         val recorded = personalization.recordVoiceCorrection(
             language = LearningLanguage.MIXED,
-            wrongText = replacement.wrongText,
-            correctedText = replacement.correctedText,
+            replacement = replacement,
             highConfidence = result.highConfidence
         )
         lastCommittedVoiceText = ""
 
-        if (recorded.status == CorrectionRecordStatus.ACTIVATED) {
+        val messageResource = when (recorded.status) {
+            CorrectionRecordStatus.ACTIVATED -> R.string.status_learning_saved
+            CorrectionRecordStatus.EVIDENCE_RECORDED -> R.string.status_learning_pending
+            CorrectionRecordStatus.REJECTED -> null
+        }
+        if (messageResource != null) {
             val message = getString(
-                R.string.status_learning_saved,
+                messageResource,
                 replacement.wrongText,
                 replacement.correctedText
             )
-            keyboardView?.setStatusText(message)
+            val statusResource = if (recorded.status == CorrectionRecordStatus.ACTIVATED) {
+                R.string.status_learning_saved_short
+            } else {
+                R.string.status_learning_pending_short
+            }
+            keyboardView?.setStatusText(getString(statusResource))
             Toast.makeText(applicationContext, message, Toast.LENGTH_SHORT).show()
         }
     }
 
     /**
-     * 單一漢字的全域取代風險太高，因此以語音句中相鄰的穩定字元擴成
-     * 短語規則。例如「新義豐公司 → 新義豊公司」，而不是「豐 → 豊」。
+     * 補齊英文詞界並將單一漢字擴成短語規則；不把相鄰整句加入詞庫。
      */
     private fun expandShortCorrection(
         replacement: CorrectionReplacement
     ): CorrectionReplacement? {
-        val wrongLength = replacement.wrongText.codePointCount(
-            0,
-            replacement.wrongText.length
-        )
-        val correctedLength = replacement.correctedText.codePointCount(
-            0,
-            replacement.correctedText.length
-        )
-        if (wrongLength >= 2 && correctedLength >= 2) return replacement
-        if (lastCommittedVoiceText.isBlank()) return null
-
-        val original = lastCommittedVoiceText.codePoints().toArray()
-        val start = replacement.unchangedPrefixCodePoints
-        val end = start + wrongLength
-        if (start !in 0..original.size || end !in 0..original.size || end < start) {
-            return null
-        }
-
-        var expandedStart = start
-        var expandedEnd = end
-        repeat(2) {
-            if (expandedStart > 0 && Character.isLetterOrDigit(original[expandedStart - 1])) {
-                expandedStart -= 1
-            }
-            if (expandedEnd < original.size && Character.isLetterOrDigit(original[expandedEnd])) {
-                expandedEnd += 1
-            }
-        }
-        if (expandedStart == start && expandedEnd == end) return null
-
-        val left = original.copyOfRange(expandedStart, start).toUnicodeString()
-        val right = original.copyOfRange(end, expandedEnd).toUnicodeString()
-        return replacement.copy(
-            wrongText = left + replacement.wrongText + right,
-            correctedText = left + replacement.correctedText + right
-        )
+        return VoiceCorrectionLearning.prepare(lastCommittedVoiceText, replacement)
     }
 
     private fun readBoundedSnapshot(connection: InputConnection): BoundedTextSnapshot? {
@@ -1412,9 +1386,5 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
         val minutes = totalSeconds / 60
         val seconds = totalSeconds % 60
         return String.format(Locale.ROOT, "%02d:%02d", minutes, seconds)
-    }
-
-    private fun IntArray.toUnicodeString(): String = buildString(size) {
-        this@toUnicodeString.forEach(::appendCodePoint)
     }
 }

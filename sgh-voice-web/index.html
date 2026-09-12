@@ -8,7 +8,7 @@
     <meta name="author" content="Shingihou Co., Ltd.">
     <title>SGH Voice — Android 多語輸入法與 macOS 語音輸入</title>
     <meta name="description"
-        content="SGH Voice 將語音、注音、日文與英文整合在同一個 Android 輸入法。v2.7.8 用單一淺綠大圓開始與結束錄音，圓內波紋隨收音變化，並加入頓號快速鍵。">
+        content="SGH Voice 將語音、注音、日文與英文整合在同一個 Android 輸入法。v2.7.9 修復先刪除再輸入的短修正漏記，改善完整英文詞提示，保留單一淺綠錄音圓。">
     <link rel="canonical" href="https://voice.shingihou.com/">
 
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
@@ -21,7 +21,7 @@
     <meta property="og:site_name" content="SGH Voice">
     <meta property="og:title" content="SGH Voice — 一個輸入法，語音、注音、日文、英文都能用。">
     <meta property="og:description"
-        content="Android 個人測試版 APK v2.7.8：單一淺綠大圓控制錄音，圓內收音波紋與頓號快速鍵；保留繁中注音與最多四語翻譯，另提供 macOS Apple Silicon v2.6.0。">
+        content="Android 個人測試版 APK v2.7.9：改善先刪除再輸入的個人化短修正及完整英文詞提示；保留單一淺綠錄音圓、繁中注音與最多四語翻譯。">
     <meta property="og:url" content="https://voice.shingihou.com/">
     <meta property="og:image" content="https://voice.shingihou.com/assets/generated/og-android-v240.png">
     <meta property="og:image:type" content="image/png">
@@ -58,9 +58,9 @@
           "name": "SGH Voice for Android",
           "applicationCategory": "ProductivityApplication",
           "operatingSystem": "Android 8.0 or later",
-          "softwareVersion": "2.7.8",
+          "softwareVersion": "2.7.9",
           "url": "https://voice.shingihou.com/",
-          "downloadUrl": "https://voice.shingihou.com/downloads/SGHVoice-Android-v2.7.8.apk",
+          "downloadUrl": "https://voice.shingihou.com/downloads/SGHVoice-Android-v2.7.9.apk",
           "description": "A personal test build of a multilingual Android input method with tap-to-dictate, long-press translation into up to four languages, predictive Zhuyin, Japanese candidates, English, and local personalization.",
           "offers": {
             "@type": "Offer",
@@ -160,7 +160,7 @@
                 <div class="hero-copy">
                     <div class="eyebrow">
                         <span class="status-dot" aria-hidden="true"></span>
-                        <span data-i18n="hero.eyebrow">Android 個人測試版 · v2.7.8</span>
+                        <span data-i18n="hero.eyebrow">Android 個人測試版 · v2.7.9</span>
                     </div>
                     <h1 data-i18n="hero.title">一個輸入法，<br><span><span class="no-break">語音、</span><span
                                 class="no-break">注音、</span><span class="no-break">日文、</span><span
@@ -215,7 +215,7 @@
                     </div>
                     <div class="release-stamp" aria-hidden="true">
                         <small>ANDROID</small>
-                        <strong>2.7.8</strong>
+                        <strong>2.7.9</strong>
                     </div>
                 </div>
             </div>
@@ -291,7 +291,7 @@
                         <span class="section-kicker" data-i18n="showcase.kicker">ANDROID FEATURE UI</span>
                         <h3 data-i18n="showcase.title">翻譯與注音功能介面</h3>
                         <p data-i18n="showcase.desc">
-                            圖片為既有版本的功能示意，並非 v2.7.8 實機截圖；目前語音模式改由單一大圓操作，底列的 @ 已改為頓號「、」，逗號「，」與句號「。」保留。
+                            圖片為既有版本的功能示意，並非 v2.7.9 實機截圖；目前語音模式改由單一大圓操作，底列的 @ 已改為頓號「、」，逗號「，」與句號「。」保留。
                         </p>
                         <ul>
                             <li data-i18n="showcase.item1">左上顯示 SGH Voice 品牌與識別圖示</li>
@@ -323,7 +323,7 @@
                     <span class="section-kicker" data-i18n="learning.kicker">LOCAL PERSONALIZATION</span>
                     <h2 data-i18n="learning.title">你改過的字，<br>下次應該更懂你。</h2>
                     <p data-i18n="learning.subtitle">
-                        新增 GitHub Actions、CI/CD、git push 等技術詞；你人工確認的短修正與自訂字典，也會用於下一次語音辨識與整句整理。
+                        先刪除再輸入的修正，也能在符合條件時記錄為短修正规則；英文提示使用完整詞彙，不把零碎差異字元當成術語。這是個人化詞彙參考，不是重新訓練模型。
                     </p>
                 </div>
 
@@ -340,7 +340,7 @@
                     <div class="correction-row correction-after">
                         <span data-i18n="learning.after.label">手動修正並學習</span>
                         <p>新義豊株式会社</p>
-                        <small data-i18n="learning.after.note">下次優先套用</small>
+                        <small data-i18n="learning.after.note">作為後續詞彙參考</small>
                     </div>
                 </div>
 
@@ -358,7 +358,7 @@
                             <path d="M8 10V7a4 4 0 0 1 8 0v3"></path>
                         </svg>
                         <h3 data-i18n="learning.safe.title">敏感欄位不學習</h3>
-                        <p data-i18n="learning.safe.desc">密碼與禁止個人化的欄位會停用語音與學習機制。</p>
+                        <p data-i18n="learning.safe.desc">密碼欄位會停用語音與學習；禁止個人化欄位只停用學習。</p>
                     </article>
                     <article>
                         <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -572,7 +572,7 @@
                         <dl class="release-meta">
                             <div>
                                 <dt data-i18n="download.meta.version">版本</dt>
-                                <dd>2.7.8 (28)</dd>
+                                <dd>2.7.9 (29)</dd>
                             </div>
                             <div>
                                 <dt data-i18n="download.meta.requirement">系統需求</dt>
@@ -591,13 +591,13 @@
                         <div class="hash-block">
                             <div>
                                 <span>SHA-256</span>
-                                <code id="apkHash">8bef85433723474ea017de1b45a4af29777631d2e3730e95a27ce7dc93809049</code>
+                                <code id="apkHash">62292210cdcbb7e75b2a8148b24245dc578f91f491f3d626fbe0c5d86fefbe3d</code>
                             </div>
                             <button type="button" class="copy-button" id="copyHashButton" data-i18n="download.hash.copy">複製</button>
                         </div>
 
                         <p class="download-update-note" data-i18n="download.android.update">
-                            已安裝官方側載版 2.7.3–2.7.7 時，直接開啟這個 2.7.8 APK 並選擇「更新」；請勿先解除安裝，以保留金鑰與詞庫。若尚未同意版本 3，請到設定閱讀並接受新版雲端處理說明；已在 2.7.6 同意者無需再次同意。Google Play 測試版請從原安裝管道更新。
+                            已安裝官方側載版 2.7.3–2.7.8 時，直接開啟這個 2.7.9 APK 並選擇「更新」；請勿先解除安裝，以保留金鑰與詞庫。更新不會自動清空舊有誤學紀錄；需要時可在「個人詞庫」撤銷最近學習或清除學習資料。若尚未同意版本 3，請到設定閱讀並接受新版雲端處理說明；已在 2.7.6 同意者無需再次同意。Google Play 測試版請從原安裝管道更新。
                         </p>
 
                         <label class="risk-check" for="riskAck">
@@ -612,15 +612,15 @@
 
                         <a class="btn btn-primary download-button disabled" id="apkDownloadButton"
                             aria-disabled="true" aria-describedby="riskDisclosure downloadRegistrationStatus"
-                            tabindex="-1" data-platform="android" data-version="2.7.8"
-                            data-filename="SGHVoice-Android-v2.7.8.apk"
-                            data-download-href="/downloads/SGHVoice-Android-v2.7.8.apk">
+                            tabindex="-1" data-platform="android" data-version="2.7.9"
+                            data-filename="SGHVoice-Android-v2.7.9.apk"
+                            data-download-href="/downloads/SGHVoice-Android-v2.7.9.apk">
                             <svg viewBox="0 0 24 24" aria-hidden="true">
                                 <path d="M12 3v12m0 0 5-5m-5 5-5-5M5 19h14"></path>
                             </svg>
                             <span data-i18n="download.android.cta">填寫資料並確認風險後下載 APK</span>
                         </a>
-                        <p class="download-file">SGHVoice-Android-v2.7.8.apk</p>
+                        <p class="download-file">SGHVoice-Android-v2.7.9.apk</p>
                     </article>
 
                     <article class="download-card download-mac">
@@ -700,7 +700,7 @@
                     </details>
                     <details>
                         <summary data-i18n="faq.q6">我口述一個問句時，模型會直接回答嗎？</summary>
-                        <p data-i18n="faq.a6">不應該。v2.7.8 會請所選 AI 整理整句標點、明確口吃與語意連貫；問句和命令仍保留原意。若偵測到新增助手回覆、無關改寫或數字與否定語意改動，會回退原逐字稿並顯示提示。辨識與整理仍可能有誤，重要內容請先核對。</p>
+                        <p data-i18n="faq.a6">不應該。v2.7.9 會請所選 AI 整理整句標點、明確口吃與語意連貫；問句和命令仍保留原意。若偵測到新增助手回覆、無關改寫或數字與否定語意改動，會回退原逐字稿並顯示提示。辨識與整理仍可能有誤，重要內容請先核對。</p>
                     </details>
                 </div>
             </div>
@@ -740,7 +740,7 @@
         </div>
     </footer>
 
-    <script src="i18n.js?v=20260912-android-278"></script>
+    <script src="i18n.js?v=20260912-android-279"></script>
     <script src="firebase.js?v=20260730-download-registration"></script>
     <script src="main.js?v=20260730-download-registration"></script>
 </body>

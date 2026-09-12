@@ -54,7 +54,7 @@ def test_firestore_download_records_are_create_only():
     assert "request.resource.data.createdAt == request.time" in block
     assert "request.resource.data.consentVersion == 2" in block
     assert "request.resource.data.riskAcknowledged is bool" in block
-    assert "SGHVoice-Android-v2.7.8.apk" in block
+    assert "SGHVoice-Android-v2.7.9.apk" in block
     assert "allow read, update, delete: if false;" in block
 
 
@@ -124,9 +124,9 @@ def test_generated_feature_images_are_not_presented_as_verified_release_screensh
     assert "android-zhuyin-ui.webp" in html
     for unsupported_claim in (
         "ACTUAL ANDROID BUILD",
-        "これが v2.7.8 の実画面です",
-        "這就是 v2.7.8 的實際鍵盤",
-        "This is the actual v2.7.8 keyboard",
+        "これが v2.7.9 の実画面です",
+        "這就是 v2.7.9 的實際鍵盤",
+        "This is the actual v2.7.9 keyboard",
     ):
         assert unsupported_claim not in html
         assert unsupported_claim not in translations
@@ -162,8 +162,8 @@ def test_android_release_manifest_matches_public_artifact_and_copy():
     index = read_web_file("index.html")
     llms = read_web_file("llms.txt")
 
-    assert release["versionName"] == "2.7.8"
-    assert release["versionCode"] == 28
+    assert release["versionName"] == "2.7.9"
+    assert release["versionCode"] == 29
     assert re.fullmatch(r"[0-9a-f]{64}", release["sha256"])
     assert re.fullmatch(r"[0-9A-F]{64}", release["certificateSha256"])
     assert artifact.is_file()
@@ -174,4 +174,4 @@ def test_android_release_manifest_matches_public_artifact_and_copy():
     assert f'{release["versionName"]} ({release["versionCode"]})' in index
     assert release["fileName"] in llms
     assert release["sha256"] in llms
-    assert "直接開啟這個 2.7.8 APK 並選擇「更新」" in index
+    assert "直接開啟這個 2.7.9 APK 並選擇「更新」" in index

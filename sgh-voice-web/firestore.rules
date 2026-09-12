@@ -69,8 +69,8 @@ service cloud.firestore {
                     && (
                       (
                         request.resource.data.platform == 'android'
-                        && request.resource.data.version == '2.7.8'
-                        && request.resource.data.fileName == 'SGHVoice-Android-v2.7.8.apk'
+                        && request.resource.data.version == '2.7.9'
+                        && request.resource.data.fileName == 'SGHVoice-Android-v2.7.9.apk'
                         && request.resource.data.riskAcknowledged == true
                       )
                       ||

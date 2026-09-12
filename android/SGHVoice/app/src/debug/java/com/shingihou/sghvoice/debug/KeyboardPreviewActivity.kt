@@ -184,6 +184,10 @@ class KeyboardPreviewActivity : Activity() {
         keyboard.setAudioLevel(0f)
         keyboard.setInputMode(previewMode)
         keyboard.updateState(previewState)
+        when (intent.getStringExtra("learning")) {
+            "pending" -> keyboard.setStatusText(keyboard.context.getString(R.string.status_learning_pending_short))
+            "saved" -> keyboard.setStatusText(keyboard.context.getString(R.string.status_learning_saved_short))
+        }
         previewDetails.text = "DEBUG · synthetic only\nMode: ${previewMode.name.lowercase(Locale.ROOT)} · " +
             "state: ${previewState.name.lowercase(Locale.ROOT)} · level: $previewLevel\n" +
             "Audio feedback stops after 10 seconds.\n$contractResult"
