@@ -23,6 +23,7 @@ Reviewed the Android and public-web changes from deployed `da3eb223488ec99c15c37
 | Translation selection left an empty circular outline | Hide the entire capture area during translation selection |
 | Hosting published development files | Exclude logs, tests, package manifests and unrelated untracked APKs; release metadata uses revalidation rather than immutable caching |
 | A rules-first deployment could break cached old download pages | Accept only exact new 2.8.2 and previous live 2.7.9 version/file tuples; reject mismatches, unpublished 2.8.1 registrations and unconsented registrations |
+| CI failed before Android compilation | Run 36216348312 attempted `sdkmanager tools` and failed to find that package. Keep the pinned setup action but explicitly request `platform-tools`; SDK 36 and build-tools 36.0.0 remain separately installed and all build/artifact gates remain mandatory |
 
 ## Verification
 
