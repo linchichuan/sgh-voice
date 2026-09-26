@@ -12,6 +12,7 @@ import org.mockito.MockitoAnnotations
 import org.mockito.kotlin.any
 import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
+import org.mockito.Mockito.verifyNoInteractions
 
 /**
  * 處理管線單元測試
@@ -134,5 +135,44 @@ class TranscriptionPipelineTest {
         assertEquals(false, result.success)
         assertEquals("", result.text)
         assertEquals(emptyList<TranslationOutput>(), result.translations)
+    }
+
+    @Test
+    fun `compose audio captures a brief without using dictation or auto-generating`() = runBlocking {
+        val wav = ByteArray(100)
+        val raw = "幫我寫一封信給 Emma，週五約時間。"
+        `when`(dictionaryManager.buildWhisperPrompt()).thenReturn("")
+        `when`(whisperClient.transcribe(any(), any())).thenReturn(raw)
+        `when`(dictionaryManager.applyCorrections(raw)).thenReturn(raw)
+
+        val captured = pipeline.process(wav, VoiceTask.Compose)
+
+        assertEquals(true, captured.success)
+        assertEquals(raw, captured.text)
+        verifyNoInteractions(llmClient)
+        Unit
+    }
+
+    @Test
+    fun `compose happens only after explicit final action`() = runBlocking {
+        val notes = "第一段：詢問週五下午。\n第二段：署名 Will。"
+        `when`(llmClient.compose(notes)).thenReturn("Emma 您好：\n請問週五下午方便嗎？\nWill")
+
+        assertEquals(
+            "Emma 您好：\n請問週五下午方便嗎？\nWill",
+            pipeline.composeNotes(notes)
+        )
+        verify(llmClient, times(1)).compose(notes)
+        Unit
+    }
+
+    @Test
+    fun `compose preserves Japanese characters without traditional Chinese conversion`() = runBlocking {
+        val notes = "発表会の案内を書いてください。"
+        val draft = "日本語の発表会、医療資料を送信します。"
+        `when`(llmClient.compose(notes)).thenReturn(draft)
+
+        assertEquals(draft, pipeline.composeNotes(notes))
+        Unit
     }
 }

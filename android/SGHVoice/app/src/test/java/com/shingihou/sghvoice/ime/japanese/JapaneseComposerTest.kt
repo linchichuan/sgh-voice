@@ -193,4 +193,72 @@ class JapaneseComposerTest {
         assertFalse(composer.appendRomaji('1'))
         assertEquals("すし", composer.composition)
     }
+
+    @Test
+    fun `kana 12 key tap cycles and a pause starts another character`() {
+        val composer = JapaneseComposer()
+        assertTrue(composer.setInputStyle(JapaneseInputStyle.KANA_12_KEY))
+
+        assertTrue(composer.tapKana("a", 1_000L))
+        assertTrue(composer.tapKana("a", 1_100L))
+        assertEquals("い", composer.composition)
+
+        assertTrue(composer.tapKana("a", 2_000L))
+        assertEquals("いあ", composer.composition)
+        assertEquals("いあ", composer.hiraganaReading)
+
+        composer.finalizeKanaTap()
+        assertTrue(composer.tapKana("a", 2_100L))
+        assertEquals("いああ", composer.composition)
+    }
+
+    @Test
+    fun `kana 12 key supports voiced semi voiced small and katakana forms`() {
+        val composer = JapaneseComposer()
+        assertTrue(composer.setInputStyle(JapaneseInputStyle.KANA_12_KEY))
+
+        assertTrue(composer.tapKana("ha", 100L))
+        assertTrue(composer.transformLastKana())
+        assertEquals("ば", composer.composition)
+        assertTrue(composer.transformLastKana())
+        assertEquals("ぱ", composer.composition)
+
+        assertTrue(composer.appendKana("つ"))
+        assertTrue(composer.transformLastKana())
+        assertEquals("ぱっ", composer.composition)
+        composer.toggleScriptMode()
+        assertEquals("パッ", composer.composition)
+        assertEquals("ぱっ", composer.hiraganaReading)
+        assertEquals("パッ", composer.commitRaw()?.text)
+    }
+
+    @Test
+    fun `kana reading shares lexicon and backspace does not corrupt mode`() {
+        val composer = JapaneseComposer(lexicon)
+        assertTrue(composer.setInputStyle(JapaneseInputStyle.KANA_12_KEY))
+        assertTrue(composer.appendKana("に"))
+        assertTrue(composer.appendKana("ほ"))
+        assertTrue(composer.appendKana("ん"))
+
+        assertEquals("日本", composer.getCandidates().first().text)
+        assertFalse(composer.setInputStyle(JapaneseInputStyle.ROMAJI))
+        assertTrue(composer.backspace())
+        assertEquals("にほ", composer.composition)
+        composer.clear()
+        assertTrue(composer.setInputStyle(JapaneseInputStyle.ROMAJI))
+        assertTrue(composer.appendRomaji("nihon"))
+        assertEquals("にほn", composer.composition)
+    }
+
+    @Test
+    fun `kana 12 key rejects invalid input without losing composition`() {
+        val composer = JapaneseComposer()
+        assertTrue(composer.setInputStyle(JapaneseInputStyle.KANA_12_KEY))
+        assertTrue(composer.appendKana("あ"))
+        assertFalse(composer.appendKana("。"))
+        assertFalse(composer.appendKana("あい"))
+        assertFalse(composer.tapKana("missing", 10L))
+        assertFalse(composer.appendRomaji("a"))
+        assertEquals("あ", composer.composition)
+    }
 }

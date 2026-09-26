@@ -124,11 +124,54 @@
         android:gravity="center"
         android:orientation="vertical"
         android:paddingStart="12dp"
-        android:paddingTop="12dp"
+        android:paddingTop="@dimen/voice_panel_vertical_padding"
         android:paddingEnd="12dp"
-        android:paddingBottom="12dp">
+        android:paddingBottom="@dimen/voice_panel_vertical_padding">
 
         <LinearLayout
+            android:id="@+id/voice_task_switch"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:background="@drawable/voice_task_switch_bg"
+            android:gravity="center"
+            android:orientation="horizontal"
+            android:padding="2dp">
+
+            <TextView
+                android:id="@+id/btn_voice_dictation"
+                android:layout_width="0dp"
+                android:layout_height="44dp"
+                android:layout_weight="1"
+                android:background="@drawable/voice_task_selected_bg"
+                android:clickable="true"
+                android:contentDescription="@string/voice_task_dictation_desc"
+                android:fontFamily="sans-serif-medium"
+                android:gravity="center"
+                android:includeFontPadding="false"
+                android:focusable="true"
+                android:text="@string/voice_task_dictation"
+                android:textColor="@color/voice_task_selected_text"
+                android:textSize="13sp" />
+
+            <TextView
+                android:id="@+id/btn_voice_compose"
+                android:layout_width="0dp"
+                android:layout_height="44dp"
+                android:layout_weight="1"
+                android:background="@drawable/voice_task_unselected_bg"
+                android:clickable="true"
+                android:contentDescription="@string/voice_task_compose_desc"
+                android:fontFamily="sans-serif-medium"
+                android:gravity="center"
+                android:includeFontPadding="false"
+                android:focusable="true"
+                android:text="@string/voice_task_compose"
+                android:textColor="@color/voice_task_unselected_text"
+                android:textSize="13sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_marginTop="@dimen/voice_status_top_margin"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:minHeight="28dp"
@@ -157,51 +200,165 @@
 
         <!-- One touch target: feedback and finish action share the same circle. -->
         <FrameLayout
-            android:id="@+id/btn_mic"
-            android:layout_width="176dp"
-            android:layout_height="176dp"
-            android:layout_marginTop="8dp"
-            android:background="@drawable/mic_button_bg"
-            android:clickable="true"
-            android:contentDescription="@string/mic_button_desc"
-            android:focusable="true"
-            android:importantForAccessibility="yes">
+            android:id="@+id/mic_outer_ring"
+            android:layout_width="@dimen/voice_mic_diameter"
+            android:layout_height="@dimen/voice_mic_diameter"
+            android:layout_marginTop="@dimen/voice_mic_top_margin"
+            android:background="@drawable/mic_outer_ring_bg"
+            android:elevation="2dp"
+            android:padding="3dp">
 
-            <com.shingihou.sghvoice.ime.AudioWaveformView
-                android:id="@+id/audio_waveform"
+            <FrameLayout
+                android:id="@+id/btn_mic"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:importantForAccessibility="no"
-                android:visibility="invisible" />
+                android:background="@drawable/mic_button_bg"
+                android:clickable="true"
+                android:contentDescription="@string/mic_button_desc"
+                android:focusable="true"
+                android:importantForAccessibility="yes">
 
-            <ImageView
-                android:id="@+id/mic_action_icon"
-                android:layout_width="32dp"
-                android:layout_height="32dp"
-                android:layout_gravity="top|center_horizontal"
-                android:layout_marginTop="54dp"
-                android:importantForAccessibility="no"
-                android:src="@drawable/ic_mic" />
+                <com.shingihou.sghvoice.ime.AudioWaveformView
+                    android:id="@+id/audio_waveform"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:importantForAccessibility="no"
+                    android:visibility="invisible" />
+
+                <ImageView
+                    android:id="@+id/mic_action_icon"
+                    android:layout_width="@dimen/voice_mic_icon_size"
+                    android:layout_height="@dimen/voice_mic_icon_size"
+                    android:layout_gravity="top|center_horizontal"
+                    android:layout_marginTop="@dimen/voice_mic_icon_top_margin"
+                    android:importantForAccessibility="no"
+                    android:src="@drawable/ic_mic" />
+
+                <TextView
+                    android:id="@+id/mic_action_label"
+                    android:layout_width="@dimen/voice_mic_label_width"
+                    android:layout_height="@dimen/voice_mic_label_height"
+                    android:layout_gravity="bottom|center_horizontal"
+                    android:layout_marginBottom="@dimen/voice_mic_label_bottom_margin"
+                    android:autoSizeMaxTextSize="14sp"
+                    android:autoSizeMinTextSize="12sp"
+                    android:autoSizeStepGranularity="1sp"
+                    android:autoSizeTextType="uniform"
+                    android:fontFamily="sans-serif-medium"
+                    android:gravity="center"
+                    android:importantForAccessibility="no"
+                    android:includeFontPadding="false"
+                    android:maxLines="2"
+                    android:text="@string/mic_action_start"
+                    android:textColor="@color/mic_text_recording"
+                    android:textSize="14sp" />
+            </FrameLayout>
+        </FrameLayout>
+
+        <LinearLayout
+            android:id="@+id/compose_action_row"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:layout_marginTop="8dp"
+            android:gravity="center"
+            android:orientation="horizontal"
+            android:visibility="gone">
 
             <TextView
-                android:id="@+id/mic_action_label"
-                android:layout_width="132dp"
-                android:layout_height="64dp"
-                android:layout_gravity="bottom|center_horizontal"
-                android:layout_marginBottom="16dp"
+                android:id="@+id/btn_compose_continue"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_marginEnd="4dp"
+                android:layout_weight="1.2"
+                android:background="@drawable/voice_compose_secondary_bg"
+                android:clickable="true"
+                android:contentDescription="@string/voice_compose_continue"
+                android:focusable="true"
                 android:fontFamily="sans-serif-medium"
                 android:gravity="center"
-                android:importantForAccessibility="no"
-                android:includeFontPadding="false"
-                android:maxLines="2"
-                android:text="@string/mic_action_start"
-                android:textColor="@color/mic_text_recording"
-                android:textSize="14sp"
-                android:autoSizeTextType="uniform"
-                android:autoSizeMinTextSize="12sp"
-                android:autoSizeMaxTextSize="14sp"
-                android:autoSizeStepGranularity="1sp" />
-        </FrameLayout>
+                android:maxLines="1"
+                android:text="@string/voice_compose_continue"
+                android:textColor="@color/voice_compose_action_text"
+                android:textSize="12sp" />
+
+            <TextView
+                android:id="@+id/btn_compose_generate"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_marginStart="4dp"
+                android:layout_marginEnd="4dp"
+                android:layout_weight="1.5"
+                android:background="@drawable/voice_compose_primary_bg"
+                android:clickable="true"
+                android:contentDescription="@string/voice_compose_generate"
+                android:focusable="true"
+                android:fontFamily="sans-serif-medium"
+                android:gravity="center"
+                android:maxLines="1"
+                android:text="@string/voice_compose_generate"
+                android:textColor="@color/voice_compose_primary_text"
+                android:textSize="12sp" />
+
+            <TextView
+                android:id="@+id/btn_compose_clear"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_marginStart="4dp"
+                android:background="@drawable/voice_compose_secondary_bg"
+                android:clickable="true"
+                android:contentDescription="@string/voice_compose_clear"
+                android:focusable="true"
+                android:fontFamily="sans-serif-medium"
+                android:gravity="center"
+                android:maxLines="1"
+                android:text="@string/voice_compose_clear"
+                android:textColor="@color/voice_compose_action_text"
+                android:textSize="12sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/pending_insert_row"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:layout_marginTop="8dp"
+            android:gravity="center"
+            android:orientation="horizontal"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/btn_pending_insert"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_marginEnd="4dp"
+                android:layout_weight="1.4"
+                android:background="@drawable/voice_compose_primary_bg"
+                android:clickable="true"
+                android:contentDescription="@string/voice_pending_insert"
+                android:focusable="true"
+                android:fontFamily="sans-serif-medium"
+                android:gravity="center"
+                android:maxLines="1"
+                android:text="@string/voice_pending_insert"
+                android:textColor="@color/voice_compose_primary_text"
+                android:textSize="13sp" />
+
+            <TextView
+                android:id="@+id/btn_pending_discard"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_marginStart="4dp"
+                android:layout_weight="1"
+                android:background="@drawable/voice_compose_secondary_bg"
+                android:clickable="true"
+                android:contentDescription="@string/voice_pending_discard"
+                android:focusable="true"
+                android:fontFamily="sans-serif-medium"
+                android:gravity="center"
+                android:maxLines="1"
+                android:text="@string/voice_pending_discard"
+                android:textColor="@color/voice_compose_action_text"
+                android:textSize="13sp" />
+        </LinearLayout>
 
         <LinearLayout
             android:id="@+id/translation_panel"

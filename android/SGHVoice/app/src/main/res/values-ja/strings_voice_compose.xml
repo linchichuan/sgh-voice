@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="voice_task_dictation">音声入力</string>
+    <string name="voice_task_dictation_desc">話した内容をそのまま入力</string>
+    <string name="voice_task_compose">文章作成</string>
+    <string name="voice_task_compose_desc">口頭のアイデアを文章にまとめる</string>
+    <string name="voice_compose_continue">続きを追加</string>
+    <string name="voice_compose_generate">文章を作成</string>
+    <string name="voice_compose_clear">消去</string>
+    <string name="voice_pending_insert">保存したテキストを挿入</string>
+    <string name="voice_pending_discard">破棄</string>
+</resources>

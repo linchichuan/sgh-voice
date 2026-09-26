@@ -1,5 +1,7 @@
 package com.shingihou.sghvoice.ime.manual
 
+import com.shingihou.sghvoice.ime.japanese.JapaneseInputStyle
+
 /**
  * Manual modes rendered inside the single SGH Voice system IME.
  *
@@ -45,6 +47,10 @@ sealed class KeyAction {
     object Shift : KeyAction()
     object Space : KeyAction()
     object ToggleJapaneseScript : KeyAction()
+    object ToggleJapaneseLayout : KeyAction()
+    data class TapJapaneseKana(val group: String) : KeyAction()
+    object TransformJapaneseKana : KeyAction()
+    object FinalizeJapaneseKana : KeyAction()
 }
 
 /**
@@ -90,7 +96,8 @@ data class ManualKeyboardLayout(
     val mode: ManualKeyboardMode,
     val layer: KeyboardLayer,
     val rows: List<KeyboardRow>,
-    val shiftState: ShiftState = ShiftState.OFF
+    val shiftState: ShiftState = ShiftState.OFF,
+    val japaneseInputStyle: JapaneseInputStyle = JapaneseInputStyle.ROMAJI
 ) {
     init {
         require(rows.isNotEmpty()) { "A keyboard layout cannot be empty." }

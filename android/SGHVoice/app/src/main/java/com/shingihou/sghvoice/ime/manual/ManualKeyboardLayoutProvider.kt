@@ -2,13 +2,15 @@ package com.shingihou.sghvoice.ime.manual
 
 import com.shingihou.sghvoice.ime.ZhuyinComposer
 import com.shingihou.sghvoice.ime.ZhuyinKey
+import com.shingihou.sghvoice.ime.japanese.JapaneseInputStyle
+import com.shingihou.sghvoice.ime.japanese.Kana12Key
 import java.util.Locale
 
 /**
  * Produces key-grid data for every manual mode without creating Android Views.
  *
- * English and Japanese intentionally share the QWERTY geometry. Japanese keys
- * emit Romaji and are converted by the Japanese composer at a higher layer.
+ * English and Japanese Romaji share QWERTY geometry. Japanese can alternatively
+ * expose the native phone 12-key kana layout without changing other modes.
  * Numeric and symbol pages are shared across all three manual modes.
  */
 class ManualKeyboardLayoutProvider {
@@ -16,12 +18,16 @@ class ManualKeyboardLayoutProvider {
     fun layout(
         mode: ManualKeyboardMode,
         layer: KeyboardLayer = KeyboardLayer.LETTERS,
-        shiftState: ShiftState = ShiftState.OFF
+        shiftState: ShiftState = ShiftState.OFF,
+        japaneseInputStyle: JapaneseInputStyle = JapaneseInputStyle.ROMAJI
     ): ManualKeyboardLayout {
         val rows = when (layer) {
             KeyboardLayer.LETTERS -> when (mode) {
                 ManualKeyboardMode.ZHUYIN -> ZhuyinLayoutAdapter.adapt()
-                ManualKeyboardMode.JAPANESE -> qwertyRows(mode, shiftState)
+                ManualKeyboardMode.JAPANESE -> when (japaneseInputStyle) {
+                    JapaneseInputStyle.ROMAJI -> qwertyRows(mode, shiftState)
+                    JapaneseInputStyle.KANA_12_KEY -> kana12Rows()
+                }
                 ManualKeyboardMode.ENGLISH -> qwertyRows(mode, shiftState)
             }
 
@@ -32,7 +38,8 @@ class ManualKeyboardLayoutProvider {
             mode = mode,
             layer = layer,
             rows = rows,
-            shiftState = shiftState
+            shiftState = shiftState,
+            japaneseInputStyle = japaneseInputStyle
         )
     }
 
@@ -65,10 +72,26 @@ class ManualKeyboardLayoutProvider {
             buildList {
                 add(
                     actionKey(
-                        id = "${prefix}_shift",
-                        label = shiftLabel(shiftState),
-                        action = KeyAction.Shift,
-                        contentDescription = shiftDescription(shiftState),
+                        id = if (mode == ManualKeyboardMode.JAPANESE) {
+                            "japanese_layout"
+                        } else {
+                            "${prefix}_shift"
+                        },
+                        label = if (mode == ManualKeyboardMode.JAPANESE) {
+                            "12キー"
+                        } else {
+                            shiftLabel(shiftState)
+                        },
+                        action = if (mode == ManualKeyboardMode.JAPANESE) {
+                            KeyAction.ToggleJapaneseLayout
+                        } else {
+                            KeyAction.Shift
+                        },
+                        contentDescription = if (mode == ManualKeyboardMode.JAPANESE) {
+                            "Switch to Japanese 12-key kana"
+                        } else {
+                            shiftDescription(shiftState)
+                        },
                         widthWeight = 1.35f
                     )
                 )
@@ -124,6 +147,58 @@ class ManualKeyboardLayoutProvider {
             enterKey("japanese_enter")
         )
     )
+
+    private fun kana12Rows(): List<KeyboardRow> = listOf(
+        KeyboardRow(listOf("a", "ka", "sa").map(::kanaGroupKey)),
+        KeyboardRow(listOf("ta", "na", "ha").map(::kanaGroupKey)),
+        KeyboardRow(listOf("ma", "ya", "ra").map(::kanaGroupKey)),
+        KeyboardRow(
+            listOf(
+                actionKey(
+                    "japanese_kana_modifier", "小゛゜",
+                    KeyAction.TransformJapaneseKana,
+                    "Small, voiced or semi-voiced kana"
+                ),
+                kanaGroupKey("wa"),
+                characterKey(
+                    "japanese_kana_punctuation", "、", "Japanese punctuation",
+                    alternatives = listOf("。", "！", "？")
+                ),
+                actionKey(
+                    "japanese_kana_finalize", "→",
+                    KeyAction.FinalizeJapaneseKana,
+                    "Finish current kana for a repeated character"
+                ),
+                backspaceKey("japanese_kana")
+            )
+        ),
+        KeyboardRow(
+            listOf(
+                switchLayerKey("japanese_kana_numbers", "?123", KeyboardLayer.NUMBERS),
+                actionKey(
+                    "japanese_layout", "ABC", KeyAction.ToggleJapaneseLayout,
+                    "Switch to Japanese Romaji QWERTY"
+                ),
+                actionKey(
+                    "japanese_script", "かな", KeyAction.ToggleJapaneseScript,
+                    "Toggle Hiragana and Katakana"
+                ),
+                spaceKey("japanese_kana_space", widthWeight = 2.5f),
+                enterKey("japanese_kana_enter")
+            )
+        )
+    )
+
+    private fun kanaGroupKey(group: String): KeySpec {
+        val kana = Kana12Key.groups.getValue(group)
+        return KeySpec(
+            id = "japanese_kana_$group",
+            label = kana.first(),
+            action = KeyAction.TapJapaneseKana(group),
+            alternatives = kana.drop(1),
+            contentDescription = "${kana.joinToString(" ")} kana key"
+        )
+    }
 
     private fun numericRows(mode: ManualKeyboardMode): List<KeyboardRow> {
         val prefix = mode.name.lowercase(Locale.ROOT)

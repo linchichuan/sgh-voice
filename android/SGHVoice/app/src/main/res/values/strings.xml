@@ -1,5 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="voice_compose_mic_start">說出想寫的內容</string>
+    <string name="voice_compose_mic_finish">完成這段</string>
+    <string name="voice_compose_hint">說明對象、用途和要求；可分段補充後再生成。</string>
+    <string name="voice_compose_ready">已記下 %1$d 段；可繼續補充或生成文字</string>
+    <string name="voice_compose_processing">正在撰寫，請稍候…</string>
+    <string name="voice_compose_requires_model">幫我寫需要先設定可用的 AI 模型與金鑰</string>
+    <string name="voice_compose_failed">撰寫失敗，口述筆記已保留，請重試。</string>
+    <string name="voice_compose_too_long">口述筆記已達上限，請先生成文字。</string>
+    <string name="voice_compose_overflow_saved">筆記已達上限，最後一段另存為待確認文字</string>
+    <string name="voice_pending_too_long">語音文字太長，無法安全暫存；請縮短每段錄音。</string>
+    <string name="voice_compose_cleared">口述筆記已清除</string>
+    <string name="voice_pending_saved">剛才的語音已存為待確認文字，請選擇插入</string>
+    <string name="voice_pending_processing">正在保存剛才的語音，請稍候…</string>
+    <string name="voice_pending_discarded">待確認文字已捨棄</string>
     <!-- App 資訊 -->
     <string name="app_name">SGH Voice</string>
     <string name="ime_label">SGH Voice 語音輸入</string>
@@ -13,7 +27,7 @@
     <string name="mode_english">ABC</string>
     <string name="mode_voice_desc">切換至語音輸入</string>
     <string name="mode_zhuyin_desc">切換至注音輸入</string>
-    <string name="mode_japanese_desc">切換至日文羅馬字輸入</string>
+    <string name="mode_japanese_desc">切換至日文輸入</string>
     <string name="mode_english_desc">切換至英文輸入</string>
     <string name="recognition_language_button_desc">語音辨識語言：%1$s。點兩下選擇語言</string>
     <string name="recognition_language_auto">自動（適合混合語言）</string>

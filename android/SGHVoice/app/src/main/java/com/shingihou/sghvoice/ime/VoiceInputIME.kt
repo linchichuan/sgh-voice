@@ -7,16 +7,19 @@ import android.util.Log
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputConnection
+import android.text.InputType
 import android.view.inputmethod.InputMethodManager
 import android.widget.Toast
 import com.shingihou.sghvoice.R
 import com.shingihou.sghvoice.api.ApiConfig
 import com.shingihou.sghvoice.api.LlmClient
+import com.shingihou.sghvoice.api.ComposeException
 import com.shingihou.sghvoice.api.WhisperClient
 import com.shingihou.sghvoice.audio.AudioRecorder
 import com.shingihou.sghvoice.ime.japanese.AndroidJapaneseLexicon
 import com.shingihou.sghvoice.ime.japanese.JapaneseCandidate
 import com.shingihou.sghvoice.ime.japanese.JapaneseComposer
+import com.shingihou.sghvoice.ime.japanese.JapaneseInputStyle
 import com.shingihou.sghvoice.ime.manual.EnglishCandidate
 import com.shingihou.sghvoice.ime.manual.EnglishCandidateProvider
 import com.shingihou.sghvoice.ime.manual.EnglishComposer
@@ -41,6 +44,7 @@ import com.shingihou.sghvoice.processing.TranslationOutput
 import com.shingihou.sghvoice.processing.TranslationRequest
 import com.shingihou.sghvoice.processing.TranscriptionPipeline
 import com.shingihou.sghvoice.processing.VoiceTask
+import com.shingihou.sghvoice.processing.VoiceDraftState
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -66,7 +70,7 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
         private const val PIPELINE_WAIT_INTERVAL_MS = 100L
         private const val MAX_RECORDING_DURATION_MS = 120_000L
         private const val MIN_WAV_SIZE_BYTES = 8_044
-        private const val ZHUYIN_CANDIDATE_LIMIT = 24
+        private const val ZHUYIN_CANDIDATE_LIMIT = 48
         private const val ZHUYIN_CONTEXT_CODE_POINTS = 16
         private const val JAPANESE_CANDIDATE_LIMIT = 24
         private const val ENGLISH_CANDIDATE_LIMIT = 12
@@ -88,6 +92,7 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
 
     private var currentState = ImeState.IDLE
     private var currentInputMode = KeyboardView.InputMode.VOICE
+    private var voiceActionMode = KeyboardView.VoiceActionMode.DICTATION
     private var keyboardView: KeyboardView? = null
 
     private var apiConfig: ApiConfig? = null
@@ -109,11 +114,16 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
     private var recordingControlJob: Job? = null
     private var recordingTimerJob: Job? = null
     private var transcriptionJob: Job? = null
+    private var composeJob: Job? = null
+    private var focusCaptureJob: Job? = null
+    private val pendingHandoffOperations = mutableSetOf<Pair<Long, Long>>()
+    private val drafts = VoiceDraftState()
     private var correctionInspectionJob: Job? = null
     private val voiceCorrectionTracker = VoiceCorrectionTracker()
     private var lastCommittedVoiceText = ""
     private var currentLearningDecision: LearningPolicyDecision = LearningPolicy.evaluate(null)
     private var activeVoiceTask: VoiceTask = VoiceTask.Dictation
+    private var japaneseInputStyle = JapaneseInputStyle.ROMAJI
 
     override fun onCreate() {
         super.onCreate()
@@ -156,7 +166,10 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
             setRecognitionLanguage(
                 apiConfig?.recognitionLanguage ?: RecognitionLanguage.AUTO
             )
+            setVoiceActionMode(voiceActionMode)
+            setJapaneseInputStyle(japaneseInputStyle)
             updateState(currentState)
+            setDraftActions(drafts.hasComposeNotes, drafts.hasPendingText && !currentLearningDecision.sensitiveField)
         }
         keyboardView = view
         updateManualUi()
@@ -174,7 +187,11 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
         keyboardView?.setRecognitionLanguage(
             apiConfig?.recognitionLanguage ?: RecognitionLanguage.AUTO
         )
+        keyboardView?.setVoiceActionMode(voiceActionMode)
+        keyboardView?.setJapaneseInputStyle(japaneseInputStyle)
         keyboardView?.updateState(currentState)
+        refreshDraftActions()
+        showAvailableDraftStatus()
         updateManualUi()
     }
 
@@ -194,7 +211,10 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
     }
 
     override fun onDestroy() {
+        focusCaptureJob?.cancel()
+        pendingHandoffOperations.clear()
         invalidateVoiceOperation(resetState = false)
+        composeJob?.cancel()
         cancelCorrectionTracking()
         serviceScope.cancel()
         audioRecorder?.release()
@@ -254,21 +274,25 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
     }
 
     private fun beginInputSession(editorInfo: EditorInfo?) {
+        preserveSpeechOnFocusLoss()
         inputSessionId += 1
-        invalidateVoiceOperation(resetState = true)
+        invalidateVoiceOperation(resetState = true, preserveInFlight = pendingHandoffOperations.isNotEmpty())
         currentLearningDecision = LearningPolicy.evaluate(editorInfo)
         resetManualComposers()
         cancelCorrectionTracking()
         updateManualUi()
+        refreshDraftActions()
     }
 
     private fun finishInputSession() {
+        preserveSpeechOnFocusLoss()
         inputSessionId += 1
-        invalidateVoiceOperation(resetState = true)
+        invalidateVoiceOperation(resetState = true, preserveInFlight = pendingHandoffOperations.isNotEmpty())
         currentInputConnection?.finishComposingText()
         resetManualComposers()
         cancelCorrectionTracking()
         updateManualUi()
+        refreshDraftActions()
     }
 
     private fun resetManualComposers() {
@@ -284,14 +308,22 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
         lastCommittedVoiceText = ""
     }
 
-    private fun invalidateVoiceOperation(resetState: Boolean) {
+    private fun invalidateVoiceOperation(
+        resetState: Boolean,
+        preserveInFlight: Boolean = false
+    ) {
+        val keepHandoff = preserveInFlight || pendingHandoffOperations.isNotEmpty()
         voiceOperationId += 1
-        recordingControlJob?.cancel()
-        recordingControlJob = null
+        if (!keepHandoff) {
+            recordingControlJob?.cancel()
+            recordingControlJob = null
+        }
         recordingTimerJob?.cancel()
         recordingTimerJob = null
-        transcriptionJob?.cancel()
-        transcriptionJob = null
+        if (!keepHandoff) {
+            transcriptionJob?.cancel()
+            transcriptionJob = null
+        }
         activeVoiceTask = VoiceTask.Dictation
 
         if (resetState) {
@@ -299,7 +331,7 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
         }
 
         val recorder = audioRecorder
-        if (recorder != null) {
+        if (recorder != null && !keepHandoff && focusCaptureJob?.isActive != true) {
             serviceScope.launch {
                 try {
                     recorder.abortAndDiscard()
@@ -315,6 +347,125 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
     private fun isCurrentOperation(sessionId: Long, operationId: Long): Boolean =
         sessionId == inputSessionId && operationId == voiceOperationId
 
+    private fun refreshDraftActions() {
+        keyboardView?.setDraftActions(
+            drafts.hasComposeNotes,
+            drafts.hasPendingText && !currentLearningDecision.sensitiveField
+        )
+    }
+
+    private fun showAvailableDraftStatus() {
+        if (currentInputMode != KeyboardView.InputMode.VOICE ||
+            currentLearningDecision.sensitiveField
+        ) return
+        when {
+            focusCaptureJob?.isActive == true || pendingHandoffOperations.isNotEmpty() ->
+                keyboardView?.setStatusText(getString(R.string.voice_pending_processing))
+            drafts.hasPendingText ->
+                keyboardView?.setStatusText(getString(R.string.voice_pending_saved))
+            voiceActionMode == KeyboardView.VoiceActionMode.COMPOSE && drafts.hasComposeNotes ->
+                keyboardView?.setStatusText(
+                    getString(R.string.voice_compose_ready, drafts.composeSegmentCount)
+                )
+        }
+    }
+
+    private fun isPendingHandoff(sessionId: Long, operationId: Long): Boolean =
+        (sessionId to operationId) in pendingHandoffOperations
+
+    /** Android closes the IME when focus moves. Stop capture, then retain text only. */
+    private fun preserveSpeechOnFocusLoss() {
+        when (currentState) {
+            ImeState.RECORDING -> {
+                if (focusCaptureJob?.isActive == true) return
+                val recorder = audioRecorder ?: return
+                val task = activeVoiceTask
+                val includePersonalization = personalizationAllowed()
+                recordingTimerJob?.cancel()
+                recordingTimerJob = null
+                focusCaptureJob = serviceScope.launch {
+                    try {
+                        val wav = recorder.stopRecording() ?: return@launch
+                        try {
+                            if (wav.size < MIN_WAV_SIZE_BYTES) return@launch
+                            val activePipeline = awaitPipelineForDraft() ?: return@launch
+                            val config = apiConfig ?: return@launch
+                            if (!config.hasCloudProcessingConsent) return@launch
+                            val result = activePipeline.process(
+                                wav, task, includePersonalization = includePersonalization
+                            )
+                            saveInterruptedResult(task, result)
+                        } finally {
+                            wav.fill(0)
+                        }
+                    } catch (error: CancellationException) {
+                        throw error
+                    } catch (error: Exception) {
+                        Log.w(TAG, "Unable to save interrupted voice draft", error)
+                    }
+                }
+            }
+
+            ImeState.STOPPING,
+            ImeState.PROCESSING -> {
+                if (composeJob?.isActive != true) {
+                    pendingHandoffOperations += inputSessionId to voiceOperationId
+                }
+            }
+
+            else -> Unit
+        }
+    }
+
+    private suspend fun awaitPipelineForDraft(): TranscriptionPipeline? {
+        repeat(PIPELINE_WAIT_ATTEMPTS) {
+            pipeline?.let { return it }
+            delay(PIPELINE_WAIT_INTERVAL_MS)
+        }
+        return pipeline
+    }
+
+    private fun saveInterruptedResult(task: VoiceTask, result: TranscriptionPipeline.Result) {
+        if (!result.success || result.text.isBlank()) return
+        var overflow = false
+        val saved = when (task) {
+            VoiceTask.Compose -> {
+                if (drafts.appendComposeSegment(result.text)) true
+                else {
+                    overflow = true
+                    drafts.savePending(
+                        result.text, VoiceDraftState.PendingOrigin.COMPOSE_OVERFLOW
+                    )
+                }
+            }
+            VoiceTask.Dictation -> drafts.savePending(
+                result.text, VoiceDraftState.PendingOrigin.DICTATION
+            )
+            is VoiceTask.Translation ->
+                drafts.savePending(
+                    formatTranslationOutputs(result.translations),
+                    VoiceDraftState.PendingOrigin.TRANSLATION
+                )
+        }
+        if (!saved) {
+            Log.w(TAG, "Interrupted voice text exceeded the in-memory draft limit")
+            keyboardView?.setStatusText(getString(R.string.voice_pending_too_long))
+            return
+        }
+        refreshDraftActions()
+        if (!currentLearningDecision.sensitiveField && currentInputMode == KeyboardView.InputMode.VOICE) {
+            keyboardView?.setStatusText(
+                if (overflow) {
+                    getString(R.string.voice_compose_overflow_saved)
+                } else if (task == VoiceTask.Compose) {
+                    getString(R.string.voice_compose_ready, drafts.composeSegmentCount)
+                } else {
+                    getString(R.string.voice_pending_saved)
+                }
+            )
+        }
+    }
+
     // ===== KeyboardActionListener =====
 
     override fun onMicToggle() {
@@ -322,12 +473,27 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
             showError(getString(R.string.msg_voice_disabled_sensitive))
             return
         }
+        if (focusCaptureJob?.isActive == true || pendingHandoffOperations.isNotEmpty() ||
+            composeJob?.isActive == true || drafts.hasPendingText
+        ) {
+            keyboardView?.setStatusText(getString(
+                if (drafts.hasPendingText) R.string.voice_pending_saved
+                else R.string.voice_pending_processing
+            ))
+            return
+        }
         when (currentState) {
             ImeState.IDLE,
             ImeState.DONE,
             ImeState.ERROR -> {
                 inspectVoiceCorrection()
-                startRecording(VoiceTask.Dictation)
+                startRecording(
+                    if (voiceActionMode == KeyboardView.VoiceActionMode.COMPOSE) {
+                        VoiceTask.Compose
+                    } else {
+                        VoiceTask.Dictation
+                    }
+                )
             }
 
             ImeState.RECORDING -> stopRecordingAndProcess()
@@ -336,6 +502,147 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
             ImeState.STOPPING,
             ImeState.PROCESSING -> Unit
         }
+    }
+
+    override fun onVoiceActionModeChanged(mode: KeyboardView.VoiceActionMode) {
+        if (currentState !in setOf(ImeState.IDLE, ImeState.DONE, ImeState.ERROR)) return
+        voiceActionMode = mode
+        keyboardView?.setVoiceActionMode(mode)
+        keyboardView?.updateState(currentState)
+        refreshDraftActions()
+        showAvailableDraftStatus()
+    }
+
+    override fun onComposeContinue() {
+        if (voiceActionMode != KeyboardView.VoiceActionMode.COMPOSE ||
+            currentState !in setOf(ImeState.IDLE, ImeState.DONE, ImeState.ERROR)
+        ) return
+        if (currentLearningDecision.sensitiveField) {
+            showError(getString(R.string.msg_voice_disabled_sensitive))
+            return
+        }
+        if (focusCaptureJob?.isActive == true || pendingHandoffOperations.isNotEmpty() ||
+            composeJob?.isActive == true || drafts.hasPendingText
+        ) {
+            keyboardView?.setStatusText(getString(
+                if (drafts.hasPendingText) R.string.voice_pending_saved
+                else R.string.voice_pending_processing
+            ))
+            return
+        }
+        startRecording(VoiceTask.Compose)
+    }
+
+    override fun onComposeClear() {
+        if (currentState !in setOf(ImeState.IDLE, ImeState.DONE, ImeState.ERROR)) return
+        if (focusCaptureJob?.isActive == true || pendingHandoffOperations.isNotEmpty()) {
+            keyboardView?.setStatusText(getString(R.string.voice_pending_processing))
+            return
+        }
+        composeJob?.cancel()
+        composeJob = null
+        drafts.clearCompose()
+        refreshDraftActions()
+        keyboardView?.setStatusText(getString(R.string.voice_compose_cleared))
+    }
+
+    override fun onComposeGenerate() {
+        if (voiceActionMode != KeyboardView.VoiceActionMode.COMPOSE ||
+            currentState !in setOf(ImeState.IDLE, ImeState.DONE, ImeState.ERROR) ||
+            !drafts.hasComposeNotes
+        ) return
+        if (focusCaptureJob?.isActive == true || pendingHandoffOperations.isNotEmpty()) {
+            keyboardView?.setStatusText(getString(R.string.voice_pending_processing))
+            return
+        }
+        if (currentLearningDecision.sensitiveField) {
+            showError(getString(R.string.msg_voice_disabled_sensitive))
+            return
+        }
+        val config = apiConfig ?: ApiConfig(this).also { apiConfig = it }
+        if (!config.hasCloudProcessingConsent) {
+            showError(getString(R.string.msg_cloud_consent_required))
+            return
+        }
+        if (!hasSelectedLlmKey(config)) {
+            showError(getString(R.string.voice_compose_requires_model))
+            return
+        }
+        val targetConnection = currentInputConnection ?: return
+        val editorInfo = currentInputEditorInfo
+        val sessionId = inputSessionId
+        val operationId = voiceOperationId
+        val notes = drafts.composeNotes()
+        setState(ImeState.PROCESSING)
+        keyboardView?.setStatusText(getString(R.string.voice_compose_processing))
+        composeJob?.cancel()
+        composeJob = serviceScope.launch {
+            val activePipeline = awaitPipeline(sessionId, operationId) ?: return@launch
+            try {
+                val draft = activePipeline.composeNotes(notes)
+                if (drafts.composeNotes() != notes) return@launch
+                val sameEditor = isCurrentOperation(sessionId, operationId) &&
+                    currentInputConnection === targetConnection &&
+                    !currentLearningDecision.sensitiveField
+                val isMultiline = editorInfo?.inputType?.and(InputType.TYPE_TEXT_FLAG_MULTI_LINE) ==
+                    InputType.TYPE_TEXT_FLAG_MULTI_LINE
+                val fitsSingleLine = draft.length <= 400 && !draft.contains('\n')
+                if (sameEditor && (isMultiline || fitsSingleLine)) {
+                    if (targetConnection.commitText(draft, 1)) {
+                        drafts.clearCompose()
+                        setState(ImeState.DONE)
+                        refreshDraftActions()
+                        return@launch
+                    }
+                }
+                // Editors have different constraints. A long draft in a single-line
+                // field, or any result completed after focus moved, needs explicit insert.
+                drafts.savePending(draft, VoiceDraftState.PendingOrigin.COMPOSED_DRAFT)
+                if (isCurrentOperation(sessionId, operationId)) {
+                    setState(ImeState.DONE)
+                    keyboardView?.setStatusText(getString(R.string.voice_pending_saved))
+                }
+                refreshDraftActions()
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: ComposeException) {
+                Log.w(TAG, "Writing draft unavailable", error)
+                if (isCurrentOperation(sessionId, operationId)) {
+                    showError(getString(R.string.voice_compose_failed))
+                }
+            } catch (error: Exception) {
+                Log.e(TAG, "Writing draft failed", error)
+                if (isCurrentOperation(sessionId, operationId)) {
+                    showError(getString(R.string.voice_compose_failed))
+                }
+            }
+        }
+    }
+
+    override fun onPendingInsert() {
+        if (focusCaptureJob?.isActive == true || pendingHandoffOperations.isNotEmpty()) return
+        if (currentLearningDecision.sensitiveField ||
+            currentState !in setOf(ImeState.IDLE, ImeState.DONE, ImeState.ERROR)
+        ) return
+        val pending = drafts.peekPending() ?: return
+        val connection = currentInputConnection ?: return
+        if (connection.commitText(pending.text, 1)) {
+            drafts.clearPending()
+            if (pending.origin == VoiceDraftState.PendingOrigin.COMPOSED_DRAFT) {
+                drafts.clearCompose()
+            }
+            refreshDraftActions()
+            setState(ImeState.DONE)
+        } else {
+            showError(getString(R.string.msg_input_connection_lost))
+        }
+    }
+
+    override fun onPendingDiscard() {
+        if (focusCaptureJob?.isActive == true || pendingHandoffOperations.isNotEmpty()) return
+        drafts.clearPending()
+        refreshDraftActions()
+        keyboardView?.setStatusText(getString(R.string.voice_pending_discarded))
     }
 
     override fun onTranslationPickerRequested() {
@@ -369,6 +676,15 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
             currentState != ImeState.DONE &&
             currentState != ImeState.ERROR
         ) {
+            return
+        }
+        if (focusCaptureJob?.isActive == true || pendingHandoffOperations.isNotEmpty() ||
+            composeJob?.isActive == true || drafts.hasPendingText
+        ) {
+            keyboardView?.setStatusText(getString(
+                if (drafts.hasPendingText) R.string.voice_pending_saved
+                else R.string.voice_pending_processing
+            ))
             return
         }
 
@@ -473,6 +789,7 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
         val operationId = voiceOperationId
         val targetConnection = currentInputConnection
         val task = activeVoiceTask
+        val includePersonalization = personalizationAllowed()
 
         recordingTimerJob?.cancel()
         recordingTimerJob = null
@@ -481,15 +798,28 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
         recordingControlJob = serviceScope.launch {
             try {
                 val wavData = recorder.stopRecording()
-                if (!isCurrentOperation(sessionId, operationId)) return@launch
+                if (!isCurrentOperation(sessionId, operationId) &&
+                    !isPendingHandoff(sessionId, operationId)
+                ) {
+                    wavData?.fill(0)
+                    return@launch
+                }
 
                 if (wavData == null || wavData.size < MIN_WAV_SIZE_BYTES) {
-                    setState(ImeState.IDLE)
-                    keyboardView?.setStatusText(getString(R.string.msg_record_too_short))
+                    wavData?.fill(0)
+                    pendingHandoffOperations.remove(sessionId to operationId)
+                    if (isCurrentOperation(sessionId, operationId)) {
+                        setState(ImeState.IDLE)
+                        keyboardView?.setStatusText(getString(R.string.msg_record_too_short))
+                    }
                     return@launch
                 }
                 if (targetConnection == null) {
-                    showError(getString(R.string.msg_input_connection_lost))
+                    wavData.fill(0)
+                    pendingHandoffOperations.remove(sessionId to operationId)
+                    if (isCurrentOperation(sessionId, operationId)) {
+                        showError(getString(R.string.msg_input_connection_lost))
+                    }
                     return@launch
                 }
 
@@ -498,11 +828,14 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
                     sessionId = sessionId,
                     operationId = operationId,
                     targetConnection = targetConnection,
-                    task = task
+                    task = task,
+                    includePersonalization = includePersonalization
                 )
             } catch (error: CancellationException) {
+                pendingHandoffOperations.remove(sessionId to operationId)
                 throw error
             } catch (error: Exception) {
+                pendingHandoffOperations.remove(sessionId to operationId)
                 if (isCurrentOperation(sessionId, operationId)) {
                     Log.e(TAG, "Unable to stop recording", error)
                     showError(getString(R.string.msg_record_failed) + (error.message ?: ""))
@@ -516,11 +849,16 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
         sessionId: Long,
         operationId: Long,
         targetConnection: InputConnection,
-        task: VoiceTask
+        task: VoiceTask,
+        includePersonalization: Boolean
     ) {
-        setState(ImeState.PROCESSING)
+        if (isCurrentOperation(sessionId, operationId)) setState(ImeState.PROCESSING)
         transcriptionJob = serviceScope.launch {
-            val activePipeline = awaitPipeline(sessionId, operationId) ?: return@launch
+            val activePipeline = awaitPipeline(sessionId, operationId) ?: run {
+                pendingHandoffOperations.remove(sessionId to operationId)
+                wavData.fill(0)
+                return@launch
+            }
 
             try {
                 // Consent can be withdrawn while the user is recording or while
@@ -536,13 +874,13 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
                     }
                     return@launch
                 }
-                if (!isCurrentOperation(sessionId, operationId) || currentInputConnection !== targetConnection) {
+                if ((!isCurrentOperation(sessionId, operationId) ||
+                    currentInputConnection !== targetConnection) &&
+                    !isPendingHandoff(sessionId, operationId)
+                ) {
                     wavData.fill(0)
                     return@launch
                 }
-                // Capture this editor's decision only after asynchronous recorder/pipeline
-                // work has completed. A later editor switch cancels the operation.
-                val includePersonalization = personalizationAllowed()
                 activePipeline.process(
                     wavData,
                     task,
@@ -576,10 +914,47 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
                         }
 
                         override fun onCompleted(result: TranscriptionPipeline.Result) {
+                            if (isPendingHandoff(sessionId, operationId)) {
+                                saveInterruptedResult(task, result)
+                                return
+                            }
                             if (!isCurrentOperation(sessionId, operationId) || currentInputConnection !== targetConnection) return
+
+                            if (task == VoiceTask.Compose) {
+                                if (result.success && result.text.isNotBlank()) {
+                                    if (drafts.appendComposeSegment(result.text)) {
+                                        setState(ImeState.DONE)
+                                        keyboardView?.setStatusText(
+                                            getString(R.string.voice_compose_ready, drafts.composeSegmentCount)
+                                        )
+                                        refreshDraftActions()
+                                    } else {
+                                        if (drafts.savePending(
+                                                result.text,
+                                                VoiceDraftState.PendingOrigin.COMPOSE_OVERFLOW
+                                            )
+                                        ) {
+                                            setState(ImeState.DONE)
+                                            refreshDraftActions()
+                                            keyboardView?.setStatusText(
+                                                getString(R.string.voice_compose_overflow_saved)
+                                            )
+                                        } else {
+                                            showError(getString(R.string.voice_pending_too_long))
+                                        }
+                                    }
+                                } else {
+                                    showError(
+                                        if (result.success) getString(R.string.msg_no_speech)
+                                        else getString(R.string.msg_process_failed)
+                                    )
+                                }
+                                return
+                            }
 
                             val textToCommit = when (task) {
                                 VoiceTask.Dictation -> result.text
+                                VoiceTask.Compose -> return
                                 is VoiceTask.Translation ->
                                     formatTranslationOutputs(result.translations)
                             }
@@ -653,6 +1028,9 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
                             (error.message ?: getString(R.string.msg_unknown_error))
                     )
                 }
+            } finally {
+                pendingHandoffOperations.remove(sessionId to operationId)
+                wavData.fill(0)
             }
         }
     }
@@ -723,7 +1101,9 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
         keyboardView?.setStatusText(getString(R.string.msg_initializing))
 
         repeat(PIPELINE_WAIT_ATTEMPTS) {
-            if (!isCurrentOperation(sessionId, operationId)) return null
+            if (!isCurrentOperation(sessionId, operationId) &&
+                !isPendingHandoff(sessionId, operationId)
+            ) return null
             pipeline?.let { return it }
             delay(PIPELINE_WAIT_INTERVAL_MS)
         }
@@ -781,10 +1161,13 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
 
         commitActiveComposition()
         inspectVoiceCorrection()
+        preserveSpeechOnFocusLoss()
         invalidateVoiceOperation(resetState = true)
         currentInputMode = mode
         keyboardView?.setInputMode(mode)
         updateManualUi()
+        refreshDraftActions()
+        showAvailableDraftStatus()
     }
 
     override fun onKeyAction(action: KeyAction) {
@@ -814,6 +1197,10 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
             KeyAction.Enter -> performEnterAction()
             KeyAction.Shift,
             KeyAction.ToggleJapaneseScript,
+            KeyAction.ToggleJapaneseLayout,
+            is KeyAction.TapJapaneseKana,
+            KeyAction.TransformJapaneseKana,
+            KeyAction.FinalizeJapaneseKana,
             is KeyAction.SwitchLayer -> Unit
         }
     }
@@ -858,6 +1245,10 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
 
             KeyAction.Shift,
             KeyAction.ToggleJapaneseScript,
+            KeyAction.ToggleJapaneseLayout,
+            is KeyAction.TapJapaneseKana,
+            KeyAction.TransformJapaneseKana,
+            KeyAction.FinalizeJapaneseKana,
             is KeyAction.SwitchLayer -> Unit
         }
     }
@@ -866,11 +1257,43 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
         if (!::japaneseComposer.isInitialized) return
         when (action) {
             is KeyAction.InsertText -> {
-                if (!japaneseComposer.appendRomaji(action.text)) {
+                val accepted = if (japaneseInputStyle == JapaneseInputStyle.KANA_12_KEY) {
+                    japaneseComposer.appendKana(action.text)
+                } else {
+                    japaneseComposer.appendRomaji(action.text)
+                }
+                if (!accepted) {
                     commitJapaneseBest()
                     currentInputConnection?.commitText(action.text, 1)
                 }
                 updateManualUi()
+            }
+
+            is KeyAction.TapJapaneseKana -> {
+                japaneseComposer.tapKana(action.group, SystemClock.uptimeMillis())
+                updateManualUi()
+            }
+
+            KeyAction.TransformJapaneseKana -> {
+                japaneseComposer.transformLastKana()
+                updateManualUi()
+            }
+
+            KeyAction.FinalizeJapaneseKana -> japaneseComposer.finalizeKanaTap()
+
+            KeyAction.ToggleJapaneseLayout -> {
+                if (japaneseComposer.hasComposition) commitJapaneseBest()
+                if (japaneseComposer.hasComposition) return
+                val next = if (japaneseInputStyle == JapaneseInputStyle.ROMAJI) {
+                    JapaneseInputStyle.KANA_12_KEY
+                } else {
+                    JapaneseInputStyle.ROMAJI
+                }
+                if (japaneseComposer.setInputStyle(next)) {
+                    japaneseInputStyle = next
+                    keyboardView?.setJapaneseInputStyle(next)
+                    updateManualUi()
+                }
             }
 
             KeyAction.Backspace -> {
@@ -931,12 +1354,17 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
             }
 
             KeyAction.ToggleJapaneseScript,
+            KeyAction.ToggleJapaneseLayout,
+            is KeyAction.TapJapaneseKana,
+            KeyAction.TransformJapaneseKana,
+            KeyAction.FinalizeJapaneseKana,
             is KeyAction.SwitchLayer -> Unit
         }
     }
 
     override fun onNextKeyboardPressed() {
         commitActiveComposition()
+        preserveSpeechOnFocusLoss()
         invalidateVoiceOperation(resetState = true)
         val switched = Build.VERSION.SDK_INT >= Build.VERSION_CODES.P &&
             switchToNextInputMethod(false)
@@ -948,6 +1376,7 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
 
     override fun onKeyboardPickerRequested() {
         commitActiveComposition()
+        preserveSpeechOnFocusLoss()
         invalidateVoiceOperation(resetState = true)
         (getSystemService(INPUT_METHOD_SERVICE) as? InputMethodManager)
             ?.showInputMethodPicker()

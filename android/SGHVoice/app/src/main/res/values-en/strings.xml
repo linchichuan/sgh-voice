@@ -1,5 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="voice_compose_mic_start">Describe what to write</string>
+    <string name="voice_compose_mic_finish">Finish this part</string>
+    <string name="voice_compose_hint">Say who it is for, the purpose, and any requirements. You can add more parts before writing.</string>
+    <string name="voice_compose_ready">Saved %1$d parts. Add more or write the draft.</string>
+    <string name="voice_compose_processing">Writing your draft…</string>
+    <string name="voice_compose_requires_model">Help me write requires an available AI model and API key.</string>
+    <string name="voice_compose_failed">Writing failed. Your spoken notes are saved; please try again.</string>
+    <string name="voice_compose_too_long">Your spoken notes are full. Write the draft before adding more.</string>
+    <string name="voice_compose_overflow_saved">Notes are full. The last part was saved as text to review.</string>
+    <string name="voice_pending_too_long">Speech text is too long to save safely. Please record a shorter part.</string>
+    <string name="voice_compose_cleared">Spoken notes cleared</string>
+    <string name="voice_pending_saved">Your last speech was saved as text to review. Tap Insert when ready.</string>
+    <string name="voice_pending_processing">Saving your last speech…</string>
+    <string name="voice_pending_discarded">Saved text discarded</string>
     <!-- App Info -->
     <string name="app_name">SGH Voice</string>
     <string name="ime_label">SGH Voice Input</string>
@@ -13,7 +27,7 @@
     <string name="mode_english">ABC</string>
     <string name="mode_voice_desc">Switch to voice input</string>
     <string name="mode_zhuyin_desc">Switch to Zhuyin input</string>
-    <string name="mode_japanese_desc">Switch to Japanese romaji input</string>
+    <string name="mode_japanese_desc">Switch to Japanese input</string>
     <string name="mode_english_desc">Switch to English input</string>
     <string name="recognition_language_button_desc">Speech recognition language: %1$s. Double tap to choose a language.</string>
     <string name="recognition_language_auto">Auto (for mixed languages)</string>

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="voice_task_dictation">Dictate</string>
+    <string name="voice_task_dictation_desc">Dictate the words you speak</string>
+    <string name="voice_task_compose">Help me write</string>
+    <string name="voice_task_compose_desc">Turn spoken ideas into a written draft</string>
+    <string name="voice_compose_continue">Add more</string>
+    <string name="voice_compose_generate">Write draft</string>
+    <string name="voice_compose_clear">Clear</string>
+    <string name="voice_pending_insert">Insert saved text</string>
+    <string name="voice_pending_discard">Discard</string>
+</resources>

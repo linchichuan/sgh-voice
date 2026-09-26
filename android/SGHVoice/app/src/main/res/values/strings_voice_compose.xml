@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="voice_task_dictation">口述</string>
+    <string name="voice_task_dictation_desc">口述，依照說話內容輸入</string>
+    <string name="voice_task_compose">幫我寫</string>
+    <string name="voice_task_compose_desc">幫我寫，將口頭想法整理成文字</string>
+    <string name="voice_compose_continue">繼續補充</string>
+    <string name="voice_compose_generate">生成文字</string>
+    <string name="voice_compose_clear">清除</string>
+    <string name="voice_pending_insert">插入待確認文字</string>
+    <string name="voice_pending_discard">捨棄</string>
+</resources>

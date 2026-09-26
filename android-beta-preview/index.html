@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>SGH Voice Android 2.8.0 個人測試版</title>
+  <style>
+    :root { color-scheme: light; font-family: -apple-system, BlinkMacSystemFont, "Noto Sans TC", sans-serif; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #f1f6f2; color: #17302b; line-height: 1.65; }
+    main { width: min(100% - 32px, 680px); margin: 44px auto 70px; }
+    .badge { display: inline-block; padding: 5px 12px; border: 1px solid #8fb4a3; border-radius: 999px; color: #245442; font-size: 13px; font-weight: 700; letter-spacing: .03em; }
+    h1 { margin: 18px 0 8px; font-size: clamp(28px, 6vw, 40px); line-height: 1.2; letter-spacing: -.025em; }
+    .lead { margin: 0 0 26px; color: #456359; font-size: 17px; }
+    .card { margin: 18px 0; padding: 22px; background: white; border: 1px solid #d7e6dc; border-radius: 22px; box-shadow: 0 10px 32px #163b2610; }
+    .circle { display: grid; place-items: center; width: 86px; height: 86px; margin: 0 0 14px; border: 7px solid #224d3e; border-radius: 50%; background: #b9e8cc; color: #173d2c; font-size: 31px; }
+    h2 { margin: 0 0 8px; font-size: 20px; }
+    ul, ol { margin: 8px 0 0; padding-left: 22px; }
+    li + li { margin-top: 6px; }
+    .button { display: block; margin: 20px 0 12px; padding: 15px 18px; border-radius: 14px; background: #20573f; color: #fff; text-align: center; text-decoration: none; font-weight: 750; font-size: 17px; }
+    .button:focus-visible { outline: 3px solid #e39343; outline-offset: 3px; }
+    .note { color: #49665a; font-size: 14px; }
+    .warning { border-color: #e0bf8a; background: #fffaf0; }
+    code { overflow-wrap: anywhere; font-size: 12px; }
+    footer { margin-top: 24px; color: #5d7166; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <main>
+    <span class="badge">ANDROID · PERSONAL TEST BUILD</span>
+    <h1>SGH Voice 2.8.0</h1>
+    <p class="lead">給現有 Android 使用者試用的新版本，尚未完成實機驗收，也不是 Google Play 公開版。</p>
+
+    <section class="card">
+      <div class="circle" aria-hidden="true">●</div>
+      <h2>這版可以試什麼</h2>
+      <ul>
+        <li>淺綠錄音圓加上深色外框，錄音時保留圓內聲音波動。</li>
+        <li>新增「幫我寫」：分段口述想法，確認後才產生可貼上的草稿；一般口述不會自動變成代寫。</li>
+        <li>注音按鍵與候選字更大；日文新增可切換的 12 鍵假名連按輸入。</li>
+        <li>切換輸入欄位時停止錄音，嘗試保留已錄語音的轉錄文字，回到鍵盤後由你決定插入位置。</li>
+      </ul>
+      <a class="button" href="/SGHVoice-Android-v2.8.0.apk" download>下載 Android 2.8.0 APK</a>
+      <p class="note">版本碼 30 · Android 8.0 以上 · 17,377,753 bytes<br>SHA-256：<code>8408d0de4310cfba2b41718fe7927b6eddad8e9147d7f3d97e926b5d9fefe339</code></p>
+    </section>
+
+    <section class="card warning">
+      <h2>安裝前請注意</h2>
+      <ol>
+        <li>若你目前使用本站側載的 2.7.9，直接開啟 APK 選「更新」；不要先解除安裝，避免遺失本機金鑰與個人詞庫。</li>
+        <li>APK 與本站 2.7.9 側載版使用同一 package 與簽章。若你安裝的是 Google Play 測試版，可能因簽章不同而無法直接覆蓋。</li>
+        <li>切換畫面時目前不會在背景持續收音；已錄片段只暫存在輸入法行程記憶體。若系統回收行程，待確認文字可能消失。請先在非敏感欄位測試，勿口述不能重講的內容。</li>
+        <li>「幫我寫」需要你已設定可用的 AI 模型與金鑰，並同意雲端處理；AI 草稿仍需核對姓名、數字及事實。</li>
+      </ol>
+    </section>
+    <footer>這是 30 天的 Firebase 測試入口；主站穩定版目前仍為 2.7.9。</footer>
+  </main>
+</body>
+</html>

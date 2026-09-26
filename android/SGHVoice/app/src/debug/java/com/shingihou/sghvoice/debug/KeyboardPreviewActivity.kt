@@ -117,6 +117,16 @@ class KeyboardPreviewActivity : Activity() {
                 startPreview()
             }
 
+            override fun onVoiceActionModeChanged(mode: KeyboardView.VoiceActionMode) {
+                keyboard.setVoiceActionMode(mode)
+            }
+
+            override fun onComposeContinue() = Unit
+            override fun onComposeGenerate() = Unit
+            override fun onComposeClear() = Unit
+            override fun onPendingInsert() = Unit
+            override fun onPendingDiscard() = Unit
+
             override fun onTranslationPickerRequested() {
                 keyboard.showTranslationPanel(listOf(TranslationLanguage.JAPANESE))
             }

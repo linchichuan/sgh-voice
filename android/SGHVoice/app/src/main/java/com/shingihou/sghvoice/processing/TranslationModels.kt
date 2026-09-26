@@ -55,6 +55,9 @@ data class TranslationOutput(
 sealed interface VoiceTask {
     data object Dictation : VoiceTask
 
+    /** Transcribe a spoken writing brief; generation happens only on explicit confirmation. */
+    data object Compose : VoiceTask
+
     data class Translation(
         val request: TranslationRequest
     ) : VoiceTask

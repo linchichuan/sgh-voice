@@ -1,5 +1,6 @@
 package com.shingihou.sghvoice.ime.manual
 
+import com.shingihou.sghvoice.ime.japanese.JapaneseInputStyle
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -44,6 +45,25 @@ class ManualKeyboardLayoutProviderTest {
         )
         assertTrue("、" in bottomLabels)
         assertTrue("。" in bottomLabels)
+        assertTrue(layout.rows.flattenKeys().any { it.action == KeyAction.ToggleJapaneseLayout })
+    }
+
+    @Test
+    fun `Japanese 12 key layout has kana groups and retains Romaji switch`() {
+        val layout = provider.layout(
+            ManualKeyboardMode.JAPANESE,
+            japaneseInputStyle = JapaneseInputStyle.KANA_12_KEY
+        )
+        val keys = layout.rows.flattenKeys()
+
+        assertEquals(5, layout.rows.size)
+        assertEquals(listOf("あ", "か", "さ"), layout.rows.first().keys.map { it.label })
+        assertEquals(10, keys.count { it.action is KeyAction.TapJapaneseKana })
+        assertTrue(keys.any { it.action == KeyAction.TransformJapaneseKana })
+        assertTrue(keys.any { it.action == KeyAction.FinalizeJapaneseKana })
+        assertTrue(keys.any { it.action == KeyAction.ToggleJapaneseLayout && it.label == "ABC" })
+        assertTrue(keys.any { it.label == "あ" && "い" in it.alternatives })
+        assertTrue(keys.any { it.action == KeyAction.Backspace })
     }
 
     @Test
@@ -82,7 +102,12 @@ class ManualKeyboardLayoutProviderTest {
     fun `Every key advertises an accessible touch target`() {
         ManualKeyboardMode.entries.forEach { mode ->
             KeyboardLayer.entries.forEach { layer ->
-                provider.layout(mode, layer).rows.flattenKeys().forEach { key ->
+                val layouts = if (mode == ManualKeyboardMode.JAPANESE) {
+                    JapaneseInputStyle.entries.map { provider.layout(mode, layer, japaneseInputStyle = it) }
+                } else {
+                    listOf(provider.layout(mode, layer))
+                }
+                layouts.flatMap { it.rows.flattenKeys() }.forEach { key ->
                     assertTrue(
                         "${key.id} was smaller than the minimum touch target",
                         key.minTouchTargetDp >= KeySpec.MIN_TOUCH_TARGET_DP

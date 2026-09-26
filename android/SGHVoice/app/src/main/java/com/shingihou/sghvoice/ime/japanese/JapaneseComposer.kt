@@ -21,7 +21,7 @@ data class JapaneseCandidate(
 )
 
 /**
- * Pure Kotlin state holder for Phase 1 Japanese manual input.
+ * Pure Kotlin state holder for Japanese manual input.
  *
  * The original romaji buffer is retained, making every backspace lossless.
  * Exact JMdict lookup only runs after the buffer has a complete kana reading.
@@ -38,6 +38,13 @@ class JapaneseComposer(
     }
 
     private val input = StringBuilder()
+    private val kanaInput = StringBuilder()
+    private var lastKanaTapGroup: String? = null
+    private var lastKanaTapAtMs: Long = Long.MIN_VALUE
+    private var lastKanaTapIndex: Int = 0
+
+    var inputStyle: JapaneseInputStyle = JapaneseInputStyle.ROMAJI
+        private set
 
     var scriptMode: JapaneseScriptMode = initialScriptMode
         private set
@@ -46,10 +53,17 @@ class JapaneseComposer(
         get() = input.toString()
 
     val hasComposition: Boolean
-        get() = input.isNotEmpty()
+        get() = input.isNotEmpty() || kanaInput.isNotEmpty()
 
     val composition: String
         get() {
+            if (inputStyle == JapaneseInputStyle.KANA_12_KEY) {
+                val reading = kanaInput.toString()
+                return when (scriptMode) {
+                    JapaneseScriptMode.HIRAGANA -> reading
+                    JapaneseScriptMode.KATAKANA -> JapaneseScripts.hiraganaToKatakana(reading)
+                }
+            }
             val converted = RomajiToHiragana.convert(input.toString())
             val convertedKana = when (scriptMode) {
                 JapaneseScriptMode.HIRAGANA -> converted.hiragana
@@ -68,6 +82,7 @@ class JapaneseComposer(
     val hiraganaReading: String?
         get() {
             if (!hasComposition) return null
+            if (inputStyle == JapaneseInputStyle.KANA_12_KEY) return kanaInput.toString()
             val finalized = RomajiToHiragana.convert(
                 input.toString(),
                 finalizeTerminalN = true
@@ -76,15 +91,70 @@ class JapaneseComposer(
         }
 
     val hasPendingRomaji: Boolean
-        get() = hiraganaReading == null && hasComposition
+        get() = inputStyle == JapaneseInputStyle.ROMAJI &&
+            hiraganaReading == null && hasComposition
+
+    /** A layout change never discards an active reading; commit it first. */
+    fun setInputStyle(style: JapaneseInputStyle): Boolean {
+        if (style == inputStyle) return true
+        if (hasComposition) return false
+        inputStyle = style
+        return true
+    }
+
+    /** Inserts a kana selected by long-press without entering multi-tap cycling. */
+    fun appendKana(kana: String): Boolean {
+        if (inputStyle != JapaneseInputStyle.KANA_12_KEY ||
+            kana.length != 1 || !Kana12Key.isKana(kana[0])) return false
+        finalizeKanaTap()
+        kanaInput.append(kana)
+        return true
+    }
+
+    /** Consecutive taps of one key cycle its kana; a pause or another key appends. */
+    fun tapKana(group: String, nowMs: Long): Boolean {
+        if (inputStyle != JapaneseInputStyle.KANA_12_KEY) return false
+        val kana = Kana12Key.groups[group] ?: return false
+        val cycling = lastKanaTapGroup == group && kanaInput.isNotEmpty() &&
+            nowMs >= lastKanaTapAtMs &&
+            nowMs - lastKanaTapAtMs <= Kana12Key.MULTITAP_WINDOW_MS
+        if (cycling) {
+            lastKanaTapIndex = (lastKanaTapIndex + 1) % kana.size
+            kanaInput.replace(kanaInput.lastIndex, kanaInput.length, kana[lastKanaTapIndex])
+        } else {
+            lastKanaTapIndex = 0
+            kanaInput.append(kana.first())
+        }
+        lastKanaTapGroup = group
+        lastKanaTapAtMs = nowMs
+        return true
+    }
+
+    /** Separates two identical first-column kana without waiting for the timeout. */
+    fun finalizeKanaTap() {
+        lastKanaTapGroup = null
+        lastKanaTapAtMs = Long.MIN_VALUE
+        lastKanaTapIndex = 0
+    }
+
+    /** Cycles the last kana through its small, voiced or semi-voiced forms. */
+    fun transformLastKana(): Boolean {
+        if (inputStyle != JapaneseInputStyle.KANA_12_KEY || kanaInput.isEmpty()) return false
+        val replacement = Kana12Key.nextModified(kanaInput.last().toString()) ?: return false
+        kanaInput.replace(kanaInput.lastIndex, kanaInput.length, replacement)
+        finalizeKanaTap()
+        return true
+    }
 
     fun appendRomaji(character: Char): Boolean {
+        if (inputStyle != JapaneseInputStyle.ROMAJI) return false
         if (!RomajiToHiragana.isSupportedInput(character.toString())) return false
         input.append(character.lowercaseChar())
         return true
     }
 
     fun appendRomaji(value: String): Boolean {
+        if (inputStyle != JapaneseInputStyle.ROMAJI) return false
         if (!RomajiToHiragana.isSupportedInput(value)) return false
         input.append(value.lowercase())
         return true
@@ -92,6 +162,7 @@ class JapaneseComposer(
 
     /** Replaces the input transactionally. */
     fun setRomaji(value: String): Boolean {
+        if (inputStyle != JapaneseInputStyle.ROMAJI) return false
         if (!RomajiToHiragana.isSupportedInput(value)) return false
         input.clear()
         input.append(value.lowercase())
@@ -100,6 +171,12 @@ class JapaneseComposer(
 
     /** Removes one original keystroke and recomputes the visible composition. */
     fun backspace(): Boolean {
+        if (inputStyle == JapaneseInputStyle.KANA_12_KEY) {
+            if (kanaInput.isEmpty()) return false
+            kanaInput.deleteCharAt(kanaInput.lastIndex)
+            finalizeKanaTap()
+            return true
+        }
         if (input.isEmpty()) return false
         input.deleteCharAt(input.lastIndex)
         return true
@@ -107,13 +184,17 @@ class JapaneseComposer(
 
     fun clear() {
         input.clear()
+        kanaInput.clear()
+        finalizeKanaTap()
     }
 
     fun setScriptMode(mode: JapaneseScriptMode) {
+        if (mode != scriptMode) finalizeKanaTap()
         scriptMode = mode
     }
 
     fun toggleScriptMode(): JapaneseScriptMode {
+        finalizeKanaTap()
         scriptMode = when (scriptMode) {
             JapaneseScriptMode.HIRAGANA -> JapaneseScriptMode.KATAKANA
             JapaneseScriptMode.KATAKANA -> JapaneseScriptMode.HIRAGANA

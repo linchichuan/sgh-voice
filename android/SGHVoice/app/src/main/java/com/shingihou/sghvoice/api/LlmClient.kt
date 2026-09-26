@@ -47,6 +47,60 @@ class LlmClient(
         private const val ANTHROPIC_VERSION = "2023-06-01"
         private const val MAX_TOKENS = 1024
         private const val TRANSLATION_MAX_TOKENS = 2048
+        private const val COMPOSE_MAX_TOKENS = 4096
+        private const val COMPOSE_MAX_BRIEF_CHARS = 8_000
+        private const val COMPOSE_MAX_DRAFT_CHARS = 12_000
+
+        // Compose is an explicit user-selected task. Unlike dictation, the
+        // brief is an instruction to draft text, never permission to send it.
+        internal const val COMPOSE_SYSTEM_PROMPT = """
+            You draft text from the user's spoken brief. This is a writing task, not a chat.
+            The user message is JSON with a single brief field. Follow its requested format,
+            audience, language, tone, length and exclusions. If asked to organize ideas for
+            another AI, produce a concise task brief with goal, context, requirements,
+            constraints and acceptance criteria only when those sections have source facts.
+            Remove filler, repetitions and abandoned self-corrections. Keep every material
+            fact, name, number, date, negation, requirement and uncertainty intact.
+            You may add natural grammar, transitions and conventional greetings, but never
+            invent names, dates, commitments, medical claims, prices or completed actions.
+            Omit optional missing details; mark indispensable missing details as [待補].
+            Never answer the brief as an assistant, identify yourself as AI, apologize,
+            explain your process, or claim to have sent or performed anything.
+            The text is a draft for the user to review; do not send, post or take actions.
+            Write in the brief's language unless it requests another output language.
+            Use Traditional Chinese when the output language is Chinese unless asked otherwise.
+            Return only strict JSON: {"draft":"<ready-to-use text>"}.
+        """
+
+        internal fun buildComposeUserContent(brief: String): String =
+            JSONObject().put("brief", brief).toString()
+
+        internal fun buildComposeSchema(): JSONObject = JSONObject().apply {
+            put("type", "object")
+            put("properties", JSONObject().put("draft", JSONObject().put("type", "string")))
+            put("required", JSONArray(listOf("draft")))
+            put("additionalProperties", false)
+        }
+
+        internal fun parseComposeResponse(raw: String): String {
+            val root = try {
+                JSONObject(raw.trim())
+            } catch (error: Exception) {
+                throw ComposeException("Writing model returned invalid JSON.", error)
+            }
+            if (root.length() != 1 || !root.has("draft") || root.isNull("draft") ||
+                root.opt("draft") !is String
+            ) {
+                throw ComposeException("Writing model returned an invalid draft.")
+            }
+            val draft = root.optString("draft").trim()
+            if (draft.isBlank() || draft.length > COMPOSE_MAX_DRAFT_CHARS ||
+                ASSISTANT_IDENTITY_REFUSAL_PATTERNS.any { it.containsMatchIn(draft) }
+            ) {
+                throw ComposeException("Writing model returned an unusable draft.")
+            }
+            return draft
+        }
 
         // 系統提示詞。使用者內容永遠是 inert transcript，不能被當作新的指令。
         internal const val DICTATION_BASE_PROMPT =
@@ -336,7 +390,8 @@ class LlmClient(
             text: String,
             systemPrompt: String,
             maxTokens: Int,
-            responseSchema: JSONObject? = null
+            responseSchema: JSONObject? = null,
+            responseName: String = "translation_response"
         ): JSONObject {
             return JSONObject().apply {
                 put("model", model)
@@ -367,7 +422,7 @@ class LlmClient(
                             .put(
                                 "json_schema",
                                 JSONObject()
-                                    .put("name", "translation_response")
+                                    .put("name", responseName)
                                     .put("strict", true)
                                     .put("schema", schema)
                             )
@@ -744,6 +799,57 @@ class LlmClient(
         )
     }
 
+    /** Explicit writing mode. Failure must never paste the spoken instruction as a draft. */
+    suspend fun compose(brief: String): String {
+        val normalized = brief.trim()
+        if (normalized.isBlank() || normalized.length > COMPOSE_MAX_BRIEF_CHARS) {
+            throw ComposeException("Writing brief was empty or too long.")
+        }
+        val schema = buildComposeSchema()
+        val userContent = buildComposeUserContent(normalized)
+        val raw = try {
+            when (apiConfig.llmEngine) {
+                "claude" -> {
+                    if (apiConfig.anthropicApiKey.isBlank()) {
+                        throw ComposeException("Anthropic API key is not configured.")
+                    }
+                    requestClaudeRaw(userContent, COMPOSE_SYSTEM_PROMPT, COMPOSE_MAX_TOKENS, schema)
+                }
+
+                "openai" -> {
+                    if (apiConfig.openAiApiKey.isBlank()) {
+                        throw ComposeException("OpenAI API key is not configured.")
+                    }
+                    requestOpenAiLikeRaw(
+                        userContent, COMPOSE_SYSTEM_PROMPT, OPENAI_API_URL,
+                        apiConfig.openAiApiKey, apiConfig.openAiLlmModel,
+                        COMPOSE_MAX_TOKENS, schema, "compose_response"
+                    )
+                }
+
+                "groq" -> {
+                    if (apiConfig.groqApiKey.isBlank()) {
+                        throw ComposeException("Groq API key is not configured.")
+                    }
+                    requestOpenAiLikeRaw(
+                        userContent, COMPOSE_SYSTEM_PROMPT, GROQ_API_URL,
+                        apiConfig.groqApiKey, apiConfig.groqLlmModel,
+                        COMPOSE_MAX_TOKENS, schema, "compose_response"
+                    )
+                }
+
+                else -> throw ComposeException("A writing model is not configured.")
+            }
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: ComposeException) {
+            throw error
+        } catch (error: Exception) {
+            throw ComposeException("Writing provider request failed.", error)
+        }
+        return parseComposeResponse(raw)
+    }
+
     /**
      * LLM 結果守門：dictate mode 先阻擋把問句／命令當成指令回答的結果，
      * 再處理「保留原逐字稿後自行接話」的尾部補寫。
@@ -947,7 +1053,8 @@ class LlmClient(
         apiKey: String,
         model: String,
         maxTokens: Int = MAX_TOKENS,
-        responseSchema: JSONObject? = null
+        responseSchema: JSONObject? = null,
+        responseName: String = "translation_response"
     ): String {
         if (apiKey.isBlank()) return ""
         return withContext(Dispatchers.IO) {
@@ -956,7 +1063,8 @@ class LlmClient(
                 text = text,
                 systemPrompt = systemPrompt,
                 maxTokens = maxTokens,
-                responseSchema = responseSchema
+                responseSchema = responseSchema,
+                responseName = responseName
             )
 
             val request = Request.Builder()
@@ -1004,6 +1112,11 @@ class LlmClient(
 }
 
 class TranslationException(
+    message: String,
+    cause: Throwable? = null
+) : Exception(message, cause)
+
+class ComposeException(
     message: String,
     cause: Throwable? = null
 ) : Exception(message, cause)

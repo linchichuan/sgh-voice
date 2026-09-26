@@ -107,6 +107,11 @@ class TranscriptionPipeline(
 
             val result = when (task) {
                 VoiceTask.Dictation -> processDictation(correctedText, rawText, callback, includePersonalization)
+                VoiceTask.Compose -> Result(
+                    text = correctedText,
+                    rawText = rawText,
+                    success = true
+                )
                 is VoiceTask.Translation ->
                     processTranslation(correctedText, rawText, task.request, callback)
             }
@@ -126,6 +131,17 @@ class TranscriptionPipeline(
                 error = errorMsg
             )
         }
+    }
+
+    /** Compose only after the user confirms all captured segments. No dictation fallback. */
+    suspend fun composeNotes(notes: String): String {
+        currentCoroutineContext().ensureActive()
+        val draft = llmClient.compose(notes)
+        currentCoroutineContext().ensureActive()
+        // The requested output can be Japanese. A global Chinese conversion
+        // would corrupt Japanese kanji such as 画像; the compose prompt owns
+        // Traditional Chinese output instead.
+        return draft
     }
 
     private suspend fun processDictation(
