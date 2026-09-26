@@ -152,13 +152,11 @@ function setRegistrationStatus(message, state = "idle") {
 }
 
 function startFileDownload(button) {
-    const link = document.createElement("a");
-    link.href = button.dataset.downloadHref;
-    link.download = button.dataset.filename || "";
-    link.rel = "noopener";
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
+    // The registration request is asynchronous. A synthetic anchor click after
+    // that await can lose Android Chrome's transient user activation and be
+    // silently blocked as a download. Navigate the current tab instead; the
+    // APK/DMG Content-Disposition header still starts the browser download.
+    window.location.assign(button.dataset.downloadHref);
 }
 
 async function handleDownload(event) {
