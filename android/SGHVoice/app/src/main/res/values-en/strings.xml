@@ -1,5 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="voice_palette_title">Recording colors</string>
+    <string name="voice_palette_hint">Tap to save. Applied next time you open the keyboard.</string>
+    <string name="voice_palette_mint">Mint</string>
+    <string name="voice_palette_sky">Sky</string>
+    <string name="voice_palette_lavender">Lavender</string>
+    <string name="voice_palette_peach">Peach</string>
+    <string name="voice_palette_rose">Rose</string>
+    <string name="voice_palette_sand">Sand</string>
+    <string name="voice_draft_preview">Review text</string>
+    <string name="voice_draft_preview_close">Close preview</string>
+    <string name="voice_pending_retry">Retry transcription</string>
+    <string name="voice_draft_preview_empty">No text to preview yet</string>
+    <string name="voice_retry_saved">Transcription failed. Audio is held in memory; retry or discard.</string>
+    <string name="voice_handoff_failed">This segment was not saved. Please record it again.</string>
+    <string name="voice_compose_clear_confirm">Tap Clear again within 4 seconds to delete the notes.</string>
     <string name="voice_compose_mic_start">Describe what to write</string>
     <string name="voice_compose_mic_finish">Finish this part</string>
     <string name="voice_compose_hint">Say who it is for, the purpose, and any requirements. You can add more parts before writing.</string>

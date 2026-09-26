@@ -2,6 +2,8 @@ package com.shingihou.sghvoice.processing
 
 import com.shingihou.sghvoice.api.LlmClient
 import com.shingihou.sghvoice.api.WhisperClient
+import com.shingihou.sghvoice.api.CloudProcessingConsentException
+import com.shingihou.sghvoice.api.TranslationException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -19,7 +21,8 @@ class TranscriptionPipeline(
     private val whisperClient: WhisperClient,
     private val llmClient: LlmClient,
     private val dictionaryManager: DictionaryManager,
-    private val openCCConverter: OpenCCConverter
+    private val openCCConverter: OpenCCConverter,
+    private val cloudProcessingAllowed: () -> Boolean
 ) {
 
     /**
@@ -87,13 +90,16 @@ class TranscriptionPipeline(
     ): Result {
         try {
             currentCoroutineContext().ensureActive()
+            requireCloudProcessingConsent()
             // === 第一層：Whisper 語音辨識 ===
             callback?.onWhisperStarted()
             val whisperPrompt = dictionaryManager.buildWhisperPrompt(includePersonalization)
+            requireCloudProcessingConsent()
             val rawText = whisperClient.transcribe(wavData, whisperPrompt)
-            // Switching editors cancels this operation. Even a late/non-cooperative STT
-            // completion must not read learned words or start a follow-up LLM request.
+            // Focus handoff may keep this operation alive. Re-check consent after
+            // STT before reading learned data or starting another cloud request.
             currentCoroutineContext().ensureActive()
+            requireCloudProcessingConsent()
 
             if (rawText.isBlank()) {
                 val result = Result(text = "", rawText = "", success = true)
@@ -122,7 +128,11 @@ class TranscriptionPipeline(
         } catch (error: CancellationException) {
             throw error
         } catch (e: Exception) {
-            val errorMsg = e.message ?: "Unknown error"
+            val errorMsg = when (e) {
+                is CloudProcessingConsentException -> CloudProcessingConsentException.MESSAGE
+                is TranslationException -> e.message ?: "Translation failed."
+                else -> "Voice processing failed."
+            }
             callback?.onError(errorMsg)
             return Result(
                 text = "",
@@ -136,8 +146,10 @@ class TranscriptionPipeline(
     /** Compose only after the user confirms all captured segments. No dictation fallback. */
     suspend fun composeNotes(notes: String): String {
         currentCoroutineContext().ensureActive()
+        requireCloudProcessingConsent()
         val draft = llmClient.compose(notes)
         currentCoroutineContext().ensureActive()
+        requireCloudProcessingConsent()
         // The requested output can be Japanese. A global Chinese conversion
         // would corrupt Japanese kanji such as 画像; the compose prompt owns
         // Traditional Chinese output instead.
@@ -151,13 +163,18 @@ class TranscriptionPipeline(
         includePersonalization: Boolean
     ): Result {
         callback?.onLlmStarted()
+        requireCloudProcessingConsent()
         val sceneExtra = dictionaryManager.getSceneSystemPromptExtra()
+        val vocabularyHint = dictionaryManager.buildLlmVocabularyHint(correctedText, includePersonalization)
+        requireCloudProcessingConsent()
         val refinement = try {
             llmClient.refineDictation(
                 correctedText, sceneExtra,
-                vocabularyHint = dictionaryManager.buildLlmVocabularyHint(correctedText, includePersonalization)
+                vocabularyHint = vocabularyHint
             )
         } catch (error: CancellationException) {
+            throw error
+        } catch (error: CloudProcessingConsentException) {
             throw error
         } catch (_: Exception) {
             // 一般口述維持既有降級策略：LLM 失敗仍可輸出詞庫修正後文字。
@@ -165,6 +182,7 @@ class TranscriptionPipeline(
         }
 
         currentCoroutineContext().ensureActive()
+        requireCloudProcessingConsent()
         val traditionalText = openCCConverter.convert(refinement.text)
         val finalText = dictionaryManager.applyCorrections(traditionalText, includePersonalization)
         return Result(
@@ -182,7 +200,9 @@ class TranscriptionPipeline(
         callback: ProgressCallback?
     ): Result {
         callback?.onLlmStarted()
+        requireCloudProcessingConsent()
         val translated = llmClient.translate(correctedText, request)
+        requireCloudProcessingConsent()
         val finalized = translated.map { output ->
             if (output.language == TranslationLanguage.TRADITIONAL_CHINESE) {
                 output.copy(text = openCCConverter.convert(output.text))
@@ -205,14 +225,25 @@ class TranscriptionPipeline(
     suspend fun transcribeOnly(wavData: ByteArray, includePersonalization: Boolean = false): Result {
         return try {
             currentCoroutineContext().ensureActive()
+            requireCloudProcessingConsent()
             val whisperPrompt = dictionaryManager.buildWhisperPrompt(includePersonalization)
+            requireCloudProcessingConsent()
             val rawText = whisperClient.transcribe(wavData, whisperPrompt)
             currentCoroutineContext().ensureActive()
+            requireCloudProcessingConsent()
             Result(text = rawText, rawText = rawText, success = true)
         } catch (error: CancellationException) {
             throw error
         } catch (e: Exception) {
-            Result(success = false, error = e.message ?: "Transcription failed")
+            Result(success = false, error = if (e is CloudProcessingConsentException) {
+                CloudProcessingConsentException.MESSAGE
+            } else {
+                "Transcription failed."
+            })
         }
+    }
+
+    private fun requireCloudProcessingConsent() {
+        if (!cloudProcessingAllowed()) throw CloudProcessingConsentException()
     }
 }

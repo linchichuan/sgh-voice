@@ -69,8 +69,13 @@ service cloud.firestore {
                     && (
                       (
                         request.resource.data.platform == 'android'
-                        && request.resource.data.version == '2.7.9'
-                        && request.resource.data.fileName == 'SGHVoice-Android-v2.7.9.apk'
+                        && (
+                          (request.resource.data.version == '2.8.1'
+                           && request.resource.data.fileName == 'SGHVoice-Android-v2.8.1.apk')
+                          // One previous release for cached pages during a rolling deploy.
+                          || (request.resource.data.version == '2.7.9'
+                              && request.resource.data.fileName == 'SGHVoice-Android-v2.7.9.apk')
+                        )
                         && request.resource.data.riskAcknowledged == true
                       )
                       ||

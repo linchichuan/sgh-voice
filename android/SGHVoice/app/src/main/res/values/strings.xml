@@ -1,5 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="voice_palette_title">錄音圓配色</string>
+    <string name="voice_palette_hint">點選立即儲存，下次開啟鍵盤即套用。</string>
+    <string name="voice_palette_mint">薄荷綠</string>
+    <string name="voice_palette_sky">天空藍</string>
+    <string name="voice_palette_lavender">薰衣草</string>
+    <string name="voice_palette_peach">蜜桃橘</string>
+    <string name="voice_palette_rose">玫瑰粉</string>
+    <string name="voice_palette_sand">暖沙色</string>
+    <string name="voice_draft_preview">查看內容</string>
+    <string name="voice_draft_preview_close">關閉預覽</string>
+    <string name="voice_pending_retry">重試辨識</string>
+    <string name="voice_draft_preview_empty">尚無可預覽的文字</string>
+    <string name="voice_retry_saved">辨識未完成，錄音暫存在記憶體；可重試或捨棄</string>
+    <string name="voice_handoff_failed">本段未能保存，請重新錄音</string>
+    <string name="voice_compose_clear_confirm">再次點清除即可刪除筆記（4 秒內）</string>
     <string name="voice_compose_mic_start">說出想寫的內容</string>
     <string name="voice_compose_mic_finish">完成這段</string>
     <string name="voice_compose_hint">說明對象、用途和要求；可分段補充後再生成。</string>

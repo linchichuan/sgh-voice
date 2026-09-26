@@ -422,13 +422,13 @@ class LlmClientTranslationTest {
     }
 
     @Test
-    fun `provider errors preserve safe status detail for Android diagnostics`() {
+    fun `provider errors retain only a fixed diagnostic category`() {
         val summary = LlmClient.providerErrorSummary(
             """{"error":{"message":"model is not available"}}""",
             404
         )
 
-        assertEquals("LLM API HTTP 404: model is not available", summary)
+        assertEquals("LLM API HTTP 404: model unavailable", summary)
     }
 
     @Test

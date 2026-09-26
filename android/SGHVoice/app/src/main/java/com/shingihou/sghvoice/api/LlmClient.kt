@@ -85,8 +85,9 @@ class LlmClient(
         internal fun parseComposeResponse(raw: String): String {
             val root = try {
                 JSONObject(raw.trim())
-            } catch (error: Exception) {
-                throw ComposeException("Writing model returned invalid JSON.", error)
+            } catch (_: Exception) {
+                // Android JSON parser exceptions include the entire response.
+                throw ComposeException("Writing model returned invalid JSON.")
             }
             if (root.length() != 1 || !root.has("draft") || root.isNull("draft") ||
                 root.opt("draft") !is String
@@ -444,8 +445,8 @@ class LlmClient(
             val jsonCandidate = unwrapJsonCodeFence(raw)
             val root = try {
                 JSONObject(jsonCandidate)
-            } catch (error: Exception) {
-                throw TranslationException("Translation response was not valid JSON.", error)
+            } catch (_: Exception) {
+                throw TranslationException("Translation response was not valid JSON.")
             }
             if (root.length() != 1 || !root.has("translations")) {
                 throw TranslationException("Translation response did not match the required schema.")
@@ -648,15 +649,18 @@ class LlmClient(
                     ?.takeIf { it.isNotBlank() }
                     ?: root.optString("message").takeIf { it.isNotBlank() }
             }.getOrNull()
-            val normalized = message
-                ?.replace(Regex("""\s+"""), " ")
-                ?.trim()
-                ?.take(240)
-            return if (normalized.isNullOrBlank()) {
-                "LLM API HTTP $statusCode"
-            } else {
-                "LLM API HTTP $statusCode: $normalized"
+            // Providers can echo input or credentials in their error message.
+            // Retain only fixed diagnostic categories, never provider prose.
+            val normalized = message.orEmpty().lowercase()
+            val category = when {
+                statusCode == 401 || statusCode == 403 -> "authentication failed"
+                statusCode == 429 -> "rate limit or quota exceeded"
+                statusCode == 404 || "model" in normalized -> "model unavailable"
+                "schema" in normalized || "json" in normalized -> "response format unsupported"
+                statusCode >= 500 -> "provider unavailable"
+                else -> null
             }
+            return "LLM API HTTP $statusCode" + category?.let { ": $it" }.orEmpty()
         }
     }
 
@@ -706,6 +710,8 @@ class LlmClient(
                 else -> ""
             }
         } catch (error: CancellationException) {
+            throw error
+        } catch (error: CloudProcessingConsentException) {
             throw error
         } catch (_: Exception) {
             return RefinementResult(text, RefinementStatus.UNAVAILABLE)
@@ -784,12 +790,14 @@ class LlmClient(
             }
         } catch (error: CancellationException) {
             throw error
+        } catch (error: CloudProcessingConsentException) {
+            throw error
         } catch (error: TranslationException) {
             throw error
         } catch (error: Exception) {
             throw TranslationException(
-                error.message ?: "Translation provider request failed.",
-                error
+                if (error is LlmRequestException) error.message.orEmpty()
+                else "Translation provider request failed."
             )
         }
 
@@ -805,6 +813,7 @@ class LlmClient(
         if (normalized.isBlank() || normalized.length > COMPOSE_MAX_BRIEF_CHARS) {
             throw ComposeException("Writing brief was empty or too long.")
         }
+        requireCloudProcessingConsent()
         val schema = buildComposeSchema()
         val userContent = buildComposeUserContent(normalized)
         val raw = try {
@@ -842,10 +851,12 @@ class LlmClient(
             }
         } catch (error: CancellationException) {
             throw error
+        } catch (error: CloudProcessingConsentException) {
+            throw error
         } catch (error: ComposeException) {
             throw error
         } catch (error: Exception) {
-            throw ComposeException("Writing provider request failed.", error)
+            throw ComposeException("Writing provider request failed.")
         }
         return parseComposeResponse(raw)
     }
@@ -1080,6 +1091,7 @@ class LlmClient(
     }
 
     private suspend fun executeRequest(request: Request, parser: (JSONObject) -> String): String {
+        requireCloudProcessingConsent()
         return try {
             val response = httpClient.awaitCall(request)
             response.use {
@@ -1090,19 +1102,23 @@ class LlmClient(
                 }
                 try {
                     parser(JSONObject(body))
-                } catch (error: Exception) {
-                    throw LlmRequestException("Unable to parse the LLM API response.", error)
+                } catch (_: Exception) {
+                    throw LlmRequestException("Unable to parse the LLM API response.")
                 }
             }
         } catch (error: CancellationException) {
             throw error
         } catch (error: LlmRequestException) {
             throw error
-        } catch (error: IOException) {
-            throw LlmRequestException("LLM network request failed.", error)
-        } catch (error: Exception) {
-            throw LlmRequestException("LLM request failed.", error)
+        } catch (_: IOException) {
+            throw LlmRequestException("LLM network request failed.")
+        } catch (_: Exception) {
+            throw LlmRequestException("LLM request failed.")
         }
+    }
+
+    private fun requireCloudProcessingConsent() {
+        if (!apiConfig.hasCloudProcessingConsent) throw CloudProcessingConsentException()
     }
 
     fun shutdown() {
@@ -1120,6 +1136,12 @@ class ComposeException(
     message: String,
     cause: Throwable? = null
 ) : Exception(message, cause)
+
+class CloudProcessingConsentException : Exception(MESSAGE) {
+    companion object {
+        const val MESSAGE = "Cloud processing consent is required."
+    }
+}
 
 private class LlmRequestException(
     message: String,

@@ -24,8 +24,8 @@ function validAndroidRegistration(overrides = {}) {
     name: "Synthetic Tester",
     email: "synthetic@example.invalid",
     platform: "android",
-    version: "2.7.9",
-    fileName: "SGHVoice-Android-v2.7.9.apk",
+    version: "2.8.1",
+    fileName: "SGHVoice-Android-v2.8.1.apk",
     locale: "en",
     consentVersion: 2,
     riskAcknowledged: true,
@@ -83,4 +83,14 @@ test("stale consent, wrong artifact, or missing Android risk acknowledgement is 
 test("public clients cannot read download registrations", async () => {
   const database = testEnvironment.unauthenticatedContext().firestore();
   await assertFails(getDoc(doc(database, "sgh-voice-downloads", "private")));
+});
+
+test("rolling deployment accepts only matched previous-release metadata", async () => {
+  const database = testEnvironment.unauthenticatedContext().firestore();
+  await assertSucceeds(setDoc(doc(database, "sgh-voice-downloads", "cached"),
+    validAndroidRegistration({ version: "2.7.9", fileName: "SGHVoice-Android-v2.7.9.apk" })));
+  await assertFails(setDoc(doc(database, "sgh-voice-downloads", "mismatched"),
+    validAndroidRegistration({ version: "2.7.9" })));
+  await assertFails(setDoc(doc(database, "sgh-voice-downloads", "unknown"),
+    validAndroidRegistration({ version: "9.9.9", fileName: "SGHVoice-Android-v9.9.9.apk" })));
 });

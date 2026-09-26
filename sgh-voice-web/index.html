@@ -8,7 +8,7 @@
     <meta name="author" content="Shingihou Co., Ltd.">
     <title>SGH Voice — Android 多語輸入法與 macOS 語音輸入</title>
     <meta name="description"
-        content="SGH Voice 將語音、注音、日文與英文整合在同一個 Android 輸入法。v2.7.9 修復先刪除再輸入的短修正漏記，改善完整英文詞提示，保留單一淺綠錄音圓。">
+        content="SGH Voice Android v2.8.1：六款淺色錄音圓自由選、語音輸入與幫我寫成稿預覽，支援注音及日文電話格線。">
     <link rel="canonical" href="https://voice.shingihou.com/">
 
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
@@ -21,7 +21,7 @@
     <meta property="og:site_name" content="SGH Voice">
     <meta property="og:title" content="SGH Voice — 一個輸入法，語音、注音、日文、英文都能用。">
     <meta property="og:description"
-        content="Android 個人測試版 APK v2.7.9：改善先刪除再輸入的個人化短修正及完整英文詞提示；保留單一淺綠錄音圓、繁中注音與最多四語翻譯。">
+        content="Android 個人測試版 APK v2.8.1：幫我寫成稿預覽、日文電話格線、較大的注音按鍵與可重試的語音辨識。">
     <meta property="og:url" content="https://voice.shingihou.com/">
     <meta property="og:image" content="https://voice.shingihou.com/assets/generated/og-android-v240.png">
     <meta property="og:image:type" content="image/png">
@@ -47,7 +47,7 @@
     <link
         href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;family=Noto+Sans+JP:wght@400;500;600;700&amp;family=Noto+Sans+TC:wght@400;500;600;700&amp;display=swap"
         rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=20260730-download-registration">
+    <link rel="stylesheet" href="style.css?v=20260926-v281">
 
     <script type="application/ld+json">
     {
@@ -58,9 +58,9 @@
           "name": "SGH Voice for Android",
           "applicationCategory": "ProductivityApplication",
           "operatingSystem": "Android 8.0 or later",
-          "softwareVersion": "2.7.9",
+          "softwareVersion": "2.8.1",
           "url": "https://voice.shingihou.com/",
-          "downloadUrl": "https://voice.shingihou.com/downloads/SGHVoice-Android-v2.7.9.apk",
+          "downloadUrl": "https://voice.shingihou.com/downloads/SGHVoice-Android-v2.8.1.apk",
           "description": "A personal test build of a multilingual Android input method with tap-to-dictate, long-press translation into up to four languages, predictive Zhuyin, Japanese candidates, English, and local personalization.",
           "offers": {
             "@type": "Offer",
@@ -117,8 +117,8 @@
             </a>
 
             <div class="nav-links" id="navLinks">
-                <a href="#features" data-i18n="nav.features">輸入方式</a>
-                <a href="#learning" data-i18n="nav.learning">學習功能</a>
+                <a href="#features" data-i18n="nav.features">功能</a>
+                <a href="#learning" data-i18n="nav.learning">使用說明</a>
                 <a href="#install" data-i18n="nav.install">安裝方式</a>
                 <a href="#privacy" data-i18n="nav.privacy">隱私</a>
                 <a href="#android-download" class="mobile-download" data-i18n="nav.download">下載 APK</a>
@@ -143,7 +143,7 @@
                             data-lang="en">English</button>
                     </div>
                 </div>
-                <a href="#android-download" class="nav-cta" data-i18n="nav.cta">取得 Android 測試版</a>
+                <a href="#android-download" class="nav-cta" data-i18n="nav.cta">下載測試版</a>
             </div>
 
             <button class="mobile-toggle" id="mobileToggle" type="button" aria-label="Toggle menu"
@@ -160,23 +160,19 @@
                 <div class="hero-copy">
                     <div class="eyebrow">
                         <span class="status-dot" aria-hidden="true"></span>
-                        <span data-i18n="hero.eyebrow">Android 個人測試版 · v2.7.9</span>
+                        <span data-i18n="hero.eyebrow">Android 個人測試版 · v2.8.1</span>
                     </div>
-                    <h1 data-i18n="hero.title">一個輸入法，<br><span><span class="no-break">語音、</span><span
-                                class="no-break">注音、</span><span class="no-break">日文、</span><span
-                                class="no-break">英文</span></span><br>都能直接用。</h1>
-                    <p class="hero-lead" data-i18n="hero.subtitle">
-                        不用再切回 Samsung 鍵盤。說話、打ㄅㄆㄇㄈ、輸入かな或 English，都留在 SGH Voice 裡完成。
-                    </p>
+                    <h1 data-i18n="hero.title">說出想法，<br><span>寫得更順。</span></h1>
+                    <p class="hero-lead" data-i18n="hero.subtitle">語音輸入、幫我寫、注音與日文，都在同一個 Android 鍵盤。</p>
                     <div class="hero-actions">
                         <a class="btn btn-primary" href="#android-download">
                             <svg viewBox="0 0 24 24" aria-hidden="true">
                                 <path d="M12 3v12m0 0 5-5m-5 5-5-5M5 19h14"></path>
                             </svg>
-                            <span data-i18n="hero.cta">查看 APK 下載與風險說明</span>
+                            <span data-i18n="hero.cta">下載 Android 測試版</span>
                         </a>
                         <a class="btn btn-secondary" href="#features">
-                            <span data-i18n="hero.secondary">查看功能介面</span>
+                            <span data-i18n="hero.secondary">看看三個重點</span>
                             <svg viewBox="0 0 24 24" aria-hidden="true">
                                 <path d="m9 18 6-6-6-6"></path>
                             </svg>
@@ -185,307 +181,89 @@
                     <div class="hero-facts" aria-label="Android release facts">
                         <span data-i18n="hero.fact1">Android 8+</span>
                         <span data-i18n="hero.fact2">已簽署 APK</span>
-                        <span data-i18n="hero.fact3">最多四語翻譯</span>
+                        <span data-i18n="hero.fact3">自備 API 金鑰</span>
                     </div>
                     <p class="hero-distribution-note">
                         <svg viewBox="0 0 24 24" aria-hidden="true">
                             <path d="M12 3 2.8 20h18.4L12 3Z"></path>
                             <path d="M12 9v4m0 3h.01"></path>
                         </svg>
-                        <span data-i18n="hero.distribution">目前不是 Google Play 公開版；下載前請先閱讀側載風險。</span>
+                        <span data-i18n="hero.distribution">網站側載測試版，尚未於 Google Play 公開上架。</span>
                     </p>
                 </div>
 
-                <div class="device-stage">
-                    <div class="stage-label stage-label-voice">
-                        <span>VOICE + TRANSLATE</span>
-                        <strong data-i18n="hero.float.voice">短按聽寫，長按選擇翻譯語言</strong>
+                <figure class="product-illustration">
+                    <div class="illustration-toolbar"><strong>SGH Voice</strong><span>注 · あ · ABC</span></div>
+                    <div class="illustration-editor">
+                        <span data-i18n="demo.input">說出想法</span>
+                        <p data-i18n="demo.text">幫我整理今天的重點，<br>寫成一則簡短的訊息。</p>
                     </div>
-                    <div class="stage-label stage-label-modes">
-                        <span>注 · あ · ABC</span>
-                        <strong data-i18n="hero.float.modes">四種模式，不離開鍵盤</strong>
+                    <div class="illustration-keyboard">
+                        <div class="illustration-modes"><span data-i18n="demo.dictate">語音輸入</span><span data-i18n="demo.write">幫我寫</span></div>
+                        <div class="illustration-orb" aria-hidden="true">
+                            <svg viewBox="0 0 180 100"><path d="M8 50h18c12 0 12-8 20-8s8 20 16 20 10-42 19-42 10 60 20 60 10-45 20-45 10 15 21 15h30"/></svg>
+                        </div>
+                        <p data-i18n="demo.hint">一個圓，開始與結束錄音</p>
                     </div>
-                    <div class="phone-shell">
-                        <div class="phone-speaker" aria-hidden="true"></div>
-                        <picture>
-                            <source srcset="/assets/generated/android-translation-ui.webp" type="image/webp">
-                            <img src="/assets/generated/android-translation-ui.webp"
-                                alt="Illustration of the SGH Voice Android four-language translation interface" width="810" height="1800">
-                        </picture>
-                    </div>
-                    <div class="release-stamp" aria-hidden="true">
-                        <small>ANDROID</small>
-                        <strong>2.7.9</strong>
-                    </div>
-                </div>
-            </div>
-
-            <div class="container platform-rail">
-                <div>
-                    <span class="rail-status rail-status-test" data-i18n="rail.android.status">AVAILABLE · TEST</span>
-                    <strong data-i18n="rail.android.title">Android APK 已可下載</strong>
-                    <small data-i18n="rail.android.desc">直接安裝版，非 Play 商店公開版</small>
-                </div>
-                <div>
-                    <span class="rail-status rail-status-stable" data-i18n="rail.mac.status">AVAILABLE · STABLE</span>
-                    <strong data-i18n="rail.mac.title">macOS v2.6.0</strong>
-                    <small data-i18n="rail.mac.desc">Apple Silicon 公開版本持續提供</small>
-                </div>
+                    <figcaption data-i18n="demo.caption">功能示意 · 非實機截圖</figcaption>
+                </figure>
             </div>
         </section>
 
-        <section class="section modes" id="features">
+        <section class="section modes compact-features" id="features">
             <div class="container">
-                <div class="section-heading split-heading">
-                    <div>
-                        <span class="section-kicker" data-i18n="modes.kicker">ONE KEYBOARD · FOUR WAYS</span>
-                        <h2 data-i18n="modes.title">不必選擇一種語言，<br>只要選擇現在怎麼輸入。</h2>
-                    </div>
-                    <p data-i18n="modes.subtitle">
-                        Voice、注音、日文、英文固定放在同一列。切換的是輸入方式，不是整套系統鍵盤。
-                    </p>
+                <div class="section-heading">
+                    <span class="section-kicker" data-i18n="modes.kicker">DAILY VOICE INPUT</span>
+                    <h2 data-i18n="modes.title">每天輸入，三個重點。</h2>
                 </div>
-
-                <div class="mode-grid">
-                    <article class="mode-card mode-voice">
-                        <div class="mode-key">
-                            <svg viewBox="0 0 24 24" aria-hidden="true">
-                                <rect x="8" y="3" width="8" height="13" rx="4"></rect>
-                                <path d="M5 11a7 7 0 0 0 14 0M12 18v3M9 21h6"></path>
-                            </svg>
-                        </div>
-                        <div>
-                            <span>VOICE</span>
-                            <h3 data-i18n="modes.voice.title">短按聽寫，長按翻譯</h3>
-                            <p data-i18n="modes.voice.desc">點一下淺綠大圓開始錄音，再點同一個圓結束。收到聲音時，圓內波紋輕柔變化；無音時保持平靜。長按仍可選 1–4 種翻譯語言，底列可直接輸入「、」「，」「。」。</p>
-                        </div>
-                    </article>
-                    <article class="mode-card mode-zhuyin">
-                        <div class="mode-key">注</div>
-                        <div>
-                            <span>ZHUYIN</span>
-                            <h3 data-i18n="modes.zhuyin.title">標準注音排列</h3>
-                            <p data-i18n="modes.zhuyin.desc">未輸完整音節或省略聲調也能預測，並提供多音節候選，不必學拼音。</p>
-                        </div>
-                    </article>
-                    <article class="mode-card mode-japanese">
-                        <div class="mode-key">あ</div>
-                        <div>
-                            <span>JAPANESE</span>
-                            <h3 data-i18n="modes.japanese.title">假名與常用漢字候選</h3>
-                            <p data-i18n="modes.japanese.desc">支援 Romaji、假名與讀音前綴預測，還沒打完整讀音就能看到候選。</p>
-                        </div>
-                    </article>
-                    <article class="mode-card mode-english">
-                        <div class="mode-key">ABC</div>
-                        <div>
-                            <span>ENGLISH</span>
-                            <h3 data-i18n="modes.english.title">完整 QWERTY</h3>
-                            <p data-i18n="modes.english.desc">英文、網址與代碼直接輸入，不用切到 Samsung 鍵盤。</p>
-                        </div>
-                    </article>
-                </div>
-
-                <div class="interface-showcase">
-                    <div class="showcase-copy">
-                        <span class="section-kicker" data-i18n="showcase.kicker">ANDROID FEATURE UI</span>
-                        <h3 data-i18n="showcase.title">翻譯與注音功能介面</h3>
-                        <p data-i18n="showcase.desc">
-                            圖片為既有版本的功能示意，並非 v2.7.9 實機截圖；目前語音模式改由單一大圓操作，底列的 @ 已改為頓號「、」，逗號「，」與句號「。」保留。
-                        </p>
-                        <ul>
-                            <li data-i18n="showcase.item1">左上顯示 SGH Voice 品牌與識別圖示</li>
-                            <li data-i18n="showcase.item2">最多 24 個候選，可展開成三欄多列</li>
-                            <li data-i18n="showcase.item3">短按一般聽寫；長按選擇最多四種翻譯目標</li>
-                            <li data-i18n="showcase.item4">保留系統鍵盤切換鍵，隨時可以退出</li>
-                            <li data-i18n="showcase.item5">查看 STT／LLM 模型 ID 與官方價格基準後再切換</li>
-                        </ul>
-                    </div>
-                    <div class="screenshot-pair">
-                        <figure>
-                            <img src="/assets/generated/android-translation-ui.webp"
-                                alt="Illustration of the SGH Voice Android multi-language translation interface" width="810" height="1800" loading="lazy">
-                            <figcaption data-i18n="showcase.voice.caption">Voice · 長按多語翻譯</figcaption>
-                        </figure>
-                        <figure>
-                            <img src="/assets/generated/android-zhuyin-ui.webp"
-                                alt="Illustration of the SGH Voice Android Zhuyin interface" width="810" height="1800" loading="lazy">
-                            <figcaption data-i18n="showcase.zhuyin.caption">注 · 標準注音</figcaption>
-                        </figure>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <section class="section learning" id="learning">
-            <div class="container learning-panel">
-                <div class="learning-heading">
-                    <span class="section-kicker" data-i18n="learning.kicker">LOCAL PERSONALIZATION</span>
-                    <h2 data-i18n="learning.title">你改過的字，<br>下次應該更懂你。</h2>
-                    <p data-i18n="learning.subtitle">
-                        先刪除再輸入的修正，也能在符合條件時記錄為短修正规則；英文提示使用完整詞彙，不把零碎差異字元當成術語。這是個人化詞彙參考，不是重新訓練模型。
-                    </p>
-                </div>
-
-                <div class="correction-demo" aria-label="Learning example">
-                    <div class="correction-row correction-before">
-                        <span data-i18n="learning.before.label">第一次辨識</span>
-                        <p>新義風株式会社</p>
-                    </div>
-                    <div class="correction-connector" aria-hidden="true">
-                        <i></i>
-                        <svg viewBox="0 0 24 24"><path d="M5 12h14m-5-5 5 5-5 5"></path></svg>
-                        <i></i>
-                    </div>
-                    <div class="correction-row correction-after">
-                        <span data-i18n="learning.after.label">手動修正並學習</span>
-                        <p>新義豊株式会社</p>
-                        <small data-i18n="learning.after.note">作為後續詞彙參考</small>
-                    </div>
-                </div>
-
-                <div class="learning-facts">
+                <div class="feature-trio">
                     <article>
-                        <svg viewBox="0 0 24 24" aria-hidden="true">
-                            <path d="M4 7h16M7 4v6M17 4v6M6 14h12M9 11v6M15 11v6"></path>
-                        </svg>
-                        <h3 data-i18n="learning.local.title">學習資料留在手機</h3>
-                        <p data-i18n="learning.local.desc">候選頻率與短修正儲存在手機；人工確認的詞彙可隨下次聽寫送至所選 STT／AI 協助辨識，AI 輸出不會自動成為已確認詞。</p>
+                        <span class="feature-number">01</span>
+                        <h3 data-i18n="writing.title">說完，幫你寫好。</h3>
+                        <p data-i18n="writing.description">日常口述直接輸入；選「幫我寫」整理長想法，預覽成稿後再插入。</p>
                     </article>
                     <article>
-                        <svg viewBox="0 0 24 24" aria-hidden="true">
-                            <rect x="5" y="10" width="14" height="10" rx="2"></rect>
-                            <path d="M8 10V7a4 4 0 0 1 8 0v3"></path>
-                        </svg>
-                        <h3 data-i18n="learning.safe.title">敏感欄位不學習</h3>
-                        <p data-i18n="learning.safe.desc">密碼欄位會停用語音與學習；禁止個人化欄位只停用學習。</p>
+                        <span class="feature-number">02</span>
+                        <h3 data-i18n="compact.keyboard.title">四種輸入，隨時切換</h3>
+                        <p data-i18n="compact.keyboard.desc">注音大按鍵與候選字、日文 Romaji／12 鍵，以及英文 QWERTY。</p>
                     </article>
                     <article>
-                        <svg viewBox="0 0 24 24" aria-hidden="true">
-                            <path d="M3 6h18M8 6V4h8v2M6 6l1 15h10l1-15M10 10v7M14 10v7"></path>
-                        </svg>
-                        <h3 data-i18n="learning.control.title">可以復原或清除</h3>
-                        <p data-i18n="learning.control.desc">不想保留的學習結果可撤銷，也能從設定中清除。</p>
+                        <span class="feature-number">03</span>
+                        <h3 data-i18n="compact.learning.title">記住你常用的詞</h3>
+                        <p data-i18n="compact.learning.desc">加入專有名詞，保留符合條件的短修正；個人詞庫可查看、撤銷或清除。</p>
                     </article>
                 </div>
-            </div>
-        </section>
-
-        <section class="section install" id="install">
-            <div class="container">
-                <div class="section-heading split-heading">
-                    <div>
-                        <span class="section-kicker" data-i18n="install.kicker">INSTALL IN FOUR STEPS</span>
-                        <h2 data-i18n="install.title">第一次安裝，<br>照著四步完成。</h2>
+                <details class="compact-details" id="learning">
+                    <summary data-i18n="compact.details">輸入方式、學習與暫存說明</summary>
+                    <div class="compact-detail-grid">
+                        <div><h3 data-i18n="compact.voice.title">錄音與幫我寫</h3>
+                            <p data-i18n="writing.handoff">切換 App 或欄位會停止錄音，已錄內容轉為待確認文字，不會自動貼到新欄位；辨識失敗可重試。</p>
+                            <p data-i18n="writing.limit">筆記、待插入文字與重試音訊只暫存在記憶體；系統結束服務或重開機後會消失。不支援背景連錄，AI 成稿請核對。</p>
+                        </div>
+                        <div><h3 data-i18n="learning.local.title">個人詞庫由你管理</h3>
+                            <p data-i18n="learning.local.desc">候選頻率與短修正存於手機；確認過的詞彙可作為下次 STT／AI 提示，並非訓練模型。</p>
+                            <p data-i18n="learning.safe.desc">密碼欄位會停用語音與學習；禁止個人化欄位只停用學習。</p>
+                        </div>
+                        <div><h3 data-i18n="compact.language.title">多語輸入</h3>
+                            <p data-i18n="modes.japanese.desc">日文 12 鍵支援點按輪替、長按選字，尚不支援 flick 或整句文脈轉換。</p>
+                            <p data-i18n="compact.translation">長按錄音圓可選 1–4 種翻譯語言；底列保留「、」「，」「。」。</p>
+                        </div>
                     </div>
-                    <p data-i18n="install.subtitle">
-                        APK 是從本網站直接安裝，不會經過 Google Play。不同品牌的設定名稱可能略有差異。
-                    </p>
-                </div>
-
-                <ol class="install-steps">
-                    <li>
-                        <span class="step-index">01</span>
-                        <div class="step-icon">
-                            <svg viewBox="0 0 24 24" aria-hidden="true">
-                                <path d="M12 3v12m0 0 5-5m-5 5-5-5M5 19h14"></path>
-                            </svg>
-                        </div>
-                        <h3 data-i18n="install.s1.title">下載 APK</h3>
-                        <p data-i18n="install.s1.desc">先閱讀本頁風險說明，再下載版本化檔案。</p>
-                    </li>
-                    <li>
-                        <span class="step-index">02</span>
-                        <div class="step-icon">
-                            <svg viewBox="0 0 24 24" aria-hidden="true">
-                                <path d="M12 3 3 7v5c0 5 3.8 8.3 9 9 5.2-.7 9-4 9-9V7l-9-4Z"></path>
-                                <path d="m9 12 2 2 4-4"></path>
-                            </svg>
-                        </div>
-                        <h3 data-i18n="install.s2.title">允許這個來源</h3>
-                        <p data-i18n="install.s2.desc">只對目前使用的瀏覽器或檔案管理員允許「安裝未知應用程式」。</p>
-                    </li>
-                    <li>
-                        <span class="step-index">03</span>
-                        <div class="step-icon">
-                            <svg viewBox="0 0 24 24" aria-hidden="true">
-                                <rect x="3" y="5" width="18" height="14" rx="2"></rect>
-                                <path d="M7 9h.01M11 9h.01M15 9h.01M7 13h.01M11 13h6M7 16h10"></path>
-                            </svg>
-                        </div>
-                        <h3 data-i18n="install.s3.title">啟用 SGH Voice</h3>
-                        <p data-i18n="install.s3.desc">到 Android 鍵盤設定中啟用，並選成目前輸入法。</p>
-                    </li>
-                    <li>
-                        <span class="step-index">04</span>
-                        <div class="step-icon">
-                            <svg viewBox="0 0 24 24" aria-hidden="true">
-                                <path d="M7 14a5 5 0 1 1 4.8 4H9l-2 2H4v-3l3-3Z"></path>
-                                <circle cx="15" cy="9" r="1"></circle>
-                            </svg>
-                        </div>
-                        <h3 data-i18n="install.s4.title">設定語音服務</h3>
-                        <p data-i18n="install.s4.desc">輸入自己的 OpenAI 或 Groq API 金鑰，授予麥克風權限後測試錄音。</p>
-                    </li>
-                </ol>
-
-                <div class="protect-notice">
-                    <div class="protect-icon">
-                        <svg viewBox="0 0 24 24" aria-hidden="true">
-                            <path d="M12 3 3 7v5c0 5 3.8 8.3 9 9 5.2-.7 9-4 9-9V7l-9-4Z"></path>
-                            <path d="M9 12.5 11 14l4-4"></path>
-                        </svg>
-                    </div>
-                    <div>
-                        <strong data-i18n="install.protect.title">請保持 Google Play Protect 開啟</strong>
-                        <p data-i18n="install.protect.desc">本頁不會要求你關閉安全掃描。安裝完成後，也可以把該來源的安裝權限關回去。</p>
-                    </div>
-                    <a href="https://support.google.com/googleplay/answer/2812853" target="_blank" rel="noopener"
-                        data-i18n="install.protect.link">Google 官方說明</a>
-                </div>
-            </div>
-        </section>
-
-        <section class="section privacy" id="privacy">
-            <div class="container privacy-panel">
-                <div class="privacy-heading">
-                    <span class="section-kicker" data-i18n="privacy.kicker">KNOW THE DATA ROUTE</span>
-                    <h2 data-i18n="privacy.title">輸入法能看到什麼，<br>資料會去哪裡，先說清楚。</h2>
-                    <p data-i18n="privacy.subtitle">
-                        Android 會對所有第三方輸入法顯示廣泛的系統提醒。SGH Voice 仍以最小處理為原則，並在敏感欄位主動停用功能。
-                    </p>
-                </div>
-
-                <div class="privacy-grid">
-                    <article>
-                        <span class="privacy-number">01</span>
-                        <h3 data-i18n="privacy.audio.title">語音直接送到你選的服務商</h3>
-                        <p data-i18n="privacy.audio.desc">錄音只在你按下按鈕後開始，並傳至 OpenAI 或 Groq，由你所選的語音辨識模型處理；不經新義豊中繼伺服器。</p>
-                    </article>
-                    <article>
-                        <span class="privacy-number">02</span>
-                        <h3 data-i18n="privacy.key.title">API 金鑰加密保存在裝置</h3>
-                        <p data-i18n="privacy.key.desc">金鑰使用 Android 加密儲存，不會提交到本網站或新義豊伺服器。</p>
-                    </article>
-                    <article>
-                        <span class="privacy-number">03</span>
-                        <h3 data-i18n="privacy.learn.title">只保留必要的個人化資料</h3>
-                        <p data-i18n="privacy.learn.desc">本機保存候選頻率與短修正規則；人工確認的詞彙會用於所選 STT／AI 提示，不以完整句子或錄音建立雲端學習檔案。</p>
-                    </article>
-                </div>
-                <p class="privacy-note" data-i18n="privacy.note">使用第三方 AI 時，資料處理與費用仍依你選擇的服務商條款為準。重要或敏感內容請在送出前自行確認。</p>
+                </details>
             </div>
         </section>
 
         <section class="section download-lab" id="android-download">
             <div class="container">
                 <div class="section-heading download-heading">
-                    <span class="section-kicker" data-i18n="download.kicker">DOWNLOAD WITH CONTEXT</span>
-                    <h2 data-i18n="download.title">可以下載。<br>但先把版本狀態與風險看完。</h2>
-                    <p data-i18n="download.subtitle">Android 目前提供個人測試版 APK；macOS 則維持公開穩定版。</p>
+                    <span class="section-kicker" data-i18n="download.kicker">GET SGH VOICE</span>
+                    <h2 data-i18n="download.title">下載，開始試用。</h2>
+                    <p data-i18n="download.subtitle">Android 2.8.1 為側載測試版。語音需自備 API 金鑰，服務商可能按用量收費。</p>
                 </div>
 
-                <div class="distribution-alert" id="riskDisclosure">
+                <details class="compact-details risk-details" id="riskDisclosure">
+                    <summary data-i18n="compact.risk">安裝前：測試版風險與安全提醒</summary>
+                    <div class="distribution-alert">
                     <div class="alert-heading">
                         <span class="alert-icon">
                             <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -517,13 +295,14 @@
                     </div>
                 </div>
 
+                </details>
+
                 <form class="download-registration" id="downloadRegistrationForm">
                     <div class="registration-heading">
-                        <span data-i18n="download.registration.badge">DOWNLOAD REGISTRATION</span>
-                        <h3 data-i18n="download.registration.title">下載前，請留下聯絡資料</h3>
-                        <p data-i18n="download.registration.desc">
-                            請填寫姓名或暱稱及 Email。本頁按鈕會在登記成功後開始下載；此登記不是下載檔案的存取控制，版本化發布檔仍是公開連結。
-                        </p>
+                        <span data-i18n="download.registration.badge">DOWNLOAD</span>
+                        <h3 data-i18n="download.registration.title">下載登記</h3>
+                        <p data-i18n="download.registration.desc">僅用於下載紀錄與必要聯絡。檔案為公開發布連結。</p>
+                        <details class="registration-disclosure"><summary data-i18n="compact.registration">登記用途與公開發布說明</summary><p data-i18n="download.registration.detail">此登記不是下載檔案的存取控制；版本化 APK 仍是公開連結。</p></details>
                     </div>
                     <div class="registration-fields">
                         <label class="registration-field" for="downloadName">
@@ -543,7 +322,7 @@
                             <svg viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"></path></svg>
                         </span>
                         <span>
-                            <span data-i18n="download.registration.consent">我同意將上述資料用於下載紀錄與必要聯絡，並已閱讀</span>
+                            <span data-i18n="download.registration.consent">我同意上述資料用於下載紀錄與必要聯絡，並已閱讀</span>
                             <a href="privacy.html" target="_blank" rel="noopener"
                                 data-i18n="download.registration.privacy">隱私權政策</a><span
                                 data-i18n="download.registration.period">。</span>
@@ -551,7 +330,7 @@
                     </label>
                     <p class="registration-status" id="downloadRegistrationStatus" role="status"
                         aria-live="polite" data-state="idle"
-                        data-i18n="download.registration.status">填妥資料後，請選擇下方要下載的平台。</p>
+                        data-i18n="download.registration.status">填妥資料後，選擇下方平台。</p>
                 </form>
 
                 <div class="download-grid">
@@ -572,7 +351,7 @@
                         <dl class="release-meta">
                             <div>
                                 <dt data-i18n="download.meta.version">版本</dt>
-                                <dd>2.7.9 (29)</dd>
+                                <dd>2.8.1 (31)</dd>
                             </div>
                             <div>
                                 <dt data-i18n="download.meta.requirement">系統需求</dt>
@@ -580,7 +359,7 @@
                             </div>
                             <div>
                                 <dt data-i18n="download.meta.size">檔案大小</dt>
-                                <dd>16.54 MiB</dd>
+                                <dd>16.60 MiB</dd>
                             </div>
                             <div>
                                 <dt data-i18n="download.meta.format">格式</dt>
@@ -588,39 +367,43 @@
                             </div>
                         </dl>
 
+                        <details class="compact-details release-verification">
+                            <summary data-i18n="compact.verify">核對 APK 檔案（SHA-256）</summary>
                         <div class="hash-block">
                             <div>
                                 <span>SHA-256</span>
-                                <code id="apkHash">62292210cdcbb7e75b2a8148b24245dc578f91f491f3d626fbe0c5d86fefbe3d</code>
+                                <code id="apkHash">9d85915609f34d98181a32dfe4141280fde7d6c2fba98060c48915415f0cafa0</code>
                             </div>
                             <button type="button" class="copy-button" id="copyHashButton" data-i18n="download.hash.copy">複製</button>
                         </div>
 
-                        <p class="download-update-note" data-i18n="download.android.update">
-                            已安裝官方側載版 2.7.3–2.7.8 時，直接開啟這個 2.7.9 APK 並選擇「更新」；請勿先解除安裝，以保留金鑰與詞庫。更新不會自動清空舊有誤學紀錄；需要時可在「個人詞庫」撤銷最近學習或清除學習資料。若尚未同意版本 3，請到設定閱讀並接受新版雲端處理說明；已在 2.7.6 同意者無需再次同意。Google Play 測試版請從原安裝管道更新。
-                        </p>
+                        </details>
+
+                        <details class="compact-details update-details">
+                            <summary data-i18n="compact.update">已安裝？查看更新方式</summary>
+                        <p class="download-update-note" data-i18n="download.android.update">本站側載版 2.7.3–2.8.0 可使用相同簽章的 2.8.1 APK 更新。直接開啟並選「更新」，請勿先解除安裝，以保留金鑰與詞庫。舊學習紀錄可在「個人詞庫」撤銷或清除；雲端同意尚未更新至版本 3 者，請到設定確認。Google Play 測試版請使用原安裝管道。</p>
+
+                        </details>
 
                         <label class="risk-check" for="riskAck">
                             <input type="checkbox" id="riskAck">
                             <span class="custom-checkbox" aria-hidden="true">
                                 <svg viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"></path></svg>
                             </span>
-                            <span data-i18n="download.consent">
-                                我已了解這是未經 Google Play 審核或認證的個人測試 APK，可能出現安全提示；我會核對官方來源與 SHA-256、自行承擔測試風險，且不會關閉 Google Play Protect。
-                            </span>
+                            <span data-i18n="download.consent">我了解這是未經 Google Play 審核的測試 APK，可能有相容性、資料遺失及安全提示風險；我會核對來源與 SHA-256，保持 Play Protect 開啟。</span>
                         </label>
 
                         <a class="btn btn-primary download-button disabled" id="apkDownloadButton"
                             aria-disabled="true" aria-describedby="riskDisclosure downloadRegistrationStatus"
-                            tabindex="-1" data-platform="android" data-version="2.7.9"
-                            data-filename="SGHVoice-Android-v2.7.9.apk"
-                            data-download-href="/downloads/SGHVoice-Android-v2.7.9.apk">
+                            tabindex="-1" data-platform="android" data-version="2.8.1"
+                            data-filename="SGHVoice-Android-v2.8.1.apk"
+                            data-download-href="/downloads/SGHVoice-Android-v2.8.1.apk">
                             <svg viewBox="0 0 24 24" aria-hidden="true">
                                 <path d="M12 3v12m0 0 5-5m-5 5-5-5M5 19h14"></path>
                             </svg>
-                            <span data-i18n="download.android.cta">填寫資料並確認風險後下載 APK</span>
+                            <span data-i18n="download.android.cta">完成資料與風險確認後下載</span>
                         </a>
-                        <p class="download-file">SGHVoice-Android-v2.7.9.apk</p>
+                        <p class="download-file">SGHVoice-Android-v2.8.1.apk</p>
                     </article>
 
                     <article class="download-card download-mac">
@@ -637,9 +420,7 @@
                             </div>
                         </div>
 
-                        <p class="mac-description" data-i18n="download.mac.desc">
-                            Apple Silicon 公開版本。支援三語混合口述、直接輸入、剪貼簿復原與本機處理選項。
-                        </p>
+                        <p class="mac-description" data-i18n="download.mac.desc">Apple Silicon 公開版，支援多語口述與本機處理選項。</p>
                         <dl class="release-meta">
                             <div>
                                 <dt data-i18n="download.meta.version">版本</dt>
@@ -658,16 +439,125 @@
                             <svg viewBox="0 0 24 24" aria-hidden="true">
                                 <path d="M12 3v12m0 0 5-5m-5 5-5-5M5 19h14"></path>
                             </svg>
-                            <span data-i18n="download.mac.cta">填寫資料後下載 macOS v2.6.0</span>
+                            <span data-i18n="download.mac.cta">完成登記後下載 macOS</span>
                         </a>
                         <a class="text-link" href="https://github.com/linchichuan/sgh-voice/releases/tag/v2.6.0"
                             target="_blank" rel="noopener" data-i18n="download.mac.notes">查看版本說明</a>
                     </article>
                 </div>
 
+                <details class="compact-details store-details">
+                    <summary data-i18n="compact.store">Google Play 測試與商店狀態</summary>
                 <p class="distribution-footnote" data-i18n="download.policy">
                     目前仍在評估適合個人使用者的 Google Play 測試與發佈方式。12 人／14 天封閉測試僅適用於 2023 年 11 月 13 日之後建立、正在申請 Production 存取權的個人開發者帳戶，不是所有帳戶或直接安裝 APK 的共同條件；本 APK 下載不等同於 Google Play 審查或上架。
                 </p>
+                </details>
+            </div>
+        </section>
+
+        <section class="section install" id="install">
+            <div class="container">
+                <div class="section-heading split-heading">
+                    <div>
+                        <span class="section-kicker" data-i18n="install.kicker">INSTALL IN FOUR STEPS</span>
+                        <h2 data-i18n="install.title">第一次安裝，四步完成。</h2>
+                    </div>
+                    <p data-i18n="install.subtitle">已安裝本站側載版？直接開啟新 APK 並選「更新」，不用解除安裝。</p>
+                </div>
+
+                <ol class="install-steps">
+                    <li>
+                        <span class="step-index">01</span>
+                        <div class="step-icon">
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M12 3v12m0 0 5-5m-5 5-5-5M5 19h14"></path>
+                            </svg>
+                        </div>
+                        <h3 data-i18n="install.s1.title">下載 APK</h3>
+                        <p data-i18n="install.s1.desc">完成上方登記與風險確認。</p>
+                    </li>
+                    <li>
+                        <span class="step-index">02</span>
+                        <div class="step-icon">
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M12 3 3 7v5c0 5 3.8 8.3 9 9 5.2-.7 9-4 9-9V7l-9-4Z"></path>
+                                <path d="m9 12 2 2 4-4"></path>
+                            </svg>
+                        </div>
+                        <h3 data-i18n="install.s2.title">允許這個來源</h3>
+                        <p data-i18n="install.s2.desc">只允許目前瀏覽器安裝未知應用程式。</p>
+                    </li>
+                    <li>
+                        <span class="step-index">03</span>
+                        <div class="step-icon">
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                <rect x="3" y="5" width="18" height="14" rx="2"></rect>
+                                <path d="M7 9h.01M11 9h.01M15 9h.01M7 13h.01M11 13h6M7 16h10"></path>
+                            </svg>
+                        </div>
+                        <h3 data-i18n="install.s3.title">啟用 SGH Voice</h3>
+                        <p data-i18n="install.s3.desc">在 Android 鍵盤設定啟用並選擇 SGH Voice。</p>
+                    </li>
+                    <li>
+                        <span class="step-index">04</span>
+                        <div class="step-icon">
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M7 14a5 5 0 1 1 4.8 4H9l-2 2H4v-3l3-3Z"></path>
+                                <circle cx="15" cy="9" r="1"></circle>
+                            </svg>
+                        </div>
+                        <h3 data-i18n="install.s4.title">設定語音服務</h3>
+                        <p data-i18n="install.s4.desc">設定自己的 API 金鑰、同意雲端處理並授予麥克風權限。</p>
+                    </li>
+                </ol>
+
+                <div class="protect-notice">
+                    <div class="protect-icon">
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M12 3 3 7v5c0 5 3.8 8.3 9 9 5.2-.7 9-4 9-9V7l-9-4Z"></path>
+                            <path d="M9 12.5 11 14l4-4"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <strong data-i18n="install.protect.title">請保持 Google Play Protect 開啟</strong>
+                        <p data-i18n="install.protect.desc">本頁不會要求你關閉安全掃描。安裝完成後，也可以把該來源的安裝權限關回去。</p>
+                    </div>
+                    <a href="https://support.google.com/googleplay/answer/2812853" target="_blank" rel="noopener"
+                        data-i18n="install.protect.link">Google 官方說明</a>
+                </div>
+            </div>
+        </section>
+
+        <section class="section privacy" id="privacy">
+            <div class="container privacy-panel">
+                <div class="privacy-heading">
+                    <span class="section-kicker" data-i18n="privacy.kicker">KNOW THE DATA ROUTE</span>
+                    <h2 data-i18n="privacy.title">你的資料，先說清楚。</h2>
+                    <p data-i18n="privacy.subtitle">語音與文字會交由所選 STT／AI 處理；API 金鑰加密保存在裝置。</p>
+                </div>
+
+                <details class="compact-details privacy-details">
+                    <summary data-i18n="compact.privacy">查看資料用途與保存方式</summary>
+                <div class="privacy-grid">
+                    <article>
+                        <span class="privacy-number">01</span>
+                        <h3 data-i18n="privacy.audio.title">語音直接送到你選的服務商</h3>
+                        <p data-i18n="privacy.audio.desc">錄音只在你按下按鈕後開始，並傳至 OpenAI 或 Groq，由你所選的語音辨識模型處理；不經新義豊中繼伺服器。</p>
+                    </article>
+                    <article>
+                        <span class="privacy-number">02</span>
+                        <h3 data-i18n="privacy.key.title">API 金鑰加密保存在裝置</h3>
+                        <p data-i18n="privacy.key.desc">金鑰使用 Android 加密儲存，不會提交到本網站或新義豊伺服器。</p>
+                    </article>
+                    <article>
+                        <span class="privacy-number">03</span>
+                        <h3 data-i18n="privacy.learn.title">只保留必要的個人化資料</h3>
+                        <p data-i18n="privacy.learn.desc">本機保存候選頻率與短修正規則；人工確認的詞彙會用於所選 STT／AI 提示，不以完整句子或錄音建立雲端學習檔案。</p>
+                    </article>
+                </div>
+                <p class="privacy-note" data-i18n="privacy.note">使用第三方 AI 時，資料處理與費用仍依你選擇的服務商條款為準。重要或敏感內容請在送出前自行確認。</p>
+                </details>
+                <a class="text-link" href="privacy.html" data-i18n="footer.privacy">隱私權政策</a>
             </div>
         </section>
 
@@ -675,7 +565,7 @@
             <div class="container faq-grid">
                 <div>
                     <span class="section-kicker">FAQ</span>
-                    <h2 data-i18n="faq.title">下載以前，<br>最常被問的五件事。</h2>
+                    <h2 data-i18n="faq.title">還想知道什麼？</h2>
                 </div>
                 <div class="faq-list">
                     <details>
@@ -700,7 +590,7 @@
                     </details>
                     <details>
                         <summary data-i18n="faq.q6">我口述一個問句時，模型會直接回答嗎？</summary>
-                        <p data-i18n="faq.a6">不應該。v2.7.9 會請所選 AI 整理整句標點、明確口吃與語意連貫；問句和命令仍保留原意。若偵測到新增助手回覆、無關改寫或數字與否定語意改動，會回退原逐字稿並顯示提示。辨識與整理仍可能有誤，重要內容請先核對。</p>
+                        <p data-i18n="faq.a6">不應該。v2.8.1 會請所選 AI 整理整句標點、明確口吃與語意連貫；問句和命令仍保留原意。若偵測到新增助手回覆、無關改寫或數字與否定語意改動，會回退原逐字稿並顯示提示。辨識與整理仍可能有誤，重要內容請先核對。</p>
                     </details>
                 </div>
             </div>
@@ -718,7 +608,7 @@
             </div>
             <div class="footer-links">
                 <span data-i18n="footer.product">產品</span>
-                <a href="#features" data-i18n="nav.features">輸入方式</a>
+                <a href="#features" data-i18n="nav.features">功能</a>
                 <a href="#install" data-i18n="nav.install">安裝方式</a>
                 <a href="#android-download" data-i18n="nav.download">下載 APK</a>
             </div>
@@ -740,9 +630,9 @@
         </div>
     </footer>
 
-    <script src="i18n.js?v=20260912-android-279"></script>
-    <script src="firebase.js?v=20260730-download-registration"></script>
-    <script src="main.js?v=20260730-download-registration"></script>
+    <script src="i18n.js?v=20260926-v281"></script>
+    <script src="firebase.js?v=20260926-v281"></script>
+    <script src="main.js?v=20260926-v281"></script>
 </body>
 
 </html>

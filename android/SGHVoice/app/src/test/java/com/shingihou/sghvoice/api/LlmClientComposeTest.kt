@@ -4,7 +4,17 @@ import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Test
+import kotlinx.coroutines.runBlocking
+import okhttp3.OkHttpClient
+import okhttp3.Protocol
+import okhttp3.Response
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.ResponseBody.Companion.toResponseBody
+import org.mockito.kotlin.mock
+import org.mockito.kotlin.whenever
 
 class LlmClientComposeTest {
     @Test
@@ -50,5 +60,73 @@ class LlmClientComposeTest {
                 LlmClient.parseComposeResponse(output)
             }
         }
+    }
+
+    @Test
+    fun `malformed draft never survives in exception causes or diagnostics`() {
+        val privateText = "SyntheticPrivatePatientNote"
+        val error = assertThrows(ComposeException::class.java) {
+            LlmClient.parseComposeResponse("{\"draft\":\"$privateText")
+        }
+
+        assertNull(error.cause)
+        assertFalse(error.stackTraceToString().contains(privateText))
+    }
+
+    @Test
+    fun `compose rechecks consent immediately before sending the HTTP request`() {
+        val config = mock<ApiConfig>()
+        whenever(config.llmEngine).thenReturn("openai")
+        whenever(config.openAiApiKey).thenReturn("synthetic-key")
+        whenever(config.openAiLlmModel).thenReturn("synthetic-model")
+        whenever(config.hasCloudProcessingConsent).thenReturn(true, false)
+        var requests = 0
+        val transport = OkHttpClient.Builder().addInterceptor {
+            requests += 1
+            throw AssertionError("Revoked consent must prevent any request")
+        }.build()
+
+        val error = assertThrows(CloudProcessingConsentException::class.java) {
+            runBlocking { LlmClient(config, transport).compose("Synthetic private brief") }
+        }
+
+        assertEquals(0, requests)
+        assertEquals(CloudProcessingConsentException.MESSAGE, error.message)
+        // Coroutine stack recovery may attach another copy of the safe exception.
+        assertFalse(error.stackTraceToString().contains("Synthetic private brief"))
+    }
+
+    @Test
+    fun `malformed HTTP response never leaks provider body into errors`() {
+        val privateText = "SyntheticPrivateProviderEcho"
+        val config = mock<ApiConfig>()
+        whenever(config.llmEngine).thenReturn("openai")
+        whenever(config.openAiApiKey).thenReturn("synthetic-key")
+        whenever(config.openAiLlmModel).thenReturn("synthetic-model")
+        whenever(config.hasCloudProcessingConsent).thenReturn(true)
+        val transport = OkHttpClient.Builder().addInterceptor { chain ->
+            Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1)
+                .code(200).message("OK")
+                .body("{\"draft\":\"$privateText".toResponseBody("application/json".toMediaType()))
+                .build()
+        }.build()
+
+        val error = assertThrows(ComposeException::class.java) {
+            runBlocking { LlmClient(config, transport).compose("Synthetic brief") }
+        }
+
+        assertNull(error.cause)
+        assertFalse(error.stackTraceToString().contains(privateText))
+    }
+
+    @Test
+    fun `provider errors cannot echo private contents or keys`() {
+        val privateText = "SyntheticPrivateInputAndKey"
+        val errorBody = JSONObject().put("error", JSONObject().put("message", privateText)).toString()
+
+        val summary = LlmClient.providerErrorSummary(errorBody, 400)
+
+        assertEquals("LLM API HTTP 400", summary)
+        assertFalse(summary.contains(privateText))
     }
 }

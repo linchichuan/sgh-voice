@@ -116,6 +116,19 @@
             android:src="@drawable/ic_keyboard_switch" />
     </LinearLayout>
 
+    <androidx.core.widget.NestedScrollView
+        android:id="@+id/keyboard_content_scroll"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:fillViewport="false"
+        android:overScrollMode="ifContentScrolls"
+        android:scrollbars="vertical">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
     <LinearLayout
         android:id="@+id/panel_voice"
         android:layout_width="match_parent"
@@ -198,12 +211,18 @@
                 android:textSize="15sp" />
         </LinearLayout>
 
+        <FrameLayout
+            android:id="@+id/voice_capture_area"
+            android:layout_width="match_parent"
+            android:layout_height="@dimen/voice_mic_diameter"
+            android:layout_marginTop="@dimen/voice_mic_top_margin">
+
         <!-- One touch target: feedback and finish action share the same circle. -->
         <FrameLayout
             android:id="@+id/mic_outer_ring"
             android:layout_width="@dimen/voice_mic_diameter"
             android:layout_height="@dimen/voice_mic_diameter"
-            android:layout_marginTop="@dimen/voice_mic_top_margin"
+            android:layout_gravity="center"
             android:background="@drawable/mic_outer_ring_bg"
             android:elevation="2dp"
             android:padding="3dp">
@@ -253,6 +272,45 @@
                     android:textColor="@color/mic_text_recording"
                     android:textSize="14sp" />
             </FrameLayout>
+        </FrameLayout>
+
+        <LinearLayout
+            android:id="@+id/draft_preview_panel"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@drawable/voice_compose_secondary_bg"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <androidx.core.widget.NestedScrollView
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:fillViewport="true"
+                android:overScrollMode="ifContentScrolls">
+
+                <TextView
+                    android:id="@+id/tv_draft_preview"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:padding="12dp"
+                    android:textColor="@color/key_text"
+                    android:textSize="15sp" />
+            </androidx.core.widget.NestedScrollView>
+
+            <TextView
+                android:id="@+id/btn_draft_preview_close"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:background="@drawable/voice_task_unselected_bg"
+                android:clickable="true"
+                android:focusable="true"
+                android:fontFamily="sans-serif-medium"
+                android:gravity="center"
+                android:text="@string/voice_draft_preview_close"
+                android:textColor="@color/voice_compose_action_text"
+                android:textSize="13sp" />
+        </LinearLayout>
         </FrameLayout>
 
         <LinearLayout
@@ -474,6 +532,21 @@
         </LinearLayout>
 
         <TextView
+            android:id="@+id/btn_draft_preview"
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/voice_compose_secondary_bg"
+            android:clickable="true"
+            android:focusable="true"
+            android:fontFamily="sans-serif-medium"
+            android:gravity="center"
+            android:text="@string/voice_draft_preview"
+            android:textColor="@color/voice_compose_action_text"
+            android:textSize="13sp"
+            android:visibility="gone" />
+
+        <TextView
             android:id="@+id/tv_voice_hint"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -584,6 +657,9 @@
             android:layout_height="wrap_content"
             android:orientation="vertical" />
     </LinearLayout>
+
+    </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
 
     <LinearLayout
         android:id="@+id/voice_action_row"

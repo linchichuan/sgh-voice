@@ -82,27 +82,21 @@ class WhisperClient(private val apiConfig: ApiConfig) {
                 .post(requestBody)
                 .build()
 
+            if (!apiConfig.hasCloudProcessingConsent) throw CloudProcessingConsentException()
             val response = httpClient.awaitCall(request)
 
             val body = response.body?.string()
                 ?: throw WhisperException("Whisper API returned empty response")
 
             if (!response.isSuccessful) {
-                val errorMsg = try {
-                    val errorJson = JSONObject(body)
-                    errorJson.optJSONObject("error")?.optString("message")
-                        ?: "HTTP ${response.code}"
-                } catch (_: Exception) {
-                    "HTTP ${response.code}: $body"
-                }
-                throw WhisperException("Whisper API error: $errorMsg")
+                throw WhisperException("Speech recognition HTTP ${response.code}")
             }
 
             try {
                 val json = JSONObject(body)
                 json.getString("text").trim()
-            } catch (e: Exception) {
-                throw WhisperException("Failed to parse Whisper response: ${e.message}")
+            } catch (_: Exception) {
+                throw WhisperException("Speech recognition returned an invalid response")
             }
         }
     }

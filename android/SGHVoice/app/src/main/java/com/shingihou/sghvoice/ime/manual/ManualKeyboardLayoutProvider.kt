@@ -149,10 +149,26 @@ class ManualKeyboardLayoutProvider {
     )
 
     private fun kana12Rows(): List<KeyboardRow> = listOf(
-        KeyboardRow(listOf("a", "ka", "sa").map(::kanaGroupKey)),
-        KeyboardRow(listOf("ta", "na", "ha").map(::kanaGroupKey)),
-        KeyboardRow(listOf("ma", "ya", "ra").map(::kanaGroupKey)),
-        KeyboardRow(
+        kanaRow(
+            listOf("a", "ka", "sa").map(::kanaGroupKey),
+            backspaceKey("japanese_kana")
+        ),
+        kanaRow(
+            listOf("ta", "na", "ha").map(::kanaGroupKey),
+            actionKey(
+                "japanese_kana_finalize", "→",
+                KeyAction.FinalizeJapaneseKana,
+                "Finish current kana for a repeated character"
+            )
+        ),
+        kanaRow(
+            listOf("ma", "ya", "ra").map(::kanaGroupKey),
+            actionKey(
+                "japanese_script", "かな", KeyAction.ToggleJapaneseScript,
+                "Toggle Hiragana and Katakana"
+            )
+        ),
+        kanaRow(
             listOf(
                 actionKey(
                     "japanese_kana_modifier", "小゛゜",
@@ -163,31 +179,28 @@ class ManualKeyboardLayoutProvider {
                 characterKey(
                     "japanese_kana_punctuation", "、", "Japanese punctuation",
                     alternatives = listOf("。", "！", "？")
-                ),
-                actionKey(
-                    "japanese_kana_finalize", "→",
-                    KeyAction.FinalizeJapaneseKana,
-                    "Finish current kana for a repeated character"
-                ),
-                backspaceKey("japanese_kana")
-            )
+                )
+            ),
+            enterKey("japanese_kana_enter")
         ),
         KeyboardRow(
             listOf(
-                switchLayerKey("japanese_kana_numbers", "?123", KeyboardLayer.NUMBERS),
+                switchLayerKey(
+                    "japanese_kana_numbers", "?123", KeyboardLayer.NUMBERS,
+                    widthWeight = 1f
+                ),
                 actionKey(
                     "japanese_layout", "ABC", KeyAction.ToggleJapaneseLayout,
                     "Switch to Japanese Romaji QWERTY"
                 ),
-                actionKey(
-                    "japanese_script", "かな", KeyAction.ToggleJapaneseScript,
-                    "Toggle Hiragana and Katakana"
-                ),
-                spaceKey("japanese_kana_space", widthWeight = 2.5f),
-                enterKey("japanese_kana_enter")
+                spaceKey("japanese_kana_space", widthWeight = 1.75f)
             )
         )
     )
+
+    /** Keep the phone keypad's three columns aligned beside a narrower action rail. */
+    private fun kanaRow(keys: List<KeySpec>, action: KeySpec): KeyboardRow =
+        KeyboardRow(keys + action.copy(widthWeight = 0.75f))
 
     private fun kanaGroupKey(group: String): KeySpec {
         val kana = Kana12Key.groups.getValue(group)

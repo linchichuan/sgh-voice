@@ -1,5 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="voice_palette_title">録音ボタンの色</string>
+    <string name="voice_palette_hint">タップで保存。次にキーボードを開くと反映します。</string>
+    <string name="voice_palette_mint">ミント</string>
+    <string name="voice_palette_sky">スカイ</string>
+    <string name="voice_palette_lavender">ラベンダー</string>
+    <string name="voice_palette_peach">ピーチ</string>
+    <string name="voice_palette_rose">ローズ</string>
+    <string name="voice_palette_sand">サンド</string>
+    <string name="voice_draft_preview">内容を確認</string>
+    <string name="voice_draft_preview_close">プレビューを閉じる</string>
+    <string name="voice_pending_retry">文字起こしを再試行</string>
+    <string name="voice_draft_preview_empty">確認できる文章はまだありません</string>
+    <string name="voice_retry_saved">文字起こしが未完了です。音声はメモリ内に一時保存中。再試行または破棄できます。</string>
+    <string name="voice_handoff_failed">この音声は保存できませんでした。もう一度録音してください。</string>
+    <string name="voice_compose_clear_confirm">4 秒以内にもう一度クリアを押すとメモを削除します。</string>
     <string name="voice_compose_mic_start">書きたい内容を話す</string>
     <string name="voice_compose_mic_finish">この部分を終了</string>
     <string name="voice_compose_hint">相手、目的、要望を話してください。文章を作る前に続きを追加できます。</string>

@@ -27,8 +27,8 @@ class AudioWaveformView @JvmOverloads constructor(
 ) : View(context, attrs, defStyleAttr) {
 
     private val density = resources.displayMetrics.density
-    private val activeColor = ContextCompat.getColor(context, R.color.waveform_active)
-    private val baselineColor = ContextCompat.getColor(context, R.color.waveform_baseline)
+    private var activeColor = ContextCompat.getColor(context, R.color.waveform_active)
+    private var baselineColor = ContextCompat.getColor(context, R.color.waveform_baseline)
     private val wavePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         strokeCap = Paint.Cap.ROUND
@@ -43,6 +43,12 @@ class AudioWaveformView @JvmOverloads constructor(
     // does not reschedule itself or keep an animation running during silence.
     private val clearStaleLevel = Runnable {
         envelope.reset()
+        invalidate()
+    }
+
+    fun setPaletteColors(active: Int, baseline: Int) {
+        activeColor = active
+        baselineColor = baseline
         invalidate()
     }
 

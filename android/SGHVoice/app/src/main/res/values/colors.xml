@@ -29,13 +29,13 @@
     <color name="candidate_primary_text">#3345C2</color>
 
     <!-- 麥克風按鈕色彩 -->
-    <color name="mic_bg">#254438</color>
-    <color name="mic_bg_recording">#1D513C</color>
-    <color name="mic_bg_processing">#33453F</color>
-    <color name="mic_icon">#E6F6EA</color>
-    <color name="mic_text_recording">#E6F6EA</color>
-    <color name="mic_ring">#163B2D</color>
-    <color name="mic_ring_edge">#7FCDA0</color>
+    <color name="mic_bg">#DDF3E5</color>
+    <color name="mic_bg_recording">#DDF3E5</color>
+    <color name="mic_bg_processing">#E5F6EB</color>
+    <color name="mic_icon">#25372F</color>
+    <color name="mic_text_recording">#25372F</color>
+    <color name="mic_ring">#DDF3E5</color>
+    <color name="mic_ring_edge">#577669</color>
     <color name="voice_task_surface">#E2ECE6</color>
     <color name="voice_task_border">#CADDD0</color>
     <color name="voice_task_selected_text">#183E2C</color>
@@ -53,8 +53,8 @@
     <color name="status_dot_processing">#6674D9</color>
     <color name="status_dot_recording">#35A875</color>
     <color name="status_dot_success">#23845A</color>
-    <color name="waveform_baseline">#91C6A7</color>
-    <color name="waveform_active">#A8E6BD</color>
+    <color name="waveform_baseline">#7C998B</color>
+    <color name="waveform_active">#577669</color>
     <color name="waveform_surface">#F0FBF5</color>
     <color name="waveform_surface_border">#B9E4CB</color>
 </resources>

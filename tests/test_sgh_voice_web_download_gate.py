@@ -44,6 +44,23 @@ def test_download_starts_only_after_firestore_registration():
     assert "riskAcknowledged:" in javascript
 
 
+def test_hosting_does_not_publish_release_tooling_or_emulator_logs():
+    hosting = json.loads(read_web_file("firebase.json"))["hosting"]
+    assert {"**/*.log", "tests/**", "package*.json", "**/node_modules/**"} <= set(hosting["ignore"])
+    manifest_header = next(
+        header for header in hosting["headers"]
+        if header["source"] == "/downloads/android-release.json"
+    )
+    assert "no-cache" in manifest_header["headers"][0]["value"]
+
+
+def test_privacy_discloses_memory_only_retry_and_explicit_writing():
+    privacy = read_web_file("privacy.html")
+    for disclosure in ("最大約125秒", "最多約 125 秒", "125 seconds",
+                       "筆記與成稿不寫入歷史檔", "There is no automatic resend"):
+        assert disclosure in privacy
+
+
 def test_firestore_download_records_are_create_only():
     rules = read_web_file("firestore.rules")
     block_start = rules.index("match /sgh-voice-downloads/{docId}")
@@ -54,7 +71,7 @@ def test_firestore_download_records_are_create_only():
     assert "request.resource.data.createdAt == request.time" in block
     assert "request.resource.data.consentVersion == 2" in block
     assert "request.resource.data.riskAcknowledged is bool" in block
-    assert "SGHVoice-Android-v2.7.9.apk" in block
+    assert "SGHVoice-Android-v2.8.1.apk" in block
     assert "allow read, update, delete: if false;" in block
 
 
@@ -80,8 +97,7 @@ def test_legal_pages_publish_canonical_and_language_alternates():
         assert f'<loc>{canonical}</loc>' in sitemap
         assert f'hreflang="x-default" href="{canonical}"' in sitemap
 
-    assert sitemap.count("<lastmod>2026-09-11</lastmod>") == 1
-    assert sitemap.count("<lastmod>2026-09-12</lastmod>") == 1
+    assert sitemap.count("<lastmod>2026-09-26</lastmod>") == 2
     assert sitemap.count("<lastmod>2026-08-30</lastmod>") == 1
 
 
@@ -114,19 +130,21 @@ def test_registration_copy_does_not_claim_access_control():
     assert "This registration is not access control for the public release files" in translations
 
 
-def test_generated_feature_images_are_not_presented_as_verified_release_screenshots():
+def test_feature_illustration_is_not_presented_as_a_verified_release_screenshot():
     html = read_web_file("index.html")
     translations = read_web_file("i18n.js")
 
     assert "android-translate-v270.webp" not in html
     assert "android-zhuyin-v250.webp" not in html
-    assert "android-translation-ui.webp" in html
-    assert "android-zhuyin-ui.webp" in html
+    assert "android-translation-ui.webp" not in html
+    assert "android-zhuyin-ui.webp" not in html
+    assert "功能示意 · 非實機截圖" in html
+    assert "Feature illustration · not a device screenshot" in translations
     for unsupported_claim in (
         "ACTUAL ANDROID BUILD",
-        "これが v2.7.9 の実画面です",
-        "這就是 v2.7.9 的實際鍵盤",
-        "This is the actual v2.7.9 keyboard",
+        "これが v2.8.1 の実画面です",
+        "這就是 v2.8.1 的實際鍵盤",
+        "This is the actual v2.8.1 keyboard",
     ):
         assert unsupported_claim not in html
         assert unsupported_claim not in translations
@@ -162,8 +180,8 @@ def test_android_release_manifest_matches_public_artifact_and_copy():
     index = read_web_file("index.html")
     llms = read_web_file("llms.txt")
 
-    assert release["versionName"] == "2.7.9"
-    assert release["versionCode"] == 29
+    assert release["versionName"] == "2.8.1"
+    assert release["versionCode"] == 31
     assert re.fullmatch(r"[0-9a-f]{64}", release["sha256"])
     assert re.fullmatch(r"[0-9A-F]{64}", release["certificateSha256"])
     assert artifact.is_file()
@@ -174,4 +192,5 @@ def test_android_release_manifest_matches_public_artifact_and_copy():
     assert f'{release["versionName"]} ({release["versionCode"]})' in index
     assert release["fileName"] in llms
     assert release["sha256"] in llms
-    assert "直接開啟這個 2.7.9 APK 並選擇「更新」" in index
+    assert "相同簽章的 2.8.1 APK 更新" in index
+    assert "直接開啟並選「更新」，請勿先解除安裝" in index

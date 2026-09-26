@@ -74,7 +74,16 @@ document.querySelectorAll('a[href^="#"]').forEach((link) => {
         if (!target) return;
 
         event.preventDefault();
-        target.scrollIntoView({ behavior: "smooth", block: "start" });
+        // A navigation link may target progressive-disclosure content.
+        let disclosure = target.closest("details");
+        while (disclosure) {
+            disclosure.open = true;
+            disclosure = disclosure.parentElement?.closest("details");
+        }
+        target.scrollIntoView({
+            behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+            block: "start",
+        });
         closeMobileMenu();
     });
 });

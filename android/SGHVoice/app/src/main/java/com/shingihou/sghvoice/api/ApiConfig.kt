@@ -8,6 +8,7 @@ import com.shingihou.sghvoice.processing.RecognitionLanguage
 import com.shingihou.sghvoice.processing.TranslationLanguage
 import com.shingihou.sghvoice.processing.TranslationRequest
 import com.shingihou.sghvoice.privacy.CloudProcessingConsent
+import com.shingihou.sghvoice.ime.VoicePalette
 
 /**
  * API 金鑰管理
@@ -29,6 +30,7 @@ class ApiConfig(context: Context) {
         private const val KEY_LANGUAGE_PREF = "language_preference"
         private const val KEY_SETUP_COMPLETE = "setup_complete"
         private const val KEY_OUTPUT_STYLE = "output_style"
+        private const val KEY_VOICE_PALETTE = "voice_palette"
         private const val KEY_STT_ENGINE = "stt_engine"
         private const val KEY_LLM_ENGINE = "llm_engine"
         private const val KEY_TRANSLATION_TARGETS = "translation_targets"
@@ -117,6 +119,11 @@ class ApiConfig(context: Context) {
     var outputStyle: String
         get() = prefs.getString(KEY_OUTPUT_STYLE, "normal") ?: "normal"
         set(value) = prefs.edit().putString(KEY_OUTPUT_STYLE, value).apply()
+
+    /** Appearance only; does not change consent, providers, or speech processing. */
+    var voicePalette: VoicePalette
+        get() = VoicePalette.fromPreference(prefs.getString(KEY_VOICE_PALETTE, null))
+        set(value) = prefs.edit().putString(KEY_VOICE_PALETTE, value.preferenceValue).apply()
 
     /** 語音辨識語言；auto 會保留中／日／英／韓混合輸入的自動偵測。 */
     var recognitionLanguage: RecognitionLanguage

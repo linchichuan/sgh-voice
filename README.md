@@ -1,4 +1,4 @@
-# 🎙 SGH Voice — 讓想法流動，不再卡在鍵盤上 (v2.7.3)
+# 🎙 SGH Voice — 讓想法流動，不再卡在鍵盤上
 
 **[English](README.en.md) | [日本語](README.ja.md) | 繁體中文**
 
@@ -7,11 +7,23 @@
 [![macOS](https://img.shields.io/badge/macOS-Apple_Silicon-black?logo=apple)](https://github.com/linchichuan/sgh-voice/releases)
 [![iOS](https://img.shields.io/badge/iOS-17.0+-blue?logo=apple)](https://github.com/linchichuan/sgh-voice/releases)
 [![Android](https://img.shields.io/badge/Android-8.0+-green?logo=android)](https://github.com/linchichuan/sgh-voice/releases)
-[![Version](https://img.shields.io/badge/Version-2.7.3-green)]()
+[![Android Version](https://img.shields.io/badge/Android-2.8.1-green)](https://voice.shingihou.com/)
 
 ---
 
-## Android v2.7.3：繁中注音字庫與聯想
+## Android v2.8.1：成稿預覽與輸入體驗修正
+
+官方側載個人測試版：[下載與安裝說明](https://voice.shingihou.com/#android-download)。同簽章版本可直接更新，請勿先解除安裝；Google Play 安裝版請沿原管道更新。
+
+- 「幫我寫」分段記下想法，先預覽成稿，再明確插入。
+- 明亮淺色錄音圓與細邊框，設定可選六種淺色配色；可容納小視窗的版面、較大注音按鍵與 48 個候選。
+- 日文可切換 Romaji／12 鍵電話格線（連按輪替、長按選字；非 flick）。
+- 切換欄位會停止錄音，已錄內容轉成待確認文字；辨識失敗可重試或捨棄。
+- 每次新雲端請求重查同意，錯誤紀錄不含私人草稿。
+
+筆記與重試音訊僅存記憶體，服務結束會消失；不支援背景連續錄音。自動化／模擬器檢查不等同實機準確度驗收，詳見 [Android RC 清單](docs/ANDROID_RC_ACCEPTANCE.md)。
+
+## Android v2.7.3：繁中注音字庫與聯想（歷史）
 
 | 重點改進 | 說明 |
 |------|------|

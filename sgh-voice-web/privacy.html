@@ -171,7 +171,7 @@
             <div class="card">
                 <h2>1. はじめに</h2>
                 <p>本プライバシーポリシーは、新義豊株式会社（以下「当社」）が提供する「SGH Voice」アプリケーション（以下「本アプリ」）における個人情報の取扱いについて説明します。</p>
-                <p><strong>最終更新日：</strong>2026年9月11日（Android の確認済み語彙ヒントとクラウド処理の再同意に関する説明を更新）</p>
+                <p><strong>最終更新日：</strong>2026年9月26日（Android の文章作成とメモリ内の一時保存を追記。確認済み語彙ヒント・クラウド処理の説明は2026年9月11日改訂を継続）</p>
             </div>
 
             <div class="card">
@@ -183,6 +183,7 @@
                     <li>音声データは、選択された <strong>STT (Speech-to-Text) プロバイダー</strong>（OpenAI 音声認識 API / Groq 音声認識 API）にのみ送信されます。Android v2.7.6 では設定画面で実際のモデル ID を確認・選択できます。</li>
                     <li>LLM 後処理（Anthropic / OpenAI / Groq / OpenRouter / Ollama）には音声ではなく、文字起こし後のテキストのみが送信されます。</li>
                     <li>当社のサーバーに音声データを保存することはありません。</li>
+                    <li>Android 2.8.1（2026年9月26日追記）：入力欄の切替で録音を停止し、確認待ちの文章をメモリ内に保持します。認識失敗時は最大約125秒分の音声を再試行用としてメモリ内にのみ保持し、再試行成功・破棄・同意撤回の確認・サービス終了時に消去します。自動再送はしません。「文章作成」は明示操作でメモを選択中のAIへ送り、成稿を確認してから挿入します。メモ・成稿は履歴ファイルに保存せず、サービス終了や再起動で失われます。</li>
                 </ul>
 
                 <h3>2.2 API キー</h3>
@@ -238,7 +239,7 @@
                 <ul>
                     <li>APIキーはiOSではKeychain、AndroidではEncryptedSharedPreferences、対応するmacOS版ではKeychainまたは権限を600に限定した設定ファイルに保存</li>
                     <li>すべての API 通信は HTTPS / TLS 1.2 以上で暗号化</li>
-                    <li>音声データは処理後に即座に削除（音声バックアップを有効化した場合を除く）</li>
+                    <li>音声データは処理後に削除（Android の明示的な再試行用一時メモリ、および有効化したデスクトップ音声バックアップを除く）</li>
                     <li>アプリ内の音声・文字・API キーは当社のサーバーへ送信されません（ウェブサイトで明示的に送信するダウンロード登録情報を除く）</li>
                 </ul>
             </div>
@@ -318,7 +319,7 @@
             <div class="card">
                 <h2>1. 前言</h2>
                 <p>本隱私權政策說明新義豊株式會社（以下簡稱「本公司」）所提供之「SGH Voice」應用程式（以下簡稱「本應用程式」）如何處理個人資訊。</p>
-                <p><strong>最後更新：</strong>2026 年 9 月 11 日（更新 Android 已確認詞彙提示與雲端處理重新同意說明）</p>
+                <p><strong>最後更新：</strong>2026 年 9 月 26 日（補充 Android 代寫與記憶體暫存；已確認詞彙與雲端處理說明沿用 2026 年 9 月 11 日修訂）</p>
             </div>
 
             <div class="card">
@@ -330,6 +331,7 @@
                     <li>語音資料僅傳送至所選之 <strong>STT (Speech-to-Text) 服務商</strong>（OpenAI 語音辨識 API / Groq 語音辨識 API）。Android v2.7.6 可在設定畫面確認並選擇實際 model ID。</li>
                     <li>LLM 後處理（Anthropic / OpenAI / Groq / OpenRouter / Ollama）收到的是文字轉譯結果，並非原始語音。</li>
                     <li>本公司不會在伺服器上儲存任何語音資料。</li>
+                    <li>Android 2.8.1（2026 年 9 月 26 日補充）：切換輸入欄會停止錄音，待確認文字只暫存在記憶體。辨識失敗時，最多約 125 秒音訊僅在記憶體保留供重試，重試成功、捨棄、確認同意已撤回或服務結束時清除，不自動重送。「幫我寫」由明確操作將筆記送至所選 AI，成稿先預覽再插入。筆記與成稿不寫入歷史檔，服務結束或重開機後會消失。</li>
                 </ul>
 
                 <h3>2.2 API 金鑰</h3>
@@ -385,7 +387,7 @@
                 <ul>
                     <li>API 金鑰在 iOS 使用 Keychain、Android 使用 EncryptedSharedPreferences；支援的 macOS 版本使用 Keychain 或權限設為 600 的設定檔</li>
                     <li>所有 API 通訊皆透過 HTTPS / TLS 1.2 以上加密</li>
-                    <li>語音資料處理後立即刪除（除非啟用音訊備份）</li>
+                    <li>語音資料處理後刪除（Android 明確重試用暫存記憶體，以及已啟用的桌面音訊備份除外）</li>
                     <li>應用程式內的語音、文字與 API 金鑰不會傳送至本公司伺服器（不含使用者在網站明示送出的下載登記資料）</li>
                 </ul>
             </div>
@@ -466,7 +468,7 @@
                 <h2>1. Introduction</h2>
                 <p>This Privacy Policy describes how Shingihou Co., Ltd. ("we", "us") handles personal information in
                     the "SGH Voice" application ("the App").</p>
-                <p><strong>Last Updated:</strong> September 11, 2026 (Android confirmed-vocabulary hints and renewed cloud-processing consent)</p>
+                <p><strong>Last Updated:</strong> September 26, 2026 (Android writing and memory-only drafts added; confirmed-vocabulary and cloud-processing disclosures retain the September 11, 2026 revision)</p>
             </div>
 
             <div class="card">
@@ -478,6 +480,7 @@
                     <li>Audio data is sent <strong>only to the selected STT (Speech-to-Text) provider</strong> (OpenAI Speech Recognition API / Groq Speech Recognition API). Android v2.7.6 shows and lets the user select the actual model ID in Settings.</li>
                     <li>LLM post-processing (Anthropic / OpenAI / Groq / OpenRouter / Ollama) receives <strong>only the transcribed text, not the audio</strong>.</li>
                     <li>We do not store any audio data on our servers.</li>
+                    <li>Android 2.8.1 (added September 26, 2026): switching fields stops recording and keeps pending text only in memory. On recognition failure, up to approximately 125 seconds of audio may remain in memory for explicit retry; it is cleared after successful retry, discard, detected consent withdrawal, or service termination. There is no automatic resend. Help me write sends notes to the selected AI only on explicit action, and presents a preview before insertion. Notes and drafts are not written to a history file and are lost on service termination or restart.</li>
                 </ul>
 
                 <h3>2.2 API Keys</h3>
@@ -533,7 +536,7 @@
                 <ul>
                     <li>API keys are stored in Keychain on iOS, EncryptedSharedPreferences on Android, and Keychain or a permission-600 configuration file on supported macOS versions</li>
                     <li>All API communications are encrypted via HTTPS / TLS 1.2 or higher</li>
-                    <li>Audio data is deleted immediately after processing (unless audio backup is enabled)</li>
+                    <li>Audio is deleted after processing, except Android in-memory explicit-retry buffers and enabled desktop audio backups</li>
                     <li>In-app audio, text, and API keys are not transmitted to our servers (except download registration details explicitly submitted through the website)</li>
                 </ul>
             </div>

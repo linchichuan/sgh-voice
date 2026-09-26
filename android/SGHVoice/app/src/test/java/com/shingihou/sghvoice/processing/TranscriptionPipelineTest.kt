@@ -2,8 +2,10 @@ package com.shingihou.sghvoice.processing
 
 import com.shingihou.sghvoice.api.LlmClient
 import com.shingihou.sghvoice.api.WhisperClient
+import com.shingihou.sghvoice.api.CloudProcessingConsentException
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertThrows
 import org.junit.Before
 import org.junit.Test
 import org.mockito.Mock
@@ -28,12 +30,16 @@ class TranscriptionPipelineTest {
     
     private lateinit var openCCConverter: OpenCCConverter
     private lateinit var pipeline: TranscriptionPipeline
+    private var cloudConsent = true
 
     @Before
     fun setup() {
         MockitoAnnotations.openMocks(this)
         openCCConverter = OpenCCConverter() // 使用真實物件測試轉換邏輯
-        pipeline = TranscriptionPipeline(whisperClient, llmClient, dictionaryManager, openCCConverter)
+        pipeline = TranscriptionPipeline(
+            whisperClient, llmClient, dictionaryManager, openCCConverter,
+            cloudProcessingAllowed = { cloudConsent }
+        )
     }
 
     @Test
@@ -174,5 +180,89 @@ class TranscriptionPipelineTest {
 
         assertEquals(draft, pipeline.composeNotes(notes))
         Unit
+    }
+
+    @Test
+    fun `revoked consent blocks STT before reading vocabulary or sending audio`() = runBlocking {
+        cloudConsent = false
+
+        val result = pipeline.process(ByteArray(100))
+        val sttOnly = pipeline.transcribeOnly(ByteArray(100))
+
+        assertEquals(false, result.success)
+        assertEquals(CloudProcessingConsentException.MESSAGE, result.error)
+        assertEquals(false, sttOnly.success)
+        verifyNoInteractions(whisperClient, llmClient, dictionaryManager)
+        Unit
+    }
+
+    @Test
+    fun `consent withdrawn during STT blocks corrections and follow up LLM`() = runBlocking {
+        `when`(dictionaryManager.buildWhisperPrompt()).thenReturn("")
+        `when`(whisperClient.transcribe(any(), any())).thenAnswer {
+            cloudConsent = false
+            "synthetic private spoken content"
+        }
+
+        val result = pipeline.process(ByteArray(100))
+
+        assertEquals(false, result.success)
+        assertEquals("", result.text)
+        assertEquals("", result.rawText)
+        assertEquals(CloudProcessingConsentException.MESSAGE, result.error)
+        verify(dictionaryManager, times(0)).applyCorrections(any(), any())
+        verifyNoInteractions(llmClient)
+        Unit
+    }
+
+    @Test
+    fun `consent is checked at LLM boundary after progress callback`() = runBlocking {
+        val raw = "synthetic content"
+        `when`(dictionaryManager.buildWhisperPrompt()).thenReturn("")
+        `when`(whisperClient.transcribe(any(), any())).thenReturn(raw)
+        `when`(dictionaryManager.applyCorrections(raw)).thenReturn(raw)
+        `when`(dictionaryManager.getSceneSystemPromptExtra()).thenReturn("")
+        `when`(dictionaryManager.buildLlmVocabularyHint(any(), any())).thenReturn("[]")
+        val callback = object : TranscriptionPipeline.ProgressCallback {
+            override fun onWhisperStarted() = Unit
+            override fun onWhisperCompleted(text: String) = Unit
+            override fun onLlmStarted() { cloudConsent = false }
+            override fun onCompleted(result: TranscriptionPipeline.Result) = Unit
+            override fun onError(error: String) = Unit
+        }
+
+        val result = pipeline.process(ByteArray(100), callback)
+
+        assertEquals(false, result.success)
+        assertEquals(CloudProcessingConsentException.MESSAGE, result.error)
+        verifyNoInteractions(llmClient)
+        Unit
+    }
+
+    @Test
+    fun `compose cannot generate after consent is withdrawn`() {
+        cloudConsent = false
+        assertThrows(CloudProcessingConsentException::class.java) {
+            runBlocking { pipeline.composeNotes("synthetic private brief") }
+        }
+        verifyNoInteractions(llmClient)
+    }
+
+    @Test
+    fun `LLM boundary consent failure cannot become successful dictation fallback`() = runBlocking {
+        val raw = "synthetic private words"
+        `when`(dictionaryManager.buildWhisperPrompt()).thenReturn("")
+        `when`(whisperClient.transcribe(any(), any())).thenReturn(raw)
+        `when`(dictionaryManager.applyCorrections(raw)).thenReturn(raw)
+        `when`(dictionaryManager.getSceneSystemPromptExtra()).thenReturn("")
+        `when`(dictionaryManager.buildLlmVocabularyHint(any(), any())).thenReturn("[]")
+        `when`(llmClient.refineDictation(raw, "", "[]"))
+            .thenAnswer { throw CloudProcessingConsentException() }
+
+        val result = pipeline.process(ByteArray(100))
+
+        assertEquals(false, result.success)
+        assertEquals("", result.text)
+        assertEquals(CloudProcessingConsentException.MESSAGE, result.error)
     }
 }

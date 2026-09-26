@@ -2388,3 +2388,136 @@ svg {
         animation-iteration-count: 1 !important;
     }
 }
+
+/* Compact Android-first landing page: stable fields, a clear CTA, details on demand. */
+.hero { padding-top: calc(var(--nav-height) + 54px); padding-bottom: 54px; }
+.hero-grid { min-height: 0; grid-template-columns: minmax(0, 1.2fr) minmax(300px, .8fr); gap: 64px; }
+.hero-copy { padding-bottom: 0; }
+.hero h1 { font-size: clamp(40px, 4.3vw, 62px); line-height: 1.16; }
+.hero-lead { max-width: 510px; margin-top: 20px; font-size: 18px; line-height: 1.65; }
+.hero-actions { margin-top: 24px; }
+.hero .btn { min-height: 48px; }
+.hero-distribution-note { margin-top: 16px; }
+.hero-grid-bg { opacity: .14; height: 460px; }
+
+.product-illustration {
+    width: 100%; max-width: 360px; margin: 0 auto; overflow: hidden;
+    border: 1px solid #cbd8cf; border-radius: 24px; background: #fffefa;
+    box-shadow: 0 18px 48px rgba(23, 35, 31, .09);
+}
+.illustration-toolbar { display: flex; justify-content: space-between; gap: 16px; padding: 18px 22px; font-size: 13px; border-bottom: 1px solid var(--line); }
+.illustration-toolbar span { color: var(--muted); }
+.illustration-editor { padding: 22px; }
+.illustration-editor > span { color: var(--muted); font-size: 12px; }
+.illustration-editor p { margin-top: 8px; color: var(--ink); font-size: 17px; line-height: 1.65; }
+.illustration-keyboard { padding: 16px 22px 20px; text-align: center; background: #eef4ee; border-top: 1px solid var(--line); }
+.illustration-modes { display: flex; gap: 4px; justify-content: center; font-size: 12px; color: #415c4d; }
+.illustration-modes span { padding: 5px 12px; border-radius: 8px; }
+.illustration-modes span:last-child { color: #183c2a; background: #d5e7d8; font-weight: 700; }
+.illustration-orb { display: grid; place-items: center; width: 146px; height: 146px; margin: 16px auto 12px; border: 4px solid #294d38; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #e2f2e1, #b9d8b7); box-shadow: inset 0 0 0 5px #f1f7ed; }
+.illustration-orb svg { width: 110px; fill: none; stroke: #375e44; stroke-width: 3; stroke-linecap: round; }
+.illustration-keyboard > p { color: #415c4d; font-size: 12px; }
+.product-illustration figcaption { padding: 10px 12px; color: var(--muted); text-align: center; font-size: 11px; }
+
+.section { padding-top: 64px; padding-bottom: 64px; }
+.section-heading { margin-bottom: 26px; }
+.section-heading h2, .privacy-heading h2, .faq h2 { font-size: clamp(28px, 3vw, 40px); line-height: 1.25; }
+.feature-trio { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; }
+.feature-trio article { min-width: 0; padding: 24px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface-strong); }
+.feature-number { color: var(--green); font-size: 12px; font-weight: 700; }
+.feature-trio h3 { margin: 14px 0 10px; font-size: 20px; line-height: 1.4; letter-spacing: -.025em; }
+.feature-trio p { color: var(--muted); font-size: 15px; line-height: 1.7; }
+
+.compact-details { margin-top: 22px; border-top: 1px solid var(--line); }
+.compact-details > summary, .registration-disclosure > summary {
+    display: list-item; min-height: 44px; padding: 12px 4px;
+    color: var(--ink-soft); font-size: 14px; font-weight: 600; cursor: pointer;
+}
+.compact-details > summary:hover, .registration-disclosure > summary:hover { color: var(--green); }
+.compact-details > summary:focus-visible, .registration-disclosure > summary:focus-visible { outline: 2px solid var(--green); outline-offset: 3px; border-radius: 4px; }
+.compact-detail-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px; padding: 12px 0 16px; }
+.compact-detail-grid h3 { margin-bottom: 10px; font-size: 16px; }
+.compact-detail-grid p { margin-top: 8px; color: var(--muted); font-size: 14px; line-height: 1.75; }
+.risk-details { margin: 0 auto 24px; max-width: 880px; }
+.risk-details > summary { color: var(--warning); }
+.distribution-alert { display: block; margin-top: 6px; padding: 22px; }
+.distribution-alert p, .distribution-alert ul, .official-links { margin-top: 16px; }
+.distribution-alert .distribution-responsibility { padding-top: 14px; }
+.download-heading { max-width: 760px; margin-inline: auto; text-align: center; }
+.download-heading > p { margin-top: 14px; font-size: 16px; line-height: 1.65; }
+.download-registration { width: 100%; max-width: 680px; margin: 0 auto 28px; grid-template-columns: minmax(0, 1fr); gap: 16px; padding: 22px 24px; box-shadow: none; }
+.registration-heading h3 { margin-top: 0; font-size: 20px; }
+.registration-heading > span { display: none; }
+.registration-heading p { margin-top: 6px; }
+.registration-fields { grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); align-content: start; align-items: start; gap: 16px; }
+.registration-field { align-content: start; gap: 6px; font-size: 13px; }
+.registration-field input { height: 46px; min-height: 46px; max-height: 46px; padding: 0 12px; font-size: 16px; border-radius: 8px; }
+.registration-consent, .registration-status { grid-column: 1; margin: 0; }
+.registration-consent { min-height: 44px; align-items: center; font-size: 13px; }
+.registration-status { min-height: 18px; }
+.registration-disclosure { margin-top: 2px; }
+.registration-disclosure > summary { padding: 8px 0; font-size: 12px; font-weight: 500; }
+.registration-disclosure p { margin: 0 0 8px; font-size: 12px; }
+.download-grid { max-width: 980px; margin-inline: auto; gap: 20px; }
+.download-card { padding: 26px; }
+.download-card h3 { font-size: 23px; }
+.download-card .release-meta { margin-top: 24px; }
+.download-card .compact-details { margin-top: 14px; }
+.download-card .compact-details summary { font-size: 13px; }
+.release-verification .hash-block { margin-top: 4px; }
+.update-details .download-update-note { margin: 0 0 14px; font-size: 13px; }
+.download-card .risk-check { margin-top: 20px; min-height: 44px; }
+.download-card .download-button { min-height: 48px; margin-top: 16px; }
+.store-details { max-width: 980px; margin-inline: auto; }
+.store-details .distribution-footnote { margin: 0 0 16px; }
+.install-steps li { min-height: 0; padding: 22px; }
+.install-steps .step-icon { margin-top: 18px; }
+.install-steps p { font-size: 14px; }
+.protect-notice { margin-top: 24px; }
+.privacy .container { display: block; }
+.privacy-heading { max-width: 750px; }
+.privacy-heading > p { max-width: 680px; margin-top: 14px; font-size: 16px; }
+.privacy-details { border-color: #52665c; }
+.privacy-details > summary { color: #ecf3ed; }
+.privacy-details .privacy-grid { display: grid; margin-top: 12px; }
+.privacy .text-link { display: inline-flex; align-items: center; min-height: 44px; color: #daebdb; }
+.privacy-note { margin-top: 14px; }
+.faq { padding-top: 48px; }
+
+@media (max-width: 980px) {
+    .hero-grid { gap: 32px; grid-template-columns: minmax(0, 1fr) minmax(260px, .8fr); }
+    .feature-trio { gap: 14px; }
+    .feature-trio article { padding: 20px; }
+    .compact-detail-grid { grid-template-columns: 1fr; gap: 20px; }
+    .feature-trio h3 { font-size: 18px; }
+}
+@media (max-width: 720px) {
+    .hero { padding-top: calc(var(--nav-height) + 32px); padding-bottom: 36px; }
+    .hero-grid { grid-template-columns: 1fr; gap: 28px; }
+    .hero h1 { margin-top: 18px; font-size: clamp(36px, 10vw, 46px); }
+    .hero-lead { margin-top: 16px; font-size: 16px; }
+    .hero-actions { display: flex; gap: 10px; margin-top: 20px; }
+    .hero-actions .btn { width: auto; padding-inline: 16px; font-size: 13px; min-height: 48px; }
+    .hero-facts { gap: 10px; }
+    .hero-facts span { font-size: 12px; }
+    .product-illustration { max-width: 320px; }
+    .illustration-editor { padding: 16px 20px; }
+    .illustration-keyboard { padding: 12px 20px 16px; }
+    .illustration-orb { width: 118px; height: 118px; margin: 12px auto; }
+    .illustration-orb svg { width: 90px; }
+    .section { padding-top: 40px; padding-bottom: 40px; }
+    .feature-trio { grid-template-columns: 1fr; gap: 12px; }
+    .feature-trio article { padding: 20px; }
+    .feature-trio h3 { margin-top: 8px; }
+    .feature-trio p { font-size: 15px; }
+    .registration-fields { grid-template-columns: 1fr; gap: 12px; }
+    .download-registration { gap: 14px; padding: 20px; }
+    .download-grid { grid-template-columns: 1fr; }
+    .download-card { padding: 22px 20px; }
+    .release-meta { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .install-steps .step-icon { margin-top: 0; }
+    .compact-details > summary { font-size: 13px; }
+    .privacy-details .privacy-grid article { grid-template-columns: 1fr; gap: 8px; }
+    .privacy-details .privacy-grid p { grid-column: 1; }
+    .privacy-details .privacy-number { display: none; }
+}

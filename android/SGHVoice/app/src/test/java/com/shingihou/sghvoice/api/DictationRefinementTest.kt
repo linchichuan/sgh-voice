@@ -21,6 +21,7 @@ class DictationRefinementTest {
         whenever(it.groqApiKey).thenReturn("synthetic-test-key")
         whenever(it.groqLlmModel).thenReturn("test-model")
         whenever(it.outputStyle).thenReturn("normal")
+        whenever(it.hasCloudProcessingConsent).thenReturn(true)
     }
 
     private fun client(reply: String, inspect: (JSONObject) -> Unit = {}): LlmClient {

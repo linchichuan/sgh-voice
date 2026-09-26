@@ -4,20 +4,25 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.content.res.ColorStateList
 import android.graphics.Canvas
+import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Typeface
 import android.graphics.drawable.InsetDrawable
+import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.RippleDrawable
 import android.text.SpannableString
 import android.text.Spanned
 import android.text.TextUtils
 import android.text.style.ReplacementSpan
 import android.util.AttributeSet
+import android.util.TypedValue
 import android.view.HapticFeedbackConstants
 import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
 import android.view.View.OnAttachStateChangeListener
 import android.widget.GridLayout
+import android.widget.FrameLayout
 import android.widget.HorizontalScrollView
 import android.widget.ImageButton
 import android.widget.ImageView
@@ -25,6 +30,7 @@ import android.widget.LinearLayout
 import android.widget.PopupMenu
 import android.widget.TextView
 import androidx.core.content.ContextCompat
+import androidx.core.graphics.ColorUtils
 import androidx.core.view.AccessibilityDelegateCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -32,6 +38,8 @@ import androidx.core.view.doOnAttach
 import androidx.core.view.isVisible
 import androidx.core.view.updatePadding
 import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
+import androidx.core.widget.NestedScrollView
+import androidx.core.widget.TextViewCompat
 import com.shingihou.sghvoice.R
 import com.shingihou.sghvoice.ime.japanese.JapaneseScriptMode
 import com.shingihou.sghvoice.ime.japanese.JapaneseInputStyle
@@ -80,6 +88,8 @@ class KeyboardView @JvmOverloads constructor(
         fun onComposeClear()
         fun onPendingInsert()
         fun onPendingDiscard()
+        fun onPendingRetry()
+        fun onDraftPreviewRequested()
         fun onTranslationPickerRequested()
         fun onTranslationRequested(request: TranslationRequest)
         fun onRecognitionLanguageChanged(language: RecognitionLanguage)
@@ -100,10 +110,22 @@ class KeyboardView @JvmOverloads constructor(
     private var voiceActionMode = VoiceActionMode.DICTATION
     private var hasComposeNotes = false
     private var hasPendingDraft = false
+    private var retryAvailable = false
+    private var draftPreviewShown = false
+    private var compactVoiceLayout = false
+    private var voicePanelChildren = emptyList<View>()
+    private var compactCaptureColumn: LinearLayout? = null
+    private var voicePalette = 0xFFDDF3E5.toInt()
     private var currentVoiceState = VoiceInputIME.ImeState.IDLE
     private var recognitionLanguage = RecognitionLanguage.AUTO
 
     private lateinit var keyboardRoot: View
+    private lateinit var contentScroll: NestedScrollView
+    private lateinit var captureArea: View
+    private lateinit var draftPreviewPanel: View
+    private lateinit var draftPreviewText: TextView
+    private lateinit var draftPreviewButton: TextView
+    private lateinit var draftPreviewCloseButton: TextView
     private lateinit var voiceModeButton: TextView
     private lateinit var zhuyinModeButton: TextView
     private lateinit var japaneseModeButton: TextView
@@ -258,20 +280,96 @@ class KeyboardView @JvmOverloads constructor(
         renderDraftActions()
     }
 
-    private fun renderDraftActions() {
-        val idle = currentVoiceState in setOf(
-            VoiceInputIME.ImeState.IDLE,
-            VoiceInputIME.ImeState.DONE,
-            VoiceInputIME.ImeState.ERROR
+    fun setDraftPreview(text: String) {
+        draftPreviewText.text = text
+        if (text.isBlank()) draftPreviewShown = false
+        renderDraftActions()
+    }
+
+    fun showDraftPreview() {
+        if (draftPreviewText.text.isBlank() || !isVoiceIdle()) return
+        draftPreviewShown = true
+        hideTranslationPanel()
+        renderDraftActions()
+    }
+
+    fun hideDraftPreview() {
+        draftPreviewShown = false
+        renderDraftActions()
+    }
+
+    fun setRetryAvailable(available: Boolean) {
+        retryAvailable = available
+        renderDraftActions()
+    }
+
+    /** A light surface preference shared by the circle and its live audio accent. */
+    fun setVoicePalette(palette: Int) {
+        val opaque = ColorUtils.setAlphaComponent(palette, 255)
+        voicePalette = if (ColorUtils.calculateLuminance(opaque) < 0.65) {
+            ColorUtils.blendARGB(opaque, Color.WHITE, 0.85f)
+        } else opaque
+        renderVoicePalette()
+    }
+
+    private fun renderVoicePalette() {
+        val ink = ContextCompat.getColor(context, R.color.mic_text_recording)
+        val surfaceColor = ColorUtils.blendARGB(voicePalette, Color.WHITE,
+            if (currentVoiceState in setOf(VoiceInputIME.ImeState.STARTING,
+                    VoiceInputIME.ImeState.STOPPING, VoiceInputIME.ImeState.PROCESSING)) 0.22f else 0f)
+        val accent = ColorUtils.blendARGB(voicePalette, ink, 0.72f)
+        micOuterRing.background = GradientDrawable().apply {
+            shape = GradientDrawable.OVAL
+            setColor(surfaceColor)
+            setStroke(dp(1).coerceAtLeast(1), accent)
+        }
+        val surface = GradientDrawable().apply {
+            shape = GradientDrawable.OVAL
+            setColor(surfaceColor)
+        }
+        val mask = GradientDrawable().apply {
+            shape = GradientDrawable.OVAL
+            setColor(Color.WHITE)
+        }
+        micButton.backgroundTintList = null
+        micButton.background = RippleDrawable(
+            ColorStateList.valueOf(ColorUtils.setAlphaComponent(accent, 32)), surface, mask
         )
+        micActionIcon.imageTintList = ColorStateList.valueOf(ink)
+        micActionLabel.setTextColor(ink)
+        audioWaveform.setPaletteColors(accent, ColorUtils.blendARGB(voicePalette, ink, 0.52f))
+    }
+
+    private fun isVoiceIdle() = currentVoiceState in setOf(
+        VoiceInputIME.ImeState.IDLE,
+        VoiceInputIME.ImeState.DONE,
+        VoiceInputIME.ImeState.ERROR
+    )
+
+    private fun renderDraftActions() {
+        val idle = isVoiceIdle()
+        if (!idle) draftPreviewShown = false
+        val canPreview = draftPreviewText.text.isNotBlank() && idle &&
+            (hasComposeNotes || hasPendingDraft)
+        if (!canPreview) draftPreviewShown = false
+        draftPreviewButton.isVisible = canPreview && !draftPreviewShown && !translationPanel.isVisible
+        draftPreviewPanel.isVisible = draftPreviewShown && canPreview
+        captureArea.isVisible = !translationPanel.isVisible
+        micOuterRing.isVisible = !draftPreviewPanel.isVisible
+        voiceHint.isVisible = !translationPanel.isVisible && !canPreview && !compactVoiceLayout
+        compactCaptureColumn?.isVisible = !translationPanel.isVisible
         composeActionRow.isVisible = inputMode == InputMode.VOICE &&
-            voiceActionMode == VoiceActionMode.COMPOSE && hasComposeNotes && !hasPendingDraft
+            voiceActionMode == VoiceActionMode.COMPOSE && hasComposeNotes && !hasPendingDraft && !retryAvailable
         composeContinueButton.isEnabled = idle
         composeGenerateButton.isEnabled = idle
         composeClearButton.isEnabled = idle
-        pendingInsertRow.isVisible = inputMode == InputMode.VOICE && hasPendingDraft
+        pendingInsertRow.isVisible = inputMode == InputMode.VOICE && (hasPendingDraft || retryAvailable)
+        pendingInsertButton.setText(if (retryAvailable) R.string.voice_pending_retry else R.string.voice_pending_insert)
+        pendingInsertButton.contentDescription = pendingInsertButton.text
         pendingInsertButton.isEnabled = idle
         pendingDiscardButton.isEnabled = idle
+        listOf(composeContinueButton, composeGenerateButton, composeClearButton,
+            pendingInsertButton, pendingDiscardButton).forEach { it.alpha = if (idle) 1f else 0.45f }
     }
 
     fun setStatusText(text: String) {
@@ -306,9 +404,11 @@ class KeyboardView @JvmOverloads constructor(
                 .getOrDefault(listOf(TranslationLanguage.JAPANESE))
         )
         renderTranslationTargets()
-        micButton.isVisible = false
+        captureArea.isVisible = false
         translationPanel.isVisible = true
+        draftPreviewButton.isVisible = false
         voiceHint.isVisible = false
+        compactCaptureColumn?.isVisible = false
         statusText.setText(R.string.translation_picker_status)
         translationPanel.announceForAccessibility(
             context.getString(R.string.translation_picker_accessibility)
@@ -318,8 +418,7 @@ class KeyboardView @JvmOverloads constructor(
     fun hideTranslationPanel() {
         if (!::translationPanel.isInitialized) return
         translationPanel.isVisible = false
-        micButton.isVisible = true
-        voiceHint.isVisible = true
+        renderDraftActions()
     }
 
     fun updateCandidates(composition: String, candidates: List<String>) {
@@ -374,7 +473,6 @@ class KeyboardView @JvmOverloads constructor(
                 statusText.setTextColor(ContextCompat.getColor(context, R.color.status_text))
                 applyMicState(
                     enabled = true,
-                    colorRes = R.color.mic_bg,
                     labelRes = R.string.mic_action_start,
                     iconRes = R.drawable.ic_mic,
                     dotColorRes = R.color.status_dot_idle
@@ -388,7 +486,6 @@ class KeyboardView @JvmOverloads constructor(
                 statusText.setTextColor(ContextCompat.getColor(context, R.color.status_text))
                 applyMicState(
                     enabled = false,
-                    colorRes = R.color.mic_bg_processing,
                     labelRes = R.string.mic_action_processing,
                     iconRes = R.drawable.ic_mic,
                     dotColorRes = R.color.status_dot_processing
@@ -401,11 +498,9 @@ class KeyboardView @JvmOverloads constructor(
                 statusText.setTextColor(ContextCompat.getColor(context, R.color.status_recording))
                 applyMicState(
                     enabled = true,
-                    colorRes = R.color.mic_bg_recording,
                     labelRes = R.string.mic_action_recording,
                     iconRes = R.drawable.ic_check,
-                    dotColorRes = R.color.status_dot_recording,
-                    contentColorRes = R.color.mic_text_recording
+                    dotColorRes = R.color.status_dot_recording
                 )
             }
 
@@ -415,7 +510,6 @@ class KeyboardView @JvmOverloads constructor(
                 statusText.setTextColor(ContextCompat.getColor(context, R.color.status_text))
                 applyMicState(
                     enabled = false,
-                    colorRes = R.color.mic_bg_processing,
                     labelRes = R.string.mic_action_processing,
                     iconRes = R.drawable.ic_mic,
                     dotColorRes = R.color.status_dot_processing
@@ -428,7 +522,6 @@ class KeyboardView @JvmOverloads constructor(
                 statusText.setTextColor(ContextCompat.getColor(context, R.color.status_text))
                 applyMicState(
                     enabled = false,
-                    colorRes = R.color.mic_bg_processing,
                     labelRes = R.string.mic_action_processing,
                     iconRes = R.drawable.ic_mic,
                     dotColorRes = R.color.status_dot_processing
@@ -441,7 +534,6 @@ class KeyboardView @JvmOverloads constructor(
                 statusText.setTextColor(ContextCompat.getColor(context, R.color.status_success))
                 applyMicState(
                     enabled = true,
-                    colorRes = R.color.mic_bg,
                     labelRes = R.string.mic_action_start,
                     iconRes = R.drawable.ic_mic,
                     dotColorRes = R.color.status_dot_success
@@ -453,7 +545,6 @@ class KeyboardView @JvmOverloads constructor(
                 statusText.setTextColor(ContextCompat.getColor(context, R.color.status_recording))
                 applyMicState(
                     enabled = true,
-                    colorRes = R.color.mic_bg,
                     labelRes = R.string.mic_action_start,
                     iconRes = R.drawable.ic_mic,
                     dotColorRes = R.color.status_dot_recording
@@ -486,6 +577,12 @@ class KeyboardView @JvmOverloads constructor(
 
     private fun bindViews() {
         keyboardRoot = findViewById(R.id.keyboard_root)
+        contentScroll = findViewById(R.id.keyboard_content_scroll)
+        captureArea = findViewById(R.id.voice_capture_area)
+        draftPreviewPanel = findViewById(R.id.draft_preview_panel)
+        draftPreviewText = findViewById(R.id.tv_draft_preview)
+        draftPreviewButton = findViewById(R.id.btn_draft_preview)
+        draftPreviewCloseButton = findViewById(R.id.btn_draft_preview_close)
         voiceModeButton = findViewById(R.id.btn_mode_voice)
         zhuyinModeButton = findViewById(R.id.btn_mode_zhuyin)
         japaneseModeButton = findViewById(R.id.btn_mode_japanese)
@@ -517,6 +614,15 @@ class KeyboardView @JvmOverloads constructor(
         pendingInsertRow = findViewById(R.id.pending_insert_row)
         pendingInsertButton = findViewById(R.id.btn_pending_insert)
         pendingDiscardButton = findViewById(R.id.btn_pending_discard)
+        listOf(composeContinueButton, composeGenerateButton, composeClearButton,
+            pendingInsertButton, pendingDiscardButton, draftPreviewButton,
+            draftPreviewCloseButton).forEach { button ->
+            button.maxLines = 2
+            button.includeFontPadding = false
+            TextViewCompat.setAutoSizeTextTypeUniformWithConfiguration(
+                button, 10, 13, 1, TypedValue.COMPLEX_UNIT_SP
+            )
+        }
         translationPanel = findViewById(R.id.translation_panel)
         translationCancelButton = findViewById(R.id.btn_translation_cancel)
         translationStartButton = findViewById(R.id.btn_translation_start)
@@ -541,6 +647,8 @@ class KeyboardView @JvmOverloads constructor(
         backspaceButton = findViewById(R.id.btn_backspace)
         enterButton = findViewById(R.id.btn_enter)
         setEnterIcon(enterButton)
+        val voiceContainer = voicePanel as LinearLayout
+        voicePanelChildren = (0 until voiceContainer.childCount).map(voiceContainer::getChildAt)
     }
 
     private fun installNavigationBarInsets() {
@@ -555,19 +663,85 @@ class KeyboardView @JvmOverloads constructor(
         doOnAttach { ViewCompat.requestApplyInsets(it) }
     }
 
-    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
-        super.onSizeChanged(w, h, oldw, oldh)
-        if (!::micOuterRing.isInitialized || w <= 0) return
+    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        if (!::contentScroll.isInitialized) {
+            super.onMeasure(widthMeasureSpec, heightMeasureSpec)
+            return
+        }
+        val width = MeasureSpec.getSize(widthMeasureSpec)
+        arrangeVoicePanel(width >= dp(600) && resources.configuration.screenHeightDp < 500)
         val preferred = resources.getDimensionPixelSize(R.dimen.voice_mic_diameter)
-        val available = (w - dp(32)).coerceAtLeast(dp(48))
-        val diameter = minOf(preferred, available)
-        if (micOuterRing.layoutParams.width != diameter ||
-            micOuterRing.layoutParams.height != diameter
-        ) {
-            micOuterRing.layoutParams = micOuterRing.layoutParams.apply {
-                width = diameter
-                height = diameter
+        val minimum = dp(if (resources.configuration.fontScale > 1.3f) 128 else 96)
+        val diameter = minOf(maxOf(preferred, minimum), (width - dp(36)).coerceAtLeast(dp(48)))
+        resizeCaptureArea(diameter)
+        contentScroll.layoutParams.height = LayoutParams.WRAP_CONTENT
+        super.onMeasure(widthMeasureSpec, heightMeasureSpec)
+
+        val screenBudget = dp((resources.configuration.screenHeightDp *
+            if (compactVoiceLayout && inputMode == InputMode.VOICE) 0.72f else 0.80f).toInt()
+            .coerceAtLeast(160))
+        val parentBudget = if (MeasureSpec.getMode(heightMeasureSpec) == MeasureSpec.UNSPECIFIED) {
+            screenBudget
+        } else MeasureSpec.getSize(heightMeasureSpec)
+        val maximumHeight = minOf(screenBudget, parentBudget)
+        val fixedHeight = keyboardRoot.paddingTop + keyboardRoot.paddingBottom + dp(44) +
+            if (voiceActionRow.isVisible) dp(56) else 0
+        val bodyBudget = (maximumHeight - fixedHeight).coerceAtLeast(dp(48))
+        val naturalHeight = contentScroll.getChildAt(0).measuredHeight
+        if (inputMode == InputMode.VOICE && naturalHeight > bodyBudget) {
+            resizeCaptureArea((diameter - (naturalHeight - bodyBudget)).coerceAtLeast(minOf(minimum, diameter)))
+        }
+        contentScroll.layoutParams.height = minOf(naturalHeight, bodyBudget)
+        super.onMeasure(widthMeasureSpec, heightMeasureSpec)
+    }
+
+    private fun arrangeVoicePanel(compact: Boolean) {
+        if (compactVoiceLayout == compact || voicePanelChildren.isEmpty()) return
+        compactVoiceLayout = compact
+        val container = voicePanel as LinearLayout
+        voicePanelChildren.forEach { (it.parent as? android.view.ViewGroup)?.removeView(it) }
+        container.removeAllViews()
+        container.orientation = if (compact) HORIZONTAL else VERTICAL
+        if (compact) {
+            val controls = LinearLayout(context).apply {
+                orientation = VERTICAL
+                layoutParams = LayoutParams(0, LayoutParams.WRAP_CONTENT, 0.58f)
             }
+            val capture = LinearLayout(context).apply {
+                orientation = VERTICAL
+                gravity = android.view.Gravity.CENTER
+                layoutParams = LayoutParams(0, LayoutParams.WRAP_CONTENT, 0.42f).apply {
+                    marginStart = dp(12)
+                }
+            }
+            container.addView(controls)
+            container.addView(capture)
+            voicePanelChildren.forEach { child ->
+                if (child === captureArea || child === draftPreviewButton) capture.addView(child)
+                else controls.addView(child)
+            }
+            compactCaptureColumn = capture
+        } else {
+            voicePanelChildren.forEach(container::addView)
+            compactCaptureColumn = null
+        }
+        renderDraftActions()
+    }
+
+    private fun resizeCaptureArea(diameter: Int) {
+        captureArea.layoutParams.height = diameter
+        micOuterRing.layoutParams.width = diameter
+        micOuterRing.layoutParams.height = diameter
+        val compact = diameter < dp(140)
+        (micActionIcon.layoutParams as FrameLayout.LayoutParams).apply {
+            width = dp(if (compact) 24 else 32)
+            height = width
+            topMargin = (diameter * if (compact) 0.13f else 0.27f).toInt()
+        }
+        (micActionLabel.layoutParams as FrameLayout.LayoutParams).apply {
+            width = (diameter - dp(24)).coerceAtLeast(dp(40))
+            height = dp(if (resources.configuration.fontScale > 1.3f) 64 else if (compact) 40 else 52)
+            bottomMargin = dp(if (compact) 6 else 14)
         }
     }
 
@@ -599,11 +773,19 @@ class KeyboardView @JvmOverloads constructor(
         }
         pendingInsertButton.setOnClickListener {
             hapticTap(it)
-            listener?.onPendingInsert()
+            if (retryAvailable) listener?.onPendingRetry() else listener?.onPendingInsert()
         }
         pendingDiscardButton.setOnClickListener {
             hapticTap(it)
             listener?.onPendingDiscard()
+        }
+        draftPreviewButton.setOnClickListener {
+            hapticTap(it)
+            listener?.onDraftPreviewRequested()
+        }
+        draftPreviewCloseButton.setOnClickListener {
+            hapticTap(it)
+            hideDraftPreview()
         }
 
         nextKeyboardButton.setOnClickListener {
@@ -783,6 +965,7 @@ class KeyboardView @JvmOverloads constructor(
                 )
                 val horizontalInset = when {
                     manualMode == ManualKeyboardMode.ZHUYIN ||
+                        japaneseInputStyle == JapaneseInputStyle.KANA_12_KEY && manualMode == ManualKeyboardMode.JAPANESE ||
                         keyboardLayer != KeyboardLayer.LETTERS -> 0
                     rowIndex == 1 -> dp(14)
                     rowIndex == 2 -> dp(2)
@@ -1156,22 +1339,16 @@ class KeyboardView @JvmOverloads constructor(
 
     private fun applyMicState(
         enabled: Boolean,
-        colorRes: Int,
         labelRes: Int,
         iconRes: Int,
-        dotColorRes: Int,
-        contentColorRes: Int = R.color.mic_text_recording
+        dotColorRes: Int
     ) {
         micButton.isEnabled = enabled
         micButton.alpha = 1f
         micActionLabel.setText(labelRes)
         micButton.contentDescription = context.getString(labelRes)
         micActionIcon.setImageResource(iconRes)
-        micActionIcon.imageTintList = ColorStateList.valueOf(ContextCompat.getColor(context, contentColorRes))
-        micActionLabel.setTextColor(ContextCompat.getColor(context, contentColorRes))
-        micButton.backgroundTintList = ColorStateList.valueOf(
-            ContextCompat.getColor(context, colorRes)
-        )
+        renderVoicePalette()
         ViewCompat.setBackgroundTintList(
             voiceStateDot,
             ColorStateList.valueOf(ContextCompat.getColor(context, dotColorRes))

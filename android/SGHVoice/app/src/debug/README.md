@@ -22,11 +22,33 @@ synthetic keyboard's font scale (0.85–2.0), not the device setting.
 `--es learning pending` or `--es learning saved` previews the short learning
 status with synthetic state only; it never records a correction or touches the
 personal dictionary. Combine with `--es state done` for post-dictation UI.
+`--es task compose --es draft notes --es state done` previews the writing actions.
+Use `--es draft pending` for a saved transcription, and `--ez preview true` to open
+its scrollable text preview. `--ez retry true --es state error` renders audio retry
+and discard actions. `--es japaneseStyle kana --es mode japanese --es state idle`
+renders the aligned phone keypad. `--ez translation true --es state idle` opens
+the translation picker. All text and retry state are synthetic.
+`--es palette mint|sky|lavender|peach|rose|sand` previews the six light microphone
+surfaces without saving a preference. Geometry verification also checks caption
+contrast for every palette against the real rendered text color.
+`--es mode palette --es state idle` renders the real settings colour picker above
+the real microphone view. Its selection updates the synthetic preview only and
+never opens `ApiConfig` or saves a user preference.
+
+For constrained viewport checks, `--ei widthDp 280 --ei heightDp 360` limits the
+keyboard width and simulated available window height. The top mode selector and
+voice punctuation row stay outside the bounded middle scroll area. These extras
+do not modify device settings. Force stop/relaunch when changing dimensions.
+Wide landscape voice mode uses two columns and at most 72% of the available window
+height, keeping the host input visible. Other modes are capped at 80%; constrained
+manual keyboards keep their touch targets and allow the middle area to scroll.
 `--ez verify true` runs device-side checks
 of the large single control, busy-state gating, one tap/one action, actual
 `、` / `，` / `。` dispatch, and the translation picker. The preview header reports
 PASS or FAIL. Clicks only change synthetic state/text; they never record or
 submit a transcript.
+The result is also written to the `KeyboardPreview` logcat tag. The geometry check
+accepts a compact landscape circle and verifies the bottom actions are unclipped.
 
 Recording previews provide a sample every 50 ms for at most 10 seconds, then
 return to idle. Take a recording-state screenshot within that interval. No

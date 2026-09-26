@@ -70,7 +70,7 @@ class PersonalizedTranscriptionBoundaryTest {
         whenever(llm.refineDictation(any(), any(), any(), any())).thenAnswer {
             LlmClient.RefinementResult(it.getArgument(0), LlmClient.RefinementStatus.APPLIED)
         }
-        val pipeline = TranscriptionPipeline(whisper, llm, dictionary, OpenCCConverter())
+        val pipeline = TranscriptionPipeline(whisper, llm, dictionary, OpenCCConverter()) { true }
 
         val denied = pipeline.process(ByteArray(1), includePersonalization = false)
         assertEquals(wrong, denied.text)
@@ -98,7 +98,7 @@ class PersonalizedTranscriptionBoundaryTest {
         val request = TranslationRequest.create(listOf(TranslationLanguage.ENGLISH))
         whenever(whisper.transcribe(any(), any())).thenReturn(wrong)
         whenever(llm.translate(wrong, request)).thenReturn(listOf(TranslationOutput(TranslationLanguage.ENGLISH, wrong)))
-        val pipeline = TranscriptionPipeline(whisper, llm, dictionary, OpenCCConverter())
+        val pipeline = TranscriptionPipeline(whisper, llm, dictionary, OpenCCConverter()) { true }
 
         assertEquals(wrong, pipeline.process(ByteArray(1), VoiceTask.Translation(request)).text)
         assertEquals(wrong, pipeline.transcribeOnly(ByteArray(1)).text)
@@ -111,7 +111,7 @@ class PersonalizedTranscriptionBoundaryTest {
         }
         val whisper = mock<WhisperClient>()
         val llm = mock<LlmClient>()
-        val pipeline = TranscriptionPipeline(whisper, llm, dictionary, OpenCCConverter())
+        val pipeline = TranscriptionPipeline(whisper, llm, dictionary, OpenCCConverter()) { true }
         val operation = async(start = CoroutineStart.LAZY) { pipeline.process(ByteArray(1)) }
         whenever(whisper.transcribe(any(), any())).thenAnswer {
             operation.cancel()

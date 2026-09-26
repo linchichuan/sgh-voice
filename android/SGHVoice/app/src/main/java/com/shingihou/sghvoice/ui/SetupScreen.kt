@@ -23,6 +23,7 @@ import com.shingihou.sghvoice.api.ApiConfig
 import com.shingihou.sghvoice.api.ApiModelCatalog
 import com.shingihou.sghvoice.learning.PersonalizationRepository
 import com.shingihou.sghvoice.ime.UserZhuyinLexiconStore
+import com.shingihou.sghvoice.ime.VoicePalette
 import com.shingihou.sghvoice.processing.DictionaryManager
 import com.shingihou.sghvoice.processing.RecognitionLanguage
 import com.shingihou.sghvoice.processing.TranslationLanguage
@@ -92,6 +93,7 @@ private fun BasicSettingsTab(
     var saveMessage by remember { mutableStateOf("") }
     val msgSaved = stringResource(R.string.msg_keys_saved)
     var selectedStyle by remember { mutableStateOf(apiConfig.outputStyle) }
+    var selectedPalette by remember { mutableStateOf(apiConfig.voicePalette) }
     var selectedSttEngine by remember { mutableStateOf(apiConfig.sttEngine) }
     var selectedLlmEngine by remember { mutableStateOf(apiConfig.llmEngine) }
     var selectedOpenAiSttModel by remember { mutableStateOf(apiConfig.whisperModel) }
@@ -195,6 +197,12 @@ private fun BasicSettingsTab(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text(stringResource(R.string.title_basic_settings), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+
+        VoicePalettePicker(selectedPalette) { palette ->
+            selectedPalette = palette
+            // Save appearance independently: never overwrite keys or cloud consent.
+            apiConfig.voicePalette = palette
+        }
 
         // === 步驟一：引擎選擇 ===
         StepCard(stepNumber = 1, title = stringResource(R.string.step_engine_selection)) {
