@@ -31,6 +31,7 @@ Reviewed the Android and public-web changes from deployed `da3eb223488ec99c15c37
 - Production npm dependency audit: zero vulnerabilities. Development dependency audit is not represented by this result.
 - Python full suite: 537 passed. Immutable artifact gate passed after packaging: version 2.8.1 (31), 17,401,709 bytes, SHA-256 `9d85915609f34d98181a32dfe4141280fde7d6c2fba98060c48915415f0cafa0`; signer SHA-256 matches the previous official sideload release.
 - UI validation uses synthetic text/audio-level fixtures only. Portrait, landscape, narrow windows, larger fonts, notes, preview, retry, Zhuyin and Japanese phone layout are checked in an emulator. Website responsive checks do not submit personal data.
+- Final light palette selection was exercised in the native picker and visually inspected. The final 72%-height landscape recapture was blocked by an emulator cold-boot failure after a system-server crash; earlier landscape checks do not certify this final adjustment. Final landscape and pending-preview runtime acceptance remain required on the target phone unless later evidence is recorded in the release receipt.
 - Website browser checks: all three languages at 320/390/768/1440px have no horizontal overflow; name/email inputs measure exactly 46px high and the form never exceeds 680px. Browser console has zero errors/warnings. Mobile/desktop screenshots were visually inspected; consent and invalid-email download gating were checked without submitting a registration.
 
 ## Runtime and privacy boundaries
