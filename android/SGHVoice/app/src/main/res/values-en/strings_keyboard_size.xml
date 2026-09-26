@@ -1,0 +1,6 @@
+<resources>
+    <string name="keyboard_height_title">Keyboard height</string>
+    <string name="keyboard_height_hint" formatted="false">Voice, Zhuyin, Japanese and English share one height. 100% matches the original Zhuyin keyboard. Applies when you reopen the keyboard.</string>
+    <string name="keyboard_height_value">%1$d%%</string>
+    <string name="keyboard_height_reset">Reset height</string>
+</resources>

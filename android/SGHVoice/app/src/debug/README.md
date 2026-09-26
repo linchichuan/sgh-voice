@@ -26,7 +26,9 @@ personal dictionary. Combine with `--es state done` for post-dictation UI.
 Use `--es draft pending` for a saved transcription, and `--ez preview true` to open
 its scrollable text preview. `--ez retry true --es state error` renders audio retry
 and discard actions. `--es japaneseStyle kana --es mode japanese --es state idle`
-renders the aligned phone keypad. `--ez translation true --es state idle` opens
+renders the flick keypad (tap = first kana; left/up/right/down select the other vowels).
+`--ei heightPercent 90` changes the shared keyboard height (90–125, default 100),
+without saving a preference. `--ez translation true --es state idle` opens
 the translation picker. All text and retry state are synthetic.
 `--es palette mint|sky|lavender|peach|rose|sand` previews the six light microphone
 surfaces without saving a preference. Geometry verification also checks caption
@@ -41,8 +43,8 @@ For constrained viewport checks, `--ei widthDp 280 --ei heightDp 360` limits the
 keyboard width and simulated available window height. The top mode selector and
 voice punctuation row stay outside the bounded middle scroll area. These extras
 do not modify device settings. Force stop/relaunch when changing dimensions.
-Wide landscape voice mode uses two columns and at most 72% of the available window
-height, keeping the host input visible. Other modes are capped at 80%; constrained
+All modes use the original 372dp Zhuyin footprint at 100%, plus navigation insets,
+capped at 80% of the available window. Wide landscape voice uses two columns; constrained
 manual keyboards keep their touch targets and allow the middle area to scroll.
 `--ez verify true` runs device-side checks
 of the large single control, busy-state gating, one tap/one action, actual

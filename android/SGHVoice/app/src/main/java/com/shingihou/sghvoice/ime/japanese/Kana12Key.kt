@@ -23,6 +23,37 @@ object Kana12Key {
         "wa" to listOf("わ", "を", "ん", "ー")
     )
 
+    /**
+     * A flick selects a position, never the next item in a multi-tap cycle.
+     * や and わ deliberately leave positions empty; do not fall back to the centre.
+     */
+    fun kanaForDirection(group: String, direction: KanaFlickDirection): String? {
+        val characters = groups[group] ?: return null
+        val index = when (group) {
+            "ya" -> when (direction) {
+                KanaFlickDirection.CENTER -> 0
+                KanaFlickDirection.UP -> 1
+                KanaFlickDirection.DOWN -> 2
+                else -> return null
+            }
+            "wa" -> when (direction) {
+                KanaFlickDirection.CENTER -> 0
+                KanaFlickDirection.LEFT -> 1
+                KanaFlickDirection.UP -> 2
+                KanaFlickDirection.RIGHT -> 3
+                KanaFlickDirection.DOWN -> return null
+            }
+            else -> when (direction) {
+                KanaFlickDirection.CENTER -> 0
+                KanaFlickDirection.LEFT -> 1
+                KanaFlickDirection.UP -> 2
+                KanaFlickDirection.RIGHT -> 3
+                KanaFlickDirection.DOWN -> 4
+            }
+        }
+        return characters.getOrNull(index)
+    }
+
     /** Cycling the modifier key covers voiced, semi-voiced and small kana. */
     private val modifierCycles: List<List<String>> = listOf(
         listOf("あ", "ぁ"), listOf("い", "ぃ"), listOf("う", "ぅ", "ゔ"),

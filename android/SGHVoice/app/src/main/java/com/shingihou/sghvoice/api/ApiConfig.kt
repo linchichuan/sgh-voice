@@ -2,6 +2,7 @@ package com.shingihou.sghvoice.api
 
 import android.content.Context
 import android.content.SharedPreferences
+import androidx.core.content.edit
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import com.shingihou.sghvoice.processing.RecognitionLanguage
@@ -9,6 +10,7 @@ import com.shingihou.sghvoice.processing.TranslationLanguage
 import com.shingihou.sghvoice.processing.TranslationRequest
 import com.shingihou.sghvoice.privacy.CloudProcessingConsent
 import com.shingihou.sghvoice.ime.VoicePalette
+import com.shingihou.sghvoice.ime.KeyboardSizing
 
 /**
  * API 金鑰管理
@@ -31,6 +33,7 @@ class ApiConfig(context: Context) {
         private const val KEY_SETUP_COMPLETE = "setup_complete"
         private const val KEY_OUTPUT_STYLE = "output_style"
         private const val KEY_VOICE_PALETTE = "voice_palette"
+        private const val KEY_KEYBOARD_HEIGHT = "keyboard_height_percent"
         private const val KEY_STT_ENGINE = "stt_engine"
         private const val KEY_LLM_ENGINE = "llm_engine"
         private const val KEY_TRANSLATION_TARGETS = "translation_targets"
@@ -124,6 +127,10 @@ class ApiConfig(context: Context) {
     var voicePalette: VoicePalette
         get() = VoicePalette.fromPreference(prefs.getString(KEY_VOICE_PALETTE, null))
         set(value) = prefs.edit().putString(KEY_VOICE_PALETTE, value.preferenceValue).apply()
+
+    var keyboardHeightPercent: Int
+        get() = KeyboardSizing.normalize(prefs.getInt(KEY_KEYBOARD_HEIGHT, KeyboardSizing.DEFAULT_PERCENT))
+        set(value) = prefs.edit { putInt(KEY_KEYBOARD_HEIGHT, KeyboardSizing.normalize(value)) }
 
     /** 語音辨識語言；auto 會保留中／日／英／韓混合輸入的自動偵測。 */
     var recognitionLanguage: RecognitionLanguage

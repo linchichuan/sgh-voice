@@ -122,6 +122,7 @@ class KeyboardPreviewActivity : ComponentActivity() {
             intent.getIntExtra("heightDp", 0).takeIf { it >= 240 }?.let { screenHeightDp = it }
         })
         keyboard = KeyboardView(keyboardContext)
+        keyboard.setKeyboardHeightPercent(intent.getIntExtra("heightPercent", 100))
         keyboard.setKeyboardActionListener(object : KeyboardView.KeyboardActionListener {
             override fun onMicToggle() {
                 micActionCount++

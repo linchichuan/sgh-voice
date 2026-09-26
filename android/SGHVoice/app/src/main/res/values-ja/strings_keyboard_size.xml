@@ -1,0 +1,6 @@
+<resources>
+    <string name="keyboard_height_title">キーボードの高さ</string>
+    <string name="keyboard_height_hint" formatted="false">音声・注音・日本語・英語で同じ高さを使います。100% は従来の注音キーボードと同じ高さです。次にキーボードを開くと反映されます。</string>
+    <string name="keyboard_height_value">%1$d%%</string>
+    <string name="keyboard_height_reset">標準の高さに戻す</string>
+</resources>

@@ -20,6 +20,7 @@ import android.view.HapticFeedbackConstants
 import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewGroup
 import android.view.View.OnAttachStateChangeListener
 import android.widget.GridLayout
 import android.widget.FrameLayout
@@ -43,6 +44,7 @@ import androidx.core.widget.TextViewCompat
 import com.shingihou.sghvoice.R
 import com.shingihou.sghvoice.ime.japanese.JapaneseScriptMode
 import com.shingihou.sghvoice.ime.japanese.JapaneseInputStyle
+import com.shingihou.sghvoice.ime.japanese.KanaFlickKeyView
 import com.shingihou.sghvoice.ime.manual.KeyAction
 import com.shingihou.sghvoice.ime.manual.KeyRole
 import com.shingihou.sghvoice.ime.manual.KeySpec
@@ -116,6 +118,7 @@ class KeyboardView @JvmOverloads constructor(
     private var voicePanelChildren = emptyList<View>()
     private var compactCaptureColumn: LinearLayout? = null
     private var voicePalette = 0xFFDDF3E5.toInt()
+    private var keyboardHeightPercent = KeyboardSizing.DEFAULT_PERCENT
     private var currentVoiceState = VoiceInputIME.ImeState.IDLE
     private var recognitionLanguage = RecognitionLanguage.AUTO
 
@@ -186,6 +189,22 @@ class KeyboardView @JvmOverloads constructor(
         this.listener = listener
     }
 
+    fun setKeyboardHeightPercent(percent: Int) {
+        val normalized = KeyboardSizing.normalize(percent)
+        if (keyboardHeightPercent == normalized) return
+        keyboardHeightPercent = normalized
+        requestLayout()
+    }
+
+    private fun updateTouchSplitting(group: ViewGroup) {
+        // Only flick needs a single gesture owner. Keep normal overlapping QWERTY taps.
+        group.isMotionEventSplittingEnabled = inputMode != InputMode.JAPANESE ||
+            japaneseInputStyle != JapaneseInputStyle.KANA_12_KEY || keyboardLayer != KeyboardLayer.LETTERS
+        for (index in 0 until group.childCount) {
+            (group.getChildAt(index) as? ViewGroup)?.let(::updateTouchSplitting)
+        }
+    }
+
     fun setInputMode(mode: InputMode) {
         setCandidatesExpanded(false)
         hideTranslationPanel()
@@ -218,6 +237,7 @@ class KeyboardView @JvmOverloads constructor(
         }
         renderVoiceModeLabel()
         renderDraftActions()
+        updateTouchSplitting(this)
     }
 
     fun setRecognitionLanguage(language: RecognitionLanguage) {
@@ -669,24 +689,37 @@ class KeyboardView @JvmOverloads constructor(
         val minimum = dp(if (resources.configuration.fontScale > 1.3f) 128 else 96)
         val diameter = minOf(maxOf(preferred, minimum), (width - dp(36)).coerceAtLeast(dp(48)))
         resizeCaptureArea(diameter)
-        contentScroll.layoutParams.height = LayoutParams.WRAP_CONTENT
-        super.onMeasure(widthMeasureSpec, heightMeasureSpec)
-
-        val screenBudget = dp((resources.configuration.screenHeightDp *
-            if (compactVoiceLayout && inputMode == InputMode.VOICE) 0.72f else 0.80f).toInt()
+        // Never derive the IME footprint from the current mode's natural content height.
+        // Navigation padding is additive, but the available-screen cap is shared by all modes.
+        val navigationPadding = (keyboardRoot.paddingBottom - dp(6)).coerceAtLeast(0)
+        val screenBudget = dp((resources.configuration.screenHeightDp * 0.80f).toInt()
             .coerceAtLeast(160))
         val parentBudget = if (MeasureSpec.getMode(heightMeasureSpec) == MeasureSpec.UNSPECIFIED) {
             screenBudget
         } else MeasureSpec.getSize(heightMeasureSpec)
-        val maximumHeight = minOf(screenBudget, parentBudget)
+        val targetHeight = minOf(dp(KeyboardSizing.heightDp(keyboardHeightPercent)) + navigationPadding,
+            screenBudget, parentBudget)
         val fixedHeight = keyboardRoot.paddingTop + keyboardRoot.paddingBottom + dp(44) +
             if (voiceActionRow.isVisible) dp(56) else 0
-        val bodyBudget = (maximumHeight - fixedHeight).coerceAtLeast(dp(48))
+        val bodyBudget = (targetHeight - fixedHeight).coerceAtLeast(0)
+        // Four-row QWERTY grows into the same key area as five-row Zhuyin/Kana.
+        // On very short screens, scroll rather than reduce targets below 44dp.
+        val rows = manualKeyRows.childCount
+        if (rows > 0) {
+            val gridHeight = (bodyBudget - dp(56)).coerceAtLeast(rows * dp(44))
+            manualKeyRows.layoutParams.height = gridHeight
+            for (index in 0 until rows) {
+                manualKeyRows.getChildAt(index).layoutParams.height =
+                    gridHeight / rows + if (index < gridHeight % rows) 1 else 0
+            }
+            candidateExpandedPanel.layoutParams.height = (gridHeight - dp(4)).coerceAtLeast(0)
+        }
+        contentScroll.layoutParams.height = bodyBudget
+        super.onMeasure(widthMeasureSpec, heightMeasureSpec)
         val naturalHeight = contentScroll.getChildAt(0).measuredHeight
         if (inputMode == InputMode.VOICE && naturalHeight > bodyBudget) {
             resizeCaptureArea((diameter - (naturalHeight - bodyBudget)).coerceAtLeast(minOf(minimum, diameter)))
         }
-        contentScroll.layoutParams.height = minOf(naturalHeight, bodyBudget)
         super.onMeasure(widthMeasureSpec, heightMeasureSpec)
     }
 
@@ -971,10 +1004,13 @@ class KeyboardView @JvmOverloads constructor(
             row.keys.forEach { key -> rowView.addView(createKeyButton(key)) }
             manualKeyRows.addView(rowView)
         }
+        updateTouchSplitting(this)
     }
 
     private fun createKeyButton(key: KeySpec): TextView {
-        return TextView(context).apply {
+        return (if (key.action is KeyAction.TapJapaneseKana) KanaFlickKeyView(context)
+            else TextView(context)).apply {
+            tag = key.id
             val displayLabel = when {
                 key.role == KeyRole.SPACE -> context.getString(R.string.key_space)
                 key.id == "japanese_script" &&
@@ -1026,7 +1062,7 @@ class KeyboardView @JvmOverloads constructor(
             if (key.action == KeyAction.Enter) setEnterIcon(this)
             layoutParams = LayoutParams(
                 0,
-                if (inputMode == InputMode.ZHUYIN) dp(52) else dp(48),
+                LayoutParams.MATCH_PARENT,
                 key.widthWeight
             )
             setOnClickListener {
@@ -1069,6 +1105,12 @@ class KeyboardView @JvmOverloads constructor(
                 setOnLongClickListener {
                     showAlternatives(this, key.alternatives)
                     true
+                }
+            }
+            if (this is KanaFlickKeyView && key.action is KeyAction.TapJapaneseKana) {
+                bindFlick(key.action.group) { kana ->
+                    hapticTap(this)
+                    listener?.onKeyAction(KeyAction.InsertText(kana))
                 }
             }
         }
@@ -1168,7 +1210,7 @@ class KeyboardView @JvmOverloads constructor(
         if (shouldExpand && manualKeyRows.height > 0) {
             candidateExpandedPanel.layoutParams =
                 candidateExpandedPanel.layoutParams.apply {
-                    height = manualKeyRows.height
+                    height = (manualKeyRows.height - dp(4)).coerceAtLeast(0)
                 }
         }
         candidateScroller.visibility = if (shouldExpand) View.INVISIBLE else View.VISIBLE

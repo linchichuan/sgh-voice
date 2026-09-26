@@ -94,6 +94,7 @@ private fun BasicSettingsTab(
     val msgSaved = stringResource(R.string.msg_keys_saved)
     var selectedStyle by remember { mutableStateOf(apiConfig.outputStyle) }
     var selectedPalette by remember { mutableStateOf(apiConfig.voicePalette) }
+    var keyboardHeightPercent by remember { mutableIntStateOf(apiConfig.keyboardHeightPercent) }
     var selectedSttEngine by remember { mutableStateOf(apiConfig.sttEngine) }
     var selectedLlmEngine by remember { mutableStateOf(apiConfig.llmEngine) }
     var selectedOpenAiSttModel by remember { mutableStateOf(apiConfig.whisperModel) }
@@ -202,6 +203,10 @@ private fun BasicSettingsTab(
             selectedPalette = palette
             // Save appearance independently: never overwrite keys or cloud consent.
             apiConfig.voicePalette = palette
+        }
+        KeyboardHeightPicker(keyboardHeightPercent) { percent ->
+            keyboardHeightPercent = percent
+            apiConfig.keyboardHeightPercent = percent
         }
 
         // === 步驟一：引擎選擇 ===

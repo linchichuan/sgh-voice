@@ -1,0 +1,6 @@
+<resources>
+    <string name="keyboard_height_title">鍵盤高度</string>
+    <string name="keyboard_height_hint" formatted="false">語音、注音、日文與英文共用同一高度。100% 以原本注音鍵盤為基準；下次開啟鍵盤時套用。</string>
+    <string name="keyboard_height_value">%1$d%%</string>
+    <string name="keyboard_height_reset">恢復標準高度</string>
+</resources>
