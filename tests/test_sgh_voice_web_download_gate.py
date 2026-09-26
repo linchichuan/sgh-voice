@@ -200,3 +200,4 @@ def test_android_release_manifest_matches_public_artifact_and_copy():
     assert "相同簽章的 2.8.3 APK 更新" in index
     assert "直接開啟並選「更新」，請勿先解除安裝" in index
     assert 'i18n.js?v=20260926-v283' in index
+    assert 'main.js?v=20260926-v284' in index
