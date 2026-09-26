@@ -1,4 +1,4 @@
-# Android 2.8.1 Production Review
+# Android 2.8.2 Production Review
 
 Date: 2026-09-26. Release type: signed, personal sideload test build, not Google Play Production approval.
 
@@ -16,22 +16,23 @@ Reviewed the Android and public-web changes from deployed `da3eb223488ec99c15c37
 | Generated writing was inserted before review in compatible editors | Always hold the generated draft for preview and explicit insertion; existing notes remain available after generation failure |
 | Notes were invisible and clearing was easy to trigger accidentally | Scrollable content preview; two-tap Clear confirmation within four seconds |
 | Japanese phone keys inherited QWERTY staggering | Equal 3-column kana grid plus a consistent utility rail and switchable romaji layout |
-| Recording surface was too dark | Light mint default with thin outline; six named light palettes saved independently of API keys/consent, visible checkmark selection and minimum text contrast tests |
+| Recording surface was too dark | Light mint default; six named light palettes saved independently of API keys/consent, visible checkmark selection and minimum text contrast tests |
+| User requested removal of the remaining circle frame | 2.8.2 replaces the outline and elevation with a borderless radial fade to transparent, including the palette preview and website illustration; the full hit target remains unchanged |
 | Landing page registration fields were oversized and copy repetitive | Compact registration form, concise feature overview and progressive disclosure for detailed explanations |
 | Small or landscape windows could clip controls | Bounded middle content area, fixed mode/footer controls, compact landscape arrangement, scroll fallback |
 | Translation selection left an empty circular outline | Hide the entire capture area during translation selection |
 | Hosting published development files | Exclude logs, tests, package manifests and unrelated untracked APKs; release metadata uses revalidation rather than immutable caching |
-| A rules-first deployment could break cached old download pages | Accept only exact new 2.8.1 and previous 2.7.9 version/file tuples; reject mismatches and unconsented registrations |
+| A rules-first deployment could break cached old download pages | Accept only exact new 2.8.2 and previous live 2.7.9 version/file tuples; reject mismatches, unpublished 2.8.1 registrations and unconsented registrations |
 
 ## Verification
 
-- Android unit regression: 208 tests, zero failures/errors (includes consent, private error payload, retry bounds, writing parser, kana layout and palette contrast). Signed release build passed; debug/release lint have zero errors (99/70 warnings respectively).
+- Android unit regression: 208 tests, zero failures/errors (includes consent, private error payload, retry bounds, writing parser, kana layout and palette contrast). Signed release build and debug/release lint are checked; lint has zero errors (107/74 warnings respectively, including unused resources and existing recommendations).
 - Firestore Emulator: 4 tests passed; no production registration writes used for testing.
 - JavaScript syntax, release-critical Ruff, and iOS source-only preflight passed. No iOS upload or provider account activation performed.
 - Production npm dependency audit: zero vulnerabilities. Development dependency audit is not represented by this result.
-- Python full suite: 537 passed. Immutable artifact gate passed after packaging: version 2.8.1 (31), 17,401,709 bytes, SHA-256 `9d85915609f34d98181a32dfe4141280fde7d6c2fba98060c48915415f0cafa0`; signer SHA-256 matches the previous official sideload release.
+- Final artifact: version 2.8.2 (32), 17,402,665 bytes, SHA-256 `f7952c4685f07fb89f5b3107735c9812f7dd09793c367f46e9bed2a61fcd998e`; signer SHA-256 matches the previous official sideload release. Full Python regression: 538 passed. Immutable artifact gate: ARTIFACT VERIFIED.
 - UI validation uses synthetic text/audio-level fixtures only. Portrait, landscape, narrow windows, larger fonts, notes, preview, retry, Zhuyin and Japanese phone layout are checked in an emulator. Website responsive checks do not submit personal data.
-- Final light palette selection was exercised in the native picker and visually inspected. The final 72%-height landscape recapture was blocked by an emulator cold-boot failure after a system-server crash; earlier landscape checks do not certify this final adjustment. Final landscape and pending-preview runtime acceptance remain required on the target phone unless later evidence is recorded in the release receipt.
+- Light palette selection was exercised in the earlier native picker and visually inspected. It does not certify the final borderless 2.8.2 rendering. After an emulator system-server/cold-boot failure, one final installation attempt stalled for 98 seconds and was stopped; the owned emulator was shut down. Final radial-fade, 72%-height landscape and pending-preview runtime acceptance remain required on the target phone. The website's new fade was visually inspected separately.
 - Website browser checks: all three languages at 320/390/768/1440px have no horizontal overflow; name/email inputs measure exactly 46px high and the form never exceeds 680px. Browser console has zero errors/warnings. Mobile/desktop screenshots were visually inspected; consent and invalid-email download gating were checked without submitting a registration.
 
 ## Runtime and privacy boundaries
@@ -58,4 +59,4 @@ The existing 38-case hardware checklist remains pending. Automated/emulator chec
 
 Canonical metadata: `sgh-voice-web/downloads/android-release.json`. Canonical installation page: <https://voice.shingihou.com/#android-download>.
 
-Final commit, GitHub CI/Hosting runs, live APK SHA-256/byte parity and exposed-file 404 checks are recorded after deployment in the workspace `release-output/android-2.8.1/RELEASE_RECEIPT.md`. Prior immutable artifacts are not overwritten.
+The 2.8.1 CI run was deliberately cancelled after the user's final border-removal request; its Firebase Hosting run was skipped. The final 2.8.2 commit, GitHub CI/Hosting runs, live APK SHA-256/byte parity and exposed-file 404 checks are recorded after deployment in the workspace `release-output/android-2.8.2/RELEASE_RECEIPT.md`. Prior immutable artifacts are not overwritten.

@@ -15,6 +15,7 @@
             "package*.json",
             "downloads/SGHVoice-Android-v2.7.0.apk",
             "downloads/SGHVoice-Android-v2.7.1.apk",
+            "downloads/SGHVoice-Android-v2.8.1.apk",
             "**/.*",
             "**/node_modules/**"
         ],

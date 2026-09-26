@@ -283,6 +283,10 @@ class KeyboardPreviewActivity : ComponentActivity() {
         contractResult = runCatching {
             keyboard.setInputMode(KeyboardView.InputMode.VOICE)
             val control = keyboard.findViewById<View>(R.id.btn_mic)
+            val surface = keyboard.findViewById<View>(R.id.mic_outer_ring)
+            check(surface.background == null && surface.elevation == 0f && surface.paddingLeft == 0) {
+                "Recording circle must not have an outer frame or shadow"
+            }
             val waveform = keyboard.findViewById<View>(R.id.audio_waveform)
             val label = keyboard.findViewById<TextView>(R.id.mic_action_label)
             val status = keyboard.findViewById<TextView>(R.id.tv_status)

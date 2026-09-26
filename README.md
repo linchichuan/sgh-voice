@@ -7,16 +7,16 @@
 [![macOS](https://img.shields.io/badge/macOS-Apple_Silicon-black?logo=apple)](https://github.com/linchichuan/sgh-voice/releases)
 [![iOS](https://img.shields.io/badge/iOS-17.0+-blue?logo=apple)](https://github.com/linchichuan/sgh-voice/releases)
 [![Android](https://img.shields.io/badge/Android-8.0+-green?logo=android)](https://github.com/linchichuan/sgh-voice/releases)
-[![Android Version](https://img.shields.io/badge/Android-2.8.1-green)](https://voice.shingihou.com/)
+[![Android Version](https://img.shields.io/badge/Android-2.8.2-green)](https://voice.shingihou.com/)
 
 ---
 
-## Android v2.8.1：成稿預覽與輸入體驗修正
+## Android v2.8.2：柔和配色、成稿預覽與輸入體驗修正
 
 官方側載個人測試版：[下載與安裝說明](https://voice.shingihou.com/#android-download)。同簽章版本可直接更新，請勿先解除安裝；Google Play 安裝版請沿原管道更新。
 
 - 「幫我寫」分段記下想法，先預覽成稿，再明確插入。
-- 明亮淺色錄音圓與細邊框，設定可選六種淺色配色；可容納小視窗的版面、較大注音按鍵與 48 個候選。
+- 無邊框、由中心向外漸淡的錄音圓，設定可選六種淺色配色；可容納小視窗的版面、較大注音按鍵與 48 個候選。
 - 日文可切換 Romaji／12 鍵電話格線（連按輪替、長按選字；非 flick）。
 - 切換欄位會停止錄音，已錄內容轉成待確認文字；辨識失敗可重試或捨棄。
 - 每次新雲端請求重查同意，錯誤紀錄不含私人草稿。

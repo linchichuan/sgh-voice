@@ -31,6 +31,8 @@ the translation picker. All text and retry state are synthetic.
 `--es palette mint|sky|lavender|peach|rose|sand` previews the six light microphone
 surfaces without saving a preference. Geometry verification also checks caption
 contrast for every palette against the real rendered text color.
+The 2.8.2 circle fades radially to transparent; it has no surrounding border,
+padding frame or elevation shadow. The geometry contract asserts that boundary.
 `--es mode palette --es state idle` renders the real settings colour picker above
 the real microphone view. Its selection updates the synthetic preview only and
 never opens `ApiConfig` or saves a user preference.

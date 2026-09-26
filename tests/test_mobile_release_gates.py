@@ -12,7 +12,7 @@ PUBLIC_APK = (
     REPO_ROOT
     / "sgh-voice-web"
     / "downloads"
-    / "SGHVoice-Android-v2.8.1.apk"
+    / "SGHVoice-Android-v2.8.2.apk"
 )
 
 
@@ -24,6 +24,19 @@ def test_android_dictation_regex_keeps_min_sdk_unicode_compatibility():
     ).read_text(encoding="utf-8")
     assert r"\p{IsHan}" not in source
     assert r"\p{script=Han}" in source
+
+
+def test_microphone_surface_fades_without_a_frame_or_shadow():
+    root = ET.parse(ANDROID_ROOT / "app/src/main/res/layout/keyboard_view.xml").getroot()
+    android = "{http://schemas.android.com/apk/res/android}"
+    frame = next(node for node in root.iter() if node.get(android + "id") == "@+id/mic_outer_ring")
+    assert frame.get(android + "elevation") == "0dp"
+    assert frame.get(android + "padding") == "0dp"
+    assert frame.get(android + "background") is None
+    surface = (ANDROID_ROOT / "app/src/main/java/com/shingihou/sghvoice/ime/SoftVoiceCircleDrawable.kt").read_text()
+    assert "RadialGradient(" in surface
+    assert "setAlphaComponent(color, 0)" in surface
+    assert "setStroke" not in surface
 
 
 def test_private_android_signing_material_is_not_tracked():
@@ -282,9 +295,9 @@ def test_android_rc_acceptance_tracks_the_current_sideload_release():
     source_code = re.search(r"versionCode\s*=\s*(\d+)", build_script)
     assert source_name is not None
     assert source_code is not None
-    assert public_release["versionName"] == "2.8.1"
-    assert public_release["versionCode"] == 31
-    assert source_name.group(1) == "2.8.1"
-    assert int(source_code.group(1)) == 31
+    assert public_release["versionName"] == "2.8.2"
+    assert public_release["versionCode"] == 32
+    assert source_name.group(1) == "2.8.2"
+    assert int(source_code.group(1)) == 32
     assert int(source_code.group(1)) == public_release["versionCode"]
-    assert "Android 2.8.1（versionCode 31）" in acceptance
+    assert "Android 2.8.2（versionCode 32）" in acceptance

@@ -24,8 +24,8 @@ function validAndroidRegistration(overrides = {}) {
     name: "Synthetic Tester",
     email: "synthetic@example.invalid",
     platform: "android",
-    version: "2.8.1",
-    fileName: "SGHVoice-Android-v2.8.1.apk",
+    version: "2.8.2",
+    fileName: "SGHVoice-Android-v2.8.2.apk",
     locale: "en",
     consentVersion: 2,
     riskAcknowledged: true,
@@ -93,4 +93,6 @@ test("rolling deployment accepts only matched previous-release metadata", async 
     validAndroidRegistration({ version: "2.7.9" })));
   await assertFails(setDoc(doc(database, "sgh-voice-downloads", "unknown"),
     validAndroidRegistration({ version: "9.9.9", fileName: "SGHVoice-Android-v9.9.9.apk" })));
+  await assertFails(setDoc(doc(database, "sgh-voice-downloads", "unpublished"),
+    validAndroidRegistration({ version: "2.8.1", fileName: "SGHVoice-Android-v2.8.1.apk" })));
 });

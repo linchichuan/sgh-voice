@@ -223,9 +223,8 @@
             android:layout_width="@dimen/voice_mic_diameter"
             android:layout_height="@dimen/voice_mic_diameter"
             android:layout_gravity="center"
-            android:background="@drawable/mic_outer_ring_bg"
-            android:elevation="2dp"
-            android:padding="3dp">
+            android:elevation="0dp"
+            android:padding="0dp">
 
             <FrameLayout
                 android:id="@+id/btn_mic"

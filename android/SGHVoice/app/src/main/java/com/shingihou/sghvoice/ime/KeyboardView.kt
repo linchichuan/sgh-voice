@@ -318,15 +318,10 @@ class KeyboardView @JvmOverloads constructor(
             if (currentVoiceState in setOf(VoiceInputIME.ImeState.STARTING,
                     VoiceInputIME.ImeState.STOPPING, VoiceInputIME.ImeState.PROCESSING)) 0.22f else 0f)
         val accent = ColorUtils.blendARGB(voicePalette, ink, 0.72f)
-        micOuterRing.background = GradientDrawable().apply {
-            shape = GradientDrawable.OVAL
-            setColor(surfaceColor)
-            setStroke(dp(1).coerceAtLeast(1), accent)
-        }
-        val surface = GradientDrawable().apply {
-            shape = GradientDrawable.OVAL
-            setColor(surfaceColor)
-        }
+        // The full touch target remains; only the painted edge fades away.
+        micOuterRing.background = null
+        micOuterRing.elevation = 0f
+        val surface = SoftVoiceCircleDrawable(surfaceColor)
         val mask = GradientDrawable().apply {
             shape = GradientDrawable.OVAL
             setColor(Color.WHITE)

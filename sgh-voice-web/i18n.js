@@ -26,7 +26,7 @@ const translations = {
         "writing.handoff": "アプリや入力欄を切り替えると録音を停止し、録音済みの内容を挿入待ちの文字として保持します。新しい欄へ自動挿入せず、認識失敗時は再試行できます。",
         "writing.limit": "メモ・挿入待ちの文字・再試行用音声はメモリ内のみで、サービス終了や再起動で消えます。バックグラウンド録音は非対応です。AI の文章はご確認ください。",
         "meta.title": "SGH Voice — Android 多言語キーボードと macOS 音声入力",
-        "meta.description": "SGH Voice Android v2.8.1：6色から選べる淡い録音ボタン。音声入力と文章作成プレビューに加え、注音・日本語12キーにも対応。",
+        "meta.description": "SGH Voice Android v2.8.2：6色から選べる、中心から外側へ柔らかく淡くなる録音ボタン。音声入力・文章作成プレビュー・注音・日本語12キーに対応。",
         "accessibility.skip": "メインコンテンツへ",
 
         "nav.features": "特長",
@@ -36,7 +36,7 @@ const translations = {
         "nav.download": "APK ダウンロード",
         "nav.cta": "テスト版を入手",
 
-        "hero.eyebrow": "Android 個人テスト版 · v2.8.1",
+        "hero.eyebrow": "Android 個人テスト版 · v2.8.2",
         "hero.title": "話したことを、<br><span>伝わる文章に。</span>",
         "hero.subtitle": "音声入力、文章作成、注音、日本語を、一つの Android キーボードで。",
         "hero.cta": "Android テスト版を入手",
@@ -69,7 +69,7 @@ const translations = {
 
         "showcase.kicker": "ANDROID FEATURE UI",
         "showcase.title": "翻訳と注音の機能画面",
-        "showcase.desc": "掲載画像は以前のバージョンを基にした説明用で、v2.8.1 の実機画面ではありません。現在の音声入力は大きな円一つで録音を操作し、下段の @ キーを「、」に置き換え、「，」「。」はそのまま使えます。",
+        "showcase.desc": "掲載画像は以前のバージョンを基にした説明用で、v2.8.2 の実機画面ではありません。現在の音声入力は大きな円一つで録音を操作し、下段の @ キーを「、」に置き換え、「，」「。」はそのまま使えます。",
         "showcase.item1": "左上に SGH Voice のブランドとアイコンを表示",
         "showcase.item2": "注音は最大48件の候補を3列・複数行へ展開",
         "showcase.item3": "短押しは通常入力、長押しは最大4言語への翻訳",
@@ -119,7 +119,7 @@ const translations = {
 
         "download.kicker": "GET SGH VOICE",
         "download.title": "ダウンロードして、試す。",
-        "download.subtitle": "Android 2.8.1 は直接インストールのテスト版です。音声機能には自分の API キーが必要で、提供元の従量料金がかかる場合があります。",
+        "download.subtitle": "Android 2.8.2 は直接インストールのテスト版です。音声機能には自分の API キーが必要で、提供元の従量料金がかかる場合があります。",
         "download.alert.badge": "インストール前に必ず確認",
         "download.alert.title": "Android 個人テスト／サイドロード版",
         "download.alert.desc": "本バージョンは Google Play Production で公開されていません。APK は直接ダウンロードでき、既存の 2.7.3 には同じ署名で上書き更新できます。特定の提供元からのインストール許可と、サイドロード版の互換性・安定性・第三者 API 料金などのリスクを確認してください。",
@@ -145,7 +145,7 @@ const translations = {
         "download.registration.error": "登録できなかったため、ダウンロードは開始されていません。時間をおいて再度お試しください。",
         "download.android.badge": "PERSONAL TEST BUILD",
         "download.android.title": "SGH Voice for Android",
-        "download.android.update": "本サイトの直接配布版 2.7.3–2.8.0 は、同じ署名の 2.8.1 APK で更新できます。開いて「更新」を選び、キーと辞書を残すため先にアンインストールしないでください。学習結果は「個人辞書」で取り消し・消去できます。クラウド同意がバージョン 3 未満の場合は設定をご確認ください。Google Play テスト版は元の配布経路で更新します。",
+        "download.android.update": "本サイトの直接配布版 2.7.3–2.8.0 は、同じ署名の 2.8.2 APK で更新できます。開いて「更新」を選び、キーと辞書を残すため先にアンインストールしないでください。学習結果は「個人辞書」で取り消し・消去できます。クラウド同意がバージョン 3 未満の場合は設定をご確認ください。Google Play テスト版は元の配布経路で更新します。",
         "download.meta.version": "バージョン",
         "download.meta.requirement": "システム要件",
         "download.meta.size": "ファイルサイズ",
@@ -176,7 +176,7 @@ const translations = {
         "faq.q5": "日本語入力は一般的な日本語キーボードと同等ですか？",
         "faq.a5": "現在は Phase 1 です。ローマ字、かな、読みの前方一致予測、最大24件の展開候補に対応しますが、Mozc など成熟した入力法のような文全体の文脈変換にはまだ達していません。",
         "faq.q6": "質問を話すと、モデルがそのまま回答しますか？",
-        "faq.a6": "回答してはいけません。v2.8.1 は選択した AI に文全体の句読点、明らかな言いよどみ、文章のつながりを整えるよう依頼し、質問や命令の原意を保ちます。助手の返答、無関係な書き換え、数字や否定の変更を検出した場合は元の文字起こしに戻し、通知を表示します。誤りは残る可能性があるため、重要な内容はご確認ください。",
+        "faq.a6": "回答してはいけません。v2.8.2 は選択した AI に文全体の句読点、明らかな言いよどみ、文章のつながりを整えるよう依頼し、質問や命令の原意を保ちます。助手の返答、無関係な書き換え、数字や否定の変更を検出した場合は元の文字起こしに戻し、通知を表示します。誤りは残る可能性があるため、重要な内容はご確認ください。",
 
         "footer.desc": "新義豊株式会社が開発する、多言語の音声・キーボード入力ツール。",
         "footer.product": "製品",
@@ -214,7 +214,7 @@ const translations = {
         "writing.handoff": "切換 App 或欄位會停止錄音，已錄內容轉為待確認文字，不會自動貼到新欄位；辨識失敗可重試。",
         "writing.limit": "筆記、待插入文字與重試音訊只暫存在記憶體；系統結束服務或重開機後會消失。不支援背景連錄，AI 成稿請核對。",
         "meta.title": "SGH Voice — Android 多語輸入法與 macOS 語音輸入",
-        "meta.description": "SGH Voice Android v2.8.1：六款淺色錄音圓自由選、語音輸入與幫我寫成稿預覽，支援注音及日文電話格線。",
+        "meta.description": "SGH Voice Android v2.8.2：六款淺色錄音圓，由中心柔和淡出；語音輸入與幫我寫成稿預覽，支援注音及日文電話格線。",
         "accessibility.skip": "跳到主要內容",
 
         "nav.features": "功能",
@@ -224,7 +224,7 @@ const translations = {
         "nav.download": "下載 APK",
         "nav.cta": "下載測試版",
 
-        "hero.eyebrow": "Android 個人測試版 · v2.8.1",
+        "hero.eyebrow": "Android 個人測試版 · v2.8.2",
         "hero.title": "說出想法，<br><span>寫得更順。</span>",
         "hero.subtitle": "語音輸入、幫我寫、注音與日文，都在同一個 Android 鍵盤。",
         "hero.cta": "下載 Android 測試版",
@@ -257,7 +257,7 @@ const translations = {
 
         "showcase.kicker": "ANDROID FEATURE UI",
         "showcase.title": "翻譯與注音功能介面",
-        "showcase.desc": "圖片為既有版本的功能示意，並非 v2.8.1 實機截圖；目前語音模式改由單一大圓操作，底列的 @ 已改為頓號「、」，逗號「，」與句號「。」保留。",
+        "showcase.desc": "圖片為既有版本的功能示意，並非 v2.8.2 實機截圖；目前語音模式改由單一大圓操作，底列的 @ 已改為頓號「、」，逗號「，」與句號「。」保留。",
         "showcase.item1": "左上顯示 SGH Voice 品牌與識別圖示",
         "showcase.item2": "注音最多 48 個候選，可展開成三欄多列",
         "showcase.item3": "短按一般聽寫；長按選擇最多四種翻譯目標",
@@ -307,7 +307,7 @@ const translations = {
 
         "download.kicker": "GET SGH VOICE",
         "download.title": "下載，開始試用。",
-        "download.subtitle": "Android 2.8.1 為側載測試版。語音需自備 API 金鑰，服務商可能按用量收費。",
+        "download.subtitle": "Android 2.8.2 為側載測試版。語音需自備 API 金鑰，服務商可能按用量收費。",
         "download.alert.badge": "安裝前必讀",
         "download.alert.title": "Android 個人測試／側載版本",
         "download.alert.desc": "本版本尚未透過 Google Play Production 公開發佈。APK 可直接下載，並以相同簽章覆蓋更新既有 2.7.3。請手動允許特定來源安裝，並確認側載版本的裝置相容性、穩定性與第三方 API 費用等風險。",
@@ -333,7 +333,7 @@ const translations = {
         "download.registration.error": "登記失敗，尚未開始下載。請稍後再試。",
         "download.android.badge": "PERSONAL TEST BUILD",
         "download.android.title": "SGH Voice for Android",
-        "download.android.update": "本站側載版 2.7.3–2.8.0 可使用相同簽章的 2.8.1 APK 更新。直接開啟並選「更新」，請勿先解除安裝，以保留金鑰與詞庫。舊學習紀錄可在「個人詞庫」撤銷或清除；雲端同意尚未更新至版本 3 者，請到設定確認。Google Play 測試版請使用原安裝管道。",
+        "download.android.update": "本站側載版 2.7.3–2.8.0 可使用相同簽章的 2.8.2 APK 更新。直接開啟並選「更新」，請勿先解除安裝，以保留金鑰與詞庫。舊學習紀錄可在「個人詞庫」撤銷或清除；雲端同意尚未更新至版本 3 者，請到設定確認。Google Play 測試版請使用原安裝管道。",
         "download.meta.version": "版本",
         "download.meta.requirement": "系統需求",
         "download.meta.size": "檔案大小",
@@ -364,7 +364,7 @@ const translations = {
         "faq.q5": "日文輸入和一般日本手機鍵盤一樣嗎？",
         "faq.a5": "目前為 Phase 1，支援 Romaji、假名、讀音前綴預測，以及最多 24 個可展開候選；尚不是 Mozc 等成熟輸入法的整句文脈轉換等級。",
         "faq.q6": "我口述一個問句時，模型會直接回答嗎？",
-        "faq.a6": "不應該。v2.8.1 會請所選 AI 整理整句標點、明確口吃與語意連貫；問句和命令仍保留原意。若偵測到新增助手回覆、無關改寫或數字與否定語意改動，會回退原逐字稿並顯示提示。辨識與整理仍可能有誤，重要內容請先核對。",
+        "faq.a6": "不應該。v2.8.2 會請所選 AI 整理整句標點、明確口吃與語意連貫；問句和命令仍保留原意。若偵測到新增助手回覆、無關改寫或數字與否定語意改動，會回退原逐字稿並顯示提示。辨識與整理仍可能有誤，重要內容請先核對。",
 
         "footer.desc": "新義豊株式会社開發的多語音聲與鍵盤輸入工具。",
         "footer.product": "產品",
@@ -402,7 +402,7 @@ const translations = {
         "writing.handoff": "Switching apps or fields stops recording and keeps captured speech as text awaiting insertion. It never auto-pastes into a new field. Failed recognition can be retried.",
         "writing.limit": "Notes, pending text, and retry audio stay in memory only and disappear if the service ends or the device restarts. Background recording is not supported. Review AI drafts.",
         "meta.title": "SGH Voice — Multilingual Android keyboard and macOS voice input",
-        "meta.description": "SGH Voice Android v2.8.1: choose from six light recording colors, dictate or preview writing drafts, and switch to Zhuyin or Japanese 12-key input.",
+        "meta.description": "SGH Voice Android v2.8.2: six light recording colors with a soft center-to-edge fade, dictation and writing previews, plus Zhuyin and Japanese 12-key input.",
         "accessibility.skip": "Skip to main content",
 
         "nav.features": "Features",
@@ -412,7 +412,7 @@ const translations = {
         "nav.download": "Download APK",
         "nav.cta": "Get the test build",
 
-        "hero.eyebrow": "Android personal test build · v2.8.1",
+        "hero.eyebrow": "Android personal test build · v2.8.2",
         "hero.title": "Speak your thoughts.<br><span>Write them clearly.</span>",
         "hero.subtitle": "Voice, Help me write, Zhuyin, and Japanese in one Android keyboard.",
         "hero.cta": "Get the Android test build",
@@ -445,7 +445,7 @@ const translations = {
 
         "showcase.kicker": "ANDROID FEATURE UI",
         "showcase.title": "Translation and Zhuyin feature interface",
-        "showcase.desc": "These illustrations are based on an earlier version, not v2.8.1 device screenshots. Voice mode now uses a single large recording circle; the bottom-row @ key is replaced with 、, while ， and 。 remain.",
+        "showcase.desc": "These illustrations are based on an earlier version, not v2.8.2 device screenshots. Voice mode now uses a single large recording circle; the bottom-row @ key is replaced with 、, while ， and 。 remain.",
         "showcase.item1": "SGH Voice brand and icon at top left",
         "showcase.item2": "Up to 48 Zhuyin candidates in an expandable three-column grid",
         "showcase.item3": "Tap for dictation; long-press for up to four translation targets",
@@ -495,7 +495,7 @@ const translations = {
 
         "download.kicker": "GET SGH VOICE",
         "download.title": "Download and try it.",
-        "download.subtitle": "Android 2.8.1 is a sideloaded test build. Voice features need your own API key; provider usage charges may apply.",
+        "download.subtitle": "Android 2.8.2 is a sideloaded test build. Voice features need your own API key; provider usage charges may apply.",
         "download.alert.badge": "READ BEFORE INSTALLING",
         "download.alert.title": "Android personal test / sideload build",
         "download.alert.desc": "This build has not been published through Google Play Production. You can download it directly and update an existing 2.7.3 installation because both APKs use the same signer. Allow installation only for the browser or file manager you use, and review the compatibility, stability, and third-party API cost risks.",
@@ -521,7 +521,7 @@ const translations = {
         "download.registration.error": "Registration failed, so the download did not start. Please try again later.",
         "download.android.badge": "PERSONAL TEST BUILD",
         "download.android.title": "SGH Voice for Android",
-        "download.android.update": "This site's sideloaded 2.7.3–2.8.0 releases can update using the same signing certificate. Open the 2.8.1 APK and choose Update. Do not uninstall first: this preserves keys and vocabulary. Undo or clear old learning in Personal Dictionary. If your cloud consent is older than version 3, review Settings. Update Google Play test builds through their original channel.",
+        "download.android.update": "This site's sideloaded 2.7.3–2.8.0 releases can update using the same signing certificate. Open the 2.8.2 APK and choose Update. Do not uninstall first: this preserves keys and vocabulary. Undo or clear old learning in Personal Dictionary. If your cloud consent is older than version 3, review Settings. Update Google Play test builds through their original channel.",
         "download.meta.version": "Version",
         "download.meta.requirement": "Requirement",
         "download.meta.size": "File size",
@@ -552,7 +552,7 @@ const translations = {
         "faq.q5": "Is Japanese input equivalent to a mature Japanese IME?",
         "faq.a5": "This is Phase 1. It supports romaji, kana, reading-prefix prediction, and up to 24 expandable candidates, but it does not yet offer sentence-level contextual conversion at the level of a mature IME such as Mozc.",
         "faq.q6": "Will the model answer a question that I dictate?",
-        "faq.a6": "It should not. v2.8.1 asks your selected AI to clean up punctuation, clear stutters, and sentence flow while preserving questions and instructions. Detected assistant replies, unrelated rewrites, or changes to numbers or negation trigger a fallback to the original transcript with a notice. Errors can still occur, so check important text.",
+        "faq.a6": "It should not. v2.8.2 asks your selected AI to clean up punctuation, clear stutters, and sentence flow while preserving questions and instructions. Detected assistant replies, unrelated rewrites, or changes to numbers or negation trigger a fallback to the original transcript with a notice. Errors can still occur, so check important text.",
 
         "footer.desc": "A multilingual voice and keyboard input tool by Shingihou Co., Ltd.",
         "footer.product": "Product",

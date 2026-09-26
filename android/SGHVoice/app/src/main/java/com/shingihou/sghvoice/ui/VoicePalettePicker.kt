@@ -1,6 +1,6 @@
 package com.shingihou.sghvoice.ui
 
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -11,6 +11,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.shingihou.sghvoice.R
@@ -21,16 +22,16 @@ import com.shingihou.sghvoice.ime.VoicePalette
 @OptIn(ExperimentalMaterial3Api::class)
 fun VoicePalettePicker(selected: VoicePalette, onSelect: (VoicePalette) -> Unit) {
     val ink = Color(0xFF25372F)
-    OutlinedCard(modifier = Modifier.fillMaxWidth()) {
+    Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color.Transparent)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Surface(
-                    modifier = Modifier.size(64.dp), shape = CircleShape,
-                    color = Color(selected.argb), border = BorderStroke(1.dp, ink.copy(alpha = 0.45f))
+                Box(
+                    modifier = Modifier.size(64.dp).background(Brush.radialGradient(
+                        0f to Color(selected.argb), 0.48f to Color(selected.argb).copy(alpha = 0.9f),
+                        0.78f to Color(selected.argb).copy(alpha = 0.39f), 1f to Color(selected.argb).copy(alpha = 0f)
+                    ), CircleShape), contentAlignment = Alignment.Center
                 ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(Icons.Default.Mic, contentDescription = null, tint = ink, modifier = Modifier.size(28.dp))
-                    }
+                    Icon(Icons.Default.Mic, contentDescription = null, tint = ink, modifier = Modifier.size(28.dp))
                 }
                 Column(Modifier.weight(1f)) {
                     Text(stringResource(R.string.voice_palette_title), style = MaterialTheme.typography.titleMedium)
@@ -42,6 +43,7 @@ fun VoicePalettePicker(selected: VoicePalette, onSelect: (VoicePalette) -> Unit)
                     row.forEach { palette ->
                         FilterChip(
                             selected = selected == palette,
+                            border = null,
                             onClick = { onSelect(palette) },
                             modifier = Modifier.weight(1f).heightIn(min = 48.dp),
                             label = { Text(stringResource(paletteLabel(palette))) },
