@@ -4,19 +4,20 @@
 
 ## Current Android test release
 
-- Version: 2.8.2 (version code 32)
+- Version: 2.8.3 (version code 33)
 - Platform: Android 8.0 or later
 - Distribution status: personal test build, distributed as a versioned APK from the official SGH Voice website
 - Google Play status: not currently published through Google Play Production
-- Download: https://voice.shingihou.com/downloads/SGHVoice-Android-v2.8.2.apk
-- File size: 17,402,665 bytes (16.60 MiB)
-- SHA-256: f7952c4685f07fb89f5b3107735c9812f7dd09793c367f46e9bed2a61fcd998e
+- Download: https://voice.shingihou.com/downloads/SGHVoice-Android-v2.8.3.apk
+- File size: 17,421,413 bytes (16.61 MiB)
+- SHA-256: d2a3e64aa14e7a05db1eea79e26cc6ddf6be663a74ac8fff4207f1e28053324c
 - App price: free
 - Cloud usage: BYOK; OpenAI, Anthropic, or Groq usage charges may apply
 
 ### Android capabilities
 
 - Four modes in one Android input method: Voice, Zhuyin, Japanese, and English
+- All four modes share one height based on the original Zhuyin size; adjust it in Settings from 90% to 125% in 5% steps, or reset to 100%. Small windows apply a common height limit and scrolling where needed
 - SGH Voice brand and icon remain visible at the top left of the keyboard
 - Tap for normal dictation; long-press to select 1–4 translation targets from Traditional Chinese, Japanese, English, and Korean
 - One large light-colored circle handles recording start, recording state, and stop; choose from six light palettes in basic settings (mint by default). Ripples inside respond gently to actual audio and remain calm during silence
@@ -31,7 +32,7 @@
 - Associated-phrase completion, including 刪 followed by 除, plus up to 200 on-device custom Zhuyin terms
 - Japanese romaji, kana, katakana, and reading-prefix candidate prediction
 - Up to 48 Zhuyin candidates with a horizontal strip and an expandable three-column, multi-row view
-- Japanese 12-key phone layout with aligned kana columns, tap cycling and long-press selection; switchable with romaji, not flick input
+- Japanese 12-key flick layout, switchable with romaji; choose kana by tapping the center or sliding left, up, right, or down, such as な／に／ぬ／ね／の, without repeated tap cycling
 - Explicit Help me write mode accumulates spoken notes, generates a draft through the selected AI and requires preview/explicit insertion
 - On editor changes, recording stops and captured speech is retained as pending text, never inserted automatically into a new field
 - Failed transcription offers explicit retry or discard; a single bounded audio buffer (up to about 125 seconds) stays only in memory
@@ -47,12 +48,13 @@
 ### Android limitations and installation notice
 
 - This APK is a sideloaded personal test build, not a public Google Play release
-- Official sideload installations of 2.7.3–2.8.0 can update directly to 2.8.2 with the same package name and signing certificate; users should not uninstall first
+- Official sideload installations of 2.7.3–2.8.2 can update directly to 2.8.3 with the same package name and signing certificate; users should not uninstall first
 - Previously mistaken learning records are not automatically erased by the update; users can undo the latest learning or clear local learning data from the personal dictionary screen
 - Google Play test installations should update through their original install channel
 - Review and accept cloud-processing consent version 3 in Settings if not yet accepted; consent already accepted in 2.7.6 remains valid, and existing keys and vocabulary are retained
 - Includes the Android 8 and 9 Unicode script syntax compatibility fix from 2.7.7
 - 2.8.2 adds writing previews, six selectable light recording colors that fade softly from the center with no outline, larger Zhuyin keys, Japanese phone-grid input, and bounded layouts for small windows
+- 2.8.3 adds shared, adjustable keyboard height and replaces Japanese 12-key tap cycling with directional flick input
 - Notes, pending drafts and retry audio disappear when the input-method service ends or the device restarts; continuous background recording is not supported
 - Cloud consent is checked before each new request; withdrawal prevents follow-up AI requests and retry uploads
 - Automated checks and emulator inspection do not establish real-device dictation accuracy; the physical-device acceptance checklist remains pending

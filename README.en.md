@@ -1,4 +1,4 @@
-# 🎙 SGH Voice — AI Voice Input Tool (v2.7.3)
+# 🎙 SGH Voice — AI Voice Input Tool
 
 **English** | **[日本語](README.ja.md)** | **[繁體中文](README.md)**
 
@@ -7,11 +7,22 @@
 [![macOS](https://img.shields.io/badge/macOS-Apple_Silicon-black?logo=apple)](https://github.com/linchichuan/sgh-voice/releases)
 [![iOS](https://img.shields.io/badge/iOS-17.0+-blue?logo=apple)](https://github.com/linchichuan/sgh-voice/releases)
 [![Android](https://img.shields.io/badge/Android-8.0+-green?logo=android)](https://github.com/linchichuan/sgh-voice/releases)
-[![Version](https://img.shields.io/badge/Version-2.7.3-green)]()
+[![Android Version](https://img.shields.io/badge/Android-2.8.3-green)](https://voice.shingihou.com/)
 
 ---
 
-## Android v2.7.3 — Traditional Chinese Zhuyin
+## Android v2.8.3 — Consistent keyboard height and Japanese flick input
+
+Official sideloaded personal test build: [download and installation guide](https://voice.shingihou.com/#android-download). Same-signer installations can update in place; do not uninstall first. Update Google Play installations through their original channel.
+
+- Voice, Zhuyin, Japanese, and English share one keyboard height, with the original Zhuyin size as 100%. Settings offers 90–125% in 5% steps and a reset control.
+- Switch between romaji and Japanese 12-key flick input. Tap the center or slide left, up, right, or down to choose kana, such as な／に／ぬ／ね／の, without repeated tap cycling.
+- Retains Help me write notes and draft previews, six light recording-circle palettes, larger Zhuyin keys, and up to 48 candidates. Small windows use a height limit and scrolling where needed.
+- Changing editors stops recording and retains captured speech for confirmation; continuous background recording is not supported. Temporary notes and retry audio disappear when the service ends.
+
+Automated and emulator checks do not establish physical-device dictation accuracy. See the [Android RC checklist](docs/ANDROID_RC_ACCEPTANCE.md).
+
+## Android v2.7.3 — Traditional Chinese Zhuyin (historical)
 
 - Replaces the 2,869-character Phase 1 table with a pinned Traditional Chinese lexicon containing characters, phrases, and associated completions.
 - `ㄕㄢ` includes `刪`; `ㄕㄢ ㄔㄨˊ` selects `刪除`; choosing `刪` can offer the suffix `除` without duplicating the prefix.

@@ -1,6 +1,7 @@
 # Android 共用鍵盤高度與日文 flick
 
-日期：2026-09-26。範圍：本機程式修正與驗證；不是新版 Play／Firebase 發布證明。
+日期：2026-09-26。範圍：程式修正、驗證與 Android 2.8.3（33）側載發布準備；
+線上發布結果另見 repo 上層 `release-output/android-2.8.3/RELEASE_RECEIPT.md`，不是 Play 發布證明。
 
 ## 問題重現
 
@@ -49,7 +50,15 @@ Lint 阻塞的 custom View 相容性已修正為 AppCompatTextView；未加入 s
 
 ## 發布邊界
 
-本輪不覆寫已發布的2.8.2 APK，也不把來源修正稱為手機已更新。下一版需分配新 versionCode、
-簽章建置、實機驗收，再依管道發布。Google Play 版與側載版須分別確認 signer；不可要求先解除安裝。
+2.8.3 使用 versionCode 33，保留已發布的2.8.2原檔。正式簽章 build 成功（9m5s），
+256個 Android 單元測試通過；Release Lint 0 errors／89 warnings。
+APK 為17,421,413 bytes，SHA-256 `d2a3e64aa14e7a05db1eea79e26cc6ddf6be663a74ac8fff4207f1e28053324c`；
+package `com.shingihou.sghvoice`，APK v2簽章有效且唯一 signer 與2.8.2相同。
+最終 Python 迴歸538項、Firestore Emulator 6組、Ruff、JavaScript語法、iOS source-only
+preflight 及 `verify_mobile_rc.sh --artifact-only` 全部通過；網頁版本、大小、hash與APK一致。
+下載規則只加入新版合法配對，保留快取頁面相容性，不放寬登記資料的讀取／更新／刪除權限。
+公開網址預定為 `https://voice.shingihou.com/downloads/SGHVoice-Android-v2.8.3.apk`；
+只有發布收據中的遠端重新下載／hash比對才算線上發布證明，不把建置成功當成手機已更新。
+Google Play 版與側載版須分別確認 signer；不可要求先解除安裝。
 目前付費 Alpha 招募仍需新版發行與測試資格設定；不把公開免費 APK 當成付費 Play 計畫已完成。
 實機仍需確認手指滑動距離、TalkBack 語音、LINE等主 App 與橫向螢幕行為。

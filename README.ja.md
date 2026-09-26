@@ -1,4 +1,4 @@
-# 🎙 SGH Voice — AI 音声入力ツール (v2.7.3)
+# 🎙 SGH Voice — AI 音声入力ツール
 
 **[English](README.en.md)** | **日本語** | **[繁體中文](README.md)**
 
@@ -7,11 +7,22 @@
 [![macOS](https://img.shields.io/badge/macOS-Apple_Silicon-black?logo=apple)](https://github.com/linchichuan/sgh-voice/releases)
 [![iOS](https://img.shields.io/badge/iOS-17.0+-blue?logo=apple)](https://github.com/linchichuan/sgh-voice/releases)
 [![Android](https://img.shields.io/badge/Android-8.0+-green?logo=android)](https://github.com/linchichuan/sgh-voice/releases)
-[![Version](https://img.shields.io/badge/Version-2.7.3-green)]()
+[![Android Version](https://img.shields.io/badge/Android-2.8.3-green)](https://voice.shingihou.com/)
 
 ---
 
-## Android v2.7.3 — 繁体字中国語の注音辞書
+## Android v2.8.3 — キーボードの高さ統一と日本語フリック入力
+
+公式サイドロード個人テスト版：[ダウンロード・インストール手順](https://voice.shingihou.com/#android-download)。同じ署名の配布版は、先にアンインストールせず上書き更新できます。Google Play からインストールした場合は、元の配布経路で更新してください。
+
+- 音声・注音・日本語・英語でキーボードの高さを統一。従来の注音サイズを 100% として、設定から 90〜125% の範囲を 5% 刻みで調整・リセットできます。
+- ローマ字入力と日本語12キーフリック入力を切り替えられます。中央タップ・左・上・右・下のフリックで「な／に／ぬ／ね／の」などを選び、連続タップによる切替は不要です。
+- 文章作成モードのメモ・下書きプレビュー、6色の淡い録音ボタン、大きな注音キー、最大48件の候補を引き続き利用できます。小さなウィンドウでは高さ制限と必要なスクロールを適用します。
+- 入力欄の切替時は録音を停止し、録音済みの内容を確認待ちとして保持します。バックグラウンド連続録音には未対応で、一時メモや再試行用音声はサービス終了時に消えます。
+
+自動テストやエミュレーター上の確認は、実機での音声認識精度の検証を意味しません。[Android RC チェックリスト](docs/ANDROID_RC_ACCEPTANCE.md)をご確認ください。
+
+## Android v2.7.3 — 繁体字中国語の注音辞書（過去の更新）
 
 - 2,869 単字だけの Phase 1 表を、単字・熟語・選字後の関連語を含む固定スナップショットの繁体字注音辞書へ置き換えました。
 - `ㄕㄢ` で「刪」、`ㄕㄢ ㄔㄨˊ` で「刪除」を選択でき、「刪」の選択後は prefix を重複せず「除」を追加できます。

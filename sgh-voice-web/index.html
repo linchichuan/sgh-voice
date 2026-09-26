@@ -8,7 +8,7 @@
     <meta name="author" content="Shingihou Co., Ltd.">
     <title>SGH Voice — Android 多語輸入法與 macOS 語音輸入</title>
     <meta name="description"
-        content="SGH Voice Android v2.8.2：六款淺色錄音圓，由中心柔和淡出；語音輸入與幫我寫成稿預覽，支援注音及日文電話格線。">
+        content="SGH Voice Android v2.8.3：四種鍵盤共用可調高度，日文 12 鍵支援上下左右滑動；淺色錄音圓、語音輸入與幫我寫成稿預覽。">
     <link rel="canonical" href="https://voice.shingihou.com/">
 
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
@@ -21,7 +21,7 @@
     <meta property="og:site_name" content="SGH Voice">
     <meta property="og:title" content="SGH Voice — 一個輸入法，語音、注音、日文、英文都能用。">
     <meta property="og:description"
-        content="Android 個人測試版 APK v2.8.2：幫我寫成稿預覽、日文電話格線、較大的注音按鍵與可重試的語音辨識。">
+        content="Android 個人測試版 APK v2.8.3：四種鍵盤高度一致，可調整 90%–125%；日文 12 鍵滑動輸入與幫我寫成稿預覽。">
     <meta property="og:url" content="https://voice.shingihou.com/">
     <meta property="og:image" content="https://voice.shingihou.com/assets/generated/og-android-v240.png">
     <meta property="og:image:type" content="image/png">
@@ -47,7 +47,7 @@
     <link
         href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;family=Noto+Sans+JP:wght@400;500;600;700&amp;family=Noto+Sans+TC:wght@400;500;600;700&amp;display=swap"
         rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=20260926-v282">
+    <link rel="stylesheet" href="style.css?v=20260926-v283">
 
     <script type="application/ld+json">
     {
@@ -58,9 +58,9 @@
           "name": "SGH Voice for Android",
           "applicationCategory": "ProductivityApplication",
           "operatingSystem": "Android 8.0 or later",
-          "softwareVersion": "2.8.2",
+          "softwareVersion": "2.8.3",
           "url": "https://voice.shingihou.com/",
-          "downloadUrl": "https://voice.shingihou.com/downloads/SGHVoice-Android-v2.8.2.apk",
+          "downloadUrl": "https://voice.shingihou.com/downloads/SGHVoice-Android-v2.8.3.apk",
           "description": "A personal test build of a multilingual Android input method with tap-to-dictate, long-press translation into up to four languages, predictive Zhuyin, Japanese candidates, English, and local personalization.",
           "offers": {
             "@type": "Offer",
@@ -160,7 +160,7 @@
                 <div class="hero-copy">
                     <div class="eyebrow">
                         <span class="status-dot" aria-hidden="true"></span>
-                        <span data-i18n="hero.eyebrow">Android 個人測試版 · v2.8.2</span>
+                        <span data-i18n="hero.eyebrow">Android 個人測試版 · v2.8.3</span>
                     </div>
                     <h1 data-i18n="hero.title">說出想法，<br><span>寫得更順。</span></h1>
                     <p class="hero-lead" data-i18n="hero.subtitle">語音輸入、幫我寫、注音與日文，都在同一個 Android 鍵盤。</p>
@@ -225,7 +225,7 @@
                     <article>
                         <span class="feature-number">02</span>
                         <h3 data-i18n="compact.keyboard.title">四種輸入，隨時切換</h3>
-                        <p data-i18n="compact.keyboard.desc">注音大按鍵與候選字、日文 Romaji／12 鍵，以及英文 QWERTY。</p>
+                        <p data-i18n="compact.keyboard.desc">語音、注音、日文與英文共用可調高度；日文可切換 Romaji／12 鍵滑動輸入。</p>
                     </article>
                     <article>
                         <span class="feature-number">03</span>
@@ -245,7 +245,7 @@
                             <p data-i18n="learning.safe.desc">密碼欄位會停用語音與學習；禁止個人化欄位只停用學習。</p>
                         </div>
                         <div><h3 data-i18n="compact.language.title">多語輸入</h3>
-                            <p data-i18n="modes.japanese.desc">日文 12 鍵支援點按輪替、長按選字，尚不支援 flick 或整句文脈轉換。</p>
+                            <p data-i18n="modes.japanese.desc">日文 12 鍵支援中央點按及上下左右滑動選字，可切換 Romaji；尚不支援整句文脈轉換。</p>
                             <p data-i18n="compact.translation">長按錄音圓可選 1–4 種翻譯語言；底列保留「、」「，」「。」。</p>
                         </div>
                     </div>
@@ -258,7 +258,7 @@
                 <div class="section-heading download-heading">
                     <span class="section-kicker" data-i18n="download.kicker">GET SGH VOICE</span>
                     <h2 data-i18n="download.title">下載，開始試用。</h2>
-                    <p data-i18n="download.subtitle">Android 2.8.2 為側載測試版。語音需自備 API 金鑰，服務商可能按用量收費。</p>
+                    <p data-i18n="download.subtitle">Android 2.8.3 為側載測試版。語音需自備 API 金鑰，服務商可能按用量收費。</p>
                 </div>
 
                 <details class="compact-details risk-details" id="riskDisclosure">
@@ -351,7 +351,7 @@
                         <dl class="release-meta">
                             <div>
                                 <dt data-i18n="download.meta.version">版本</dt>
-                                <dd>2.8.2 (32)</dd>
+                                <dd>2.8.3 (33)</dd>
                             </div>
                             <div>
                                 <dt data-i18n="download.meta.requirement">系統需求</dt>
@@ -359,7 +359,7 @@
                             </div>
                             <div>
                                 <dt data-i18n="download.meta.size">檔案大小</dt>
-                                <dd>16.60 MiB</dd>
+                                <dd>16.61 MiB</dd>
                             </div>
                             <div>
                                 <dt data-i18n="download.meta.format">格式</dt>
@@ -372,7 +372,7 @@
                         <div class="hash-block">
                             <div>
                                 <span>SHA-256</span>
-                                <code id="apkHash">f7952c4685f07fb89f5b3107735c9812f7dd09793c367f46e9bed2a61fcd998e</code>
+                                <code id="apkHash">d2a3e64aa14e7a05db1eea79e26cc6ddf6be663a74ac8fff4207f1e28053324c</code>
                             </div>
                             <button type="button" class="copy-button" id="copyHashButton" data-i18n="download.hash.copy">複製</button>
                         </div>
@@ -381,7 +381,7 @@
 
                         <details class="compact-details update-details">
                             <summary data-i18n="compact.update">已安裝？查看更新方式</summary>
-                        <p class="download-update-note" data-i18n="download.android.update">本站側載版 2.7.3–2.8.0 可使用相同簽章的 2.8.2 APK 更新。直接開啟並選「更新」，請勿先解除安裝，以保留金鑰與詞庫。舊學習紀錄可在「個人詞庫」撤銷或清除；雲端同意尚未更新至版本 3 者，請到設定確認。Google Play 測試版請使用原安裝管道。</p>
+                        <p class="download-update-note" data-i18n="download.android.update">本站側載版 2.7.3–2.8.2 可使用相同簽章的 2.8.3 APK 更新。直接開啟並選「更新」，請勿先解除安裝，以保留金鑰與詞庫。舊學習紀錄可在「個人詞庫」撤銷或清除；雲端同意尚未更新至版本 3 者，請到設定確認。Google Play 測試版請使用原安裝管道。</p>
 
                         </details>
 
@@ -395,15 +395,15 @@
 
                         <a class="btn btn-primary download-button disabled" id="apkDownloadButton"
                             aria-disabled="true" aria-describedby="riskDisclosure downloadRegistrationStatus"
-                            tabindex="-1" data-platform="android" data-version="2.8.2"
-                            data-filename="SGHVoice-Android-v2.8.2.apk"
-                            data-download-href="/downloads/SGHVoice-Android-v2.8.2.apk">
+                            tabindex="-1" data-platform="android" data-version="2.8.3"
+                            data-filename="SGHVoice-Android-v2.8.3.apk"
+                            data-download-href="/downloads/SGHVoice-Android-v2.8.3.apk">
                             <svg viewBox="0 0 24 24" aria-hidden="true">
                                 <path d="M12 3v12m0 0 5-5m-5 5-5-5M5 19h14"></path>
                             </svg>
                             <span data-i18n="download.android.cta">完成資料與風險確認後下載</span>
                         </a>
-                        <p class="download-file">SGHVoice-Android-v2.8.2.apk</p>
+                        <p class="download-file">SGHVoice-Android-v2.8.3.apk</p>
                     </article>
 
                     <article class="download-card download-mac">
@@ -590,7 +590,7 @@
                     </details>
                     <details>
                         <summary data-i18n="faq.q6">我口述一個問句時，模型會直接回答嗎？</summary>
-                        <p data-i18n="faq.a6">不應該。v2.8.2 會請所選 AI 整理整句標點、明確口吃與語意連貫；問句和命令仍保留原意。若偵測到新增助手回覆、無關改寫或數字與否定語意改動，會回退原逐字稿並顯示提示。辨識與整理仍可能有誤，重要內容請先核對。</p>
+                        <p data-i18n="faq.a6">不應該。目前版本會請所選 AI 整理整句標點、明確口吃與語意連貫；問句和命令仍保留原意。若偵測到新增助手回覆、無關改寫或數字與否定語意改動，會回退原逐字稿並顯示提示。辨識與整理仍可能有誤，重要內容請先核對。</p>
                     </details>
                 </div>
             </div>
@@ -630,9 +630,9 @@
         </div>
     </footer>
 
-    <script src="i18n.js?v=20260926-v282"></script>
-    <script src="firebase.js?v=20260926-v282"></script>
-    <script src="main.js?v=20260926-v282"></script>
+    <script src="i18n.js?v=20260926-v283"></script>
+    <script src="firebase.js?v=20260926-v283"></script>
+    <script src="main.js?v=20260926-v283"></script>
 </body>
 
 </html>
