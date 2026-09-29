@@ -25,10 +25,10 @@ class AudioHaloEnvelopeTest {
             val quiet = (0..40).map { point ->
                 GentleWaveGeometry.offsetAt(point / 40f, line, 0.2f, 0.9f, false)
             }
-            assertTrue(loud.maxOf { kotlin.math.abs(it) } > 0.005f)
+            assertTrue(loud.maxOf { kotlin.math.abs(it) } > 0.015f)
             assertTrue(loud.maxOf { kotlin.math.abs(it) } > quiet.maxOf { kotlin.math.abs(it) })
-            assertTrue(loud.all { it in -0.065f..0.065f })
-            assertTrue(loud.all { 0.42f + it < 0.65f })
+            assertTrue(loud.all { it in -GentleWaveGeometry.MAX_AMPLITUDE_FRACTION..GentleWaveGeometry.MAX_AMPLITUDE_FRACTION })
+            assertTrue(loud.all { GentleWaveGeometry.BASELINE_Y_FRACTION + it < 0.62f })
             assertEquals(0f, loud.first(), 0f)
             assertEquals(0f, loud.last(), 0f)
         }

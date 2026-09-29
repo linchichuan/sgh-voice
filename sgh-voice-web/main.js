@@ -6,8 +6,6 @@ const navLinks = document.getElementById("navLinks");
 const riskAcknowledgement = document.getElementById("riskAck");
 const apkDownloadButton = document.getElementById("apkDownloadButton");
 const macDownloadButton = document.getElementById("macDownloadButton");
-const copyHashButton = document.getElementById("copyHashButton");
-const apkHash = document.getElementById("apkHash");
 const downloadRegistrationForm = document.getElementById("downloadRegistrationForm");
 const downloadName = document.getElementById("downloadName");
 const downloadEmail = document.getElementById("downloadEmail");
@@ -15,6 +13,7 @@ const downloadPrivacyConsent = document.getElementById("downloadPrivacyConsent")
 const downloadRegistrationStatus = document.getElementById("downloadRegistrationStatus");
 const downloadButtons = [apkDownloadButton, macDownloadButton].filter(Boolean);
 let downloadIsPending = false;
+let androidApplicationSubmitted = false;
 
 function updateNavbar() {
     if (navbar) {
@@ -119,6 +118,7 @@ function setDownloadButtonState(button, enabled, label) {
 
     button.classList.toggle("disabled", !enabled);
     button.setAttribute("aria-disabled", String(!enabled));
+    if (button.tagName === "BUTTON") button.disabled = !enabled;
     button.tabIndex = enabled ? 0 : -1;
     const labelElement = button.querySelector("span");
     if (labelElement) labelElement.textContent = label;
@@ -126,15 +126,15 @@ function setDownloadButtonState(button, enabled, label) {
 
 function syncDownloadState() {
     const registered = registrationIsValid();
-    const androidEnabled = registered && riskAcknowledgement?.checked && !downloadIsPending;
+    const androidEnabled = registered && riskAcknowledgement?.checked && !downloadIsPending && !androidApplicationSubmitted;
     const macEnabled = registered && !downloadIsPending;
 
     setDownloadButtonState(
         apkDownloadButton,
         androidEnabled,
-        androidEnabled
-            ? translate("download.android.ctaReady", "登記並下載 APK")
-            : translate("download.android.cta", "填寫資料並確認風險後下載 APK")
+        androidApplicationSubmitted
+            ? translate("download.android.submitted", "已收到申請，等待邀請")
+            : translate("download.android.cta", "申請 Android 封閉測試")
     );
     setDownloadButtonState(
         macDownloadButton,
@@ -152,16 +152,17 @@ function setRegistrationStatus(message, state = "idle") {
 }
 
 function startFileDownload(button) {
-    // The registration request is asynchronous. A synthetic anchor click after
-    // that await can lose Android Chrome's transient user activation and be
-    // silently blocked as a download. Navigate the current tab instead; the
-    // APK/DMG Content-Disposition header still starts the browser download.
+    // Only macOS uses direct downloads. Android applications never navigate.
+    if (button.dataset.platform !== "macos") return;
     window.location.assign(button.dataset.downloadHref);
 }
 
 async function handleDownload(event) {
     event.preventDefault();
     const button = event.currentTarget;
+    const isAndroid = button.dataset.platform === "android";
+    if (downloadIsPending || (isAndroid && androidApplicationSubmitted)) return;
+    if (!isAndroid && button.dataset.platform !== "macos") return;
 
     if (!registrationIsValid()) {
         downloadRegistrationForm?.reportValidity();
@@ -172,10 +173,10 @@ async function handleDownload(event) {
         return;
     }
 
-    if (button.dataset.platform === "android" && !riskAcknowledgement?.checked) {
+    if (isAndroid && !riskAcknowledgement?.checked) {
         riskAcknowledgement?.focus();
         setRegistrationStatus(
-            translate("download.registration.riskRequired", "下載 Android APK 前，請先勾選測試版風險確認。"),
+            translate("download.registration.riskRequired", "請確認願意使用 Android 手機參加至少 14 天的封閉測試。"),
             "error"
         );
         return;
@@ -184,12 +185,32 @@ async function handleDownload(event) {
     downloadIsPending = true;
     syncDownloadState();
     setRegistrationStatus(
-        translate("download.registration.saving", "正在登記下載資料…"),
+        translate("download.registration.saving", "正在儲存資料…"),
         "pending"
     );
 
     try {
         const firestore = await window.SGH_FIRESTORE_READY;
+        if (isAndroid) {
+            await firestore.addDoc(firestore.collection(firestore.db, "sgh-voice-alpha-applications"), {
+                name: downloadName.value.trim(),
+                email: downloadEmail.value.trim().toLowerCase(),
+                platform: "android",
+                track: "alpha",
+                status: "pending",
+                locale: window.SGH_LANG || "zh",
+                consentVersion: 1,
+                privacyConsent: true,
+                testingCommitment: true,
+                createdAt: firestore.serverTimestamp()
+            });
+            androidApplicationSubmitted = true;
+            setRegistrationStatus(
+                translate("download.android.success", "已收到申請，等待安排邀請。這不代表已取得 Google Play 測試資格；目前尚未寄出郵件，也不會自動下載。"),
+                "success"
+            );
+            return;
+        }
         await firestore.addDoc(firestore.collection(firestore.db, "sgh-voice-downloads"), {
             name: downloadName.value.trim(),
             email: downloadEmail.value.trim().toLowerCase(),
@@ -210,9 +231,9 @@ async function handleDownload(event) {
         );
         startFileDownload(button);
     } catch (error) {
-        console.error("Unable to register download:", error);
+        console.error("Unable to save registration:", error?.code || "unknown");
         setRegistrationStatus(
-            translate("download.registration.error", "登記失敗，尚未開始下載。請稍後再試。"),
+            translate("download.registration.error", "資料尚未儲存，未送出申請或開始下載。請稍後再試。"),
             "error"
         );
     } finally {
@@ -236,26 +257,12 @@ if (downloadButtons.length) {
     syncDownloadState();
 }
 
-if (copyHashButton && apkHash) {
-    copyHashButton.addEventListener("click", async () => {
-        try {
-            await navigator.clipboard.writeText(apkHash.textContent.trim());
-            copyHashButton.textContent = translate("download.hash.copied", "已複製");
-            window.setTimeout(() => {
-                copyHashButton.textContent = translate("download.hash.copy", "複製");
-            }, 1600);
-        } catch {
-            const range = document.createRange();
-            range.selectNodeContents(apkHash);
-            const selection = window.getSelection();
-            selection.removeAllRanges();
-            selection.addRange(range);
-        }
-    });
-}
-
 window.addEventListener("sgh:languagechange", () => {
     syncDownloadState();
+    if (androidApplicationSubmitted) {
+        setRegistrationStatus(translate("download.android.success", "已收到申請，等待邀請。"), "success");
+        return;
+    }
     if (downloadRegistrationStatus?.dataset.state === "idle") {
         setRegistrationStatus(
             translate("download.registration.status", "填妥資料後，請選擇下方要下載的平台。")

@@ -5,6 +5,8 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Path
+import android.graphics.RadialGradient
+import android.graphics.Shader
 import android.os.SystemClock
 import android.util.AttributeSet
 import android.view.View
@@ -29,6 +31,7 @@ class AudioWaveformView @JvmOverloads constructor(
     private val density = resources.displayMetrics.density
     private var activeColor = ContextCompat.getColor(context, R.color.waveform_active)
     private var baselineColor = ContextCompat.getColor(context, R.color.waveform_baseline)
+    private val haloPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val wavePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         strokeCap = Paint.Cap.ROUND
@@ -49,6 +52,7 @@ class AudioWaveformView @JvmOverloads constructor(
     fun setPaletteColors(active: Int, baseline: Int) {
         activeColor = active
         baselineColor = baseline
+        updateHaloShader()
         invalidate()
     }
 
@@ -76,37 +80,70 @@ class AudioWaveformView @JvmOverloads constructor(
         if (!recordingActive || width <= 0 || height <= 0) return
 
         val level = envelope.level
-        val startX = width * 0.18f
-        val endX = width * 0.82f
-        val centerY = height * 0.42f
+        val diameter = minOf(width, height).toFloat()
+        val centerX = width / 2f
+        val centerY = height * GentleWaveGeometry.BASELINE_Y_FRACTION
+        if (level > 0.015f) {
+            // A broad, soft mint bloom follows only real incoming audio samples.
+            // It is painted below the mic label and fades fully at the circle edge.
+            haloPaint.alpha = (48 + 64 * level).toInt().coerceIn(0, 112)
+            canvas.drawCircle(centerX, height / 2f, diameter * 0.48f, haloPaint)
+        }
+
+        val startX = width * 0.08f
+        val endX = width * 0.92f
         wavePaint.color = ColorUtils.blendARGB(baselineColor, activeColor, 0.4f + 0.6f * level)
         if (level <= 0.015f || reducedMotion) {
             // No displacement in silence or Android's reduced-motion mode.
             // Audible samples still darken this line when motion is disabled.
             wavePaint.alpha = 220
-            wavePaint.strokeWidth = 2f * density
+            wavePaint.strokeWidth = 2.4f * density
             canvas.drawLine(startX, centerY, endX, centerY, wavePaint)
             return
         }
 
         for (line in 2 downTo 0) {
             wavePaint.alpha = when (line) {
-                0 -> 245
-                1 -> 145
-                else -> 85
+                0 -> 255
+                1 -> 175
+                else -> 112
             }
-            wavePaint.strokeWidth = (if (line == 0) 2.2f else 1.6f) * density
+            wavePaint.strokeWidth = when (line) {
+                0 -> 3.2f * density
+                1 -> 2.2f * density
+                else -> 1.6f * density
+            }
             wavePath.rewind()
             for (point in 0..48) {
                 val position = point / 48f
                 val x = startX + (endX - startX) * position
-                val y = centerY + height * GentleWaveGeometry.offsetAt(
+                val y = height * (GentleWaveGeometry.BASELINE_Y_FRACTION + GentleWaveGeometry.offsetAt(
                     position, line, level, envelope.phase, reducedMotion
-                )
+                ))
                 if (point == 0) wavePath.moveTo(x, y) else wavePath.lineTo(x, y)
             }
             canvas.drawPath(wavePath, wavePaint)
         }
+    }
+
+    override fun onSizeChanged(width: Int, height: Int, oldWidth: Int, oldHeight: Int) {
+        super.onSizeChanged(width, height, oldWidth, oldHeight)
+        updateHaloShader()
+    }
+
+    private fun updateHaloShader() {
+        val radius = minOf(width, height) * 0.48f
+        if (radius <= 0f) return
+        val center = ColorUtils.blendARGB(baselineColor, activeColor, 0.24f)
+        val middle = ColorUtils.blendARGB(baselineColor, activeColor, 0.12f)
+        haloPaint.shader = RadialGradient(
+            width / 2f,
+            height / 2f,
+            radius,
+            intArrayOf(center, middle, ColorUtils.setAlphaComponent(baselineColor, 0)),
+            floatArrayOf(0f, 0.64f, 1f),
+            Shader.TileMode.CLAMP
+        )
     }
 
     override fun onDetachedFromWindow() {
@@ -132,7 +169,7 @@ internal class AudioHaloEnvelope {
         }
         val elapsed = lastSampleTime?.let { (timestampMillis - it).coerceIn(0L, 250L) } ?: 50L
         lastSampleTime = timestampMillis
-        val timeConstant = if (sample > level) 140f else 220f
+        val timeConstant = if (sample > level) 110f else 180f
         val fraction = 1f - exp(-elapsed / timeConstant)
         level += (sample - level) * fraction
         // A slow contour shift exists only while genuine audible samples arrive.
@@ -149,6 +186,9 @@ internal class AudioHaloEnvelope {
 
 /** Normalized vertical displacement within the microphone control. */
 internal object GentleWaveGeometry {
+    const val BASELINE_Y_FRACTION = 0.44f
+    const val MAX_AMPLITUDE_FRACTION = 0.15f
+
     fun offsetAt(position: Float, line: Int, level: Float, phase: Float, reducedMotion: Boolean): Float {
         if (reducedMotion || !level.isFinite() || level <= 0.015f ||
             !position.isFinite() || position <= 0f || position >= 1f || !phase.isFinite()
@@ -159,7 +199,7 @@ internal object GentleWaveGeometry {
             else -> 0.45f
         }
         val taper = sin(PI * position).toFloat()
-        return 0.052f * level.coerceAtMost(1f) * strength * taper * taper *
+        return MAX_AMPLITUDE_FRACTION * level.coerceAtMost(1f) * strength * taper * taper *
             sin(2 * PI * 1.35 * position + phase + line * 0.7).toFloat()
     }
 }

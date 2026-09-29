@@ -72,17 +72,17 @@ def test_firestore_download_records_are_create_only():
     assert "request.resource.data.createdAt == request.time" in block
     assert "request.resource.data.consentVersion == 2" in block
     assert "request.resource.data.riskAcknowledged is bool" in block
-    assert "SGHVoice-Android-v2.8.3.apk" in block
-    assert "SGHVoice-Android-v2.8.2.apk" in block
+    assert "request.resource.data.platform == 'macos'" in block
+    assert "SGHVoice-Android" not in block
     assert "allow read, update, delete: if false;" in block
 
 
 def test_privacy_policy_discloses_download_registration_in_all_languages():
     privacy = read_web_file("privacy.html")
 
-    assert "2.5 ウェブサイトでのダウンロード登録" in privacy
-    assert "2.5 網站下載登記" in privacy
-    assert "2.5 Website Download Registration" in privacy
+    assert "2.5 Android テスト申請と macOS ダウンロード登録" in privacy
+    assert "2.5 Android 測試申請與 macOS 下載登記" in privacy
+    assert "2.5 Android Test Applications and macOS Download Registration" in privacy
 
 
 def test_legal_pages_publish_canonical_and_language_alternates():
@@ -103,15 +103,14 @@ def test_legal_pages_publish_canonical_and_language_alternates():
     assert sitemap.count("<lastmod>2026-08-30</lastmod>") == 1
 
 
-def test_android_test_build_notice_preserves_platform_security_controls():
+def test_android_recruitment_does_not_offer_sideload_as_play_testing():
     html = read_web_file("index.html")
     translations = read_web_file("i18n.js")
     terms = read_web_file("terms.html")
 
-    assert "尚未經 Google Play 審核或認證" in html
-    assert "請勿關閉 Google Play Protect" in html
-    assert "悪意のあるアプリとして検出された場合" in translations
-    assert "Stop the installation if Android identifies the file as malicious" in translations
+    assert "封閉" in html and "14" in html
+    assert "Google Play" in translations
+    assert not re.search(r'(?:href|data-download-href)="[^"]*\.apk"', html)
     assert "責任範圍依第 6 條辦理" in terms
 
 
@@ -123,13 +122,14 @@ def test_no_personalization_copy_distinguishes_learning_from_cloud_voice():
     assert "Password fields disable voice and learning; no-personalization fields disable learning only" in translations
 
 
-def test_registration_copy_does_not_claim_access_control():
+def test_registration_copy_does_not_claim_invitation_or_eligibility():
     html = read_web_file("index.html")
     translations = read_web_file("i18n.js")
 
-    assert "此登記不是下載檔案的存取控制" in html
-    assert "この登録はファイルへのアクセス制御ではありません" in translations
-    assert "This registration is not access control for the public release files" in translations
+    assert "目前沒有自動寄信" in html
+    assert "download.android.success" in translations
+    assert "Google Play のテスト資格はまだ付与されておらず" in translations
+    assert "status: \"pending\"" in read_web_file("main.js")
 
 
 def test_feature_illustration_is_not_presented_as_a_verified_release_screenshot():
@@ -185,19 +185,15 @@ def test_android_release_manifest_matches_public_artifact_and_copy():
     index = read_web_file("index.html")
     llms = read_web_file("llms.txt")
 
-    assert release["versionName"] == "2.8.3"
-    assert release["versionCode"] == 33
+    assert release["versionName"] == "2.8.4"
+    assert release["versionCode"] == 34
     assert re.fullmatch(r"[0-9a-f]{64}", release["sha256"])
     assert re.fullmatch(r"[0-9A-F]{64}", release["certificateSha256"])
     assert artifact.is_file()
     assert artifact.stat().st_size == release["sizeBytes"]
     assert hashlib.sha256(artifact.read_bytes()).hexdigest() == release["sha256"]
-    assert release["fileName"] in index
-    assert release["sha256"] in index
-    assert f'{release["versionName"]} ({release["versionCode"]})' in index
-    assert release["fileName"] in llms
-    assert release["sha256"] in llms
-    assert "相同簽章的 2.8.3 APK 更新" in index
-    assert "直接開啟並選「更新」，請勿先解除安裝" in index
-    assert 'i18n.js?v=20260926-v283' in index
-    assert 'main.js?v=20260926-v284' in index
+    # Owner sideload artifacts remain verifiable but are not recruitment CTAs.
+    assert release["fileName"] not in index
+    assert release["fileName"] not in llms
+    assert 'i18n.js?v=20260930-alpha' in index
+    assert 'main.js?v=20260930-alpha' in index

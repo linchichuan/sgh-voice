@@ -7,13 +7,18 @@
 [![macOS](https://img.shields.io/badge/macOS-Apple_Silicon-black?logo=apple)](https://github.com/linchichuan/sgh-voice/releases)
 [![iOS](https://img.shields.io/badge/iOS-17.0+-blue?logo=apple)](https://github.com/linchichuan/sgh-voice/releases)
 [![Android](https://img.shields.io/badge/Android-8.0+-green?logo=android)](https://github.com/linchichuan/sgh-voice/releases)
-[![Android Version](https://img.shields.io/badge/Android-2.8.3-green)](https://voice.shingihou.com/)
+[![Android Version](https://img.shields.io/badge/Android-2.8.4-green)](https://voice.shingihou.com/)
 
 ---
 
-## Android v2.8.3：統一鍵盤高度與日文滑動輸入
+## Android v2.8.4：語音操作介面與封閉測試招募
 
-官方側載個人測試版：[下載與安裝說明](https://voice.shingihou.com/#android-download)。同簽章版本可直接更新，請勿先解除安裝；Google Play 安裝版請沿原管道更新。
+[Android 封閉測試申請](https://voice.shingihou.com/?lang=zh#android-download)：填表只登記待處理申請，不會直接下載 APK、取得 Play 資格或自動算入測試人數。受邀者須在 Google Play 加入測試；12 人須連續保留測試資格至少 14 天。Google Play 審查與正式存取仍需另行申請。
+
+- 語音輸入與幫我寫改成左右分離的小型按鈕，錄音／處理中禁止切換，避免無效點擊。
+- 放大真實收音驅動的波紋和柔和漸層；沒有收音保持平線，不使用假錄音動畫。
+- SGH 品牌字放大；保留一致的頂部工具列高度。
+- 個人側載更新與公開招募分開提供。同簽章版本可直接更新，請勿先解除安裝；Google Play 安裝版請沿原管道更新。版本化 APK 是公開檔案，不是存取控制。
 
 - 語音、注音、日文與英文共用鍵盤高度，以注音原本大小為 100%；設定可在 90–125% 間每次調整 5%，也可重設。
 - 日文可切換 Romaji／12 鍵 flick：輕點中央或向左、上、右、下滑動選字，例如「な／に／ぬ／ね／の」，不必連按輪替。

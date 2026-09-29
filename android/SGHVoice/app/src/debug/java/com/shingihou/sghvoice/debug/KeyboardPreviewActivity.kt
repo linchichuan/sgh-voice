@@ -10,6 +10,7 @@ import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import android.util.Log
+import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
 import android.widget.EditText
@@ -283,6 +284,7 @@ class KeyboardPreviewActivity : ComponentActivity() {
     private fun verifyCircleContract() {
         contractResult = runCatching {
             keyboard.setInputMode(KeyboardView.InputMode.VOICE)
+            keyboard.setVoiceActionMode(KeyboardView.VoiceActionMode.DICTATION)
             val control = keyboard.findViewById<View>(R.id.btn_mic)
             val surface = keyboard.findViewById<View>(R.id.mic_outer_ring)
             check(surface.background == null && surface.elevation == 0f && surface.paddingLeft == 0) {
@@ -291,6 +293,35 @@ class KeyboardPreviewActivity : ComponentActivity() {
             val waveform = keyboard.findViewById<View>(R.id.audio_waveform)
             val label = keyboard.findViewById<TextView>(R.id.mic_action_label)
             val status = keyboard.findViewById<TextView>(R.id.tv_status)
+            val taskSwitch = keyboard.findViewById<LinearLayout>(R.id.voice_task_switch)
+            val dictationTask = keyboard.findViewById<View>(R.id.btn_voice_dictation)
+            val composeTask = keyboard.findViewById<View>(R.id.btn_voice_compose)
+            val modeBar = keyboard.findViewById<View>(R.id.mode_bar)
+            val nextKeyboard = keyboard.findViewById<View>(R.id.btn_next_keyboard)
+            val brand = keyboard.findViewById<TextView>(R.id.tv_keyboard_brand)
+            check(taskSwitch.background == null && taskSwitch.width <= dp(300)) {
+                "Voice tasks must be compact separate cards, not one joined switch"
+            }
+            check(composeTask.left - dictationTask.right >= dp(8)) {
+                "Voice task cards must have a visible gap"
+            }
+            check(dictationTask.height >= dp(44) && composeTask.height >= dp(44)) {
+                "Voice task cards must remain easy to tap"
+            }
+            check(dictationTask.isSelected && !composeTask.isSelected) {
+                "Only the active voice task should look selected"
+            }
+            keyboard.setVoiceActionMode(KeyboardView.VoiceActionMode.COMPOSE)
+            check(!dictationTask.isSelected && composeTask.isSelected) {
+                "Selecting a voice task should move the selected state"
+            }
+            keyboard.setVoiceActionMode(KeyboardView.VoiceActionMode.DICTATION)
+            val minimumBrandTextSize = TypedValue.applyDimension(
+                TypedValue.COMPLEX_UNIT_SP, 12f, resources.displayMetrics
+            )
+            check(modeBar.height == nextKeyboard.height && brand.textSize >= minimumBrandTextSize) {
+                "Brand and input-mode controls should align at a readable size"
+            }
             VoicePalette.entries.forEach {
                 keyboard.setVoicePalette(it.argb)
                 check(ColorUtils.calculateContrast(label.currentTextColor, it.argb) >= 4.5) {
@@ -311,6 +342,9 @@ class KeyboardPreviewActivity : ComponentActivity() {
             listOf(VoiceInputIME.ImeState.STARTING, VoiceInputIME.ImeState.STOPPING, VoiceInputIME.ImeState.PROCESSING).forEach {
                 keyboard.updateState(it)
                 check(!control.isEnabled) { "Busy state must not accept another recording action" }
+                check(!dictationTask.isEnabled && !composeTask.isEnabled) {
+                    "Voice task must not appear changeable while audio is busy"
+                }
                 check(waveform.visibility != View.VISIBLE) { "Busy state must not pretend to capture sound" }
             }
             previewState = VoiceInputIME.ImeState.RECORDING
@@ -334,7 +368,8 @@ class KeyboardPreviewActivity : ComponentActivity() {
             check(bottom.getGlobalVisibleRect(visible) && visible.height() == bottom.height) {
                 "Bottom actions are clipped"
             }
-            "PASS: 6 palette contrasts / circle / busy states / single tap / 、，。 / translation / bottom controls / " +
+            "PASS: task selection / compact split cards / toolbar / 6 palette contrasts / circle / busy states / " +
+                "single tap / 、，。 / translation / bottom controls / " +
                 "height ${keyboard.height}px of ${dp(config.screenHeightDp)}px"
         }.getOrElse { "FAIL: ${it.message}" }
         Log.i("KeyboardPreview", contractResult)

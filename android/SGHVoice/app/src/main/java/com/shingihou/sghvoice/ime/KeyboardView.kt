@@ -145,6 +145,7 @@ class KeyboardView @JvmOverloads constructor(
     private lateinit var voiceStateDot: View
     private lateinit var audioWaveform: AudioWaveformView
     private lateinit var voiceHint: TextView
+    private lateinit var voiceTaskSwitch: LinearLayout
     private lateinit var dictationTaskButton: TextView
     private lateinit var composeTaskButton: TextView
     private lateinit var composeActionRow: View
@@ -363,6 +364,11 @@ class KeyboardView @JvmOverloads constructor(
 
     private fun renderDraftActions() {
         val idle = isVoiceIdle()
+        val canChangeVoiceTask = idle
+        listOf(dictationTaskButton, composeTaskButton).forEach { button ->
+            button.isEnabled = canChangeVoiceTask
+            button.alpha = if (canChangeVoiceTask) 1f else 0.58f
+        }
         if (!idle) draftPreviewShown = false
         val canPreview = draftPreviewText.text.isNotBlank() && idle &&
             (hasComposeNotes || hasPendingDraft)
@@ -620,6 +626,7 @@ class KeyboardView @JvmOverloads constructor(
         voiceStateDot = findViewById(R.id.voice_state_dot)
         audioWaveform = findViewById(R.id.audio_waveform)
         voiceHint = findViewById(R.id.tv_voice_hint)
+        voiceTaskSwitch = findViewById(R.id.voice_task_switch)
         dictationTaskButton = findViewById(R.id.btn_voice_dictation)
         composeTaskButton = findViewById(R.id.btn_voice_compose)
         composeActionRow = findViewById(R.id.compose_action_row)
@@ -685,6 +692,13 @@ class KeyboardView @JvmOverloads constructor(
         }
         val width = MeasureSpec.getSize(widthMeasureSpec)
         arrangeVoicePanel(width >= dp(600) && resources.configuration.screenHeightDp < 500)
+        val availableTaskWidth = if (compactVoiceLayout) {
+            ((width - dp(48)) * 0.58f).toInt()
+        } else width - dp(48)
+        val taskWidth = minOf(dp(300), availableTaskWidth.coerceAtLeast(dp(160)))
+        if (voiceTaskSwitch.layoutParams.width != taskWidth) {
+            voiceTaskSwitch.layoutParams = voiceTaskSwitch.layoutParams.apply { this.width = taskWidth }
+        }
         val preferred = resources.getDimensionPixelSize(R.dimen.voice_mic_diameter)
         val minimum = dp(if (resources.configuration.fontScale > 1.3f) 128 else 96)
         val diameter = minOf(maxOf(preferred, minimum), (width - dp(36)).coerceAtLeast(dp(48)))

@@ -38,6 +38,7 @@
     <color name="mic_ring_edge">#577669</color>
     <color name="voice_task_surface">#E2ECE6</color>
     <color name="voice_task_border">#CADDD0</color>
+    <color name="voice_task_selected_border">#95BFA2</color>
     <color name="voice_task_selected_text">#183E2C</color>
     <color name="voice_task_unselected_text">#365F49</color>
     <color name="voice_compose_secondary_surface">#E9F4EC</color>

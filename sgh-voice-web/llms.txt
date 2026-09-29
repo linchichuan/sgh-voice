@@ -2,17 +2,18 @@
 
 > A multilingual input tool by Shingihou Co., Ltd. The Android keyboard combines voice, Zhuyin, Japanese, and English input in one IME. A separate macOS app supports mixed Traditional Chinese, Japanese, and English dictation.
 
-## Current Android test release
+## Android closed Alpha recruitment
 
-- Version: 2.8.3 (version code 33)
 - Platform: Android 8.0 or later
-- Distribution status: personal test build, distributed as a versioned APK from the official SGH Voice website
-- Google Play status: not currently published through Google Play Production
-- Download: https://voice.shingihou.com/downloads/SGHVoice-Android-v2.8.3.apk
-- File size: 17,421,413 bytes (16.61 MiB)
-- SHA-256: d2a3e64aa14e7a05db1eea79e26cc6ddf6be663a74ac8fff4207f1e28053324c
-- App price: free
-- Cloud usage: BYOK; OpenAI, Anthropic, or Groq usage charges may apply
+- Public entry: https://voice.shingihou.com/#android-download
+- Recruiting at least 12 Android users who will remain opted in for at least 14 days
+- Application flow: submit name and Google Play account email with consent; application is saved as pending
+- No automatic APK download, no automatic test eligibility and no automatic email currently
+- Our team must arrange tester eligibility and invitation before the applicant opts in and installs through Google Play
+- A submitted form, an email or a sideloaded APK does not count as Google Play opt-in
+- Android Google Play base price: US$10 one-time, not a subscription; local store prices apply and test invitations do not guarantee free licenses
+- Cloud usage: BYOK; provider usage charges may apply
+- Production availability is not implied by recruitment
 
 ### Android capabilities
 
@@ -47,8 +48,7 @@
 
 ### Android limitations and installation notice
 
-- This APK is a sideloaded personal test build, not a public Google Play release
-- Official sideload installations of 2.7.3–2.8.2 can update directly to 2.8.3 with the same package name and signing certificate; users should not uninstall first
+- Public Android applicants must wait for a closed-test invitation and install through Google Play
 - Previously mistaken learning records are not automatically erased by the update; users can undo the latest learning or clear local learning data from the personal dictionary screen
 - Google Play test installations should update through their original install channel
 - Review and accept cloud-processing consent version 3 in Settings if not yet accepted; consent already accepted in 2.7.6 remains valid, and existing keys and vocabulary are retained
@@ -58,11 +58,11 @@
 - Notes, pending drafts and retry audio disappear when the input-method service ends or the device restarts; continuous background recording is not supported
 - Cloud consent is checked before each new request; withdrawal prevents follow-up AI requests and retry uploads
 - Automated checks and emulator inspection do not establish real-device dictation accuracy; the physical-device acceptance checklist remains pending
-- Android requires the user to allow installation from the browser or file manager used for the download
-- Compatibility and stability can vary by device; users should evaluate sideloading risks before installation
+- Closed-test installations use Google Play; no unknown-source installation is requested
+- Compatibility and stability can vary by device; back up important data
 - Keep Google Play Protect enabled
 - Japanese conversion is Phase 1 and does not yet provide sentence-level contextual conversion comparable to a mature Japanese IME such as Mozc
-- Google Play's 12-tester, 14-day closed-test requirement applies to personal developer accounts created after November 13, 2023 when applying for Production access; it is not a requirement for every developer account or for directly installing this APK
+- Google Play's 12-tester, 14-day closed-test requirement applies to personal developer accounts created after November 13, 2023 when applying for Production access; it is not a requirement for every developer account. Applications on this site do not replace Google Play opt-in
 
 ## Current macOS public release
 
@@ -83,6 +83,8 @@
 - Optional on-device speech recognition on supported Apple Silicon Macs
 
 ## Data handling
+
+- Test applications are stored in Cloud Firestore as pending, with contact details, consent and testing commitment. Our team may add the account email to Google Play for test eligibility. No invitation is claimed until actually arranged
 
 - Android API keys use encrypted on-device storage
 - Android learning data is stored locally on the device

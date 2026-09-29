@@ -47,7 +47,8 @@ All modes use the original 372dp Zhuyin footprint at 100%, plus navigation inset
 capped at 80% of the available window. Wide landscape voice uses two columns; constrained
 manual keyboards keep their touch targets and allow the middle area to scroll.
 `--ez verify true` runs device-side checks
-of the large single control, busy-state gating, one tap/one action, actual
+of the separated voice-task cards, selected/disabled states, same-height toolbar,
+large single control, busy-state gating, one tap/one action, actual
 `、` / `，` / `。` dispatch, and the translation picker. The preview header reports
 PASS or FAIL. Clicks only change synthetic state/text; they never record or
 submit a transcript.

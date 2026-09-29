@@ -174,11 +174,12 @@ verify_release_apk() {
 
 verify_public_copy() {
     verify_release_apk "$PUBLISHED_APK"
-    grep -Fq "$EXPECTED_FILE_NAME" "$WEB_DIR/index.html" || fail "Website does not reference the release filename"
-    grep -Fq "$EXPECTED_SHA256" "$WEB_DIR/index.html" || fail "Website does not show the release SHA-256"
-    grep -Fq "$EXPECTED_VERSION_NAME ($EXPECTED_VERSION_CODE)" "$WEB_DIR/index.html" || fail "Website version does not match the release manifest"
-    grep -Fq "$EXPECTED_FILE_NAME" "$WEB_DIR/llms.txt" || fail "llms.txt does not reference the release filename"
-    grep -Fq "$EXPECTED_SHA256" "$WEB_DIR/llms.txt" || fail "llms.txt SHA-256 does not match the release manifest"
+    # The landing page recruits closed-test applicants, not sideload users.
+    # Keep immutable owner-update artifacts verifiable without advertising them
+    # as a substitute for Google Play opt-in and its 14-day testing requirement.
+    if grep -Eq 'data-download-href="[^\"]*\.apk"|href="[^\"]*\.apk"' "$WEB_DIR/index.html"; then
+        fail "Recruitment page must not link directly to an APK"
+    fi
 }
 
 if [[ "$MODE" == "artifact-only" ]]; then

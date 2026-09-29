@@ -20,7 +20,7 @@
 
         <TextView
             android:id="@+id/tv_keyboard_brand"
-            android:layout_width="64dp"
+            android:layout_width="72dp"
             android:layout_height="44dp"
             android:layout_marginEnd="4dp"
             android:contentDescription="@string/keyboard_brand"
@@ -34,7 +34,7 @@
             android:maxLines="1"
             android:text="@string/keyboard_brand_short"
             android:textColor="@color/key_text"
-            android:textSize="10sp" />
+            android:textSize="13sp" />
 
         <LinearLayout
             android:id="@+id/mode_group"
@@ -143,17 +143,18 @@
 
         <LinearLayout
             android:id="@+id/voice_task_switch"
-            android:layout_width="match_parent"
+            android:layout_width="300dp"
             android:layout_height="48dp"
-            android:background="@drawable/voice_task_switch_bg"
+            android:layout_gravity="center_horizontal"
             android:gravity="center"
             android:orientation="horizontal"
-            android:padding="2dp">
+            android:padding="0dp">
 
             <TextView
                 android:id="@+id/btn_voice_dictation"
                 android:layout_width="0dp"
                 android:layout_height="44dp"
+                android:layout_marginEnd="8dp"
                 android:layout_weight="1"
                 android:background="@drawable/voice_task_selected_bg"
                 android:clickable="true"

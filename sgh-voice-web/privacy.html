@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SGH Voice - Privacy Policy / プライバシーポリシー</title>
-    <meta name="description" content="SGH Voice が音声、文字、API キー、端末内学習データ、ダウンロード登録情報をどのように取り扱うかを説明します。">
+    <meta name="description" content="SGH Voice が音声、文字、API キー、端末内学習データ、テスト申請・ダウンロード登録情報をどのように取り扱うかを説明します。">
     <meta name="robots" content="index, follow">
     <link rel="canonical" href="https://voice.shingihou.com/privacy.html">
     <link rel="alternate" hreflang="ja" href="https://voice.shingihou.com/privacy.html?lang=ja">
@@ -196,8 +196,8 @@
                 <p>macOS版では、各回の音声認識結果と最終出力テキストを <code>~/.voice-input/history.json</code> に保存し、Dashboardで参照・編集・削除できます。iOS版は発話履歴ファイルを作成せず、現在の結果を画面上に一時表示します。Android v2.7.6も完全な発話履歴ファイルを作成せず、候補頻度、短い修正ルール、およびユーザーが明示的に追加した注音の語彙と読みだけを端末内に保持します。いずれも当社のサーバーには送信されません。</p>
                 <p>macOS版のスタイルプロファイル再生成は、直近最大100件を端末内で集計し、文章の長さ・句読点・言語混在等の特徴だけを保存します。本文を外部AIへ送信したり、プロファイルに原文を転載したりしません。端末内の診断レポートは内容プレビューを保存せずメタデータのみを記録します。自動トリアージレポートには、ユーザーが編集した短い修正候補が含まれる場合があります。</p>
 
-                <h3>2.5 ウェブサイトでのダウンロード登録</h3>
-                <p>Android または macOS 版をダウンロードする際、お名前またはニックネーム、メールアドレス、対象プラットフォーム、バージョン、表示言語および登録日時を収集します。これらはダウンロード状況の把握、重要な更新・セキュリティ情報等の必要なご連絡、お問い合わせ対応のために利用し、Google Firebase（Cloud Firestore）に保存します。</p>
+                <h3>2.5 Android テスト申請と macOS ダウンロード登録</h3>
+                <p>Android テストへの申請時に、お名前またはニックネーム、Google Play で使用する Google アカウントのメールアドレス、対象プラットフォーム・トラック、申請状態、表示言語、同意内容のバージョン、プライバシーへの同意、14日間以上の参加意思および受付日時を Google Firebase（Cloud Firestore）に保存します。テスター募集・招待・必要な連絡に使用し、テスト資格の設定のため Google Play にメールアドレスを登録する場合があります。申請は受付待ちとなり、現在は自動メールを送信しません。macOS のダウンロード登録では、お名前、メールアドレス、プラットフォーム、バージョン、ファイル名、表示言語、同意内容のバージョン、リスク確認フラグ（macOS は false）および日時を記録し、必要な更新連絡に使用します。</p>
             </div>
 
             <div class="card">
@@ -207,7 +207,7 @@
                     <li>AI による文章の後処理・校正</li>
                     <li>繁体字中国語への変換</li>
                     <li>カスタム辞書による認識精度の向上</li>
-                    <li>ダウンロード記録の管理および必要なご連絡</li>
+                    <li>テスター募集・招待、ダウンロード記録の管理および必要なご連絡</li>
                 </ul>
             </div>
 
@@ -219,7 +219,7 @@
                     <li><strong>LLM 後処理：</strong>Anthropic / OpenAI / Groq / OpenRouter / Ollama（ローカル）— 文字起こし結果を整理・校正</li>
                     <li><strong>OpenRouter</strong> はリクエスト毎に内部で複数のモデルプロバイダー（Meta / DeepSeek 等）にサブルーティングする場合があります。本アプリは送信先モデルをユーザーが選択できる仕様としており、各サブプロバイダーのプライバシーポリシーをご確認ください。</li>
                 </ul>
-                <p>ダウンロード登録情報の保管には Google Firebase（Cloud Firestore）を利用します。各AIプロバイダーに送信したデータの保存期間と削除方法は、ユーザー自身のプロバイダー契約、アカウント設定および各社のプライバシーポリシーに従います。当社はユーザーのBYOKアカウント内にあるプロバイダー側のデータを直接削除できません。それ以外の第三者への情報提供は行いません。</p>
+                <p>テスト申請・ダウンロード登録情報の保管には Google Firebase（Cloud Firestore）を利用します。各AIプロバイダーに送信したデータの保存期間と削除方法は、ユーザー自身のプロバイダー契約、アカウント設定および各社のプライバシーポリシーに従います。当社はユーザーのBYOKアカウント内にあるプロバイダー側のデータを直接削除できません。上記のテスト資格設定のための Google Play への提供を除き、それ以外の第三者への情報提供は行いません。</p>
                 <ul>
                     <li><strong>OpenAI：</strong>APIデータは初期設定で学習に使用されません。Abuse monitoring logには送信内容が含まれる場合があり、通常は最長30日間保管されます。承認済みのZero Data RetentionまたはModified Abuse Monitoring設定では条件が異なります。</li>
                     <li><strong>Groq：</strong>推論の入力・出力は初期設定では保管されません。ただし、サービス信頼性または不正利用調査のためのログが最長30日間一時保管される場合があります。Zero Data Retention設定では条件が異なります。</li>
@@ -240,7 +240,7 @@
                     <li>APIキーはiOSではKeychain、AndroidではEncryptedSharedPreferences、対応するmacOS版ではKeychainまたは権限を600に限定した設定ファイルに保存</li>
                     <li>すべての API 通信は HTTPS / TLS 1.2 以上で暗号化</li>
                     <li>音声データは処理後に削除（Android の明示的な再試行用一時メモリ、および有効化したデスクトップ音声バックアップを除く）</li>
-                    <li>アプリ内の音声・文字・API キーは当社のサーバーへ送信されません（ウェブサイトで明示的に送信するダウンロード登録情報を除く）</li>
+                    <li>アプリ内の音声・文字・API キーは当社のサーバーへ送信されません（ウェブサイトで明示的に送信するテスト申請・ダウンロード登録情報を除く）</li>
                 </ul>
             </div>
 
@@ -301,7 +301,7 @@
                 </ul>
                 <p>API キーは別途、Dashboard 設定画面より個別に削除できます。</p>
                 <p>iOS版では、設定画面の「APIキー・辞書・設定を消去」からKeychain内のAPIキー、カスタム辞書および端末内の設定を削除できます。アプリを削除した場合、iOSのアプリ領域にあるデータも削除されます。</p>
-                <p>ウェブサイトのダウンロード登録情報は、上記利用目的に必要な期間に限って保管し、不要となった情報を定期的に見直します。開示・訂正・削除をご希望の場合は、登録したメールアドレスを明記のうえ、下記窓口までご連絡ください。</p>
+                <p>ウェブサイトのテスト申請・ダウンロード登録情報は、上記利用目的に必要な期間に限って保管し、不要となった情報を定期的に見直します。開示・訂正・削除をご希望の場合は、登録したメールアドレスを明記のうえ、下記窓口までご連絡ください。</p>
                 <p>AIプロバイダーへ送信済みのデータを削除する場合は、ユーザー自身のプロバイダーアカウントまたは各社の問い合わせ窓口からお手続きください。</p>
             </div>
 
@@ -344,8 +344,8 @@
                 <p>macOS 版會將每次語音辨識結果與最終輸出文字儲存於 <code>~/.voice-input/history.json</code>，可從 Dashboard 檢視、編輯、刪除。iOS 版不建立發話歷史檔案，只在目前畫面暫時顯示結果。Android v2.7.6 也不建立完整發話歷史檔案，只在裝置內保存候選頻率、短修正規則，以及使用者明確加入的注音詞彙與讀音。上述資料皆不會傳送至本公司伺服器。</p>
                 <p>macOS 版重新生成風格 Profile 時，只會在裝置本機彙整最近最多 100 筆紀錄，並保存句長、標點及語言混用等整體特徵；不會將原文傳送給外部 AI，也不會在 Profile 內重現原文。本機健康報告不保存逐字稿預覽，只記錄後設資料；自動分類報告可能包含使用者已編輯的短修正候選。</p>
 
-                <h3>2.5 網站下載登記</h3>
-                <p>下載 Android 或 macOS 版本時，本公司會蒐集姓名或暱稱、Email、下載平台、版本、顯示語言及登記時間。資料用於掌握下載狀況、必要的版本或安全通知及回覆詢問，並儲存於 Google Firebase（Cloud Firestore）。</p>
+                <h3>2.5 Android 測試申請與 macOS 下載登記</h3>
+                <p>申請 Android 測試時，本公司將姓名或暱稱、Google Play 使用的 Google 帳號 Email、平台與測試軌道、申請狀態、顯示語言、同意版本、隱私同意、至少參與 14 天的意願與申請時間儲存於 Google Firebase（Cloud Firestore），用於招募、邀請與必要聯絡；為設定測試資格，可能將 Email 加入 Google Play 測試名單。申請先列為待處理，目前不會自動寄信。macOS 下載登記則記錄姓名、Email、平台、版本、檔名、語言、同意版本、風險確認旗標（macOS 為 false）及時間，用於下載紀錄與必要更新通知。</p>
             </div>
 
             <div class="card">
@@ -355,7 +355,7 @@
                     <li>AI 文字後處理與潤稿</li>
                     <li>繁體中文轉換</li>
                     <li>透過自訂詞庫提升辨識準確度</li>
-                    <li>管理下載紀錄及必要聯絡</li>
+                    <li>測試招募與邀請、管理下載紀錄及必要聯絡</li>
                 </ul>
             </div>
 
@@ -367,7 +367,7 @@
                     <li><strong>LLM 後處理：</strong>Anthropic / OpenAI / Groq / OpenRouter / Ollama（本機）— 整理潤稿文字結果</li>
                     <li><strong>OpenRouter</strong> 可能依請求動態路由至內部多個模型服務商（Meta / DeepSeek 等子服務商）。請另行確認各子服務商之隱私權政策。</li>
                 </ul>
-                <p>下載登記資料使用 Google Firebase（Cloud Firestore）保存。送往 AI 服務商的資料，其保存期間與刪除方式依使用者本人的服務商契約、帳號設定及各公司隱私權政策辦理；本公司無法直接刪除使用者 BYOK 帳號內的服務商端資料。除此之外，本公司不會向其他第三方提供資訊。</p>
+                <p>測試申請與下載登記資料使用 Google Firebase（Cloud Firestore）保存。送往 AI 服務商的資料，其保存期間與刪除方式依使用者本人的服務商契約、帳號設定及各公司隱私權政策辦理；本公司無法直接刪除使用者 BYOK 帳號內的服務商端資料。除上述為安排測試資格向 Google Play 提供 Email 外，本公司不會向其他第三方提供資訊。</p>
                 <ul>
                     <li><strong>OpenAI：</strong>API 資料預設不會用於訓練。Abuse monitoring logs 可能包含送出內容，一般最長保存 30 天；經核准的 Zero Data Retention 或 Modified Abuse Monitoring 設定適用不同條件。</li>
                     <li><strong>Groq：</strong>推論輸入與輸出預設不保留，但因服務可靠性或疑似濫用調查所產生的紀錄可能暫存最長 30 天；Zero Data Retention 設定適用不同條件。</li>
@@ -388,7 +388,7 @@
                     <li>API 金鑰在 iOS 使用 Keychain、Android 使用 EncryptedSharedPreferences；支援的 macOS 版本使用 Keychain 或權限設為 600 的設定檔</li>
                     <li>所有 API 通訊皆透過 HTTPS / TLS 1.2 以上加密</li>
                     <li>語音資料處理後刪除（Android 明確重試用暫存記憶體，以及已啟用的桌面音訊備份除外）</li>
-                    <li>應用程式內的語音、文字與 API 金鑰不會傳送至本公司伺服器（不含使用者在網站明示送出的下載登記資料）</li>
+                    <li>應用程式內的語音、文字與 API 金鑰不會傳送至本公司伺服器（不含使用者在網站明示送出的測試申請與下載登記資料）</li>
                 </ul>
             </div>
 
@@ -449,7 +449,7 @@
                 </ul>
                 <p>API 金鑰可從 Dashboard 設定頁面個別刪除。</p>
                 <p>iOS 版可從設定畫面的「清除 API 金鑰、詞庫與偏好設定」刪除 Keychain 內的 API 金鑰、自訂詞庫與裝置內設定；刪除 App 時，iOS App 儲存區中的資料亦會移除。</p>
-                <p>網站下載登記資料只在上述使用目的所需期間保存，並定期檢視不再需要的資料。如欲查詢、更正或刪除，請於來信中註明登記時使用的 Email，並聯絡下方窗口。</p>
+                <p>網站測試申請與下載登記資料只在上述使用目的所需期間保存，並定期檢視不再需要的資料。如欲查詢、更正或刪除，請於來信中註明登記時使用的 Email，並聯絡下方窗口。</p>
                 <p>如需刪除已傳送至 AI 服務商的資料，請由使用者本人的服務商帳號或各公司聯絡窗口辦理。</p>
             </div>
 
@@ -493,8 +493,8 @@
                 <p>On macOS, each speech-recognition result and final output text is stored locally in <code>~/.voice-input/history.json</code> and can be viewed, edited, and deleted from the Dashboard. The iOS version does not create an utterance-history file and displays the current result only in memory. Android v2.7.6 also does not create a complete dictation-history file; it stores only candidate frequency, short correction rules, and Zhuyin terms and readings explicitly added by the user. None of these platforms send this local data to our servers.</p>
                 <p>On macOS, style-profile regeneration aggregates at most 100 recent entries locally and stores only broad traits such as sentence length, punctuation, and language mixing. It does not send source text to an external AI or reproduce source text in the profile. Local health reports store metadata without transcript previews. The local auto-triage report may contain short correction candidates from entries the user edited.</p>
 
-                <h3>2.5 Website Download Registration</h3>
-                <p>When you download the Android or macOS release, we collect your name or nickname, email address, target platform, version, display language, and registration time. We use this information to understand download activity, provide necessary release or security notices, and respond to inquiries. The records are stored in Google Firebase (Cloud Firestore).</p>
+                <h3>2.5 Android Test Applications and macOS Download Registration</h3>
+                <p>For Android test applications, we store your name or nickname, Google Play account email, platform and test track, pending application status, display language, consent version, privacy consent, commitment to at least 14 days of testing, and submission time in Google Firebase (Cloud Firestore). We use these for recruitment, invitations and necessary contact, and may add your email to Google Play to arrange test eligibility. Applications are initially pending; automatic email is not currently enabled. For macOS downloads, we record your name, email, platform, version, filename, language, consent version, risk acknowledgement flag (false for macOS) and registration time for download records and necessary updates.</p>
             </div>
 
             <div class="card">
@@ -516,7 +516,7 @@
                     <li><strong>LLM post-processing:</strong> Anthropic / OpenAI / Groq / OpenRouter / Ollama (local) — clean up the transcribed text</li>
                     <li><strong>OpenRouter</strong> may dynamically route requests to internal model sub-providers (Meta / DeepSeek, etc.). Please review each sub-provider's privacy policy.</li>
                 </ul>
-                <p>Download registration records are stored using Google Firebase (Cloud Firestore). Retention and deletion of data sent to an AI provider are governed by the user's own provider agreement, account settings, and that provider's privacy policy. We cannot directly delete provider-side data held under a user's BYOK account. We do not share the information with other third parties.</p>
+                <p>Test application and download registration records are stored using Google Firebase (Cloud Firestore). Retention and deletion of data sent to an AI provider are governed by the user's own provider agreement, account settings, and that provider's privacy policy. We cannot directly delete provider-side data held under a user's BYOK account. Other than providing the email to Google Play to arrange test eligibility as described above, we do not share the information with other third parties.</p>
                 <ul>
                     <li><strong>OpenAI:</strong> API data is not used for training by default. Abuse-monitoring logs may include submitted content and are normally retained for up to 30 days; approved Zero Data Retention or Modified Abuse Monitoring settings apply different conditions.</li>
                     <li><strong>Groq:</strong> Inference inputs and outputs are not retained by default, but logs for service reliability or suspected-abuse investigations may be retained temporarily for up to 30 days; Zero Data Retention settings apply different conditions.</li>
@@ -537,7 +537,7 @@
                     <li>API keys are stored in Keychain on iOS, EncryptedSharedPreferences on Android, and Keychain or a permission-600 configuration file on supported macOS versions</li>
                     <li>All API communications are encrypted via HTTPS / TLS 1.2 or higher</li>
                     <li>Audio is deleted after processing, except Android in-memory explicit-retry buffers and enabled desktop audio backups</li>
-                    <li>In-app audio, text, and API keys are not transmitted to our servers (except download registration details explicitly submitted through the website)</li>
+                    <li>In-app audio, text, and API keys are not transmitted to our servers (except test application and download registration details explicitly submitted through the website)</li>
                 </ul>
             </div>
 
@@ -598,7 +598,7 @@
                 </ul>
                 <p>API keys can be deleted individually from the Dashboard Settings page.</p>
                 <p>On iOS, “Clear API Keys, Dictionary, and Preferences” in Settings removes API keys from Keychain and deletes the custom dictionary and on-device preferences. Deleting the app also removes data from the iOS app container.</p>
-                <p>Website download registration data is retained only as long as needed for the purposes stated above, and records that are no longer needed are reviewed periodically. To access, correct, or delete this data, contact us below and include the email address used for registration.</p>
+                <p>Website test application and download registration data is retained only as long as needed for the purposes stated above, and records that are no longer needed are reviewed periodically. To access, correct, or delete this data, contact us below and include the email address used for registration.</p>
                 <p>To delete data already sent to an AI provider, use your provider account or contact that provider directly.</p>
             </div>
 
