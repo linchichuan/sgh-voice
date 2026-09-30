@@ -24,6 +24,10 @@
             android:layout_height="44dp"
             android:layout_marginEnd="4dp"
             android:contentDescription="@string/keyboard_brand"
+            android:autoSizeMaxTextSize="17sp"
+            android:autoSizeMinTextSize="14sp"
+            android:autoSizeStepGranularity="1sp"
+            android:autoSizeTextType="uniform"
             android:drawableStart="@drawable/ic_sgh_voice_mark"
             android:drawablePadding="4dp"
             android:ellipsize="end"
@@ -34,7 +38,7 @@
             android:maxLines="1"
             android:text="@string/keyboard_brand_short"
             android:textColor="@color/key_text"
-            android:textSize="13sp" />
+            android:textSize="17sp" />
 
         <LinearLayout
             android:id="@+id/mode_group"
@@ -143,8 +147,8 @@
 
         <LinearLayout
             android:id="@+id/voice_task_switch"
-            android:layout_width="300dp"
-            android:layout_height="48dp"
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
             android:layout_gravity="center_horizontal"
             android:gravity="center"
             android:orientation="horizontal"
@@ -152,10 +156,11 @@
 
             <TextView
                 android:id="@+id/btn_voice_dictation"
-                android:layout_width="0dp"
+                android:layout_width="wrap_content"
                 android:layout_height="44dp"
-                android:layout_marginEnd="8dp"
-                android:layout_weight="1"
+                android:minWidth="88dp"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"
                 android:background="@drawable/voice_task_selected_bg"
                 android:clickable="true"
                 android:contentDescription="@string/voice_task_dictation_desc"
@@ -165,13 +170,21 @@
                 android:focusable="true"
                 android:text="@string/voice_task_dictation"
                 android:textColor="@color/voice_task_selected_text"
-                android:textSize="13sp" />
+                android:maxLines="1"
+                android:textSize="12sp" />
+
+            <Space
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1" />
 
             <TextView
                 android:id="@+id/btn_voice_compose"
-                android:layout_width="0dp"
+                android:layout_width="wrap_content"
                 android:layout_height="44dp"
-                android:layout_weight="1"
+                android:minWidth="88dp"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"
                 android:background="@drawable/voice_task_unselected_bg"
                 android:clickable="true"
                 android:contentDescription="@string/voice_task_compose_desc"
@@ -181,7 +194,8 @@
                 android:focusable="true"
                 android:text="@string/voice_task_compose"
                 android:textColor="@color/voice_task_unselected_text"
-                android:textSize="13sp" />
+                android:maxLines="1"
+                android:textSize="12sp" />
         </LinearLayout>
 
         <LinearLayout
@@ -218,10 +232,10 @@
             android:layout_height="@dimen/voice_mic_diameter"
             android:layout_marginTop="@dimen/voice_mic_top_margin">
 
-        <!-- One touch target: feedback and finish action share the same circle. -->
+        <!-- One broad oval touch target contains feedback and the finish action. -->
         <FrameLayout
             android:id="@+id/mic_outer_ring"
-            android:layout_width="@dimen/voice_mic_diameter"
+            android:layout_width="match_parent"
             android:layout_height="@dimen/voice_mic_diameter"
             android:layout_gravity="center"
             android:elevation="0dp"
@@ -546,16 +560,6 @@
             android:textSize="13sp"
             android:visibility="gone" />
 
-        <TextView
-            android:id="@+id/tv_voice_hint"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:gravity="center"
-            android:maxLines="2"
-            android:text="@string/voice_toggle_hint"
-            android:textColor="@color/keyboard_muted_text"
-            android:textSize="12sp" />
     </LinearLayout>
 
     <LinearLayout

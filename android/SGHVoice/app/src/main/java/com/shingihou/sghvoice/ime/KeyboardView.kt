@@ -114,9 +114,6 @@ class KeyboardView @JvmOverloads constructor(
     private var hasPendingDraft = false
     private var retryAvailable = false
     private var draftPreviewShown = false
-    private var compactVoiceLayout = false
-    private var voicePanelChildren = emptyList<View>()
-    private var compactCaptureColumn: LinearLayout? = null
     private var voicePalette = 0xFFDDF3E5.toInt()
     private var keyboardHeightPercent = KeyboardSizing.DEFAULT_PERCENT
     private var currentVoiceState = VoiceInputIME.ImeState.IDLE
@@ -144,7 +141,6 @@ class KeyboardView @JvmOverloads constructor(
     private lateinit var statusText: TextView
     private lateinit var voiceStateDot: View
     private lateinit var audioWaveform: AudioWaveformView
-    private lateinit var voiceHint: TextView
     private lateinit var voiceTaskSwitch: LinearLayout
     private lateinit var dictationTaskButton: TextView
     private lateinit var composeTaskButton: TextView
@@ -183,6 +179,7 @@ class KeyboardView @JvmOverloads constructor(
         installNavigationBarInsets()
         bindActions()
         setInputMode(InputMode.VOICE)
+        setVoiceActionMode(voiceActionMode)
         updateCandidates("", emptyList())
     }
 
@@ -274,14 +271,8 @@ class KeyboardView @JvmOverloads constructor(
 
     fun setVoiceActionMode(mode: VoiceActionMode) {
         voiceActionMode = mode
-        dictationTaskButton.setBackgroundResource(
-            if (mode == VoiceActionMode.DICTATION) R.drawable.voice_task_selected_bg
-            else R.drawable.voice_task_unselected_bg
-        )
-        composeTaskButton.setBackgroundResource(
-            if (mode == VoiceActionMode.COMPOSE) R.drawable.voice_task_selected_bg
-            else R.drawable.voice_task_unselected_bg
-        )
+        styleVoiceTaskButton(dictationTaskButton, mode == VoiceActionMode.DICTATION)
+        styleVoiceTaskButton(composeTaskButton, mode == VoiceActionMode.COMPOSE)
         dictationTaskButton.setTextColor(ContextCompat.getColor(context,
             if (mode == VoiceActionMode.DICTATION) R.color.voice_task_selected_text
             else R.color.voice_task_unselected_text
@@ -293,6 +284,13 @@ class KeyboardView @JvmOverloads constructor(
         dictationTaskButton.isSelected = mode == VoiceActionMode.DICTATION
         composeTaskButton.isSelected = mode == VoiceActionMode.COMPOSE
         renderDraftActions()
+    }
+
+    private fun styleVoiceTaskButton(button: TextView, selected: Boolean) {
+        val surface = ContextCompat.getDrawable(context,
+            if (selected) R.drawable.voice_task_selected_bg else R.drawable.voice_task_unselected_bg)
+        // Quiet 28 dp cards at opposite edges; the full 44 dp area remains tappable.
+        button.background = InsetDrawable(surface, 0, dp(8), 0, dp(8))
     }
 
     fun setDraftActions(hasNotes: Boolean, hasPending: Boolean) {
@@ -324,7 +322,7 @@ class KeyboardView @JvmOverloads constructor(
         renderDraftActions()
     }
 
-    /** A light surface preference shared by the circle and its live audio accent. */
+    /** A light surface preference shared by the oval and its live audio accent. */
     fun setVoicePalette(palette: Int) {
         val opaque = ColorUtils.setAlphaComponent(palette, 255)
         voicePalette = if (ColorUtils.calculateLuminance(opaque) < 0.65) {
@@ -342,7 +340,7 @@ class KeyboardView @JvmOverloads constructor(
         // The full touch target remains; only the painted edge fades away.
         micOuterRing.background = null
         micOuterRing.elevation = 0f
-        val surface = SoftVoiceCircleDrawable(surfaceColor)
+        val surface = SoftVoiceCircleDrawable(ColorUtils.blendARGB(surfaceColor, ink, 0.07f))
         val mask = GradientDrawable().apply {
             shape = GradientDrawable.OVAL
             setColor(Color.WHITE)
@@ -377,8 +375,6 @@ class KeyboardView @JvmOverloads constructor(
         draftPreviewPanel.isVisible = draftPreviewShown && canPreview
         captureArea.isVisible = !translationPanel.isVisible
         micOuterRing.isVisible = !draftPreviewPanel.isVisible
-        voiceHint.isVisible = !translationPanel.isVisible && !canPreview && !compactVoiceLayout
-        compactCaptureColumn?.isVisible = !translationPanel.isVisible
         composeActionRow.isVisible = inputMode == InputMode.VOICE &&
             voiceActionMode == VoiceActionMode.COMPOSE && hasComposeNotes && !hasPendingDraft && !retryAvailable
         composeContinueButton.isEnabled = idle
@@ -428,8 +424,6 @@ class KeyboardView @JvmOverloads constructor(
         captureArea.isVisible = false
         translationPanel.isVisible = true
         draftPreviewButton.isVisible = false
-        voiceHint.isVisible = false
-        compactCaptureColumn?.isVisible = false
         statusText.setText(R.string.translation_picker_status)
         translationPanel.announceForAccessibility(
             context.getString(R.string.translation_picker_accessibility)
@@ -573,10 +567,6 @@ class KeyboardView @JvmOverloads constructor(
             }
         }
         micActionIcon.isVisible = state != VoiceInputIME.ImeState.RECORDING
-        voiceHint.setText(
-            if (state == VoiceInputIME.ImeState.RECORDING) R.string.voice_recording_hint
-            else R.string.voice_toggle_hint
-        )
         if (voiceActionMode == VoiceActionMode.COMPOSE) {
             when (state) {
                 VoiceInputIME.ImeState.IDLE,
@@ -591,7 +581,6 @@ class KeyboardView @JvmOverloads constructor(
                 }
                 else -> Unit
             }
-            voiceHint.setText(R.string.voice_compose_hint)
         }
         renderDraftActions()
     }
@@ -625,10 +614,14 @@ class KeyboardView @JvmOverloads constructor(
         statusText = findViewById(R.id.tv_status)
         voiceStateDot = findViewById(R.id.voice_state_dot)
         audioWaveform = findViewById(R.id.audio_waveform)
-        voiceHint = findViewById(R.id.tv_voice_hint)
         voiceTaskSwitch = findViewById(R.id.voice_task_switch)
         dictationTaskButton = findViewById(R.id.btn_voice_dictation)
         composeTaskButton = findViewById(R.id.btn_voice_compose)
+        listOf(dictationTaskButton, composeTaskButton).forEach {
+            TextViewCompat.setAutoSizeTextTypeUniformWithConfiguration(
+                it, 10, 12, 1, TypedValue.COMPLEX_UNIT_SP
+            )
+        }
         composeActionRow = findViewById(R.id.compose_action_row)
         composeContinueButton = findViewById(R.id.btn_compose_continue)
         composeGenerateButton = findViewById(R.id.btn_compose_generate)
@@ -669,8 +662,13 @@ class KeyboardView @JvmOverloads constructor(
         backspaceButton = findViewById(R.id.btn_backspace)
         enterButton = findViewById(R.id.btn_enter)
         setEnterIcon(enterButton)
-        val voiceContainer = voicePanel as LinearLayout
-        voicePanelChildren = (0 until voiceContainer.childCount).map(voiceContainer::getChildAt)
+        // Voice-mode utility keys look one third shorter, without shrinking their targets.
+        listOf(layerButton, commaButton, spaceButton, periodButton, backspaceButton, enterButton)
+            .forEach { button ->
+                button.background = InsetDrawable(button.background, 0, dp(8), 0, dp(8))
+                button.elevation = 0f
+                button.includeFontPadding = false
+            }
     }
 
     private fun installNavigationBarInsets() {
@@ -691,18 +689,18 @@ class KeyboardView @JvmOverloads constructor(
             return
         }
         val width = MeasureSpec.getSize(widthMeasureSpec)
-        arrangeVoicePanel(width >= dp(600) && resources.configuration.screenHeightDp < 500)
-        val availableTaskWidth = if (compactVoiceLayout) {
-            ((width - dp(48)) * 0.58f).toInt()
-        } else width - dp(48)
-        val taskWidth = minOf(dp(300), availableTaskWidth.coerceAtLeast(dp(160)))
-        if (voiceTaskSwitch.layoutParams.width != taskWidth) {
-            voiceTaskSwitch.layoutParams = voiceTaskSwitch.layoutParams.apply { this.width = taskWidth }
+        val captureWidth = (width - keyboardRoot.paddingLeft - keyboardRoot.paddingRight -
+            voicePanel.paddingLeft - voicePanel.paddingRight).coerceAtLeast(dp(48))
+        val maximumTaskWidth = (captureWidth * 0.44f).toInt()
+        listOf(dictationTaskButton, composeTaskButton).forEach {
+            it.maxWidth = maximumTaskWidth
         }
         val preferred = resources.getDimensionPixelSize(R.dimen.voice_mic_diameter)
-        val minimum = dp(if (resources.configuration.fontScale > 1.3f) 128 else 96)
-        val diameter = minOf(maxOf(preferred, minimum), (width - dp(36)).coerceAtLeast(dp(48)))
-        resizeCaptureArea(diameter)
+        val minimum = dp(if (resources.configuration.fontScale > 1.3f) 104 else 88)
+        // Keep the shape broad even on a narrow phone or a short landscape viewport.
+        val captureHeight = minOf(maxOf(preferred, minimum), (captureWidth * 0.64f).toInt())
+            .coerceAtLeast(dp(48))
+        resizeCaptureArea(captureWidth, captureHeight)
         // Never derive the IME footprint from the current mode's natural content height.
         // Navigation padding is additive, but the available-screen cap is shared by all modes.
         val navigationPadding = (keyboardRoot.paddingBottom - dp(6)).coerceAtLeast(0)
@@ -732,58 +730,26 @@ class KeyboardView @JvmOverloads constructor(
         super.onMeasure(widthMeasureSpec, heightMeasureSpec)
         val naturalHeight = contentScroll.getChildAt(0).measuredHeight
         if (inputMode == InputMode.VOICE && naturalHeight > bodyBudget) {
-            resizeCaptureArea((diameter - (naturalHeight - bodyBudget)).coerceAtLeast(minOf(minimum, diameter)))
+            resizeCaptureArea(captureWidth,
+                (captureHeight - (naturalHeight - bodyBudget)).coerceAtLeast(minOf(minimum, captureHeight)))
         }
         super.onMeasure(widthMeasureSpec, heightMeasureSpec)
     }
 
-    private fun arrangeVoicePanel(compact: Boolean) {
-        if (compactVoiceLayout == compact || voicePanelChildren.isEmpty()) return
-        compactVoiceLayout = compact
-        val container = voicePanel as LinearLayout
-        voicePanelChildren.forEach { (it.parent as? android.view.ViewGroup)?.removeView(it) }
-        container.removeAllViews()
-        container.orientation = if (compact) HORIZONTAL else VERTICAL
-        if (compact) {
-            val controls = LinearLayout(context).apply {
-                orientation = VERTICAL
-                layoutParams = LayoutParams(0, LayoutParams.WRAP_CONTENT, 0.58f)
-            }
-            val capture = LinearLayout(context).apply {
-                orientation = VERTICAL
-                gravity = android.view.Gravity.CENTER
-                layoutParams = LayoutParams(0, LayoutParams.WRAP_CONTENT, 0.42f).apply {
-                    marginStart = dp(12)
-                }
-            }
-            container.addView(controls)
-            container.addView(capture)
-            voicePanelChildren.forEach { child ->
-                if (child === captureArea || child === draftPreviewButton) capture.addView(child)
-                else controls.addView(child)
-            }
-            compactCaptureColumn = capture
-        } else {
-            voicePanelChildren.forEach(container::addView)
-            compactCaptureColumn = null
-        }
-        renderDraftActions()
-    }
-
-    private fun resizeCaptureArea(diameter: Int) {
-        captureArea.layoutParams.height = diameter
-        micOuterRing.layoutParams.width = diameter
-        micOuterRing.layoutParams.height = diameter
-        val compact = diameter < dp(140)
+    private fun resizeCaptureArea(ovalWidth: Int, ovalHeight: Int) {
+        captureArea.layoutParams.height = ovalHeight
+        micOuterRing.layoutParams.width = ovalWidth
+        micOuterRing.layoutParams.height = ovalHeight
+        val compact = ovalHeight < dp(140)
         (micActionIcon.layoutParams as FrameLayout.LayoutParams).apply {
             width = dp(if (compact) 24 else 32)
             height = width
-            topMargin = (diameter * if (compact) 0.13f else 0.27f).toInt()
+            topMargin = (ovalHeight * if (compact) 0.16f else 0.26f).toInt()
         }
         (micActionLabel.layoutParams as FrameLayout.LayoutParams).apply {
-            width = (diameter - dp(24)).coerceAtLeast(dp(40))
-            height = dp(if (resources.configuration.fontScale > 1.3f) 64 else if (compact) 40 else 52)
-            bottomMargin = dp(if (compact) 6 else 14)
+            width = (ovalWidth * 0.74f).toInt().coerceAtLeast(dp(40))
+            this.height = dp(if (resources.configuration.fontScale > 1.3f) 48 else if (compact) 32 else 40)
+            bottomMargin = dp(if (compact) 3 else 8)
         }
     }
 

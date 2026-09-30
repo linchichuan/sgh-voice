@@ -135,4 +135,48 @@ class LlmClientDictationSafetyTest {
             "GitHub 先測試，GitHub 再部署。", "GitHub 先測試，再部署。", "dictate"
         ))
     }
+
+    @Test
+    fun `formatting numbers do not replace quantities or ordered facts`() {
+        val source = "第一點收 20 元第二點退 50 元第三點不要更新版本 2.8.4"
+        val organized = "1. 收 20 元。\n2. 退 50 元。\n3. 不要更新版本 2.8.4。"
+        assertEquals(organized, client.validateLlmResult(source, organized, "dictate"))
+        assertNull(client.validateLlmResult(source, organized.replace("20", "21"), "dictate"))
+        assertNull(client.validateLlmResult(source,
+            "1. 收 50 元。\n2. 退 20 元。\n3. 不要更新版本 2.8.4。", "dictate"))
+        assertNull(client.validateLlmResult(source, organized.replace("不要", "要"), "dictate"))
+        assertNull(client.validateLlmResult(source, organized.replace("2.8.4", "2.8.5"), "dictate"))
+    }
+
+    @Test
+    fun `short spoken points and Arabic spoken ordinals may become list labels`() {
+        val organized = "1. 請測試。\n2. 請部署。"
+        assertEquals(organized, client.validateLlmResult("第一點請測試第二點請部署", organized, "dictate"))
+        assertEquals(organized, client.validateLlmResult("第1點請測試第2點請部署", organized, "dictate"))
+        val bullets = "- 請測試。\n- 請部署。"
+        assertEquals(bullets, client.validateLlmResult("第1點請測試第2點請部署", bullets, "dictate"))
+    }
+
+    @Test
+    fun `numbered lists preserve literal technical tokens and unspoken numbers are rejected`() {
+        val source = "第一點開啟 /tmp/MyRepo 第二點檢查 CI/CD 第三點不要 git push"
+        val organized = "1. 開啟 /tmp/MyRepo。\n2. 檢查 CI/CD。\n3. 不要 git push。"
+        assertEquals(organized, client.validateLlmResult(source, organized, "dictate"))
+        assertNull(client.validateLlmResult(source, organized.replace("MyRepo", "myrepo"), "dictate"))
+        assertNull(client.validateLlmResult(source, organized.replace("檢查 CI/CD", "檢查 CI/CD 12 次"), "dictate"))
+        assertNull(client.validateLlmResult(source, organized.replace("2. ", "8. "), "dictate"))
+    }
+
+    @Test
+    fun `existing numbered source labels remain protected`() {
+        val source = "1. 請測試。\n2. 請部署。"
+        assertEquals(source, client.validateLlmResult(source, source, "dictate"))
+        assertNull(client.validateLlmResult(source, source.replace("2. ", "3. "), "dictate"))
+    }
+
+    @Test
+    fun `URL queries are not mistaken for source sentence punctuation`() {
+        val source = "開啟 https://example.com/?q=Android 然後檢查設定"
+        assertEquals(source, client.validateLlmResult(source, source, "dictate"))
+    }
 }

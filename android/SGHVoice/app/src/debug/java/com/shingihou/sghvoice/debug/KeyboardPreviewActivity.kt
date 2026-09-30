@@ -211,7 +211,7 @@ class KeyboardPreviewActivity : ComponentActivity() {
         ).apply { gravity = Gravity.CENTER_HORIZONTAL })
         setContentView(root)
         readPreviewOptions(intent)
-        if (intent.getBooleanExtra("verify", false)) keyboard.post { verifyCircleContract() }
+        if (intent.getBooleanExtra("verify", false)) keyboard.post { verifyOvalContract() }
     }
 
     override fun onStart() {
@@ -281,14 +281,14 @@ class KeyboardPreviewActivity : ComponentActivity() {
     }
 
     /** Device-side checks of visible geometry and the real View action surface. */
-    private fun verifyCircleContract() {
+    private fun verifyOvalContract() {
         contractResult = runCatching {
             keyboard.setInputMode(KeyboardView.InputMode.VOICE)
             keyboard.setVoiceActionMode(KeyboardView.VoiceActionMode.DICTATION)
             val control = keyboard.findViewById<View>(R.id.btn_mic)
             val surface = keyboard.findViewById<View>(R.id.mic_outer_ring)
             check(surface.background == null && surface.elevation == 0f && surface.paddingLeft == 0) {
-                "Recording circle must not have an outer frame or shadow"
+                "Recording oval must not have an outer frame or shadow"
             }
             val waveform = keyboard.findViewById<View>(R.id.audio_waveform)
             val label = keyboard.findViewById<TextView>(R.id.mic_action_label)
@@ -299,8 +299,9 @@ class KeyboardPreviewActivity : ComponentActivity() {
             val modeBar = keyboard.findViewById<View>(R.id.mode_bar)
             val nextKeyboard = keyboard.findViewById<View>(R.id.btn_next_keyboard)
             val brand = keyboard.findViewById<TextView>(R.id.tv_keyboard_brand)
-            check(taskSwitch.background == null && taskSwitch.width <= dp(300)) {
-                "Voice tasks must be compact separate cards, not one joined switch"
+            check(taskSwitch.background == null && dictationTask.width <= taskSwitch.width * 0.45f &&
+                composeTask.width <= taskSwitch.width * 0.45f) {
+                "Voice tasks must be small separate cards at opposite edges"
             }
             check(composeTask.left - dictationTask.right >= dp(8)) {
                 "Voice task cards must have a visible gap"
@@ -317,7 +318,7 @@ class KeyboardPreviewActivity : ComponentActivity() {
             }
             keyboard.setVoiceActionMode(KeyboardView.VoiceActionMode.DICTATION)
             val minimumBrandTextSize = TypedValue.applyDimension(
-                TypedValue.COMPLEX_UNIT_SP, 12f, resources.displayMetrics
+                TypedValue.COMPLEX_UNIT_SP, 14f, keyboard.resources.displayMetrics
             )
             check(modeBar.height == nextKeyboard.height && brand.textSize >= minimumBrandTextSize) {
                 "Brand and input-mode controls should align at a readable size"
@@ -329,13 +330,14 @@ class KeyboardPreviewActivity : ComponentActivity() {
                 }
             }
             val config = keyboard.context.resources.configuration
-            val heightFraction = if (keyboard.width >= dp(600) && config.screenHeightDp < 500) 0.72f else 0.80f
+            val heightFraction = 0.80f
             check(keyboard.height <= dp((config.screenHeightDp * heightFraction).toInt()) + dp(2)) {
                 "Keyboard exceeds the window height budget"
             }
-            check(control.width == control.height && control.width >= dp(84)) { "Control must remain circular and touchable" }
+            check(control.width > control.height && control.width >= keyboard.width * 2 / 3 &&
+                control.height >= dp(48)) { "Control must remain a broad, touchable oval" }
             check(waveform.parent === control) { "Audio feedback must be inside the control" }
-            check(waveform.width <= control.width && waveform.height <= control.height) { "Feedback outside circle" }
+            check(waveform.width <= control.width && waveform.height <= control.height) { "Feedback outside oval" }
             check(label.layout.height <= label.height) { "Action caption is vertically clipped" }
             check((0 until label.lineCount).all { label.layout.getLineWidth(it) <= label.width }) { "Action caption is horizontally clipped" }
             check(status.layout.height <= status.height) { "Recording status is vertically clipped" }
@@ -368,7 +370,7 @@ class KeyboardPreviewActivity : ComponentActivity() {
             check(bottom.getGlobalVisibleRect(visible) && visible.height() == bottom.height) {
                 "Bottom actions are clipped"
             }
-            "PASS: task selection / compact split cards / toolbar / 6 palette contrasts / circle / busy states / " +
+            "PASS: task selection / small split cards / toolbar / 6 palette contrasts / broad oval / busy states / " +
                 "single tap / 、，。 / translation / bottom controls / " +
                 "height ${keyboard.height}px of ${dp(config.screenHeightDp)}px"
         }.getOrElse { "FAIL: ${it.message}" }

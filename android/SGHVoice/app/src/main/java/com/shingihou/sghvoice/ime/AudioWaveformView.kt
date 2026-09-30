@@ -3,6 +3,7 @@ package com.shingihou.sghvoice.ime
 import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.Canvas
+import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RadialGradient
@@ -20,7 +21,7 @@ import kotlin.math.sin
 /**
  * Gentle, transparent voice contours inside the single microphone control.
  * Only live PCM callbacks advance them; silence is a still horizontal line.
- * The parent owns the circular surface and the caption below these contours.
+ * The parent owns the broad oval surface and the caption below these contours.
  */
 class AudioWaveformView @JvmOverloads constructor(
     context: Context,
@@ -32,6 +33,7 @@ class AudioWaveformView @JvmOverloads constructor(
     private var activeColor = ContextCompat.getColor(context, R.color.waveform_active)
     private var baselineColor = ContextCompat.getColor(context, R.color.waveform_baseline)
     private val haloPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val haloMatrix = Matrix()
     private val wavePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         strokeCap = Paint.Cap.ROUND
@@ -80,18 +82,17 @@ class AudioWaveformView @JvmOverloads constructor(
         if (!recordingActive || width <= 0 || height <= 0) return
 
         val level = envelope.level
-        val diameter = minOf(width, height).toFloat()
-        val centerX = width / 2f
         val centerY = height * GentleWaveGeometry.BASELINE_Y_FRACTION
         if (level > 0.015f) {
             // A broad, soft mint bloom follows only real incoming audio samples.
-            // It is painted below the mic label and fades fully at the circle edge.
+            // It follows the entire oval, rather than a small circle at its centre.
             haloPaint.alpha = (48 + 64 * level).toInt().coerceIn(0, 112)
-            canvas.drawCircle(centerX, height / 2f, diameter * 0.48f, haloPaint)
+            canvas.drawOval(width * 0.02f, height * 0.02f, width * 0.98f,
+                height * 0.98f, haloPaint)
         }
 
-        val startX = width * 0.08f
-        val endX = width * 0.92f
+        val startX = width * 0.04f
+        val endX = width * 0.96f
         wavePaint.color = ColorUtils.blendARGB(baselineColor, activeColor, 0.4f + 0.6f * level)
         if (level <= 0.015f || reducedMotion) {
             // No displacement in silence or Android's reduced-motion mode.
@@ -132,18 +133,21 @@ class AudioWaveformView @JvmOverloads constructor(
     }
 
     private fun updateHaloShader() {
-        val radius = minOf(width, height) * 0.48f
-        if (radius <= 0f) return
+        if (width <= 0 || height <= 0) return
         val center = ColorUtils.blendARGB(baselineColor, activeColor, 0.24f)
         val middle = ColorUtils.blendARGB(baselineColor, activeColor, 0.12f)
         haloPaint.shader = RadialGradient(
-            width / 2f,
-            height / 2f,
-            radius,
+            0f,
+            0f,
+            1f,
             intArrayOf(center, middle, ColorUtils.setAlphaComponent(baselineColor, 0)),
             floatArrayOf(0f, 0.64f, 1f),
             Shader.TileMode.CLAMP
-        )
+        ).apply {
+            haloMatrix.setScale(width * 0.48f, height * 0.48f)
+            haloMatrix.postTranslate(width / 2f, height / 2f)
+            setLocalMatrix(haloMatrix)
+        }
     }
 
     override fun onDetachedFromWindow() {
@@ -186,8 +190,8 @@ internal class AudioHaloEnvelope {
 
 /** Normalized vertical displacement within the microphone control. */
 internal object GentleWaveGeometry {
-    const val BASELINE_Y_FRACTION = 0.44f
-    const val MAX_AMPLITUDE_FRACTION = 0.15f
+    const val BASELINE_Y_FRACTION = 0.40f
+    const val MAX_AMPLITUDE_FRACTION = 0.16f
 
     fun offsetAt(position: Float, line: Int, level: Float, phase: Float, reducedMotion: Boolean): Float {
         if (reducedMotion || !level.isFinite() || level <= 0.015f ||

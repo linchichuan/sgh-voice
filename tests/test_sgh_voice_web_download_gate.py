@@ -185,8 +185,8 @@ def test_android_release_manifest_matches_public_artifact_and_copy():
     index = read_web_file("index.html")
     llms = read_web_file("llms.txt")
 
-    assert release["versionName"] == "2.8.4"
-    assert release["versionCode"] == 34
+    assert release["versionName"] == "2.8.5"
+    assert release["versionCode"] == 35
     assert re.fullmatch(r"[0-9a-f]{64}", release["sha256"])
     assert re.fullmatch(r"[0-9A-F]{64}", release["certificateSha256"])
     assert artifact.is_file()

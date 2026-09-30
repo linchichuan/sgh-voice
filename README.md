@@ -7,11 +7,21 @@
 [![macOS](https://img.shields.io/badge/macOS-Apple_Silicon-black?logo=apple)](https://github.com/linchichuan/sgh-voice/releases)
 [![iOS](https://img.shields.io/badge/iOS-17.0+-blue?logo=apple)](https://github.com/linchichuan/sgh-voice/releases)
 [![Android](https://img.shields.io/badge/Android-8.0+-green?logo=android)](https://github.com/linchichuan/sgh-voice/releases)
-[![Android Version](https://img.shields.io/badge/Android-2.8.4-green)](https://voice.shingihou.com/)
+[![Android Version](https://img.shields.io/badge/Android-2.8.5-green)](https://voice.shingihou.com/)
 
 ---
 
-## Android v2.8.4：語音操作介面與封閉測試招募
+## Android v2.8.5：手機語音操作與閱讀整理
+
+- 保留頂部語言切換列，放大 SGH；口述／幫我寫縮成左右小卡片。
+- 中央改為超過畫面三分之二寬的漸層橢圓，真實音量驅動寬波形；保留錄音秒數，移除多餘說明。
+- 語音底列按鍵可視高度縮小約三分之一，保留觸控區；手動鍵盤高度不變。
+- 口述整理補齊標點、依話題分段，有「第一點、第二點」時可轉成條列；條列編號不再被誤判成新增數字而退回逐字稿。金額、版本、專有詞與否定語意仍會核對。
+- 鍵盤高度可於 App → 基本設定 → 鍵盤高度調整 90–125%。
+
+本版是個人側載更新；先前送審的 2.8.4 Alpha 以 Google Play 審核狀態為準。新版的自動化、視覺檢查與實機待驗項目見 [2.8.5 改善紀錄](docs/reviews/2026-10-01-android-285-oval-readability.md)。
+
+## Android v2.8.4：語音操作介面與封閉測試招募（歷史）
 
 [Android 封閉測試申請](https://voice.shingihou.com/?lang=zh#android-download)：填表只登記待處理申請，不會直接下載 APK、取得 Play 資格或自動算入測試人數。受邀者須在 Google Play 加入測試；12 人須連續保留測試資格至少 14 天。Google Play 審查與正式存取仍需另行申請。
 
@@ -115,7 +125,7 @@
 
 ## 🤖 Android 個人測試版
 
-目前可從 [voice.shingihou.com](https://voice.shingihou.com/#download) 下載 APK 側載，不必等待 Google Play 封閉測試名額。這仍是個人測試版，並非 Play 商店正式發布；安裝前請閱讀頁面上的風險說明，且僅從官方下載頁取得檔案。
+公開頁面提供 [Android 封閉測試申請](https://voice.shingihou.com/?lang=zh#android-download)。個人側載更新使用另行提供的版本化 APK 連結，不視為加入 Google Play 封閉測試，也不計入測試人數。
 
 ---
 

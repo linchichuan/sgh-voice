@@ -33,8 +33,10 @@ the translation picker. All text and retry state are synthetic.
 `--es palette mint|sky|lavender|peach|rose|sand` previews the six light microphone
 surfaces without saving a preference. Geometry verification also checks caption
 contrast for every palette against the real rendered text color.
-The 2.8.2 circle fades radially to transparent; it has no surrounding border,
-padding frame or elevation shadow. The geometry contract asserts that boundary.
+The broad oval fades from a darker centre to transparent at all of its edges;
+it has no surrounding border, padding frame or elevation shadow. The oval spans
+at least two thirds of the keyboard width. Its full-width waveform and colour
+bloom respond only to supplied audio levels. The geometry contract asserts that boundary.
 `--es mode palette --es state idle` renders the real settings colour picker above
 the real microphone view. Its selection updates the synthetic preview only and
 never opens `ApiConfig` or saves a user preference.
@@ -44,16 +46,20 @@ keyboard width and simulated available window height. The top mode selector and
 voice punctuation row stay outside the bounded middle scroll area. These extras
 do not modify device settings. Force stop/relaunch when changing dimensions.
 All modes use the original 372dp Zhuyin footprint at 100%, plus navigation insets,
-capped at 80% of the available window. Wide landscape voice uses two columns; constrained
+capped at 80% of the available window. Voice controls retain one full-width column
+in landscape, with the oval's height adapting to the available space; constrained
 manual keyboards keep their touch targets and allow the middle area to scroll.
 `--ez verify true` runs device-side checks
-of the separated voice-task cards, selected/disabled states, same-height toolbar,
-large single control, busy-state gating, one tap/one action, actual
+of the small voice-task cards at opposite edges, selected/disabled states,
+same-height toolbar, large single oval, busy-state gating, one tap/one action, actual
 `、` / `，` / `。` dispatch, and the translation picker. The preview header reports
 PASS or FAIL. Clicks only change synthetic state/text; they never record or
 submit a transcript.
 The result is also written to the `KeyboardPreview` logcat tag. The geometry check
-accepts a compact landscape circle and verifies the bottom actions are unclipped.
+accepts a shorter landscape oval and verifies the bottom actions are unclipped.
+Task cards paint at 28dp inside 44dp touch targets; bottom voice keys paint at
+32dp inside 48dp touch targets. The status retains elapsed recording time and
+the extra waveform explanation is removed to keep the recording surface clear.
 
 Recording previews provide a sample every 50 ms for at most 10 seconds, then
 return to idle. Take a recording-state screenshot within that interval. No

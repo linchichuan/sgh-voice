@@ -32,6 +32,8 @@ class DictationRefinementTest {
             val response = JSONObject().put("choices", JSONArray().put(JSONObject()
                 .put("finish_reason", "stop")
                 .put("message", JSONObject().put("content", reply))))
+                .put("stop_reason", "end_turn")
+                .put("content", JSONArray().put(JSONObject().put("type", "text").put("text", reply)))
             Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1)
                 .code(200).message("OK")
                 .body(response.toString().toResponseBody("application/json".toMediaType())).build()
@@ -86,6 +88,41 @@ class DictationRefinementTest {
         val result = client("should never be called") { fail("Disabled means no HTTP request") }
             .refineDictation("今天先測試")
         assertEquals(LlmClient.RefinementStatus.DISABLED, result.status)
+    }
+
+    @Test fun `spoken requirements become numbered paragraphs through every provider`() = runBlocking {
+        whenever(config.openAiApiKey).thenReturn("synthetic-test-key")
+        whenever(config.openAiLlmModel).thenReturn("test-model")
+        whenever(config.anthropicApiKey).thenReturn("synthetic-test-key")
+        whenever(config.claudeModel).thenReturn("test-model")
+        val source = "第一點請檢查 GitHub Actions 第二點先跑 CI/CD 第三點不要 git push"
+        val organized = "1. 請檢查 GitHub Actions。\n2. 先跑 CI/CD。\n3. 不要 git push。"
+        for (engine in listOf("claude", "openai", "groq")) {
+            whenever(config.llmEngine).thenReturn(engine)
+            val result = client(organized) { body ->
+                val prompt = if (engine == "claude") body.getString("system") else
+                    body.getJSONArray("messages").getJSONObject(0).getString("content")
+                assertTrue(prompt.contains("第一點、第二點、第三點"))
+                assertTrue(prompt.contains("必須補齊"))
+            }.refineDictation(source)
+            assertEquals(engine, LlmClient.RefinementStatus.APPLIED, result.status)
+            assertEquals(engine, organized, result.text)
+        }
+    }
+
+    @Test fun `topic paragraph breaks survive real refinement path`() = runBlocking {
+        val source = "今天已經修好 GitHub Actions，先跑 CI/CD。明天再檢查 Android，確認後不要直接部署。"
+        val organized = "今天已經修好 GitHub Actions，先跑 CI/CD。\n\n明天再檢查 Android，確認後不要直接部署。"
+        val result = client(organized).refineDictation(source)
+        assertEquals(LlmClient.RefinementStatus.APPLIED, result.status)
+        assertEquals(organized, result.text)
+    }
+
+    @Test fun `removing sentence punctuation returns the punctuated source`() = runBlocking {
+        val source = "今天先測試。明天再部署。"
+        val result = client("今天先測試明天再部署").refineDictation(source)
+        assertEquals(LlmClient.RefinementStatus.REJECTED, result.status)
+        assertEquals(source, result.text)
     }
 
 }

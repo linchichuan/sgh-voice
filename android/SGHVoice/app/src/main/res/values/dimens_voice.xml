@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <dimen name="voice_panel_vertical_padding">10dp</dimen>
-    <dimen name="voice_status_top_margin">4dp</dimen>
+    <dimen name="voice_panel_vertical_padding">4dp</dimen>
+    <dimen name="voice_status_top_margin">2dp</dimen>
     <dimen name="voice_mic_diameter">176dp</dimen>
-    <dimen name="voice_mic_top_margin">8dp</dimen>
+    <dimen name="voice_mic_top_margin">2dp</dimen>
     <dimen name="voice_mic_icon_size">32dp</dimen>
     <dimen name="voice_mic_icon_top_margin">48dp</dimen>
     <dimen name="voice_mic_label_width">136dp</dimen>
