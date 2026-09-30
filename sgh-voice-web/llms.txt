@@ -19,9 +19,9 @@
 
 - Four modes in one Android input method: Voice, Zhuyin, Japanese, and English
 - All four modes share one height based on the original Zhuyin size; adjust it in Settings from 90% to 125% in 5% steps, or reset to 100%. Small windows apply a common height limit and scrolling where needed
-- SGH Voice brand and icon remain visible at the top left of the keyboard
+- The original Shingihou company logo sits directly beside the larger SGH label as one centred brand group at the top left of the keyboard
 - Tap for normal dictation; long-press to select 1–4 translation targets from Traditional Chinese, Japanese, English, and Korean
-- One large light-colored circle handles recording start, recording state, and stop; choose from six light palettes in basic settings (mint by default). Ripples inside respond gently to actual audio and remain calm during silence
+- One broad, borderless oval handles recording start, recording state, and stop; choose from six light palettes in basic settings (mint by default). The surface fades from centre to edge without a dark glow overlay. Waves inside respond gently to actual audio and stay flat during silence
 - Voice mode replaces the bottom-row @ key with the ideographic comma 、 and keeps the ， (comma) and 。 (full stop) keys
 - Compact mode selector and a larger Enter symbol
 - Short and long dictation both use one cleanup request to the selected AI, considering the recorded passage for punctuation, clear stutters, and sentence flow while preserving meaning
@@ -55,6 +55,7 @@
 - Includes the Android 8 and 9 Unicode script syntax compatibility fix from 2.7.7
 - 2.8.2 adds writing previews, six selectable light recording colors that fade softly from the center with no outline, larger Zhuyin keys, Japanese phone-grid input, and bounded layouts for small windows
 - 2.8.3 adds shared, adjustable keyboard height and replaces Japanese 12-key tap cycling with directional flick input
+- 2.8.6 refines the light mint recording surface and joins the original company logo with a larger, centred SGH label
 - Notes, pending drafts and retry audio disappear when the input-method service ends or the device restarts; continuous background recording is not supported
 - Cloud consent is checked before each new request; withdrawal prevents follow-up AI requests and retry uploads
 - Automated checks and emulator inspection do not establish real-device dictation accuracy; the physical-device acceptance checklist remains pending

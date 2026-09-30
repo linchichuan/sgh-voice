@@ -7,11 +7,19 @@
 [![macOS](https://img.shields.io/badge/macOS-Apple_Silicon-black?logo=apple)](https://github.com/linchichuan/sgh-voice/releases)
 [![iOS](https://img.shields.io/badge/iOS-17.0+-blue?logo=apple)](https://github.com/linchichuan/sgh-voice/releases)
 [![Android](https://img.shields.io/badge/Android-8.0+-green?logo=android)](https://github.com/linchichuan/sgh-voice/releases)
-[![Android Version](https://img.shields.io/badge/Android-2.8.5-green)](https://voice.shingihou.com/)
+[![Android Version](https://img.shields.io/badge/Android-2.8.6-green)](https://voice.shingihou.com/)
 
 ---
 
-## Android v2.8.5：手機語音操作與閱讀整理
+## Android v2.8.6：淡綠收音與一體品牌
+
+- 錄音區改為清爽淡綠漸層，移除疊加灰色光暈；仍由真實音量驅動波形，靜音保持平線。
+- 新義豊 Logo 與放大的 SGH 緊鄰為一組、整組置中；保留旁邊模式列、左右小任務卡與鍵盤尺寸。
+- 使用者已看過預覽並核准發布；此版是個人同簽章側載更新，不更換 Google Play 已送審版本。
+
+驗證與實機待驗項目見 [2.8.6 改善紀錄](docs/reviews/2026-10-01-android-286-mint-brand.md)。公開網站仍是封閉測試申請導線，填表不直接下載 APK。
+
+## Android v2.8.5：手機語音操作與閱讀整理（歷史）
 
 - 保留頂部語言切換列，放大 SGH；口述／幫我寫縮成左右小卡片。
 - 中央改為超過畫面三分之二寬的漸層橢圓，真實音量驅動寬波形；保留錄音秒數，移除多餘說明。

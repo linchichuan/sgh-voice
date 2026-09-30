@@ -29,12 +29,12 @@
     <color name="candidate_primary_text">#3345C2</color>
 
     <!-- 麥克風按鈕色彩 -->
-    <color name="mic_bg">#DDF3E5</color>
-    <color name="mic_bg_recording">#DDF3E5</color>
+    <color name="mic_bg">#E1F8EA</color>
+    <color name="mic_bg_recording">#E1F8EA</color>
     <color name="mic_bg_processing">#E5F6EB</color>
     <color name="mic_icon">#25372F</color>
     <color name="mic_text_recording">#25372F</color>
-    <color name="mic_ring">#DDF3E5</color>
+    <color name="mic_ring">#E1F8EA</color>
     <color name="mic_ring_edge">#577669</color>
     <color name="voice_task_surface">#E2ECE6</color>
     <color name="voice_task_border">#CADDD0</color>

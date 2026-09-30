@@ -35,8 +35,10 @@ surfaces without saving a preference. Geometry verification also checks caption
 contrast for every palette against the real rendered text color.
 The broad oval fades from a darker centre to transparent at all of its edges;
 it has no surrounding border, padding frame or elevation shadow. The oval spans
-at least two thirds of the keyboard width. Its full-width waveform and colour
-bloom respond only to supplied audio levels. The geometry contract asserts that boundary.
+at least two thirds of the keyboard width. Its full-width waveform responds only
+to supplied audio levels; it never adds a dark colour bloom over the light surface.
+The geometry contract asserts that boundary. The header uses the original
+Shingihou company mark with a centred SGH label (22sp at normal phone widths).
 `--es mode palette --es state idle` renders the real settings colour picker above
 the real microphone view. Its selection updates the synthetic preview only and
 never opens `ApiConfig` or saves a user preference.

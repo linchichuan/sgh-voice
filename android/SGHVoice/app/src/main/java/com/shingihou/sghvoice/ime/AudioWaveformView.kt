@@ -3,11 +3,8 @@ package com.shingihou.sghvoice.ime
 import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.Canvas
-import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.Path
-import android.graphics.RadialGradient
-import android.graphics.Shader
 import android.os.SystemClock
 import android.util.AttributeSet
 import android.view.View
@@ -32,8 +29,6 @@ class AudioWaveformView @JvmOverloads constructor(
     private val density = resources.displayMetrics.density
     private var activeColor = ContextCompat.getColor(context, R.color.waveform_active)
     private var baselineColor = ContextCompat.getColor(context, R.color.waveform_baseline)
-    private val haloPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val haloMatrix = Matrix()
     private val wavePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         strokeCap = Paint.Cap.ROUND
@@ -54,7 +49,6 @@ class AudioWaveformView @JvmOverloads constructor(
     fun setPaletteColors(active: Int, baseline: Int) {
         activeColor = active
         baselineColor = baseline
-        updateHaloShader()
         invalidate()
     }
 
@@ -83,13 +77,8 @@ class AudioWaveformView @JvmOverloads constructor(
 
         val level = envelope.level
         val centerY = height * GentleWaveGeometry.BASELINE_Y_FRACTION
-        if (level > 0.015f) {
-            // A broad, soft mint bloom follows only real incoming audio samples.
-            // It follows the entire oval, rather than a small circle at its centre.
-            haloPaint.alpha = (48 + 64 * level).toInt().coerceIn(0, 112)
-            canvas.drawOval(width * 0.02f, height * 0.02f, width * 0.98f,
-                height * 0.98f, haloPaint)
-        }
+        // Keep the light oval surface separate from the ink used for the waves.
+        // Dark, stacked glows made the centre look grey as audio grew louder.
 
         val startX = width * 0.04f
         val endX = width * 0.96f
@@ -124,29 +113,6 @@ class AudioWaveformView @JvmOverloads constructor(
                 if (point == 0) wavePath.moveTo(x, y) else wavePath.lineTo(x, y)
             }
             canvas.drawPath(wavePath, wavePaint)
-        }
-    }
-
-    override fun onSizeChanged(width: Int, height: Int, oldWidth: Int, oldHeight: Int) {
-        super.onSizeChanged(width, height, oldWidth, oldHeight)
-        updateHaloShader()
-    }
-
-    private fun updateHaloShader() {
-        if (width <= 0 || height <= 0) return
-        val center = ColorUtils.blendARGB(baselineColor, activeColor, 0.24f)
-        val middle = ColorUtils.blendARGB(baselineColor, activeColor, 0.12f)
-        haloPaint.shader = RadialGradient(
-            0f,
-            0f,
-            1f,
-            intArrayOf(center, middle, ColorUtils.setAlphaComponent(baselineColor, 0)),
-            floatArrayOf(0f, 0.64f, 1f),
-            Shader.TileMode.CLAMP
-        ).apply {
-            haloMatrix.setScale(width * 0.48f, height * 0.48f)
-            haloMatrix.postTranslate(width / 2f, height / 2f)
-            setLocalMatrix(haloMatrix)
         }
     }
 

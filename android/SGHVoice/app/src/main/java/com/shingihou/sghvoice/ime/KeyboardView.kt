@@ -114,7 +114,7 @@ class KeyboardView @JvmOverloads constructor(
     private var hasPendingDraft = false
     private var retryAvailable = false
     private var draftPreviewShown = false
-    private var voicePalette = 0xFFDDF3E5.toInt()
+    private var voicePalette = VoicePalette.MINT.argb
     private var keyboardHeightPercent = KeyboardSizing.DEFAULT_PERCENT
     private var currentVoiceState = VoiceInputIME.ImeState.IDLE
     private var recognitionLanguage = RecognitionLanguage.AUTO
@@ -336,11 +336,11 @@ class KeyboardView @JvmOverloads constructor(
         val surfaceColor = ColorUtils.blendARGB(voicePalette, Color.WHITE,
             if (currentVoiceState in setOf(VoiceInputIME.ImeState.STARTING,
                     VoiceInputIME.ImeState.STOPPING, VoiceInputIME.ImeState.PROCESSING)) 0.22f else 0f)
-        val accent = ColorUtils.blendARGB(voicePalette, ink, 0.72f)
+        val accent = ColorUtils.blendARGB(voicePalette, ink, 0.58f)
         // The full touch target remains; only the painted edge fades away.
         micOuterRing.background = null
         micOuterRing.elevation = 0f
-        val surface = SoftVoiceCircleDrawable(ColorUtils.blendARGB(surfaceColor, ink, 0.07f))
+        val surface = SoftVoiceCircleDrawable(surfaceColor)
         val mask = GradientDrawable().apply {
             shape = GradientDrawable.OVAL
             setColor(Color.WHITE)
@@ -351,7 +351,7 @@ class KeyboardView @JvmOverloads constructor(
         )
         micActionIcon.imageTintList = ColorStateList.valueOf(ink)
         micActionLabel.setTextColor(ink)
-        audioWaveform.setPaletteColors(accent, ColorUtils.blendARGB(voicePalette, ink, 0.52f))
+        audioWaveform.setPaletteColors(accent, ColorUtils.blendARGB(voicePalette, ink, 0.36f))
     }
 
     private fun isVoiceIdle() = currentVoiceState in setOf(
@@ -689,6 +689,11 @@ class KeyboardView @JvmOverloads constructor(
             return
         }
         val width = MeasureSpec.getSize(widthMeasureSpec)
+        // Give the company mark and larger SGH room without crowding the tabs
+        // on narrow phones. Their group stays centred in the same 44dp row.
+        val brandWidth = dp(if (width < dp(320)) 88 else if (width < dp(360)) 96 else 104)
+        findViewById<View>(R.id.keyboard_brand_group).layoutParams.width = brandWidth
+        findViewById<TextView>(R.id.tv_keyboard_brand).maxWidth = brandWidth - dp(24)
         val captureWidth = (width - keyboardRoot.paddingLeft - keyboardRoot.paddingRight -
             voicePanel.paddingLeft - voicePanel.paddingRight).coerceAtLeast(dp(48))
         val maximumTaskWidth = (captureWidth * 0.44f).toInt()

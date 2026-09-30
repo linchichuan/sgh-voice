@@ -7,6 +7,9 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.drawable.InsetDrawable
 import android.widget.TextView
+import android.widget.ImageView
+import android.view.Gravity
+import android.util.TypedValue
 import androidx.core.graphics.Insets
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -181,6 +184,57 @@ class KeyboardGeometryTest {
             assertTrue(key.height >= 48 * density)
             assertEquals((16 * density).toInt(), padding.top + padding.bottom)
         }
+    }
+
+    @Test fun `company logo and larger brand share the toolbar centre without crowding tabs`() {
+        val app = RuntimeEnvironment.getApplication()
+        for (widthDp in listOf(280, 320, 393, 480)) {
+            for (fontScale in listOf(1f, 1.5f)) {
+                val context = app.createConfigurationContext(Configuration(app.resources.configuration).apply {
+                    screenWidthDp = widthDp
+                    this.fontScale = fontScale
+                })
+                val view = KeyboardView(context)
+                measure(view, widthDp)
+                val group = view.findViewById<LinearLayout>(R.id.keyboard_brand_group)
+                val logo = view.findViewById<ImageView>(R.id.keyboard_company_logo)
+                val brand = view.findViewById<TextView>(R.id.tv_keyboard_brand)
+                val tabs = view.findViewById<View>(R.id.mode_group)
+                assertTrue(logo.drawable != null)
+                assertEquals(Gravity.CENTER, group.gravity)
+                assertEquals(tabs.top + tabs.height / 2, group.top + group.height / 2)
+                assertTrue(group.right <= tabs.left)
+                assertEquals("Logo and SGH must be adjacent", logo.right, brand.left)
+                assertTrue("The combined brand must be centred",
+                    kotlin.math.abs(logo.left + brand.right - group.width) <= 1)
+                assertTrue(brand.right <= group.width)
+                assertTrue(brand.layout.getEllipsisCount(0) == 0)
+                assertTrue(brand.layout.getLineWidth(0) <= brand.width)
+                if (widthDp >= 393 && fontScale == 1f) {
+                    assertEquals(TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP,
+                        22f, context.resources.displayMetrics), brand.textSize, 0.1f)
+                }
+            }
+        }
+    }
+
+    @Test @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun `live waves do not paint a dark wash over the light surface`() {
+        val view = AudioWaveformView(RuntimeEnvironment.getApplication())
+        view.layout(0, 0, 600, 300)
+        view.setRecordingActive(true)
+        repeat(12) {
+            ShadowSystemClock.advanceBy(Duration.ofMillis(50))
+            view.setAudioLevel(1f)
+        }
+        val bitmap = Bitmap.createBitmap(600, 300, Bitmap.Config.ARGB_8888)
+        view.draw(Canvas(bitmap))
+        // Wave movement is limited to the upper half. The rest must stay clear
+        // so loud audio cannot tint the parent's pastel gradient grey.
+        for (x in listOf(150, 300, 450)) {
+            assertEquals(0, android.graphics.Color.alpha(bitmap.getPixel(x, 210)))
+        }
+        bitmap.recycle()
     }
 
     @Test fun `voice task cards initialize selected state and paint 28dp inside 44dp targets`() {
