@@ -1,5 +1,21 @@
 const translations = {
     ja: {
+        "update.support": "更新について問い合わせる",
+        "update.apply": "初めての方：Google Play テストに応募",
+        "update.changes": "2.8.7 の変更点",
+        "update.safety": "テスト版のため、重要なデータは事前にバックアップしてください。Google Play Protect は有効のままお使いください。",
+        "update.install": "既存アプリを残したまま、ダウンロードした更新ファイルを開いてください。更新できない場合は、表示されたエラーを確認し、サポートへお問い合わせください。",
+        "update.download": "2.8.7 更新ファイルをダウンロード",
+        "update.channel.desc": "Google Play からインストールした方は、Google Play で更新してください。このページの更新はクローズドテストへの参加手続きではなく、12人のテスター数にも含まれません。",
+        "update.channel.title": "インストール元に合わせて更新",
+        "update.intro": "このページは、既にサイドロード版をインストールしている方向けの更新案内です。",
+        "update.title": "Android 2.8.7 に更新",
+        "update.kicker": "既存のサイドロード版をご利用の方へ",
+        "update.back": "ホームに戻る",
+        "update.meta.description": "既存のサイドロード版利用者向け Android 2.8.7 更新案内。Google Play クローズドテストの参加手続きとは異なります。",
+        "update.meta.title": "SGH Voice — Android サイドロード版 2.8.7 更新",
+        "update.entry": "サイドロード版をご利用中の方：2.8.7 更新案内",
+        "writing.preview": "「文章作成」では長い考えを整理し、プレビューを確認してから挿入できます。文章整理や語彙のヒントは認識精度を保証するものではありません。",
         "download.android.submitted": "申請受付済み・招待待ち",
         "download.android.success": "申請を受け付けました。招待の手配をお待ちください。Google Play のテスト資格はまだ付与されておらず、メールもまだ送信していません。自動ダウンロードはありません。",
         "download.android.instructions": "申請 → 招待待ち → Google Play でテスト参加 → インストールしてフィードバック。",
@@ -11,11 +27,11 @@ const translations = {
         "demo.dictate": "音声入力",
         "demo.write": "文章作成",
         "demo.hint": "一つの円で、録音の開始と終了",
-        "demo.caption": "機能イメージ・実機画面ではありません",
+        "demo.caption": "2.8.7 UI プレビュー・実機での録音検証ではありません",
         "compact.keyboard.title": "4つの入力を切り替え",
-        "compact.keyboard.desc": "4つの入力モードで高さを統一し、設定で90〜125%に調整。日本語はローマ字／12キーフリック。",
-        "compact.learning.title": "よく使う言葉を辞書に",
-        "compact.learning.desc": "専門用語を追加し、条件を満たす短い修正を保存。辞書の確認・取り消し・消去もできます。",
+        "compact.keyboard.desc": "各モードで高さを調整可能。英語の Space／Enter、日本語のタップ・フリック入力時のカーソル処理を改善し、録音画面も穏やかに。",
+        "compact.learning.title": "短い修正は、確認してから。",
+        "compact.learning.desc": "短い語句の修正は確認待ちに。別の音声入力で繰り返し確認するか、手動で確認すると有効になります。確認・取り消し・消去も可能です。",
         "compact.details": "入力・学習・一時保存について",
         "compact.voice.title": "録音と文章作成",
         "compact.language.title": "多言語入力",
@@ -23,8 +39,8 @@ const translations = {
         "compact.risk": "クローズドテスト参加前のご案内",
         "compact.store": "Google Play のテスト・公開状況",
         "compact.privacy": "データの用途と保存方法を見る",
-        "writing.title": "話して、文章にする。",
-        "writing.description": "普段はそのまま音声入力。「文章作成」では長い考えを整理し、プレビューを確認してから挿入できます。",
+        "writing.title": "意味を保ち、文章を整える。",
+        "writing.description": "元の意味・数字・否定表現・人名を保つ方針で、句読点・段落・箇条書きを整理します。重要な内容はご確認ください。",
         "writing.handoff": "アプリや入力欄を切り替えると録音を停止し、録音済みの内容を挿入待ちの文字として保持します。新しい欄へ自動挿入せず、認識失敗時は再試行できます。",
         "writing.limit": "メモ・挿入待ちの文字・再試行用音声はメモリ内のみで、サービス終了や再起動で消えます。バックグラウンド録音は非対応です。AI の文章はご確認ください。",
         "meta.title": "SGH Voice — Android 多言語キーボードと macOS 音声入力",
@@ -40,7 +56,7 @@ const translations = {
 
         "hero.eyebrow": "Android クローズド Alpha · 募集中",
         "hero.title": "話したことを、<br><span>伝わる文章に。</span>",
-        "hero.subtitle": "音声入力、文章作成、注音、日本語を、一つの Android キーボードで。",
+        "hero.subtitle": "話した意味を保ち、文章を整える。音声・注音・日本語・英語を、一つの Android キーボードで。",
         "hero.cta": "Android テストに応募",
         "hero.secondary": "3つの特長を見る",
         "hero.fact1": "Android 8+",
@@ -87,7 +103,7 @@ const translations = {
         "learning.after.label": "手動修正して学習",
         "learning.after.note": "次回の語彙ヒントに利用",
         "learning.local.title": "自分の辞書を管理",
-        "learning.local.desc": "候補頻度や短い修正は端末に保存。確認済み語彙を次回の STT／AI にヒントとして渡します。モデルの再学習ではありません。",
+        "learning.local.desc": "候補頻度と短い語句の記憶は端末内に保存し、モデルの再学習は行いません。確認済み語彙はクラウド処理への同意後に、選択した STT／AI へヒントとして送信します。",
         "learning.safe.title": "機密フィールドでは学習しない",
         "learning.safe.desc": "パスワード欄では音声入力と学習を無効にし、パーソナライズ禁止欄では学習だけを無効にします。",
         "learning.control.title": "元に戻す・消去が可能",
@@ -116,7 +132,7 @@ const translations = {
         "privacy.key.title": "API キーは端末内で暗号化保存",
         "privacy.key.desc": "キーは Android の暗号化ストレージに保存され、このサイトや新義豊のサーバーへ送信されません。",
         "privacy.learn.title": "必要なパーソナライズのみ保存",
-        "privacy.learn.desc": "候補頻度と短い修正ルールを端末内に保存します。確認済みの語彙は選択した STT／AI のヒントに使い、全文や録音からクラウド学習ファイルは作成しません。",
+        "privacy.learn.desc": "候補頻度と短い修正は端末内に保存します。確認済み語彙はクラウド処理への同意後に、選択した STT／AI へヒントとして送信できます。全文や録音からクラウド学習ファイルは作成せず、モデルの再学習も行いません。",
         "privacy.note": "第三者 AI を利用する場合、データ処理と料金は選択したプロバイダーの規約に従います。重要情報や機密情報は送信前に必ず確認してください。",
 
         "download.kicker": "JOIN THE ANDROID ALPHA",
@@ -181,6 +197,22 @@ const translations = {
     },
 
     zh: {
+        "update.support": "聯絡更新支援",
+        "update.apply": "第一次使用？申請 Google Play 測試",
+        "update.changes": "2.8.7 更新重點",
+        "update.safety": "測試版可能不穩定，請先備份重要資料，並保持 Google Play Protect 開啟。",
+        "update.install": "保留既有 App，開啟下載的更新檔進行更新。若無法更新，請保留錯誤訊息並聯絡支援。",
+        "update.download": "下載 2.8.7 更新檔",
+        "update.channel.desc": "從 Google Play 安裝的使用者，請繼續透過 Google Play 更新。此頁側載更新不等於加入封閉測試，也不計入 12 人測試人數。",
+        "update.channel.title": "沿用原本的更新管道",
+        "update.intro": "此頁提供已安裝側載版使用者更新；請先確認原本的安裝來源。",
+        "update.title": "更新 Android 2.8.7",
+        "update.kicker": "給已安裝側載版的使用者",
+        "update.back": "回到首頁",
+        "update.meta.description": "提供既有 Android 側載使用者的 2.8.7 更新說明。此更新不等於加入 Google Play 封閉測試。",
+        "update.meta.title": "SGH Voice — Android 側載版 2.8.7 更新",
+        "update.entry": "已安裝側載版？查看 2.8.7 更新",
+        "writing.preview": "選「幫我寫」可整理較長想法，預覽成稿後再插入。整理與詞彙提示不保證辨識準確率。",
         "download.android.submitted": "已收到申請，等待邀請",
         "download.android.success": "已收到申請，等待安排邀請。這不代表已取得 Google Play 測試資格；目前尚未寄出郵件，也不會自動下載。",
         "download.android.instructions": "送出申請 → 等待邀請 → 在 Google Play 加入測試 → 安裝並回報使用情況。",
@@ -192,11 +224,11 @@ const translations = {
         "demo.dictate": "語音輸入",
         "demo.write": "幫我寫",
         "demo.hint": "一個圓，開始與結束錄音",
-        "demo.caption": "功能示意 · 非實機截圖",
+        "demo.caption": "2.8.7 介面預覽 · 非實機收音驗證",
         "compact.keyboard.title": "四種輸入，隨時切換",
-        "compact.keyboard.desc": "四種輸入高度一致，設定可調 90–125%；日文可選 Romaji／12 鍵滑動輸入。",
-        "compact.learning.title": "記住你常用的詞",
-        "compact.learning.desc": "加入專有名詞，保留符合條件的短修正；個人詞庫可查看、撤銷或清除。",
+        "compact.keyboard.desc": "共用可調高度；改善英文 Space／Enter、日文點按與 flick 滑動輸入的游標處理，錄音介面更柔和。",
+        "compact.learning.title": "短詞修正，確認後記住。",
+        "compact.learning.desc": "短詞修正先待確認；不同次語音重複確認，或手動確認後才生效。可查看、撤銷或清除。",
         "compact.details": "輸入方式、學習與暫存說明",
         "compact.voice.title": "錄音與幫我寫",
         "compact.language.title": "多語輸入",
@@ -204,8 +236,8 @@ const translations = {
         "compact.risk": "參加封閉測試前，請先了解",
         "compact.store": "Google Play 測試與商店狀態",
         "compact.privacy": "查看資料用途與保存方式",
-        "writing.title": "說完，幫你寫好。",
-        "writing.description": "日常口述直接輸入；選「幫我寫」整理長想法，預覽成稿後再插入。",
+        "writing.title": "整理口述，保留原意。",
+        "writing.description": "以保留原意、數字、否定與姓名為原則，整理標點、段落與條列；重要內容仍請核對。",
         "writing.handoff": "切換 App 或欄位會停止錄音，已錄內容轉為待確認文字，不會自動貼到新欄位；辨識失敗可重試。",
         "writing.limit": "筆記、待插入文字與重試音訊只暫存在記憶體；系統結束服務或重開機後會消失。不支援背景連錄，AI 成稿請核對。",
         "meta.title": "SGH Voice — Android 多語輸入法與 macOS 語音輸入",
@@ -221,7 +253,7 @@ const translations = {
 
         "hero.eyebrow": "Android 封閉 Alpha · 招募中",
         "hero.title": "說出想法，<br><span>寫得更順。</span>",
-        "hero.subtitle": "語音輸入、幫我寫、注音與日文，都在同一個 Android 鍵盤。",
+        "hero.subtitle": "保留原意，整理口述。語音、注音、日文與英文，都在同一個 Android 鍵盤。",
         "hero.cta": "申請 Android 封閉測試",
         "hero.secondary": "看看三個重點",
         "hero.fact1": "Android 8+",
@@ -268,7 +300,7 @@ const translations = {
         "learning.after.label": "手動修正並學習",
         "learning.after.note": "作為後續詞彙參考",
         "learning.local.title": "個人詞庫由你管理",
-        "learning.local.desc": "候選頻率與短修正存於手機；確認過的詞彙可作為下次 STT／AI 提示，並非訓練模型。",
+        "learning.local.desc": "候選頻率與短詞記憶存於手機，並非訓練模型；確認過的詞彙只在同意雲端處理後，作為所選 STT／AI 的提示送出。",
         "learning.safe.title": "敏感欄位不學習",
         "learning.safe.desc": "密碼欄位會停用語音與學習；禁止個人化欄位只停用學習。",
         "learning.control.title": "可以復原或清除",
@@ -297,7 +329,7 @@ const translations = {
         "privacy.key.title": "API 金鑰加密保存在裝置",
         "privacy.key.desc": "金鑰使用 Android 加密儲存，不會提交到本網站或新義豊伺服器。",
         "privacy.learn.title": "只保留必要的個人化資料",
-        "privacy.learn.desc": "本機保存候選頻率與短修正規則；人工確認的詞彙會用於所選 STT／AI 提示，不以完整句子或錄音建立雲端學習檔案。",
+        "privacy.learn.desc": "本機保存候選頻率與短詞修正；確認過的詞彙在同意雲端處理後可送至所選 STT／AI 作提示。不以完整句子或錄音建立雲端學習檔案，也不是訓練模型。",
         "privacy.note": "使用第三方 AI 時，資料處理與費用仍依你選擇的服務商條款為準。重要或敏感內容請在送出前自行確認。",
 
         "download.kicker": "JOIN THE ANDROID ALPHA",
@@ -362,6 +394,22 @@ const translations = {
     },
 
     en: {
+        "update.support": "Contact update support",
+        "update.apply": "New here? Apply for the Google Play test",
+        "update.changes": "What's new in 2.8.7",
+        "update.safety": "Test builds may be unstable. Back up important data and keep Google Play Protect enabled.",
+        "update.install": "Keep the existing app installed and open the downloaded update file. If the update cannot install, save the error message and contact support.",
+        "update.download": "Download the 2.8.7 update",
+        "update.channel.desc": "If you installed from Google Play, continue updating through Google Play. Sideloading this update does not join the closed test or count toward the 12 testers.",
+        "update.channel.title": "Keep your original update channel",
+        "update.intro": "This update is for people who already have the sideloaded version. Check your original installation source first.",
+        "update.title": "Update to Android 2.8.7",
+        "update.kicker": "FOR EXISTING SIDELOAD USERS",
+        "update.back": "Back to home",
+        "update.meta.description": "Android 2.8.7 update for existing sideload users. This does not join the Google Play closed test.",
+        "update.meta.title": "SGH Voice — Android sideload update 2.8.7",
+        "update.entry": "Already using a sideloaded version? Update to 2.8.7",
+        "writing.preview": "Choose Help me write to organize longer thoughts, then review the draft before inserting. Cleanup and vocabulary hints do not guarantee recognition accuracy.",
         "download.android.submitted": "Application received · awaiting invitation",
         "download.android.success": "Application received. Please wait while we arrange invitations. Google Play test access has not been granted and no email has been sent yet. No download will start automatically.",
         "download.android.instructions": "Apply → wait for an invitation → opt in on Google Play → install and share feedback.",
@@ -373,11 +421,11 @@ const translations = {
         "demo.dictate": "Dictate",
         "demo.write": "Help me write",
         "demo.hint": "One circle to start and stop recording",
-        "demo.caption": "Feature illustration · not a device screenshot",
+        "demo.caption": "2.8.7 UI preview · not a real-device recording test",
         "compact.keyboard.title": "Four ways to type",
-        "compact.keyboard.desc": "Four modes share one height, adjustable from 90–125% in Settings. Japanese offers romaji or 12-key flick input.",
-        "compact.learning.title": "Keep your everyday vocabulary",
-        "compact.learning.desc": "Add names and terms, and save eligible short corrections. Review, undo, or clear your personal dictionary.",
+        "compact.keyboard.desc": "Shared adjustable height, improved English Space/Enter and cursor handling for Japanese tap and flick input, with a softer recording interface.",
+        "compact.learning.title": "Confirm short corrections first.",
+        "compact.learning.desc": "Short corrections start as pending. They become active after repeated confirmation across separate dictations, or manual confirmation. Review, undo, or clear them.",
         "compact.details": "Input, learning, and temporary storage",
         "compact.voice.title": "Recording and writing",
         "compact.language.title": "Multilingual input",
@@ -385,8 +433,8 @@ const translations = {
         "compact.risk": "Before joining the closed test",
         "compact.store": "Google Play testing and release status",
         "compact.privacy": "See data use and storage details",
-        "writing.title": "Speak, then shape your draft.",
-        "writing.description": "Dictate for everyday input. Choose Help me write to organize longer thoughts, then review the draft before inserting.",
+        "writing.title": "Tidy the text. Keep the meaning.",
+        "writing.description": "Conservative cleanup aims to preserve meaning, numbers, negation, and names while organizing punctuation, paragraphs, and lists. Check important text.",
         "writing.handoff": "Switching apps or fields stops recording and keeps captured speech as text awaiting insertion. It never auto-pastes into a new field. Failed recognition can be retried.",
         "writing.limit": "Notes, pending text, and retry audio stay in memory only and disappear if the service ends or the device restarts. Background recording is not supported. Review AI drafts.",
         "meta.title": "SGH Voice — Multilingual Android keyboard and macOS voice input",
@@ -402,7 +450,7 @@ const translations = {
 
         "hero.eyebrow": "Android closed Alpha · Recruiting",
         "hero.title": "Speak your thoughts.<br><span>Write them clearly.</span>",
-        "hero.subtitle": "Voice, Help me write, Zhuyin, and Japanese in one Android keyboard.",
+        "hero.subtitle": "Organize what you say while preserving its meaning. Voice, Zhuyin, Japanese, and English in one Android keyboard.",
         "hero.cta": "Apply for Android Alpha",
         "hero.secondary": "See three key features",
         "hero.fact1": "Android 8+",
@@ -449,7 +497,7 @@ const translations = {
         "learning.after.label": "Corrected and learned",
         "learning.after.note": "Used as a later vocabulary hint",
         "learning.local.title": "Your personal dictionary",
-        "learning.local.desc": "Candidate frequency and short corrections stay on your phone. Confirmed words may guide your chosen STT/AI next time; this does not retrain the model.",
+        "learning.local.desc": "Candidate frequency and short vocabulary corrections stay on your phone; this does not retrain the model. Confirmed terms are sent as hints to your selected STT/AI only after cloud-processing consent.",
         "learning.safe.title": "No learning in sensitive fields",
         "learning.safe.desc": "Password fields disable voice and learning; no-personalization fields disable learning only.",
         "learning.control.title": "Undo or clear it",
@@ -478,7 +526,7 @@ const translations = {
         "privacy.key.title": "API keys are encrypted on device",
         "privacy.key.desc": "Keys use Android encrypted storage and are not submitted to this website or a Shingihou server.",
         "privacy.learn.title": "Only necessary personalization is saved",
-        "privacy.learn.desc": "Candidate frequency and short correction rules stay on device. Confirmed terms guide your selected STT/AI; no cloud learning file is built from full sentences or recordings.",
+        "privacy.learn.desc": "Candidate frequency and short corrections stay on device. After cloud-processing consent, confirmed terms may be sent as hints to your selected STT/AI. No cloud learning file is built from full sentences or recordings, and no model is retrained.",
         "privacy.note": "When you use third-party AI, data handling and charges follow the provider you select. Review important or sensitive text before sending it.",
 
         "download.kicker": "JOIN THE ANDROID ALPHA",
@@ -569,13 +617,14 @@ function applyLanguage(lang) {
     });
 
     document.documentElement.lang = HTML_LANG[normalized] || "zh-Hant";
-    document.title = data["meta.title"];
-    setMeta("name", "description", data["meta.description"]);
-    setMeta("property", "og:title", data["meta.title"]);
-    setMeta("property", "og:description", data["meta.description"]);
+    const metaPrefix = document.body.dataset.page === "android-update" ? "update.meta" : "meta";
+    document.title = data[metaPrefix + ".title"];
+    setMeta("name", "description", data[metaPrefix + ".description"]);
+    setMeta("property", "og:title", data[metaPrefix + ".title"]);
+    setMeta("property", "og:description", data[metaPrefix + ".description"]);
     setMeta("property", "og:locale", META_LOCALE[normalized]);
-    setMeta("name", "twitter:title", data["meta.title"]);
-    setMeta("name", "twitter:description", data["meta.description"]);
+    setMeta("name", "twitter:title", data[metaPrefix + ".title"]);
+    setMeta("name", "twitter:description", data[metaPrefix + ".description"]);
 
     const currentLanguage = document.getElementById("currentLang");
     if (currentLanguage) {

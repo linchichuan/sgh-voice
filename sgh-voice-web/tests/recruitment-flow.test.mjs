@@ -120,3 +120,15 @@ test("all locales disclose pending recruitment, testing commitment and one-time 
     assert.match(context.copy[lang]["download.consent"], /14/);
   }
 });
+
+test("both pages have translated copy in every supported locale", async () => {
+  const update = await readFile(new URL("../android-update.html", import.meta.url), "utf8");
+  const context = vm.createContext({ document: { addEventListener() {} } });
+  vm.runInContext(i18n + "\nglobalThis.copy = translations;", context);
+  const keys = [...(html + update).matchAll(/data-i18n="([^"]+)"/g)].map(match => match[1]);
+  for (const lang of ["zh", "ja", "en"]) {
+    for (const key of keys) assert.ok(context.copy[lang][key], `${lang}: ${key}`);
+    assert.ok(context.copy[lang]["update.meta.title"]);
+    assert.ok(context.copy[lang]["update.meta.description"]);
+  }
+});

@@ -17,6 +17,8 @@
 
 ### Android capabilities
 
+- Current sideload update: Android 2.8.7, versionCode 37, 17.6 MB. Existing sideload users can find update instructions at https://voice.shingihou.com/android-update.html; Google Play installations should keep updating through Google Play. This does not grant closed-test membership or count toward the 12 testers
+- The 2.8.7 landing-page image is a UI preview, not evidence of real-device audio capture or recognition accuracy
 - Four modes in one Android input method: Voice, Zhuyin, Japanese, and English
 - All four modes share one height based on the original Zhuyin size; adjust it in Settings from 90% to 125% in 5% steps, or reset to 100%. Small windows apply a common height limit and scrolling where needed
 - The original Shingihou company logo sits directly beside the larger SGH label as one centred brand group at the top left of the keyboard
@@ -24,7 +26,7 @@
 - One broad, borderless oval handles recording start, recording state, and stop; choose from six light palettes in basic settings (mint by default). The surface fades from centre to edge without a dark glow overlay. Waves inside respond gently to actual audio and stay flat during silence
 - Voice mode replaces the bottom-row @ key with the ideographic comma 、 and keeps the ， (comma) and 。 (full stop) keys
 - Compact mode selector and a larger Enter symbol
-- Short and long dictation both use one cleanup request to the selected AI, considering the recorded passage for punctuation, clear stutters, and sentence flow while preserving meaning
+- Short and long dictation both use one conservative cleanup request to the selected AI, organizing punctuation, paragraphs, and lists while aiming to preserve meaning, numbers, negation, and names; important text still requires review
 - Multi-target translation uses one speech-recognition pass and one strict JSON LLM request
 - Dictated questions and instructions remain transcript content; detected assistant chatter, unrelated rewrites, or changes to protected numbers and negation trigger a source-transcript fallback with a visible notice
 - Built-in technical vocabulary includes GitHub Actions, CI/CD, and git push; custom terms and human-confirmed correction vocabulary guide later STT and AI cleanup
@@ -39,9 +41,9 @@
 - Failed transcription offers explicit retry or discard; a single bounded audio buffer (up to about 125 seconds) stays only in memory
 - Selectable STT and LLM models with the actual provider model ID and a dated public-pricing reference shown in Android settings
 - Groq GPT OSS post-processing uses low reasoning effort to limit latency and reasoning-token consumption
-- English QWERTY input
+- English QWERTY input; 2.8.7 improves English Space/Enter handling and cursor handling for Japanese tap and flick input
 - On-device candidate-frequency learning and short correction rules
-- Eligible delete-then-retype edits can form one short manual correction; deletion alone is not recorded as a learned replacement
+- Eligible short manual corrections start pending and become active only after repeated confirmation across distinct dictations or explicit manual confirmation; deletion alone is not recorded as a learned replacement
 - English vocabulary hints use complete terms instead of isolated changed characters; this is bounded personalization, not STT or LLM model retraining
 - Personalization disabled in password and no-personalization fields
 - Undo and clear controls for local learning
@@ -56,6 +58,7 @@
 - 2.8.2 adds writing previews, six selectable light recording colors that fade softly from the center with no outline, larger Zhuyin keys, Japanese phone-grid input, and bounded layouts for small windows
 - 2.8.3 adds shared, adjustable keyboard height and replaces Japanese 12-key tap cycling with directional flick input
 - 2.8.6 refines the light mint recording surface and joins the original company logo with a larger, centred SGH label
+- 2.8.7 refines conservative cleanup, confirmation-gated short vocabulary memory, English and Japanese input handling, and the soft recording interface. Vocabulary memory is local personalization, not model training; neither cleanup nor vocabulary hints guarantee recognition accuracy
 - Notes, pending drafts and retry audio disappear when the input-method service ends or the device restarts; continuous background recording is not supported
 - Cloud consent is checked before each new request; withdrawal prevents follow-up AI requests and retry uploads
 - Automated checks and emulator inspection do not establish real-device dictation accuracy; the physical-device acceptance checklist remains pending
@@ -89,7 +92,7 @@
 
 - Android API keys use encrypted on-device storage
 - Android learning data is stored locally on the device
-- Human-confirmed correction targets and custom terms may be sent as vocabulary hints to the selected STT and AI; full correction records and candidate frequency stay on device
+- Confirmed correction targets and custom terms may be sent as vocabulary hints to the selected STT and AI only after cloud-processing consent; full correction records and candidate frequency stay on device
 - AI output does not automatically become confirmed vocabulary, and Android does not create a complete dictation-history file
 - Android recording begins only after the user taps the recording control
 - When cloud speech recognition is selected, audio is sent directly to the provider configured by the user

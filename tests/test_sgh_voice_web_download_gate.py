@@ -99,7 +99,8 @@ def test_legal_pages_publish_canonical_and_language_alternates():
         assert f'<loc>{canonical}</loc>' in sitemap
         assert f'hreflang="x-default" href="{canonical}"' in sitemap
 
-    assert sitemap.count("<lastmod>2026-09-26</lastmod>") == 2
+    assert sitemap.count("<lastmod>2026-10-03</lastmod>") == 1
+    assert sitemap.count("<lastmod>2026-09-26</lastmod>") == 1
     assert sitemap.count("<lastmod>2026-08-30</lastmod>") == 1
 
 
@@ -140,8 +141,9 @@ def test_feature_illustration_is_not_presented_as_a_verified_release_screenshot(
     assert "android-zhuyin-v250.webp" not in html
     assert "android-translation-ui.webp" not in html
     assert "android-zhuyin-ui.webp" not in html
-    assert "功能示意 · 非實機截圖" in html
-    assert "Feature illustration · not a device screenshot" in translations
+    assert "2.8.7 介面預覽 · 非實機收音驗證" in html
+    assert "2.8.7 UI preview · not a real-device recording test" in translations
+    assert 'assets/generated/android-2.8.7-voice.png' in html
     for unsupported_claim in (
         "ACTUAL ANDROID BUILD",
         "これが v2.8.2 の実画面です",
@@ -185,8 +187,8 @@ def test_android_release_manifest_matches_public_artifact_and_copy():
     index = read_web_file("index.html")
     llms = read_web_file("llms.txt")
 
-    assert release["versionName"] == "2.8.6"
-    assert release["versionCode"] == 36
+    assert release["versionName"] == "2.8.7"
+    assert release["versionCode"] == 37
     assert re.fullmatch(r"[0-9a-f]{64}", release["sha256"])
     assert re.fullmatch(r"[0-9A-F]{64}", release["certificateSha256"])
     assert artifact.is_file()
@@ -195,5 +197,28 @@ def test_android_release_manifest_matches_public_artifact_and_copy():
     # Owner sideload artifacts remain verifiable but are not recruitment CTAs.
     assert release["fileName"] not in index
     assert release["fileName"] not in llms
-    assert 'i18n.js?v=20260930-alpha' in index
+    assert 'i18n.js?v=20261003-android287' in index
     assert 'main.js?v=20260930-alpha' in index
+
+
+def test_sideload_update_is_separate_from_recruitment_and_matches_artifact():
+    release = json.loads(read_web_file("downloads/android-release.json"))
+    update = read_web_file("android-update.html")
+    index = read_web_file("index.html")
+    assert 'android-update.html' in index
+    assert f'href="/downloads/{release["fileName"]}"' in update
+    assert release["versionName"] in update
+    assert re.search(r'<meta\s+name="robots"\s+content="noindex[^\"]*"', update)
+    assert 'firebase.js' not in update
+    assert 'downloadRegistrationForm' not in update
+    assert 'Google Play' in update
+
+
+def test_apk_headers_support_a_real_file_download():
+    hosting = json.loads(read_web_file("firebase.json"))["hosting"]
+    headers = next(entry["headers"] for entry in hosting["headers"]
+                   if entry["source"] == "/downloads/*.apk")
+    headers = {header["key"]: header["value"] for header in headers}
+    assert headers["Content-Disposition"] == "attachment"
+    assert headers["Content-Type"] == "application/vnd.android.package-archive"
+    assert headers["X-Content-Type-Options"] == "nosniff"
