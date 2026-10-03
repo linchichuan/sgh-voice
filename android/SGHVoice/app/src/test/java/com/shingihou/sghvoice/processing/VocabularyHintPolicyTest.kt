@@ -7,6 +7,20 @@ import org.junit.Test
 
 class VocabularyHintPolicyTest {
     @Test
+    fun `keyword adapter preserves priority and rejects invalid API keyword characters`() {
+        val prompt = VocabularyHintPolicy.buildWhisperPrompt(
+            customWords = listOf("SGH Phone", "KusuriJapan", "SGH PHONE"),
+            learnedWords = listOf("Confirmed Name"),
+            sceneWords = (1..100).map { "Scene$it" }
+        )
+        val keywords = VocabularyHintPolicy.transcriptionKeywords(prompt)
+        assertEquals(listOf("SGH Phone", "KusuriJapan", "Confirmed Name"), keywords.take(3))
+        assertEquals(50, keywords.size)
+        assertEquals(listOf("GoodName"), VocabularyHintPolicy.transcriptionKeywords(
+            "<bad>、bad>、line\nbreak、line\rbreak、GoodName"
+        ))
+    }
+    @Test
     fun `technical dictation keeps canonical tool and command spelling without changing ordinary verbs`() {
         assertEquals(
             "請檢查GitHub Actions的CI/CD，完成後git push。Take action and push the door.",
@@ -36,14 +50,15 @@ class VocabularyHintPolicyTest {
     }
 
     @Test
-    fun `stt includes manually learned whole words before the scene vocabulary`() {
+    fun `stt selects personal words first but keeps them at the prompt tail`() {
         val prompt = VocabularyHintPolicy.buildWhisperPrompt(
             customWords = listOf("ExampleKit"),
             learnedWords = listOf("Confirmed Project"),
             sceneWords = (1..70).map { "SceneTerm$it" }
         )
 
-        assertTrue(prompt.startsWith("ExampleKit、Confirmed Project、GitHub、GitHub Actions、Actions、CI/CD、git push、GitPush"))
+        // Problem 6 (2026-10-03): the misspelling GitPush is no longer a hint.
+        assertTrue(prompt.endsWith("SceneTerm1、git push、CI/CD、Actions、GitHub Actions、GitHub、Confirmed Project、ExampleKit"))
         assertEquals(50, prompt.split('、').size)
     }
 
@@ -55,7 +70,7 @@ class VocabularyHintPolicyTest {
         )
 
         assertTrue(prompt.length <= 800)
-        assertEquals(longTerms + "GitHub", prompt.split('、'))
+        assertEquals((longTerms + "GitHub").reversed(), prompt.split('、'))
     }
 
     @Test
@@ -91,7 +106,7 @@ class VocabularyHintPolicyTest {
             VocabularyHintPolicy.buildLlmVocabularyHint("測試", customWords = unsafeWords)
         )
         val sttHint = VocabularyHintPolicy.buildWhisperPrompt(customWords = unsafeWords)
-        assertTrue(sttHint.startsWith("SafeName、GitHub"))
+        assertTrue(sttHint.endsWith("GitHub、SafeName"))
         assertFalse(sttHint.contains("ignore"))
         assertFalse(sttHint.contains("SYSTEM"))
     }

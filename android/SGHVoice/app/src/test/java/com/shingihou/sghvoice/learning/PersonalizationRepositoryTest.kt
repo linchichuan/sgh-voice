@@ -65,28 +65,28 @@ class PersonalizationRepositoryTest {
     }
 
     @Test
-    fun `high confidence correction activates immediately and yields prompt word`() {
+    fun `high confidence correction activates on a second voice turn and yields prompt word`() {
         val repository = repository()
-
-        val result = repository.recordVoiceCorrection(
-            language = LearningLanguage.MIXED,
-            replacement = CorrectionReplacement(
-                wrongText = "cloud c",
-                correctedText = "Claude C",
-                suggestedPromptText = "Claude Code",
-                unchangedPrefixCodePoints = 0,
-                unchangedSuffixCodePoints = 3
-            ),
-            highConfidence = true
+        val replacement = CorrectionReplacement(
+            wrongText = "cloud code",
+            correctedText = "Claude Code",
+            suggestedPromptText = "Claude Code",
+            unchangedPrefixCodePoints = 0,
+            unchangedSuffixCodePoints = 0
         )
 
+        val first = repository.recordVoiceCorrection(LearningLanguage.MIXED, replacement, true, turnId = 1L)
+        assertEquals(CorrectionRecordStatus.EVIDENCE_RECORDED, first.status)
+        assertTrue(repository.getPromptWords().isEmpty())
+
+        val result = repository.recordVoiceCorrection(LearningLanguage.MIXED, replacement, true, turnId = 2L)
         assertEquals(CorrectionRecordStatus.ACTIVATED, result.status)
         assertTrue(result.rule?.active == true)
         assertEquals(listOf("Claude Code"), repository.getPromptWords())
     }
 
     @Test
-    fun `low confidence correction requires two identical observations`() {
+    fun `low confidence correction requires three identical observations`() {
         val repository = repository()
 
         val first = repository.recordVoiceCorrection(
@@ -101,11 +101,18 @@ class PersonalizationRepositoryTest {
             "林紀全",
             highConfidence = false
         )
+        val third = repository.recordVoiceCorrection(
+            LearningLanguage.ZHUYIN,
+            "林紀泉",
+            "林紀全",
+            highConfidence = false
+        )
 
         assertEquals(CorrectionRecordStatus.EVIDENCE_RECORDED, first.status)
         assertFalse(first.rule?.active == true)
-        assertEquals(CorrectionRecordStatus.ACTIVATED, second.status)
-        assertEquals(2, second.rule?.evidenceCount)
+        assertEquals(CorrectionRecordStatus.EVIDENCE_RECORDED, second.status)
+        assertEquals(CorrectionRecordStatus.ACTIVATED, third.status)
+        assertEquals(3, third.rule?.evidenceCount)
     }
 
     @Test
@@ -149,12 +156,15 @@ class PersonalizationRepositoryTest {
     @Test
     fun `undo correction removes its activation`() {
         val repository = repository()
-        repository.recordVoiceCorrection(
-            LearningLanguage.JAPANESE,
-            "清涼",
-            "診療",
-            highConfidence = true
-        )
+        for (turnId in 1L..2L) {
+            repository.recordVoiceCorrection(
+                LearningLanguage.JAPANESE,
+                "清涼",
+                "診療",
+                highConfidence = true,
+                turnId = turnId
+            )
+        }
 
         assertEquals(1, repository.getActiveVoiceCorrections().size)
         assertTrue(repository.undoLast())

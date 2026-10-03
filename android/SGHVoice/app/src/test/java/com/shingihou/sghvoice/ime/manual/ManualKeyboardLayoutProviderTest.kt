@@ -60,7 +60,9 @@ class ManualKeyboardLayoutProviderTest {
         assertEquals(listOf("あ", "か", "さ"), layout.rows.first().keys.take(3).map { it.label })
         assertEquals(10, keys.count { it.action is KeyAction.TapJapaneseKana })
         assertTrue(keys.any { it.action == KeyAction.TransformJapaneseKana })
-        assertTrue(keys.any { it.action == KeyAction.FinalizeJapaneseKana })
+        assertTrue(keys.any { it.action == KeyAction.CursorLeft })
+        assertTrue(keys.any { it.action == KeyAction.CursorRight })
+        assertTrue(keys.any { it.action == KeyAction.ToggleJapaneseScript })
         assertTrue(keys.any { it.action == KeyAction.ToggleJapaneseLayout && it.label == "ABC" })
         assertTrue(keys.any { it.label == "あ" && "い" in it.alternatives })
         assertTrue(keys.any { it.action == KeyAction.Backspace })
@@ -82,21 +84,18 @@ class ManualKeyboardLayoutProviderTest {
             assertTrue(row.keys.last().widthWeight < row.keys.first().widthWeight)
         }
         assertEquals(
-            listOf(KeyAction.Backspace, KeyAction.FinalizeJapaneseKana,
-                KeyAction.ToggleJapaneseScript, KeyAction.Enter),
+            listOf(KeyAction.Backspace, KeyAction.CursorLeft,
+                KeyAction.CursorRight, KeyAction.Enter),
             keypadRows.map { it.keys.last().action }
         )
         assertEquals("わ", keypadRows.last().keys[1].label)
         assertEquals(
             listOf(KeyAction.SwitchLayer(KeyboardLayer.NUMBERS),
-                KeyAction.ToggleJapaneseLayout, KeyAction.Space),
+                KeyAction.ToggleJapaneseLayout, KeyAction.ToggleJapaneseScript, KeyAction.Space),
             layout.rows.last().keys.map { it.action }
         )
-        assertEquals(
-            columnWeights.sum(),
-            layout.rows.last().keys.sumOf { it.widthWeight.toDouble() }.toFloat(),
-            0.001f
-        )
+        val bottomKeys = layout.rows.last().keys
+        assertTrue(bottomKeys.last().widthWeight > bottomKeys.dropLast(1).maxOf { it.widthWeight })
     }
 
     @Test

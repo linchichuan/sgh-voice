@@ -1006,12 +1006,17 @@ class KeyboardView @JvmOverloads constructor(
                 else -> key.label
             }
             text = displayLabel
-            contentDescription = key.contentDescription
+            contentDescription = when (key.action) {
+                KeyAction.CursorLeft -> context.getString(R.string.keyboard_cursor_left)
+                KeyAction.CursorRight -> context.getString(R.string.keyboard_cursor_right)
+                else -> key.contentDescription
+            }
             gravity = android.view.Gravity.CENTER
             includeFontPadding = false
             maxLines = 1
             textSize = when {
                 key.action == KeyAction.Enter -> 27f
+                key.action == KeyAction.CursorLeft || key.action == KeyAction.CursorRight -> 22f
                 displayLabel.length > 4 -> 12f
                 inputMode == InputMode.ZHUYIN && key.role == KeyRole.CHARACTER -> 21f
                 key.role == KeyRole.CHARACTER -> 18f
@@ -1093,10 +1098,17 @@ class KeyboardView @JvmOverloads constructor(
                 }
             }
             if (this is KanaFlickKeyView && key.action is KeyAction.TapJapaneseKana) {
-                bindFlick(key.action.group) { kana ->
-                    hapticTap(this)
-                    listener?.onKeyAction(KeyAction.InsertText(kana))
-                }
+                bindFlick(
+                    key.action.group,
+                    onKana = { kana ->
+                        hapticTap(this)
+                        listener?.onKeyAction(KeyAction.InsertText(kana))
+                    },
+                    onCenterTap = {
+                        hapticTap(this)
+                        listener?.onKeyAction(key.action)
+                    }
+                )
             }
         }
     }

@@ -256,7 +256,7 @@ class KanaFlickKeyViewTest {
     }
 
     @Test
-    fun `production keyboard routes rapid taps to independent insert callbacks`() {
+    fun `production keyboard routes rapid taps through the kana multitap composer`() {
         val actions = mutableListOf<KeyAction>()
         val keyboard = productionKeyboard(actions)
         val bounds = keyBounds(keyboard, "na")
@@ -264,10 +264,12 @@ class KanaFlickKeyViewTest {
             dispatch(keyboard, MotionEvent.ACTION_DOWN, bounds.exactCenterX(), bounds.exactCenterY())
             dispatch(keyboard, MotionEvent.ACTION_UP, bounds.exactCenterX(), bounds.exactCenterY())
         }
-        assertEquals(List(3) { KeyAction.InsertText("な") }, actions)
+        assertEquals(List(3) { KeyAction.TapJapaneseKana("na") }, actions)
         val composer = JapaneseComposer().apply { setInputStyle(JapaneseInputStyle.KANA_12_KEY) }
-        actions.forEach { assertTrue(composer.appendKana((it as KeyAction.InsertText).text)) }
-        assertEquals("ななな", composer.composition)
+        actions.forEachIndexed { index, action ->
+            assertTrue(composer.tapKana((action as KeyAction.TapJapaneseKana).group, index * 100L))
+        }
+        assertEquals("ぬ", composer.composition)
     }
 
     @Test
@@ -293,6 +295,32 @@ class KanaFlickKeyViewTest {
             dispatch(keyboard, MotionEvent.ACTION_UP, bounds.exactCenterX() + delta.first, bounds.exactCenterY() + delta.second)
         }
         assertEquals("Empty directions must not fall back to a tap", cases.size, actions.size)
+    }
+
+    @Test
+    fun `production tap and flick can alternate without replacing the flicked kana`() {
+        val actions = mutableListOf<KeyAction>()
+        val keyboard = productionKeyboard(actions)
+        val bounds = keyBounds(keyboard, "na")
+        repeat(2) {
+            dispatch(keyboard, MotionEvent.ACTION_DOWN, bounds.exactCenterX(), bounds.exactCenterY())
+            dispatch(keyboard, MotionEvent.ACTION_UP, bounds.exactCenterX(), bounds.exactCenterY())
+        }
+        dispatch(keyboard, MotionEvent.ACTION_DOWN, bounds.exactCenterX(), bounds.exactCenterY())
+        dispatch(keyboard, MotionEvent.ACTION_UP, bounds.exactCenterX(), bounds.exactCenterY() + 100f)
+        repeat(2) {
+            dispatch(keyboard, MotionEvent.ACTION_DOWN, bounds.exactCenterX(), bounds.exactCenterY())
+            dispatch(keyboard, MotionEvent.ACTION_UP, bounds.exactCenterX(), bounds.exactCenterY())
+        }
+        val composer = JapaneseComposer().apply { setInputStyle(JapaneseInputStyle.KANA_12_KEY) }
+        actions.forEachIndexed { index, action ->
+            when (action) {
+                is KeyAction.TapJapaneseKana -> composer.tapKana(action.group, index * 100L)
+                is KeyAction.InsertText -> composer.appendKana(action.text)
+                else -> error("Unexpected key action $action")
+            }
+        }
+        assertEquals("にのに", composer.composition)
     }
 
     @Test
@@ -322,6 +350,13 @@ class KanaFlickKeyViewTest {
         assertTrue("Neither finger may commit after multi-touch", actions.isEmpty())
         dispatch(keyboard, MotionEvent.ACTION_DOWN, first.exactCenterX(), first.exactCenterY())
         dispatch(keyboard, MotionEvent.ACTION_UP, first.exactCenterX(), first.exactCenterY())
-        assertEquals(listOf(KeyAction.InsertText("な")), actions)
+        assertEquals(listOf(KeyAction.TapJapaneseKana("na")), actions)
+    }
+
+    @Test
+    fun `production kana keyboard exposes real cursor controls in both directions`() {
+        val keyboard = productionKeyboard(mutableListOf())
+        assertTrue(keyboard.findViewWithTag<View>("japanese_cursor_left") != null)
+        assertTrue(keyboard.findViewWithTag<View>("japanese_cursor_right") != null)
     }
 }

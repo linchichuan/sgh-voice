@@ -90,9 +90,16 @@ class ApiConfig(context: Context) {
         get() = prefs.getString(KEY_ELEVENLABS_API_KEY, "") ?: ""
         set(value) = prefs.edit().putString(KEY_ELEVENLABS_API_KEY, value).apply()
 
+    /** Explicit opt-in: brief same-editor voice context may accompany cloud refinement. */
+    var recentVoiceContextEnabled: Boolean
+        get() = prefs.getBoolean("recent_voice_context_enabled", false)
+        set(value) = prefs.edit().putBoolean("recent_voice_context_enabled", value).apply()
+
     /** Whisper 模型名稱 */
     var whisperModel: String
-        get() = prefs.getString(KEY_WHISPER_MODEL, DEFAULT_WHISPER_MODEL) ?: DEFAULT_WHISPER_MODEL
+        get() = ApiModelCatalog.openAiSttModelForInstallation(
+            prefs.getString(KEY_WHISPER_MODEL, null), isSetupComplete
+        )
         set(value) = prefs.edit().putString(KEY_WHISPER_MODEL, value).apply()
 
     /** Groq 語音辨識模型名稱 */

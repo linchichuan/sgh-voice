@@ -24,12 +24,14 @@ class KanaFlickKeyView @JvmOverloads constructor(
     private val hintPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.CENTER }
     private var group: String? = null
     private var onKana: ((String) -> Unit)? = null
+    private var onCenterTap: (() -> Unit)? = null
 
     /** Call after generic key styling/listeners; this replaces the tap-only listener. */
-    fun bindFlick(group: String, onKana: (String) -> Unit) {
+    fun bindFlick(group: String, onKana: (String) -> Unit, onCenterTap: (() -> Unit)? = null) {
         cancelGesture()
         this.group = group
         this.onKana = onKana
+        this.onCenterTap = onCenterTap
         val center = Kana12Key.kanaForDirection(group, KanaFlickDirection.CENTER)
         text = center.orEmpty()
         contentDescription = center.orEmpty()
@@ -39,7 +41,9 @@ class KanaFlickKeyView @JvmOverloads constructor(
         setOnLongClickListener(null)
         isLongClickable = false
         setOnClickListener {
-            if (isEnabled) emitKana(KanaFlickDirection.CENTER)
+            if (isEnabled) {
+                this.onCenterTap?.invoke() ?: emitKana(KanaFlickDirection.CENTER)
+            }
         }
     }
 
@@ -93,7 +97,7 @@ class KanaFlickKeyView @JvmOverloads constructor(
         return true
     }
 
-    /** TalkBack and hardware-key activation always select the centre once. */
+    /** TalkBack and hardware-key activation use the same centre tap as touch. */
     override fun performClick(): Boolean {
         if (!isEnabled) return false
         cancelGesture()

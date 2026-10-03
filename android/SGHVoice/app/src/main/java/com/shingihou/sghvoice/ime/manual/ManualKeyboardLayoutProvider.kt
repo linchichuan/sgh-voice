@@ -156,16 +156,16 @@ class ManualKeyboardLayoutProvider {
         kanaRow(
             listOf("ta", "na", "ha").map(::kanaGroupKey),
             actionKey(
-                "japanese_kana_finalize", "→",
-                KeyAction.FinalizeJapaneseKana,
-                "Finish current kana for a repeated character"
+                "japanese_cursor_left", "←",
+                KeyAction.CursorLeft,
+                "Move text cursor left"
             )
         ),
         kanaRow(
             listOf("ma", "ya", "ra").map(::kanaGroupKey),
             actionKey(
-                "japanese_script", "かな", KeyAction.ToggleJapaneseScript,
-                "Toggle Hiragana and Katakana"
+                "japanese_cursor_right", "→", KeyAction.CursorRight,
+                "Move text cursor right"
             )
         ),
         kanaRow(
@@ -192,6 +192,10 @@ class ManualKeyboardLayoutProvider {
                 actionKey(
                     "japanese_layout", "ABC", KeyAction.ToggleJapaneseLayout,
                     "Switch to Japanese Romaji QWERTY"
+                ),
+                actionKey(
+                    "japanese_script", "かな", KeyAction.ToggleJapaneseScript,
+                    "Toggle Hiragana and Katakana"
                 ),
                 spaceKey("japanese_kana_space", widthWeight = 1.75f)
             )

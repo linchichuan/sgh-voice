@@ -10,7 +10,9 @@ object VocabularyHintPolicy {
             "|(?:system|assistant|user)\\s*[:：]|(?:請|请)?(?:忽略|無視|无视).{0,20}(?:指令|規則|规则|提示)" +
             "|(?:指示|命令).{0,12}(?:無視|従って)|(?:respond|reply|output)\\s+(?:only|with)"
     )
-    private val technicalTerms = listOf("GitHub", "GitHub Actions", "Actions", "CI/CD", "git push", "GitPush")
+    // Correct spellings only: these are sent as STT hints. The misspelling GitPush is a
+    // correction source below, never a hint (it taught STT the wrong spelling).
+    internal val technicalTerms = listOf("GitHub", "GitHub Actions", "Actions", "CI/CD", "git push")
 
     // Only unambiguous product/command spellings. Plain action/actions/push are deliberately absent.
     private val technicalCorrections = linkedMapOf<String, String>().apply {
@@ -34,10 +36,16 @@ object VocabularyHintPolicy {
         }
     }
 
-    fun applyCorrections(text: String, corrections: Map<String, String> = emptyMap()): String =
-        TextCorrectionEngine.apply(text, technicalCorrections + corrections)
+    fun applyCorrections(
+        text: String,
+        corrections: Map<String, String> = emptyMap(),
+        nameProtectedKeys: Set<String> = emptySet()
+    ): String = TextCorrectionEngine.apply(text, technicalCorrections + corrections, nameProtectedKeys)
 
-    /** Whole vocabulary terms only: the final term is never cut in half to fit the STT budget. */
+    /**
+     * Select high-priority whole terms first, then put them LAST for Whisper's retained prompt tail.
+     * 800 characters is only a payload bound, NOT a measurement of Whisper's 224-token window.
+     */
     fun buildWhisperPrompt(
         customWords: List<String> = emptyList(),
         learnedWords: List<String> = emptyList(),
@@ -48,7 +56,15 @@ object VocabularyHintPolicy {
         maxWords = 50,
         maxLength = 800,
         separator = "、"
-    ).joinToString("、")
+    ).asReversed().joinToString("、")
+
+    /** Restore the priority order of our spelling list for the keyword-capable STT adapter. */
+    fun transcriptionKeywords(spellingPrompt: String): List<String> = boundedTerms(
+        spellingPrompt.split('、').asReversed(),
+        maxWords = 50,
+        maxLength = 800,
+        separator = "、"
+    )
 
     /**
      * Returns JSON spelling-reference data, never instructions or example model responses.

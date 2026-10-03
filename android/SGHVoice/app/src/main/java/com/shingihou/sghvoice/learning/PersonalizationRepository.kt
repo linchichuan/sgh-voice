@@ -3,6 +3,7 @@ package com.shingihou.sghvoice.learning
 import android.content.Context
 import android.content.SharedPreferences
 import org.json.JSONArray
+import com.shingihou.sghvoice.processing.FactPreservation
 import org.json.JSONObject
 import java.util.Locale
 
@@ -28,6 +29,15 @@ data class CandidateUsage(
     val lastUsedAtMillis: Long
 )
 
+/** Where a learned rule may be applied. Latin rules still require ASCII word boundaries. */
+enum class CorrectionScope {
+    /** Legacy (pre-v2) Han rule whose original context is unknown. */
+    ANY,
+    LATIN,
+    CHINESE,
+    JAPANESE
+}
+
 data class VoiceCorrectionRule(
     val language: LearningLanguage,
     val wrongText: String,
@@ -35,8 +45,12 @@ data class VoiceCorrectionRule(
     val promptText: String,
     val evidenceCount: Int,
     val highConfidenceSeen: Boolean,
+    /** true = 已生效 (eligible for safe hints/rules); false = 待確認 (local only). */
     val active: Boolean,
-    val lastSeenAtMillis: Long
+    val lastSeenAtMillis: Long,
+    val scope: CorrectionScope = CorrectionScope.ANY,
+    val confirmedByUser: Boolean = false,
+    val lastTurnId: Long? = null
 )
 
 enum class CorrectionRecordStatus {
@@ -56,27 +70,38 @@ data class PersonalizationStats(
     val totalCandidateSelections: Long,
     val correctionRuleCount: Int,
     val activeCorrectionRuleCount: Int,
-    val totalCorrectionEvidence: Long
+    val totalCorrectionEvidence: Long,
+    val pendingCorrectionRuleCount: Int = 0
 )
 
 data class PersonalizationLimits(
     val maxCandidateRecords: Int = 2_000,
     val maxCorrectionRules: Int = 500,
-    val lowConfidenceEvidenceThreshold: Int = 2
+    /** Distinct voice turns needed when the edit was never anchored on both sides. */
+    val lowConfidenceEvidenceThreshold: Int = 3,
+    /** Distinct voice turns needed before a short correction becomes 已生效. */
+    val activationEvidenceThreshold: Int = 2,
+    val maxRejectedCorrections: Int = 200
 ) {
     init {
         require(maxCandidateRecords > 0)
         require(maxCorrectionRules > 0)
         require(lowConfidenceEvidenceThreshold > 0)
+        require(activationEvidenceThreshold > 0)
+        require(maxRejectedCorrections > 0)
     }
 }
 
 /**
  * Versioned, bounded, on-device personalization repository.
  *
- * High-confidence voice corrections become active after the first observation.
- * Lower-confidence observations require [PersonalizationLimits.lowConfidenceEvidenceThreshold]
- * identical observations. The repository never uploads learned data. Calling
+ * A learned voice correction starts as 待確認 (pending): it stays on this device only, is
+ * never sent as a hint and never replaces text. It becomes 已生效 (active) only after the same pair was seen in
+ * [PersonalizationLimits.activationEvidenceThreshold] different voice turns (more when the
+ * edit was never anchored), or when the user confirms it in settings. Pairs that change a
+ * number, unit, date, sign, currency or negation, style-word swaps and long rewrites are
+ * never learned. Undone or deleted pairs go to a bounded rejection list and are not
+ * relearned. Only short word pairs are stored. The repository never uploads learned data. Calling
  * [getPromptWords] only returns local values; the caller must separately decide
  * whether any of them may be included in a network request.
  */
@@ -88,13 +113,16 @@ class PersonalizationRepository internal constructor(
 
     companion object {
         const val PREFERENCE_NAME = "sgh_voice_personalization"
-        const val SCHEMA_VERSION = 1
+        const val SCHEMA_VERSION = 2
 
         private const val KEY_SCHEMA_VERSION = "schema_version"
         private const val KEY_ENABLED = "enabled"
         private const val KEY_CANDIDATE_USAGE = "candidate_usage_v1"
-        private const val KEY_VOICE_CORRECTIONS = "voice_corrections_v1"
-        private const val KEY_LAST_UNDO = "last_undo_v1"
+        private const val KEY_VOICE_CORRECTIONS_V1 = "voice_corrections_v1"
+        private const val KEY_LAST_UNDO_V1 = "last_undo_v1"
+        private const val KEY_VOICE_CORRECTIONS = "voice_corrections_v2"
+        private const val KEY_REJECTED_CORRECTIONS = "voice_corrections_rejected_v2"
+        private const val KEY_LAST_UNDO = "last_undo_v2"
 
         private const val MAX_INPUT_KEY_CODE_POINTS = 128
         private const val MAX_CANDIDATE_CODE_POINTS = 128
@@ -146,10 +174,14 @@ class PersonalizationRepository internal constructor(
     private val candidateUsages = linkedMapOf<CandidateKey, CandidateUsage>()
     private val correctionRules = linkedMapOf<CorrectionKey, VoiceCorrectionRule>()
 
+    private val rejectedCorrections = linkedSetOf<Pair<String, String>>()
+
     init {
         initializeSchema()
         loadCandidateUsages()
         loadCorrectionRules()
+        loadRejectedCorrections()
+        migrateV1CorrectionsIfNeeded()
         enforceBoundsAndPersistIfNeeded()
     }
 
@@ -250,11 +282,15 @@ class PersonalizationRepository internal constructor(
     }
 
     /**
-     * Adds one correction observation.
+     * Adds one correction observation from one voice turn.
      *
-     * A high-confidence result from [VoiceCorrectionTracker] is activated on
-     * the first observation. Low-confidence evidence is retained but does not
-     * become active until the same pair reaches the configured threshold.
+     * New pairs start 待確認. The same pair seen again in a different voice turn
+     * ([turnId]) becomes 已生效; observations within one turn count once. Facts-changing
+     * pairs, style-word swaps, long rewrites, rejected pairs and pairs longer than
+     * [LearnedTerms.MAX_LEARNED_CODE_POINTS] are refused. Recording the reverse of an
+     * existing rule (the user changed a learned word back) removes that rule instead.
+     *
+     * [promptText] is ignored: the hint is always derived from the pair itself (spec 6).
      */
     @Synchronized
     fun recordVoiceCorrection(
@@ -262,37 +298,62 @@ class PersonalizationRepository internal constructor(
         wrongText: String,
         correctedText: String,
         highConfidence: Boolean,
-        promptText: String = correctedText
+        promptText: String = correctedText,
+        turnId: Long? = null,
+        scope: CorrectionScope? = null
     ): CorrectionRecordResult {
         if (!isEnabled()) {
             return CorrectionRecordResult(CorrectionRecordStatus.REJECTED)
         }
 
-        val wrong = normalizeCorrectionText(wrongText)
+        val wrong = normalizeCorrectionText(wrongText, LearnedTerms.MAX_LEARNED_CODE_POINTS)
             ?: return CorrectionRecordResult(CorrectionRecordStatus.REJECTED)
-        val corrected = normalizeCorrectionText(correctedText)
+        val corrected = normalizeCorrectionText(correctedText, LearnedTerms.MAX_LEARNED_CODE_POINTS)
             ?: return CorrectionRecordResult(CorrectionRecordStatus.REJECTED)
-        if (wrong == corrected) {
+        if (wrong == corrected || (wrong to corrected) in rejectedCorrections ||
+            LearnedTerms.rejectionReason(wrong, corrected) != null
+        ) {
             return CorrectionRecordResult(CorrectionRecordStatus.REJECTED)
         }
-        val normalizedPrompt = normalizeCorrectionText(promptText) ?: corrected
+
+        val reversed = correctionRules.keys.filter { it.wrongText == corrected && it.correctedText == wrong }
+        if (reversed.isNotEmpty()) {
+            // The user turned a learned word back: demote it, do not learn a ping-pong pair.
+            reversed.forEach { key ->
+                correctionRules.remove(key)
+                addRejected(key.wrongText, key.correctedText)
+            }
+            storage.update(
+                mapOf(
+                    KEY_VOICE_CORRECTIONS to encodeCorrectionRules(),
+                    KEY_REJECTED_CORRECTIONS to encodeRejected(),
+                    KEY_LAST_UNDO to null
+                )
+            )
+            return CorrectionRecordResult(CorrectionRecordStatus.REJECTED)
+        }
 
         val key = CorrectionKey(language, wrong, corrected)
         val previous = correctionRules[key]
-        val evidenceCount = incrementSaturated(previous?.evidenceCount ?: 0)
+        val sameTurn = turnId != null && previous?.lastTurnId == turnId
+        val evidenceCount = if (sameTurn) previous!!.evidenceCount
+            else incrementSaturated(previous?.evidenceCount ?: 0)
         val sawHighConfidence = highConfidence || previous?.highConfidenceSeen == true
-        val active = previous?.active == true ||
-            sawHighConfidence ||
-            evidenceCount >= limits.lowConfidenceEvidenceThreshold
+        val threshold = if (sawHighConfidence) limits.activationEvidenceThreshold
+            else maxOf(limits.activationEvidenceThreshold, limits.lowConfidenceEvidenceThreshold)
+        val active = previous?.active == true || evidenceCount >= threshold
         val updated = VoiceCorrectionRule(
             language = language,
             wrongText = wrong,
             correctedText = corrected,
-            promptText = normalizedPrompt,
+            promptText = LearnedTerms.promptTerm(wrong, corrected),
             evidenceCount = evidenceCount,
             highConfidenceSeen = sawHighConfidence,
             active = active,
-            lastSeenAtMillis = clockMillis()
+            lastSeenAtMillis = clockMillis(),
+            scope = previous?.scope ?: scope ?: LearnedTerms.scopeOf(wrong, corrected, language),
+            confirmedByUser = previous?.confirmedByUser == true,
+            lastTurnId = turnId ?: previous?.lastTurnId
         )
         correctionRules[key] = updated
         val evicted = pruneCorrectionRules(protectedKey = key)
@@ -320,15 +381,104 @@ class PersonalizationRepository internal constructor(
     fun recordVoiceCorrection(
         language: LearningLanguage,
         replacement: CorrectionReplacement,
-        highConfidence: Boolean
+        highConfidence: Boolean,
+        turnId: Long? = null,
+        scope: CorrectionScope? = null
     ): CorrectionRecordResult {
         return recordVoiceCorrection(
             language = language,
             wrongText = replacement.wrongText,
             correctedText = replacement.correctedText,
             highConfidence = highConfidence,
-            promptText = replacement.suggestedPromptText
+            promptText = replacement.suggestedPromptText,
+            turnId = turnId,
+            scope = scope
         )
+    }
+
+    /** All learned rules (待確認 and 已生效), most recent first, for the settings list. */
+    @Synchronized
+    fun getVoiceCorrections(): List<VoiceCorrectionRule> =
+        correctionRules.values.sortedByDescending { it.lastSeenAtMillis }
+
+    /** The user confirmed a rule in settings: it becomes 已生效 immediately. */
+    @Synchronized
+    fun confirmVoiceCorrection(wrongText: String, correctedText: String): Boolean {
+        val keys = keysOf(wrongText, correctedText)
+        if (keys.isEmpty()) return false
+        keys.forEach { key ->
+            correctionRules[key] = correctionRules.getValue(key).copy(active = true, confirmedByUser = true)
+        }
+        persistUserEdit(keys)
+        return true
+    }
+
+    /**
+     * Replaces a rule with the user's own spelling. The new pair is 已生效 and confirmed;
+     * the old pair is rejected so it is not relearned. A pair that changes a fact is refused
+     * and the existing rule stays unchanged.
+     */
+    @Synchronized
+    fun editVoiceCorrection(
+        wrongText: String,
+        correctedText: String,
+        newWrongText: String,
+        newCorrectedText: String
+    ): CorrectionRecordResult {
+        val oldKeys = keysOf(wrongText, correctedText)
+        val wrong = normalizeCorrectionText(newWrongText, MAX_CORRECTION_CODE_POINTS)
+        val corrected = normalizeCorrectionText(newCorrectedText, MAX_CORRECTION_CODE_POINTS)
+        if (oldKeys.isEmpty() || wrong == null || corrected == null || wrong == corrected ||
+            !FactPreservation.correctionPreservesFacts(wrong, corrected)
+        ) {
+            return CorrectionRecordResult(CorrectionRecordStatus.REJECTED)
+        }
+        val old = correctionRules.getValue(oldKeys.first())
+        oldKeys.forEach { correctionRules.remove(it) }
+        if (old.wrongText != wrong || old.correctedText != corrected) addRejected(old.wrongText, old.correctedText)
+        rejectedCorrections.remove(wrong to corrected)
+        val key = CorrectionKey(old.language, wrong, corrected)
+        val newScope = LearnedTerms.scopeOf(wrong, corrected, old.language)
+        val updated = VoiceCorrectionRule(
+            language = old.language,
+            wrongText = wrong,
+            correctedText = corrected,
+            promptText = LearnedTerms.promptTerm(wrong, corrected),
+            evidenceCount = maxOf(1, correctionRules[key]?.evidenceCount ?: old.evidenceCount),
+            highConfidenceSeen = old.highConfidenceSeen,
+            active = true,
+            lastSeenAtMillis = clockMillis(),
+            scope = if (newScope == CorrectionScope.LATIN || old.scope == CorrectionScope.LATIN) newScope else old.scope,
+            confirmedByUser = true,
+            lastTurnId = old.lastTurnId
+        )
+        correctionRules[key] = updated
+        pruneCorrectionRules(protectedKey = key)
+        persistUserEdit(oldKeys + key)
+        return CorrectionRecordResult(CorrectionRecordStatus.ACTIVATED, updated)
+    }
+
+    /** Deletes a rule; the pair goes to the rejection list and is not learned again. */
+    @Synchronized
+    fun deleteVoiceCorrection(wrongText: String, correctedText: String): Boolean {
+        val keys = keysOf(wrongText, correctedText)
+        if (keys.isEmpty()) return false
+        keys.forEach { correctionRules.remove(it) }
+        addRejected(wrongText, correctedText)
+        persistUserEdit(keys)
+        return true
+    }
+
+    @Synchronized
+    fun isRejectedCorrection(wrongText: String, correctedText: String): Boolean =
+        (wrongText to correctedText) in rejectedCorrections
+
+    /** 已生效 rules as known mishearing aliases (wrong -> right) for the dictation guard. */
+    @Synchronized
+    fun getLearnedSpellingAliases(): Map<String, String> {
+        if (!isEnabled()) return emptyMap()
+        return getActiveVoiceCorrections().asReversed()
+            .associate { it.wrongText to it.correctedText }
     }
 
     @Synchronized
@@ -344,7 +494,8 @@ class PersonalizationRepository internal constructor(
                     rule.language == LearningLanguage.MIXED
             }
             .sortedWith(
-                compareByDescending<VoiceCorrectionRule> { it.highConfidenceSeen }
+                compareByDescending<VoiceCorrectionRule> { it.confirmedByUser }
+                    .thenByDescending { it.highConfidenceSeen }
                     .thenByDescending { it.evidenceCount }
                     .thenByDescending { it.lastSeenAtMillis }
             )
@@ -352,7 +503,7 @@ class PersonalizationRepository internal constructor(
     }
 
     /**
-     * Returns corrected terms suitable for an optional Whisper prompt.
+     * Returns corrected words of 已生效 rules, suitable for STT and AI spelling references.
      *
      * This method has no networking side effect. In particular, calling code
      * must apply its own privacy/consent decision before uploading these terms.
@@ -365,15 +516,19 @@ class PersonalizationRepository internal constructor(
         if (!isEnabled() || limit <= 0) return emptyList()
         return getActiveVoiceCorrections(language)
             .asSequence()
-            .map { it.promptText }
+            // Re-derive hints so an already-active schema-v2 rule with the old empty
+            // single-Han prompt benefits too, without relearning or changing consent.
+            .map { LearnedTerms.promptTerm(it.wrongText, it.correctedText) }
+            .filter { it.isNotBlank() }
             .distinct()
             .take(limit)
             .toList()
     }
 
     /**
-     * Reverts the latest candidate-selection or voice-correction mutation,
-     * including any record evicted by the bounded-store policy.
+     * Reverts the latest candidate-selection or voice-correction learning, including any
+     * record evicted by the bounded-store policy. An undone correction is removed and put
+     * on the rejection list so the same pair is not learned again.
      */
     @Synchronized
     fun undoLast(): Boolean {
@@ -393,11 +548,12 @@ class PersonalizationRepository internal constructor(
 
             is UndoRecord.Correction -> {
                 correctionRules.remove(undo.key)
-                undo.previous?.let { correctionRules[correctionKeyOf(it)] = it }
                 undo.evicted.forEach { correctionRules[correctionKeyOf(it)] = it }
+                addRejected(undo.key.wrongText, undo.key.correctedText)
                 storage.update(
                     mapOf(
                         KEY_VOICE_CORRECTIONS to encodeCorrectionRules(),
+                        KEY_REJECTED_CORRECTIONS to encodeRejected(),
                         KEY_LAST_UNDO to null
                     )
                 )
@@ -407,18 +563,22 @@ class PersonalizationRepository internal constructor(
     }
 
     /**
-     * Removes learned candidate and correction data while preserving the user's
-     * enabled/disabled preference.
+     * Removes learned candidate and correction data (including the rejection list) while
+     * preserving the user's enabled/disabled preference.
      */
     @Synchronized
     fun clearAll() {
         candidateUsages.clear()
         correctionRules.clear()
+        rejectedCorrections.clear()
         storage.update(
             mapOf(
                 KEY_CANDIDATE_USAGE to null,
                 KEY_VOICE_CORRECTIONS to null,
+                KEY_VOICE_CORRECTIONS_V1 to null,
+                KEY_REJECTED_CORRECTIONS to null,
                 KEY_LAST_UNDO to null,
+                KEY_LAST_UNDO_V1 to null,
                 KEY_SCHEMA_VERSION to SCHEMA_VERSION
             )
         )
@@ -436,24 +596,122 @@ class PersonalizationRepository internal constructor(
             activeCorrectionRuleCount = correctionRules.values.count { it.active },
             totalCorrectionEvidence = correctionRules.values.sumOf {
                 it.evidenceCount.toLong()
+            },
+            pendingCorrectionRuleCount = correctionRules.values.count { !it.active }
+        )
+    }
+
+    private fun keysOf(wrongText: String, correctedText: String): List<CorrectionKey> =
+        correctionRules.keys.filter { it.wrongText == wrongText && it.correctedText == correctedText }
+
+    private fun addRejected(wrong: String, corrected: String) {
+        rejectedCorrections.remove(wrong to corrected)
+        rejectedCorrections.add(wrong to corrected)
+        while (rejectedCorrections.size > limits.maxRejectedCorrections) {
+            rejectedCorrections.remove(rejectedCorrections.first())
+        }
+    }
+
+    /** Settings edits are explicit user actions; they are not "the latest learning" to undo. */
+    private fun persistUserEdit(touched: Collection<CorrectionKey>) {
+        val undo = decodeUndo(storage.getString(KEY_LAST_UNDO, null))
+        val clearUndo = undo is UndoRecord.Correction && touched.any {
+            it.wrongText == undo.key.wrongText && it.correctedText == undo.key.correctedText
+        }
+        storage.update(
+            buildMap {
+                put(KEY_VOICE_CORRECTIONS, encodeCorrectionRules())
+                put(KEY_REJECTED_CORRECTIONS, encodeRejected())
+                if (clearUndo) put(KEY_LAST_UNDO, null)
             }
         )
     }
 
     private fun initializeSchema() {
         val storedVersion = storage.getInt(KEY_SCHEMA_VERSION, 0)
-        if (storedVersion == SCHEMA_VERSION) return
+        if (storedVersion <= SCHEMA_VERSION) return
 
-        // No older schema exists yet. Unknown/future payloads are discarded
-        // rather than interpreted incorrectly, while the enabled flag remains.
+        // An unknown future payload is discarded rather than interpreted incorrectly,
+        // while the enabled flag remains. Older versions are migrated, never discarded.
         storage.update(
             mapOf(
                 KEY_SCHEMA_VERSION to SCHEMA_VERSION,
                 KEY_CANDIDATE_USAGE to null,
                 KEY_VOICE_CORRECTIONS to null,
+                KEY_REJECTED_CORRECTIONS to null,
                 KEY_LAST_UNDO to null
             )
         )
+    }
+
+    /**
+     * v1 -> v2: retain each rule's activation state behind the fact filter. Pending or
+     * unspecified rules must not acquire permission to appear in cloud hints on upgrade.
+     * Each hint is re-derived without sentence context. The v1 payload is
+     * removed only in the same write that stores the migrated rules. When the payload cannot
+     * be parsed nothing is deleted and the migration is retried on the next start.
+     */
+    private fun migrateV1CorrectionsIfNeeded() {
+        val storedVersion = storage.getInt(KEY_SCHEMA_VERSION, 0)
+        if (storedVersion >= SCHEMA_VERSION) return
+        val encoded = storage.getString(KEY_VOICE_CORRECTIONS_V1, null)
+        if (encoded != null) {
+            val array = try {
+                JSONArray(encoded)
+            } catch (_: Exception) {
+                return
+            }
+            repeat(array.length()) { index ->
+                val legacy = decodeCorrectionRule(array.optJSONObject(index)) ?: return@repeat
+                if (!FactPreservation.correctionPreservesFacts(legacy.wrongText, legacy.correctedText)) {
+                    return@repeat
+                }
+                val migrated = legacy.copy(
+                    promptText = LearnedTerms.promptTerm(legacy.wrongText, legacy.correctedText),
+                    active = legacy.active,
+                    scope = legacyScope(legacy),
+                    lastTurnId = null
+                )
+                correctionRules.putIfAbsent(correctionKeyOf(migrated), migrated)
+            }
+        }
+        pruneCorrectionRules()
+        storage.update(
+            mapOf(
+                KEY_VOICE_CORRECTIONS to encodeCorrectionRules(),
+                KEY_VOICE_CORRECTIONS_V1 to null,
+                KEY_LAST_UNDO_V1 to null,
+                KEY_SCHEMA_VERSION to SCHEMA_VERSION
+            )
+        )
+    }
+
+    /** A legacy Han rule's original language is unknown, so it keeps applying everywhere. */
+    private fun legacyScope(rule: VoiceCorrectionRule): CorrectionScope =
+        when (val derived = LearnedTerms.scopeOf(rule.wrongText, rule.correctedText, rule.language)) {
+            CorrectionScope.CHINESE -> CorrectionScope.ANY
+            else -> derived
+        }
+
+    private fun loadRejectedCorrections() {
+        val encoded = storage.getString(KEY_REJECTED_CORRECTIONS, null) ?: return
+        try {
+            val array = JSONArray(encoded)
+            repeat(array.length()) { index ->
+                val pair = array.optJSONArray(index) ?: return@repeat
+                val wrong = pair.optString(0)
+                val corrected = pair.optString(1)
+                if (wrong.isNotEmpty() && corrected.isNotEmpty()) rejectedCorrections.add(wrong to corrected)
+            }
+        } catch (_: Exception) {
+            rejectedCorrections.clear()
+        }
+    }
+
+    private fun encodeRejected(): String {
+        val array = JSONArray()
+        rejectedCorrections.forEach { (wrong, corrected) -> array.put(JSONArray().put(wrong).put(corrected)) }
+        return array.toString()
     }
 
     private fun loadCandidateUsages() {
@@ -525,6 +783,7 @@ class PersonalizationRepository internal constructor(
                 .values
                 .minWithOrNull(
                     compareBy<VoiceCorrectionRule> { it.active }
+                        .thenBy { it.confirmedByUser }
                         .thenBy { it.evidenceCount }
                         .thenBy { it.lastSeenAtMillis }
                 ) ?: break
@@ -604,14 +863,16 @@ class PersonalizationRepository internal constructor(
             .put("highConfidenceSeen", rule.highConfidenceSeen)
             .put("active", rule.active)
             .put("lastSeenAtMillis", rule.lastSeenAtMillis)
+            .put("scope", rule.scope.name)
+            .put("confirmedByUser", rule.confirmedByUser)
+            .apply { rule.lastTurnId?.let { put("lastTurnId", it) } }
 
     private fun decodeCorrectionRule(value: JSONObject?): VoiceCorrectionRule? {
         value ?: return null
         return try {
             val correctedText = value.getString("correctedText")
-            val promptText = normalizeCorrectionText(
-                value.optString("promptText", correctedText)
-            ) ?: correctedText
+            val promptText = value.optString("promptText", correctedText).trim()
+                .takeIf { it.isEmpty() || normalizeCorrectionText(it) != null } ?: ""
             val rule = VoiceCorrectionRule(
                 language = LearningLanguage.valueOf(value.getString("language")),
                 wrongText = value.getString("wrongText"),
@@ -620,7 +881,11 @@ class PersonalizationRepository internal constructor(
                 evidenceCount = value.getInt("evidenceCount").coerceAtLeast(1),
                 highConfidenceSeen = value.optBoolean("highConfidenceSeen", false),
                 active = value.optBoolean("active", false),
-                lastSeenAtMillis = value.getLong("lastSeenAtMillis")
+                lastSeenAtMillis = value.getLong("lastSeenAtMillis"),
+                scope = runCatching { CorrectionScope.valueOf(value.optString("scope", "ANY")) }
+                    .getOrDefault(CorrectionScope.ANY),
+                confirmedByUser = value.optBoolean("confirmedByUser", false),
+                lastTurnId = if (value.has("lastTurnId")) value.optLong("lastTurnId") else null
             )
             if (normalizeCorrectionText(rule.wrongText) == null ||
                 normalizeCorrectionText(rule.correctedText) == null ||
@@ -764,13 +1029,16 @@ class PersonalizationRepository internal constructor(
         }
     }
 
-    private fun normalizeCorrectionText(value: String): String? {
+    private fun normalizeCorrectionText(
+        value: String,
+        maxCodePoints: Int = MAX_CORRECTION_CODE_POINTS
+    ): String? {
         val normalized = value.trim()
         return normalized.takeIf {
             it.isNotBlank() &&
                 '\n' !in it &&
                 '\r' !in it &&
-                it.codePointCount(0, it.length) <= MAX_CORRECTION_CODE_POINTS &&
+                it.codePointCount(0, it.length) <= maxCodePoints &&
                 it.codePoints().anyMatch(Character::isLetterOrDigit)
         }
     }

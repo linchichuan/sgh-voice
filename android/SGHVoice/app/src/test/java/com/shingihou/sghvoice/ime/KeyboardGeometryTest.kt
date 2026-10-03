@@ -205,6 +205,7 @@ class KeyboardGeometryTest {
                 assertEquals(tabs.top + tabs.height / 2, group.top + group.height / 2)
                 assertTrue(group.right <= tabs.left)
                 assertEquals("Logo and SGH must be adjacent", logo.right, brand.left)
+                assertEquals("Exactly one half-width space separates logo and letters", " SGH", brand.text.toString())
                 assertTrue("The combined brand must be centred",
                     kotlin.math.abs(logo.left + brand.right - group.width) <= 1)
                 assertTrue(brand.right <= group.width)

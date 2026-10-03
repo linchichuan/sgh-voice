@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="model_openai_stt_gpt_transcribe">GPT-Transcribe（專有名詞提示）</string>
+    <string name="price_openai_stt_gpt_transcribe">每分鐘音訊 US$0.0045</string>
+    <string name="keyboard_cursor_left">文字游標向左</string>
+    <string name="keyboard_cursor_right">文字游標向右</string>
     <string name="voice_palette_title">錄音圓配色</string>
     <string name="voice_palette_hint">點選立即儲存，下次開啟鍵盤即套用。</string>
     <string name="voice_palette_mint">薄荷綠</string>
@@ -35,7 +39,7 @@
 
     <!-- 鍵盤狀態文字 -->
     <string name="keyboard_brand">SGH Voice</string>
-    <string name="keyboard_brand_short">SGH</string>
+    <string name="keyboard_brand_short">\u0020SGH</string>
     <string name="mode_voice">語音</string>
     <string name="mode_zhuyin">注</string>
     <string name="mode_japanese">あ</string>
@@ -67,7 +71,7 @@
     <string name="status_translation_recording_elapsed">翻譯錄音中 %1$s；點按送出，長按取消</string>
     <string name="status_recording_limit">已達兩分鐘上限，正在送出</string>
     <string name="status_learning_saved">已在本機學習「%1$s → %2$s」</string>
-    <string name="status_learning_pending">已記下修正「%1$s → %2$s」，再次確認後才會套用</string>
+    <string name="status_learning_pending">已記下修正「%1$s → %2$s」，下次語音再出現或在設定中確認後才會套用</string>
     <string name="status_learning_pending_short">已記下修正，待確認</string>
     <string name="status_learning_saved_short">已更新個人詞庫</string>
     <string name="status_learning_disabled">此欄位已停用個人化學習</string>
@@ -198,8 +202,22 @@
     <string name="label_correct_word">修正</string>
     <string name="title_personalized_learning">本機個人化學習</string>
     <string name="label_personalized_learning">自動學習候選字與語音修正</string>
-    <string name="desc_personalized_learning">在本機保存候選使用次數與短範圍錯字對照；短片段仍可能含個人內容，音訊不作為學習資料。密碼及禁止個人化的欄位不會學習。可撤銷最近學習或清除全部。</string>
-    <string name="learning_stats">已學習 %1$d 個候選、%2$d 組修正</string>
+    <string name="desc_personalized_learning">只在本機保存候選使用次數與短詞修正對照，不保存整段文字、音訊或密碼。語音插入後 60 秒內你改正的錯字，會在改完後與語音辨識原文比對學習；AI 整理、翻譯與「幫我寫」產生的文字不學，改變數字、日期、金額或否定的修改也不學。新學的詞先列為「待確認」，只留在本機、不會替換文字；在另一次語音中再改一次，或在下方清單按確認後才會生效。已生效的詞可隨下次語音送至你選用的雲端服務作為拼字提示。密碼及禁止個人化的欄位不會學習。</string>
+    <string name="label_recent_voice_context">參考同一欄位的近期語音</string>
+    <string name="desc_recent_voice_context">預設關閉。開啟後，上一段語音末尾最多 512 字會暫存 60 秒，隨本次語音交給所選雲端 AI 協助整理或翻譯；只輸出本次內容。切換欄位即清除，不保存跨 App 的文章歷史。</string>
+    <string name="learning_stats">已學習 %1$d 個候選；修正 %2$d 組已生效、%3$d 組待確認</string>
+    <string name="status_learning_multiple">已記下 %1$d 組修正，可在設定的詞庫頁查看</string>
+    <string name="title_learned_corrections">已學詞</string>
+    <string name="label_learned_pending">待確認（%1$d）</string>
+    <string name="label_learned_active">已生效（%1$d）</string>
+    <string name="desc_learned_pending">待確認的詞只留在本機，不會替換文字也不會送出；確認後才生效。</string>
+    <string name="msg_no_learned_corrections">目前沒有已學詞</string>
+    <string name="btn_confirm_learned">確認</string>
+    <string name="btn_edit_learned">修改</string>
+    <string name="btn_delete_learned">刪除</string>
+    <string name="title_edit_learned">修改已學詞</string>
+    <string name="msg_learned_edit_rejected">這個修改會改變數字、日期、金額或否定，無法儲存</string>
+    <string name="label_learned_confirmed">已確認</string>
     <string name="btn_undo_learning">撤銷最近學習</string>
     <string name="btn_clear_learning">清除學習資料</string>
     <string name="msg_learning_cleared">個人化學習資料已清除</string>

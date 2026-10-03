@@ -217,25 +217,37 @@ enum class VoiceCorrectionTrackingStatus {
     INSUFFICIENT_CONTEXT,
     NO_CHANGE,
     REJECTED_EDIT,
-    CORRECTION_FOUND
+    CORRECTION_FOUND,
+    /** The tracked text changed; learning waits for [VoiceCorrectionTracker.finish]. */
+    EDIT_OBSERVED
 }
+
+/** One correction extracted from the final, stable edit of a voice turn. */
+data class LearnedCorrection(
+    val replacement: CorrectionReplacement,
+    val highConfidence: Boolean,
+    val scope: CorrectionScope
+)
 
 data class VoiceCorrectionTrackingResult(
     val status: VoiceCorrectionTrackingStatus,
     val replacement: CorrectionReplacement? = null,
     val highConfidence: Boolean = false,
-    val rejection: CorrectionDiffRejection? = null
+    val rejection: CorrectionDiffRejection? = null,
+    val originalText: String? = null,
+    val editedText: String? = null
 )
 
 /**
  * Tracks one recently committed voice result for at most 60 seconds.
  *
- * It identifies the committed range again using short anchors immediately
- * before and after the result. A correction is high-confidence only when both
- * sides are anchored, or when a missing anchor is a verified window boundary.
- * The tracker learns at most one replacement per voice turn. A bounded deletion
- * may be the first half of a delete-then-type correction;
- * it is never learned, but keeps the original deadline while awaiting replacement.
+ * [inspect] only observes: it re-locates the committed range with short anchors and keeps the
+ * latest version in memory. Nothing is learned from intermediate editor states (a word deleted
+ * and retyped in pieces, a pure insertion, a half-typed replacement). [finish] compares the
+ * final stable text with the text as inserted and extracts every short replacement at once.
+ *
+ * Only spans that came verbatim from speech recognition may be learned: [begin] receives the
+ * STT-derived baseline and a replacement of AI-generated wording is ignored.
  */
 class VoiceCorrectionTracker(
     private val clockElapsedMillis: () -> Long = {
@@ -252,13 +264,18 @@ class VoiceCorrectionTracker(
     companion object {
         const val DEFAULT_SESSION_DURATION_MILLIS = 60_000L
         const val DEFAULT_ANCHOR_CODE_POINTS = 24
-        const val DEFAULT_MAX_TRACKED_TEXT_CODE_POINTS = 512
-        const val DEFAULT_MAX_WINDOW_CODE_POINTS = 1_200
+        const val DEFAULT_MAX_TRACKED_TEXT_CODE_POINTS = 2_048
+        const val DEFAULT_MAX_WINDOW_CODE_POINTS = 4_400
+
+        /** An edit this close to the deadline may be unfinished; it is not learned. */
+        const val SETTLE_MILLIS = 2_000L
+        const val MAX_CORRECTIONS_PER_TURN = 8
     }
 
     private data class Session(
         val sessionId: Long,
-        val committedText: String,
+        val originalText: String,
+        val latestText: String,
         val beforeAnchor: String,
         val afterAnchor: String,
         val targetStartedAtWindowBoundary: Boolean,
@@ -266,7 +283,12 @@ class VoiceCorrectionTracker(
         val targetStartedAtDocumentBoundary: Boolean,
         val targetEndedAtDocumentBoundary: Boolean,
         val initialWindowStartOffset: Int?,
-        val startedAtMillis: Long
+        val startedAtMillis: Long,
+        val lastChangeAtMillis: Long,
+        val strongAnchors: Boolean,
+        /** Per code point of [originalText]: true when it came verbatim from STT. */
+        val sttVerbatim: BooleanArray,
+        val discarded: Boolean = false
     )
 
     private var session: Session? = null
@@ -282,13 +304,17 @@ class VoiceCorrectionTracker(
     /**
      * Starts tracking from a snapshot taken after commitText(..., 1), where the
      * cursor is expected to be directly after [committedText].
+     *
+     * @param sttText the text the user would have seen without AI cleanup. Null means the
+     * committed text itself came from STT. Spans that differ from it are never learned.
      */
     @Synchronized
     fun begin(
         sessionId: Long,
         committedText: String,
         afterCommitSnapshot: BoundedTextSnapshot,
-        learningAllowed: Boolean = true
+        learningAllowed: Boolean = true,
+        sttText: String? = null
     ): Boolean {
         session = null
         if (!learningAllowed || committedText.isBlank()) return false
@@ -302,10 +328,12 @@ class VoiceCorrectionTracker(
         val fullText = afterCommitSnapshot.fullText
         val beforeText = fullText.substring(0, targetStart)
         val afterText = fullText.substring(targetEnd)
+        val started = clockElapsedMillis()
 
         session = Session(
             sessionId = sessionId,
-            committedText = committedText,
+            originalText = committedText,
+            latestText = committedText,
             beforeAnchor = beforeText.takeLastCodePoints(anchorCodePoints),
             afterAnchor = afterText.takeFirstCodePoints(anchorCodePoints),
             targetStartedAtWindowBoundary = targetStart == 0,
@@ -315,11 +343,20 @@ class VoiceCorrectionTracker(
             targetEndedAtDocumentBoundary =
                 targetEnd == fullText.length && afterCommitSnapshot.endsAtDocumentBoundary,
             initialWindowStartOffset = afterCommitSnapshot.windowStartOffset,
-            startedAtMillis = clockElapsedMillis()
+            startedAtMillis = started,
+            lastChangeAtMillis = started,
+            strongAnchors = false,
+            sttVerbatim = if (sttText == null || sttText == committedText) {
+                BooleanArray(committedText.codePointLength()) { true }
+            } else {
+                EditHunks.verbatimMask(committedText, sttText)
+                    ?: BooleanArray(committedText.codePointLength())
+            }
         )
         return true
     }
 
+    /** Observes the editor. Never learns; see [finish]. */
     @Synchronized
     fun inspect(
         sessionId: Long,
@@ -330,11 +367,13 @@ class VoiceCorrectionTracker(
             return result(VoiceCorrectionTrackingStatus.SESSION_MISMATCH)
         }
 
-        val elapsed = clockElapsedMillis() - active.startedAtMillis
+        val now = clockElapsedMillis()
+        val elapsed = now - active.startedAtMillis
         if (elapsed < 0L || elapsed > sessionDurationMillis) {
-            session = null
+            // Kept (without new observations) only until finish()/cancel() at the deadline.
             return result(VoiceCorrectionTrackingStatus.EXPIRED)
         }
+        if (active.discarded) return result(VoiceCorrectionTrackingStatus.REJECTED_EDIT)
         if (currentSnapshot.fullText.codePointLength() > maxWindowCodePoints) {
             return result(VoiceCorrectionTrackingStatus.INSUFFICIENT_CONTEXT)
         }
@@ -342,40 +381,55 @@ class VoiceCorrectionTracker(
         val located = locateTrackedText(active, currentSnapshot)
             ?: return result(VoiceCorrectionTrackingStatus.INSUFFICIENT_CONTEXT)
         val (editedText, strongAnchors) = located
-        if (editedText == active.committedText) {
+        if (editedText == active.latestText) {
             return result(VoiceCorrectionTrackingStatus.NO_CHANGE)
         }
-
-        return when (
-            val diff = CorrectionDiff.analyze(
-                original = active.committedText,
-                edited = editedText,
-                maxReplacementCodePoints = maxReplacementCodePoints
+        if (editedText.isBlank() || editedText.codePointLength() > maxTrackedTextCodePoints) {
+            // The whole voice result was removed (or replaced by something much longer):
+            // whatever is typed next is new writing, not a correction of this turn.
+            session = active.copy(discarded = true)
+            return VoiceCorrectionTrackingResult(
+                status = VoiceCorrectionTrackingStatus.REJECTED_EDIT,
+                rejection = if (editedText.isBlank()) CorrectionDiffRejection.PURE_DELETION
+                    else CorrectionDiffRejection.TOO_LARGE
             )
-        ) {
-            is CorrectionDiffResult.Accepted -> {
-                session = null
-                VoiceCorrectionTrackingResult(
-                    status = VoiceCorrectionTrackingStatus.CORRECTION_FOUND,
-                    replacement = diff.replacement,
-                    highConfidence = strongAnchors
-                )
-            }
-
-            is CorrectionDiffResult.Rejected -> {
-                val deletedCodePoints = active.committedText.codePointLength() -
-                    editedText.codePointLength()
-                val pendingReplacement =
-                    diff.reason == CorrectionDiffRejection.PURE_DELETION &&
-                        editedText.isNotBlank() &&
-                        deletedCodePoints in 1..maxReplacementCodePoints
-                if (!pendingReplacement) session = null
-                VoiceCorrectionTrackingResult(
-                    status = VoiceCorrectionTrackingStatus.REJECTED_EDIT,
-                    rejection = diff.reason
-                )
-            }
         }
+        session = active.copy(
+            latestText = editedText,
+            lastChangeAtMillis = now,
+            strongAnchors = strongAnchors
+        )
+        return VoiceCorrectionTrackingResult(
+            status = VoiceCorrectionTrackingStatus.EDIT_OBSERVED,
+            highConfidence = strongAnchors,
+            originalText = active.latestText,
+            editedText = editedText
+        )
+    }
+
+    /**
+     * Ends the turn and returns the corrections between the inserted text and its final
+     * version. Nothing is returned when the result was cleared, when the final edit may be
+     * unfinished at the deadline, or when the change looks like a rewrite rather than fixes.
+     *
+     * @param requireSettledMillis when > 0, the last observed change must be at least this old.
+     */
+    @Synchronized
+    fun finish(sessionId: Long? = null, requireSettledMillis: Long = 0L): List<LearnedCorrection> {
+        val active = session ?: return emptyList()
+        session = null
+        if (sessionId != null && sessionId != active.sessionId) return emptyList()
+        if (active.discarded || active.latestText == active.originalText) return emptyList()
+        val now = clockElapsedMillis()
+        val deadline = active.startedAtMillis + sessionDurationMillis
+        if (now < active.startedAtMillis) return emptyList()
+        // Never keep a turn's text beyond its retention window plus a short grace period.
+        if (now > deadline + SETTLE_MILLIS * 3) return emptyList()
+        if (now > deadline && active.lastChangeAtMillis > deadline - SETTLE_MILLIS) return emptyList()
+        if (requireSettledMillis > 0 && now - active.lastChangeAtMillis < requireSettledMillis) {
+            return emptyList()
+        }
+        return extract(active)
     }
 
     @Synchronized
@@ -387,11 +441,67 @@ class VoiceCorrectionTracker(
     fun isTracking(sessionId: Long? = null): Boolean {
         val active = session ?: return false
         val elapsed = clockElapsedMillis() - active.startedAtMillis
-        if (elapsed < 0L || elapsed > sessionDurationMillis) {
-            session = null
-            return false
-        }
+        if (elapsed < 0L || elapsed > sessionDurationMillis) return false
         return sessionId == null || sessionId == active.sessionId
+    }
+
+    private fun extract(active: Session): List<LearnedCorrection> {
+        val original = active.originalText
+        val hunks = EditHunks.hunks(original, active.latestText) ?: return emptyList()
+        val replacements = hunks.filter { it.wrong.isNotEmpty() && it.corrected.isNotEmpty() }
+        if (replacements.isEmpty() || replacements.size > MAX_CORRECTIONS_PER_TURN) return emptyList()
+        val originalLength = original.codePointLength()
+        // Latin fixes count their edit distance (Orbyt -> Orbit = 1); other spans count their length.
+        val changed = replacements.sumOf(EditHunks::changeCost)
+        // Replacing most of the utterance is rewriting, not fixing misrecognized words.
+        if (originalLength >= 8 && changed * 10 > originalLength * 6) return emptyList()
+
+        val japaneseContext = original.codePoints().anyMatch(::isKana)
+        val learned = mutableListOf<LearnedCorrection>()
+        val seen = mutableSetOf<Pair<String, String>>()
+        for (hunk in replacements) {
+            if (!isLearnableHunk(hunk)) continue
+            // Spec: only text that came verbatim from speech recognition can be a mishearing.
+            val fromStt = (hunk.start until hunk.end).all { index ->
+                active.sttVerbatim.getOrElse(index) { false } ||
+                    !Character.isLetterOrDigit(original.codePointAtIndex(index))
+            }
+            if (!fromStt) continue
+            val prepared = VoiceCorrectionLearning.prepare(
+                original,
+                CorrectionReplacement(
+                    wrongText = hunk.wrong,
+                    correctedText = hunk.corrected,
+                    suggestedPromptText = hunk.corrected,
+                    unchangedPrefixCodePoints = hunk.start,
+                    unchangedSuffixCodePoints = originalLength - hunk.end
+                )
+            ) ?: continue
+            if (!seen.add(prepared.wrongText to prepared.correctedText)) continue
+            val latin = !prepared.wrongText.codePoints().anyMatch(::isCjk) &&
+                !prepared.correctedText.codePoints().anyMatch(::isCjk)
+            learned += LearnedCorrection(
+                replacement = prepared,
+                highConfidence = active.strongAnchors,
+                scope = when {
+                    latin -> CorrectionScope.LATIN
+                    japaneseContext -> CorrectionScope.JAPANESE
+                    else -> CorrectionScope.CHINESE
+                }
+            )
+        }
+        return learned
+    }
+
+    private fun isLearnableHunk(hunk: EditHunk): Boolean {
+        val wrong = hunk.wrong.codePointLength()
+        val corrected = hunk.corrected.codePointLength()
+        if (wrong > maxReplacementCodePoints || corrected > maxReplacementCodePoints) return false
+        if (!hunk.wrong.any(Char::isLetterOrDigit) || !hunk.corrected.any(Char::isLetterOrDigit)) return false
+        if ((hunk.wrong + hunk.corrected).any { Character.getType(it) == Character.CONTROL.toInt() }) return false
+        // A long CJK-only replacement is a rewrite of the sentence, not a misheard word.
+        val hasLatinOrDigit = (hunk.wrong + hunk.corrected).any { it.code < 128 && it.isLetterOrDigit() }
+        return hasLatinOrDigit || maxOf(wrong, corrected) <= MAX_CJK_REPLACEMENT_CODE_POINTS
     }
 
     /**
@@ -438,6 +548,18 @@ class VoiceCorrectionTracker(
     private fun result(status: VoiceCorrectionTrackingStatus) =
         VoiceCorrectionTrackingResult(status = status)
 }
+
+private const val MAX_CJK_REPLACEMENT_CODE_POINTS = 6
+
+private fun String.codePointAtIndex(index: Int): Int = codePointAt(offsetByCodePoints(0, index))
+
+private fun isKana(codePoint: Int): Boolean = when (Character.UnicodeScript.of(codePoint)) {
+    Character.UnicodeScript.HIRAGANA, Character.UnicodeScript.KATAKANA -> true
+    else -> codePoint == 0x30FC || codePoint == 0xFF70
+}
+
+private fun isCjk(codePoint: Int): Boolean =
+    Character.UnicodeScript.of(codePoint) == Character.UnicodeScript.HAN || isKana(codePoint)
 
 private fun String.uniqueIndexOf(needle: String, startIndex: Int = 0): Int? {
     val first = indexOf(needle, startIndex)

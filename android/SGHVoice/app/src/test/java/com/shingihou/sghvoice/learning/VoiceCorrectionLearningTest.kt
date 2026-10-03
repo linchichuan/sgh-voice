@@ -11,6 +11,77 @@ import org.mockito.kotlin.mock
 
 /** Real diff, learning adapter, repository and dictionary; only storage is synthetic. */
 class VoiceCorrectionLearningTest {
+    @Test fun `two corrections in one voice paragraph both reach the next dictation`() {
+        fun snapshot(text: String) = BoundedTextSnapshot(text, afterCursor = "",
+            windowStartOffset = 0, startsAtDocumentBoundary = true, endsAtDocumentBoundary = true)
+        val original = "請用Orbyt檢查Kotlun。"
+        val first = "請用Orbit檢查Kotlun。"
+        val second = "請用Orbit檢查Kotlin。"
+        val repository = PersonalizationRepository(CorrectionLearningStorage())
+        // The same two fixes in two voice turns make both rules 已生效.
+        for (turn in 1L..2L) {
+            val tracker = VoiceCorrectionTracker(clockElapsedMillis = { 0L })
+            assertTrue(tracker.begin(turn, original, snapshot(original)))
+            for ((before, after) in listOf(original to first, first to second)) {
+                val found = tracker.inspect(turn, snapshot(after))
+                assertEquals(VoiceCorrectionTrackingStatus.EDIT_OBSERVED, found.status)
+                assertEquals(before, found.originalText)
+            }
+            val learned = tracker.finish(turn)
+            assertEquals(listOf("Orbit", "Kotlin"), learned.map { it.replacement.correctedText })
+            learned.forEach {
+                repository.recordVoiceCorrection(LearningLanguage.MIXED, it.replacement, it.highConfidence, turn, it.scope)
+            }
+        }
+        val dictionary = DictionaryManager(mock<SharedPreferences>()) { repository }
+        assertEquals(second, dictionary.applyCorrections(original, includePersonalization = true))
+    }
+
+    @Test fun `bounded long voice paragraph can learn a short correction without persisting the paragraph`() {
+        val tracker = VoiceCorrectionTracker(clockElapsedMillis = { 0L })
+        val prefix = "這是一段測試文字。".repeat(80)
+        val source = prefix + "Orbyt"
+        fun snapshot(text: String) = BoundedTextSnapshot(text, afterCursor = "",
+            startsAtDocumentBoundary = true, endsAtDocumentBoundary = true)
+        assertTrue(tracker.begin(1L, source, snapshot(source)))
+        tracker.inspect(1L, snapshot(prefix + "Orbit"))
+        val prepared = tracker.finish(1L).single().replacement
+        assertEquals("Orbyt", prepared.wrongText)
+        assertEquals("Orbit", prepared.correctedText)
+        assertFalse(tracker.begin(2L, "字".repeat(2049), snapshot("字".repeat(2049))))
+    }
+
+    @Test fun `repeated toggles do not count as independent confirmation and edits do not extend expiry`() {
+        var now = 0L
+        val tracker = VoiceCorrectionTracker(clockElapsedMillis = { now })
+        fun snapshot(text: String) = BoundedTextSnapshot(text, afterCursor = "")
+        assertTrue(tracker.begin(1L, "Orbyt", snapshot("Orbyt")))
+        assertEquals(VoiceCorrectionTrackingStatus.EDIT_OBSERVED, tracker.inspect(1L, snapshot("Orbit")).status)
+        assertEquals(VoiceCorrectionTrackingStatus.EDIT_OBSERVED, tracker.inspect(1L, snapshot("Orbyt")).status)
+        assertEquals(VoiceCorrectionTrackingStatus.EDIT_OBSERVED, tracker.inspect(1L, snapshot("Orbit")).status)
+        now = 60_001L
+        assertEquals(VoiceCorrectionTrackingStatus.EXPIRED, tracker.inspect(1L, snapshot("OrbitX")).status)
+        // Only the final text counts, once per voice turn.
+        val learned = tracker.finish(1L)
+        assertEquals(listOf("Orbyt" to "Orbit"), learned.map { it.replacement.wrongText to it.replacement.correctedText })
+        val repository = PersonalizationRepository(CorrectionLearningStorage())
+        repeat(3) {
+            assertEquals(CorrectionRecordStatus.EVIDENCE_RECORDED,
+                repository.recordVoiceCorrection(LearningLanguage.MIXED, learned.single().replacement, true, 1L).status)
+        }
+    }
+
+    @Test fun `same letter correction in two different terms is not deduplicated`() {
+        val tracker = VoiceCorrectionTracker(clockElapsedMillis = { 0L })
+        fun snapshot(text: String) = BoundedTextSnapshot(text, afterCursor = "")
+        // Separated by Han so the two words are two fixes (adjacent words form one phrase rule).
+        tracker.begin(1L, "Orbyt和Kyt", snapshot("Orbyt和Kyt"))
+        tracker.inspect(1L, snapshot("Orbit和Kyt"))
+        tracker.inspect(1L, snapshot("Orbit和Kit"))
+        assertEquals(listOf("Orbyt" to "Orbit", "Kyt" to "Kit"),
+            tracker.finish(1L).map { it.replacement.wrongText to it.replacement.correctedText })
+    }
+
     @Test
     fun `single letter correction beside Chinese learns only the complete English term`() {
         val original = "使用Orbyt進行部署"
@@ -18,7 +89,8 @@ class VoiceCorrectionLearningTest {
             as CorrectionDiffResult.Accepted
         val replacement = requireNotNull(VoiceCorrectionLearning.prepare(original, diff.replacement))
         val repository = PersonalizationRepository(CorrectionLearningStorage())
-        repository.recordVoiceCorrection(LearningLanguage.MIXED, replacement, highConfidence = true)
+        repository.recordVoiceCorrection(LearningLanguage.MIXED, replacement, highConfidence = true, turnId = 1L)
+        repository.recordVoiceCorrection(LearningLanguage.MIXED, replacement, highConfidence = true, turnId = 2L)
         val dictionary = DictionaryManager(mock<SharedPreferences>()) { repository }
 
         assertEquals(listOf("Orbit"), repository.getPromptWords())
@@ -33,10 +105,13 @@ class VoiceCorrectionLearningTest {
             as CorrectionDiffResult.Accepted
         val replacement = requireNotNull(VoiceCorrectionLearning.prepare(original, diff.replacement))
         val repository = PersonalizationRepository(CorrectionLearningStorage())
+        val pending = repository.recordVoiceCorrection(LearningLanguage.MIXED, replacement, true, turnId = 1L)
+        assertEquals(CorrectionRecordStatus.EVIDENCE_RECORDED, pending.status)
         val recorded = repository.recordVoiceCorrection(
             LearningLanguage.MIXED,
             replacement,
-            highConfidence = true
+            highConfidence = true,
+            turnId = 2L
         )
         val dictionary = DictionaryManager(mock<SharedPreferences>()) { repository }
 
@@ -70,6 +145,8 @@ class VoiceCorrectionLearningTest {
         val replacement = requireNotNull(VoiceCorrectionLearning.prepare(original, diff.replacement))
 
         assertEquals("新義豐公司", replacement.wrongText)
+        // A bounded complete term is useful even when its changed fragment is one Han.
+        // It remains STT-only, not permission for literal or LLM replacement.
         assertEquals("新義豊公司", replacement.suggestedPromptText)
 
         val unicodeOriginal = "🙂𠮷野泉🙂"
@@ -85,13 +162,19 @@ class VoiceCorrectionLearningTest {
     }
 
     @Test
-    fun `complete 64 character word reaches hints but oversized word is never truncated`() {
-        val original = "a".repeat(64)
-        val edited = "A" + "a".repeat(63)
+    fun `complete 24 character word reaches hints but longer or oversized words are never learned`() {
+        val longDiff = CorrectionDiff.analyze("a".repeat(64), "A" + "a".repeat(63)) as CorrectionDiffResult.Accepted
+        val longReplacement = requireNotNull(VoiceCorrectionLearning.prepare("a".repeat(64), longDiff.replacement))
+        val repository = PersonalizationRepository(CorrectionLearningStorage())
+        assertEquals("Learning is limited to short word fixes", CorrectionRecordStatus.REJECTED,
+            repository.recordVoiceCorrection(LearningLanguage.MIXED, longReplacement, true, turnId = 1L).status)
+
+        val original = "a".repeat(24)
+        val edited = "A" + "a".repeat(23)
         val diff = CorrectionDiff.analyze(original, edited) as CorrectionDiffResult.Accepted
         val replacement = requireNotNull(VoiceCorrectionLearning.prepare(original, diff.replacement))
-        val repository = PersonalizationRepository(CorrectionLearningStorage())
-        repository.recordVoiceCorrection(LearningLanguage.MIXED, replacement, highConfidence = true)
+        repository.recordVoiceCorrection(LearningLanguage.MIXED, replacement, highConfidence = true, turnId = 1L)
+        repository.recordVoiceCorrection(LearningLanguage.MIXED, replacement, highConfidence = true, turnId = 2L)
         val dictionary = DictionaryManager(mock<SharedPreferences>()) { repository }
 
         assertEquals(edited, replacement.suggestedPromptText)
@@ -113,12 +196,14 @@ class VoiceCorrectionLearningTest {
         val repository = PersonalizationRepository(CorrectionLearningStorage())
         val dictionary = DictionaryManager(mock<SharedPreferences>()) { repository }
 
-        val pending = repository.recordVoiceCorrection(LearningLanguage.MIXED, replacement, highConfidence = false)
-        assertEquals(CorrectionRecordStatus.EVIDENCE_RECORDED, pending.status)
-        assertTrue(repository.getPromptWords().isEmpty())
-        assertEquals(original, dictionary.applyCorrections(original, includePersonalization = true))
+        for (turn in 1L..2L) {
+            val pending = repository.recordVoiceCorrection(LearningLanguage.MIXED, replacement, false, turn)
+            assertEquals(CorrectionRecordStatus.EVIDENCE_RECORDED, pending.status)
+            assertTrue(repository.getPromptWords().isEmpty())
+            assertEquals(original, dictionary.applyCorrections(original, includePersonalization = true))
+        }
 
-        val confirmed = repository.recordVoiceCorrection(LearningLanguage.MIXED, replacement, highConfidence = false)
+        val confirmed = repository.recordVoiceCorrection(LearningLanguage.MIXED, replacement, false, 3L)
         assertEquals(CorrectionRecordStatus.ACTIVATED, confirmed.status)
         assertEquals("請開啟Orbit Code", dictionary.applyCorrections(original, includePersonalization = true))
         assertEquals(original, dictionary.applyCorrections(original, includePersonalization = false))

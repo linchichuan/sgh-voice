@@ -51,6 +51,8 @@ sealed class KeyAction {
     data class TapJapaneseKana(val group: String) : KeyAction()
     object TransformJapaneseKana : KeyAction()
     object FinalizeJapaneseKana : KeyAction()
+    object CursorLeft : KeyAction()
+    object CursorRight : KeyAction()
 }
 
 /**

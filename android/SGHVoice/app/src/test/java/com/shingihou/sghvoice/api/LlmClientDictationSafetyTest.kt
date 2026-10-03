@@ -179,4 +179,67 @@ class LlmClientDictationSafetyTest {
         val source = "開啟 https://example.com/?q=Android 然後檢查設定"
         assertEquals(source, client.validateLlmResult(source, source, "dictate"))
     }
+
+    @Test fun `spoken numeric repair preserves the final time instead of forcing the abandoned time`() {
+        assertEquals("四點開會。", client.validateLlmResult(
+            "三點，不是，四點開會。", "四點開會。", "dictate"
+        ))
+        assertEquals("4 點開會。", client.validateLlmResult(
+            "3 點，不是，4 點開會。", "4 點開會。", "dictate"
+        ))
+    }
+
+    @Test fun `colloquial restart marker may disappear while its subject and location remain`() {
+        assertEquals("有一個 GitHub，在外接式硬碟裡面。", client.validateLlmResult(
+            "有一個 GitHub 啊，沒有，在外接式硬碟裡面。",
+            "有一個 GitHub，在外接式硬碟裡面。", "dictate"
+        ))
+    }
+
+    @Test fun `equivalent integer quantities survive cleanup but changed facts do not`() {
+        val source = "今天下午三點，不是，四點開會，請確認 GitHub Actions。"
+        val cleaned = "今天下午4 點開會，請確認 GitHub Actions。"
+        assertEquals(cleaned, client.validateLlmResult(source, cleaned, "dictate"))
+        for (unsafe in listOf(cleaned.replace("4 點", "3 點"), cleaned.replace("4 點", "5 點"),
+            cleaned.replace("4 點", "4 點半"), cleaned.replace("4 點", "-4 點"),
+            cleaned.replace("4 點", "4.5 點"))) {
+            assertNull(unsafe, client.validateLlmResult(source, unsafe, "dictate"))
+        }
+        // 2026-10-03 (08 numeric guard): a Chinese serial year converted to Arabic with the same
+        // value is a correct cleanup the owner requires to pass (二〇二六年三月 -> 2026年3月); it
+        // moved from the unsafe list to this applied assertion. A changed year is still rejected.
+        assertEquals("2026年10月4日開會。", client.validateLlmResult("二〇二六年十月四日開會。", "2026年10月4日開會。", "dictate"))
+        assertNull(client.validateLlmResult("二〇二六年十月四日開會。", "2027年10月4日開會。", "dictate"))
+        for ((raw, unsafe) in listOf(
+            "收二十元，退五十元。" to "收50元，退20元。",
+            "不要收二十元。" to "收20元。",
+            "四點半開會。" to "4點開會。",
+            "使用 v2.8.6，收四元。" to "使用 v2.8.7，收4元。",
+            "使用 id_四點。" to "使用 id_4點。",
+            "使用 /tmp/會議四點。" to "使用 /tmp/會議4點。",
+            "負四元。" to "4元。",
+            "四點開會。" to "-4點開會。",
+            "4點開會。" to "-4點開會。",
+            "-4元。" to "4元。",
+            "4元。" to "+4元。",
+            "4點開會。" to "−4點開會。",
+            "4元。" to "－4元。",
+            "4元。" to "＋4元。",
+            "- 三點，不是，四點開會。" to "-4點開會。",
+            "第三點，不是，四點。" to "第4點。",
+            "一百二元。" to "120元。",
+            "四點五元。" to "4.5元。"
+        )) assertNull("$raw -> $unsafe", client.validateLlmResult(raw, unsafe, "dictate"))
+    }
+
+    @Test fun `equivalent numeral spelling must retain units and quantity order`() {
+        val cleaned = "收20元。"
+        assertEquals(cleaned, client.validateLlmResult("收二十元。", cleaned, "dictate"))
+        for ((raw, unsafe) in listOf(
+            "收二十元。" to "收20美元。",
+            "收20元。" to "收20。",
+            "收四個。" to "收4人。",
+            "收二十元，退五十美元。" to "收50美元，退20元。"
+        )) assertNull("$raw -> $unsafe", client.validateLlmResult(raw, unsafe, "dictate"))
+    }
 }

@@ -26,7 +26,10 @@ personal dictionary. Combine with `--es state done` for post-dictation UI.
 Use `--es draft pending` for a saved transcription, and `--ez preview true` to open
 its scrollable text preview. `--ez retry true --es state error` renders audio retry
 and discard actions. `--es japaneseStyle kana --es mode japanese --es state idle`
-renders the flick keypad (tap = first kana; left/up/right/down select the other vowels).
+renders the kana keypad. In the real IME, repeated centre taps cycle the kana
+group; left/up/right/down flicks select a vowel directly. The separate ← / →
+keys move the text caret after committing composition, not the candidate list.
+This visual-only activity does not simulate the full Japanese composer.
 `--ei heightPercent 90` changes the shared keyboard height (90–125, default 100),
 without saving a preference. `--ez translation true --es state idle` opens
 the translation picker. All text and retry state are synthetic.
@@ -39,6 +42,8 @@ at least two thirds of the keyboard width. Its full-width waveform responds only
 to supplied audio levels; it never adds a dark colour bloom over the light surface.
 The geometry contract asserts that boundary. The header uses the original
 Shingihou company mark with a centred SGH label (22sp at normal phone widths).
+The label starts with exactly one ASCII space (U+0020), separating the mark from
+SGH while keeping the combined brand centred. No extra margin is added.
 `--es mode palette --es state idle` renders the real settings colour picker above
 the real microphone view. Its selection updates the synthetic preview only and
 never opens `ApiConfig` or saves a user preference.

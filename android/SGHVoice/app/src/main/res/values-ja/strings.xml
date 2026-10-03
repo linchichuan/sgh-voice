@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="model_openai_stt_gpt_transcribe">GPT-Transcribe（専門用語ヒント）</string>
+    <string name="price_openai_stt_gpt_transcribe">音声 1 分あたり US$0.0045</string>
+    <string name="keyboard_cursor_left">文字カーソルを左へ移動</string>
+    <string name="keyboard_cursor_right">文字カーソルを右へ移動</string>
     <string name="voice_palette_title">録音ボタンの色</string>
     <string name="voice_palette_hint">タップで保存。次にキーボードを開くと反映します。</string>
     <string name="voice_palette_mint">ミント</string>
@@ -35,7 +39,7 @@
 
     <!-- 鍵盤狀態文字 -->
     <string name="keyboard_brand">SGH Voice</string>
-    <string name="keyboard_brand_short">SGH</string>
+    <string name="keyboard_brand_short">\u0020SGH</string>
     <string name="mode_voice">音声</string>
     <string name="mode_zhuyin">注</string>
     <string name="mode_japanese">あ</string>
@@ -67,7 +71,7 @@
     <string name="status_translation_recording_elapsed">翻訳録音中 %1$s・タップで送信、長押しでキャンセル</string>
     <string name="status_recording_limit">2分の上限に達したため送信します</string>
     <string name="status_learning_saved">端末内で学習しました「%1$s → %2$s」</string>
-    <string name="status_learning_pending">修正を記録しました「%1$s → %2$s」。再度確認できた場合に適用します。</string>
+    <string name="status_learning_pending">修正を記録しました「%1$s → %2$s」。別の音声入力で同じ修正をするか、設定で確認すると適用されます。</string>
     <string name="status_learning_pending_short">修正を記録・確認待ち</string>
     <string name="status_learning_saved_short">個人辞書を更新しました</string>
     <string name="status_learning_disabled">この入力欄では個人学習が無効です</string>
@@ -198,8 +202,22 @@
     <string name="label_correct_word">修正後</string>
     <string name="title_personalized_learning">端末内の個人学習</string>
     <string name="label_personalized_learning">候補選択と音声修正を自動学習</string>
-    <string name="desc_personalized_learning">候補の使用回数と短い修正対照を端末内に保存します。短い断片にも個人情報が含まれる場合があります。音声は学習データに使用しません。パスワード欄と個人学習禁止の入力欄は対象外です。直近の学習の取り消しや学習データの全削除ができます。</string>
-    <string name="learning_stats">候補 %1$d 件、修正 %2$d 件を学習済み</string>
+    <string name="desc_personalized_learning">候補の使用回数と短い単語の修正対照だけを端末内に保存し、文章全体・音声・パスワードは保存しません。音声入力後60秒以内に直した誤字は、編集が終わってから音声認識の結果と比較して学習します。AI 校正・翻訳・「文章作成」で生成された文字は学習せず、数字・日付・金額・否定を変える修正も学習しません。新しく学習した単語はまず「確認待ち」となり、端末内に留まり文字の置き換えにも使われません。別の音声入力で同じ修正をするか、下の一覧で確認すると有効になります。有効な単語は、次回の音声とともに選択したクラウドサービスへ表記の参考として送信される場合があります。パスワード欄と個人学習禁止の入力欄は対象外です。</string>
+    <string name="label_recent_voice_context">同じ入力欄の直前の音声を参照</string>
+    <string name="desc_recent_voice_context">初期設定はオフです。有効にすると、直前の音声入力の末尾最大512文字を60秒間だけメモリに保持し、今回の音声とともに選択したクラウドAIへ送信して文章整理や翻訳に利用します。出力は今回の内容のみです。入力欄の切り替えで消去し、アプリをまたぐ記事履歴は保存しません。</string>
+    <string name="learning_stats">候補 %1$d 件、修正は有効 %2$d 件・確認待ち %3$d 件</string>
+    <string name="status_learning_multiple">%1$d 件の修正を記録しました。設定の辞書タブで確認できます。</string>
+    <string name="title_learned_corrections">学習した単語</string>
+    <string name="label_learned_pending">確認待ち（%1$d）</string>
+    <string name="label_learned_active">有効（%1$d）</string>
+    <string name="desc_learned_pending">確認待ちの単語は端末内に留まり、文字の置き換えにも送信にも使われません。確認すると有効になります。</string>
+    <string name="msg_no_learned_corrections">学習した単語はまだありません</string>
+    <string name="btn_confirm_learned">確認</string>
+    <string name="btn_edit_learned">編集</string>
+    <string name="btn_delete_learned">削除</string>
+    <string name="title_edit_learned">学習した単語を編集</string>
+    <string name="msg_learned_edit_rejected">数字・日付・金額・否定が変わるため保存できません</string>
+    <string name="label_learned_confirmed">確認済み</string>
     <string name="btn_undo_learning">直前の学習を取り消す</string>
     <string name="btn_clear_learning">学習データを消去</string>
     <string name="msg_learning_cleared">個人学習データを消去しました</string>

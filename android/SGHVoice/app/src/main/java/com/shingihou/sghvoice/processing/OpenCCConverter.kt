@@ -7,9 +7,17 @@ import com.github.houbb.opencc4j.util.ZhConverterUtil
  * 使用 opencc4j 執行 s2twp（簡體→繁體台灣用語）轉換
  * 三層繁中防護的最後一道防線
  *
- * 只轉換中文字元，英文與日文保持原樣
+ * 只轉換中文子句；含平假名／片假名的子句視為日文，整段保持原字形
+ * （否則 opencc 會把日文新字體 画像／会議 改成 畫像／會議）。
  */
 class OpenCCConverter {
+
+    private companion object {
+        // Clause delimiters; the Japanese 、 is deliberately not a delimiter so a
+        // Japanese sentence stays one clause.
+        val CLAUSE = Regex("[^。！？!?\\n，,；;]*[。！？!?\\n，,；;]*")
+        val KANA = Regex("[\\u3041-\\u309F\\u30A1-\\u30FA\\u30FC-\\u30FF\\uFF66-\\uFF9F]")
+    }
 
     /**
      * 將文字中的簡體中文轉換為繁體中文（台灣用語）
@@ -22,9 +30,12 @@ class OpenCCConverter {
         if (text.isBlank()) return text
 
         return try {
-            // opencc4j 的 toTraditional 會處理簡體→繁體轉換
-            // 非中文字元（英文、日文假名、數字、標點）不會被影響
-            ZhConverterUtil.toTraditional(text)
+            if (!KANA.containsMatchIn(text)) return ZhConverterUtil.toTraditional(text)
+            CLAUSE.findAll(text).joinToString("") { clause ->
+                val value = clause.value
+                if (value.isEmpty() || KANA.containsMatchIn(value)) value
+                else ZhConverterUtil.toTraditional(value)
+            }
         } catch (e: Exception) {
             // 轉換失敗時回傳原文，確保不會中斷流程
             text

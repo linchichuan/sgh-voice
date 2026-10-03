@@ -9,7 +9,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -21,7 +23,9 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.shingihou.sghvoice.api.ApiConfig
 import com.shingihou.sghvoice.api.ApiModelCatalog
+import com.shingihou.sghvoice.learning.CorrectionRecordStatus
 import com.shingihou.sghvoice.learning.PersonalizationRepository
+import com.shingihou.sghvoice.learning.VoiceCorrectionRule
 import com.shingihou.sghvoice.ime.UserZhuyinLexiconStore
 import com.shingihou.sghvoice.ime.VoicePalette
 import com.shingihou.sghvoice.processing.DictionaryManager
@@ -65,7 +69,7 @@ fun SetupScreen(
         Box(modifier = Modifier.fillMaxSize().padding(16.dp)) {
             when (selectedTab) {
                 0 -> BasicSettingsTab(apiConfig, onCloudConsentGranted)
-                1 -> DictionaryTab(dictionaryManager, userZhuyinLexicon, personalization)
+                1 -> DictionaryTab(dictionaryManager, userZhuyinLexicon, personalization, apiConfig)
                 2 -> UsageTab()
             }
         }
@@ -113,6 +117,11 @@ private fun BasicSettingsTab(
     }
 
     val openAiSttModels = listOf(
+        UiModelOption(
+            ApiModelCatalog.OPENAI_STT_GPT_TRANSCRIBE,
+            stringResource(R.string.model_openai_stt_gpt_transcribe),
+            stringResource(R.string.price_openai_stt_gpt_transcribe)
+        ),
         UiModelOption(
             ApiModelCatalog.OPENAI_STT_GPT_4O_MINI,
             stringResource(R.string.model_openai_stt_mini),
@@ -652,7 +661,8 @@ private fun ModelSelector(
 private fun DictionaryTab(
     dictionaryManager: DictionaryManager,
     userZhuyinLexicon: UserZhuyinLexiconStore,
-    personalization: PersonalizationRepository
+    personalization: PersonalizationRepository,
+    apiConfig: ApiConfig
 ) {
     val scrollState = rememberScrollState()
     var newWord by remember { mutableStateOf("") }
@@ -667,10 +677,20 @@ private fun DictionaryTab(
     var correctText by remember { mutableStateOf("") }
     var corrections by remember { mutableStateOf(dictionaryManager.getCorrections()) }
     var learningEnabled by remember { mutableStateOf(personalization.isEnabled()) }
+    var contextEnabled by remember { mutableStateOf(apiConfig.recentVoiceContextEnabled) }
     var learningStats by remember { mutableStateOf(personalization.getStats()) }
     var learningMessage by remember { mutableStateOf("") }
     var showClearLearningDialog by remember { mutableStateOf(false) }
     val learningClearedMessage = stringResource(R.string.msg_learning_cleared)
+    var learnedRules by remember { mutableStateOf(personalization.getVoiceCorrections()) }
+    var editingRule by remember { mutableStateOf<VoiceCorrectionRule?>(null) }
+    var editWrong by remember { mutableStateOf("") }
+    var editCorrect by remember { mutableStateOf("") }
+    var editRejected by remember { mutableStateOf(false) }
+    fun refreshLearning() {
+        learningStats = personalization.getStats()
+        learnedRules = personalization.getVoiceCorrections()
+    }
 
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(scrollState),
@@ -711,11 +731,21 @@ private fun DictionaryTab(
                     stringResource(R.string.desc_personalized_learning),
                     style = MaterialTheme.typography.bodySmall
                 )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(stringResource(R.string.label_recent_voice_context), modifier = Modifier.weight(1f))
+                    Switch(checked = contextEnabled, enabled = learningEnabled,
+                        onCheckedChange = { enabled ->
+                            apiConfig.recentVoiceContextEnabled = enabled
+                            contextEnabled = enabled
+                        })
+                }
+                Text(stringResource(R.string.desc_recent_voice_context), style = MaterialTheme.typography.bodySmall)
                 Text(
                     stringResource(
                         R.string.learning_stats,
                         learningStats.candidateRecordCount,
-                        learningStats.activeCorrectionRuleCount
+                        learningStats.activeCorrectionRuleCount,
+                        learningStats.pendingCorrectionRuleCount
                     ),
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.SemiBold
@@ -727,7 +757,7 @@ private fun DictionaryTab(
                     OutlinedButton(
                         onClick = {
                             if (personalization.undoLast()) {
-                                learningStats = personalization.getStats()
+                                refreshLearning()
                                 learningMessage = ""
                             }
                         },
@@ -749,6 +779,23 @@ private fun DictionaryTab(
                         style = MaterialTheme.typography.bodySmall
                     )
                 }
+                LearnedCorrectionsList(
+                    rules = learnedRules,
+                    onConfirm = { rule ->
+                        personalization.confirmVoiceCorrection(rule.wrongText, rule.correctedText)
+                        refreshLearning()
+                    },
+                    onEdit = { rule ->
+                        editingRule = rule
+                        editWrong = rule.wrongText
+                        editCorrect = rule.correctedText
+                        editRejected = false
+                    },
+                    onDelete = { rule ->
+                        personalization.deleteVoiceCorrection(rule.wrongText, rule.correctedText)
+                        refreshLearning()
+                    }
+                )
             }
         }
 
@@ -938,7 +985,7 @@ private fun DictionaryTab(
                 TextButton(
                     onClick = {
                         personalization.clearAll()
-                        learningStats = personalization.getStats()
+                        refreshLearning()
                         learningMessage = learningClearedMessage
                         showClearLearningDialog = false
                     }
@@ -952,6 +999,135 @@ private fun DictionaryTab(
                 }
             }
         )
+    }
+
+    editingRule?.let { rule ->
+        AlertDialog(
+            onDismissRequest = { editingRule = null },
+            title = { Text(stringResource(R.string.title_edit_learned)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = editWrong,
+                        onValueChange = { editWrong = it; editRejected = false },
+                        label = { Text(stringResource(R.string.label_wrong_word)) },
+                        singleLine = true
+                    )
+                    OutlinedTextField(
+                        value = editCorrect,
+                        onValueChange = { editCorrect = it; editRejected = false },
+                        label = { Text(stringResource(R.string.label_correct_word)) },
+                        singleLine = true
+                    )
+                    if (editRejected) {
+                        Text(
+                            stringResource(R.string.msg_learned_edit_rejected),
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val result = personalization.editVoiceCorrection(
+                        rule.wrongText, rule.correctedText, editWrong, editCorrect
+                    )
+                    if (result.status == CorrectionRecordStatus.REJECTED) {
+                        editRejected = true
+                    } else {
+                        editingRule = null
+                        refreshLearning()
+                    }
+                }) { Text(stringResource(R.string.btn_edit_learned)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { editingRule = null }) {
+                    Text(stringResource(android.R.string.cancel))
+                }
+            }
+        )
+    }
+}
+
+/** 待確認 and 已生效 learned corrections; each row can be confirmed, edited or deleted. */
+@Composable
+private fun LearnedCorrectionsList(
+    rules: List<VoiceCorrectionRule>,
+    onConfirm: (VoiceCorrectionRule) -> Unit,
+    onEdit: (VoiceCorrectionRule) -> Unit,
+    onDelete: (VoiceCorrectionRule) -> Unit
+) {
+    Text(
+        stringResource(R.string.title_learned_corrections),
+        fontWeight = FontWeight.SemiBold,
+        style = MaterialTheme.typography.titleSmall
+    )
+    if (rules.isEmpty()) {
+        Text(
+            stringResource(R.string.msg_no_learned_corrections),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        return
+    }
+    val pending = rules.filter { !it.active }
+    val active = rules.filter { it.active }
+    if (pending.isNotEmpty()) {
+        Text(
+            stringResource(R.string.label_learned_pending, pending.size),
+            style = MaterialTheme.typography.labelLarge
+        )
+        Text(
+            stringResource(R.string.desc_learned_pending),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        pending.forEach { rule -> LearnedCorrectionRow(rule, onConfirm, onEdit, onDelete) }
+    }
+    if (active.isNotEmpty()) {
+        Text(
+            stringResource(R.string.label_learned_active, active.size),
+            style = MaterialTheme.typography.labelLarge
+        )
+        active.forEach { rule -> LearnedCorrectionRow(rule, null, onEdit, onDelete) }
+    }
+}
+
+@Composable
+private fun LearnedCorrectionRow(
+    rule: VoiceCorrectionRule,
+    onConfirm: ((VoiceCorrectionRule) -> Unit)?,
+    onEdit: (VoiceCorrectionRule) -> Unit,
+    onDelete: (VoiceCorrectionRule) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text("${rule.wrongText} → ${rule.correctedText}", style = MaterialTheme.typography.bodyMedium)
+            if (rule.confirmedByUser) {
+                Text(
+                    stringResource(R.string.label_learned_confirmed),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
+        if (onConfirm != null) {
+            IconButton(onClick = { onConfirm(rule) }) {
+                Icon(Icons.Default.Check, contentDescription = stringResource(R.string.btn_confirm_learned))
+            }
+        }
+        IconButton(onClick = { onEdit(rule) }) {
+            Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.btn_edit_learned),
+                modifier = Modifier.size(20.dp))
+        }
+        IconButton(onClick = { onDelete(rule) }) {
+            Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.btn_delete_learned),
+                modifier = Modifier.size(20.dp))
+        }
     }
 }
 

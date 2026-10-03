@@ -19,9 +19,9 @@ class SoftVoiceCircleDrawable(private val color: Int) : Drawable() {
     override fun onBoundsChange(bounds: Rect) {
         paint.shader = if (bounds.width() > 0 && bounds.height() > 0) RadialGradient(
             0f, 0f, 1f,
-            intArrayOf(color, ColorUtils.setAlphaComponent(color, 230),
-                ColorUtils.setAlphaComponent(color, 100), ColorUtils.setAlphaComponent(color, 0)),
-            floatArrayOf(0f, 0.48f, 0.78f, 1f), Shader.TileMode.CLAMP
+            intArrayOf(ColorUtils.setAlphaComponent(color, 170), ColorUtils.setAlphaComponent(color, 120),
+                ColorUtils.setAlphaComponent(color, 48), ColorUtils.setAlphaComponent(color, 0)),
+            floatArrayOf(0f, 0.40f, 0.72f, 1f), Shader.TileMode.CLAMP
         ).apply {
             shaderMatrix.setScale(bounds.width() / 2f, bounds.height() / 2f)
             shaderMatrix.postTranslate(bounds.exactCenterX(), bounds.exactCenterY())

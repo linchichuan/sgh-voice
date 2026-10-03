@@ -1,5 +1,6 @@
 package com.shingihou.sghvoice.api
 
+import com.shingihou.sghvoice.processing.VocabularyHintPolicy
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
@@ -13,32 +14,34 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 import org.json.JSONObject
 import java.io.IOException
+import java.net.SocketTimeoutException
 import java.util.concurrent.TimeUnit
 import kotlin.coroutines.resumeWithException
 
 /**
- * OpenAI Whisper API 客戶端
- * 將錄音的 WAV 檔傳送至 Whisper API 取得語音辨識結果
+ * Existing BYOK file-transcription adapter for OpenAI and Groq.
+ * Provider-specific multipart fields stay here; callers supply audio and spelling references.
  */
-class WhisperClient(private val apiConfig: ApiConfig) {
+class WhisperClient(
+    private val apiConfig: ApiConfig,
+    private val httpClient: OkHttpClient = OkHttpClient.Builder()
+        .connectTimeout(30, TimeUnit.SECONDS)
+        .readTimeout(30, TimeUnit.SECONDS)
+        .writeTimeout(30, TimeUnit.SECONDS)
+        .build()
+) {
 
     companion object {
         private const val WHISPER_API_URL = "https://api.openai.com/v1/audio/transcriptions"
         private const val GROQ_API_URL = "https://api.groq.com/openai/v1/audio/transcriptions"
-        private const val TIMEOUT_SECONDS = 30L
     }
-
-    private val httpClient = OkHttpClient.Builder()
-        .connectTimeout(TIMEOUT_SECONDS, TimeUnit.SECONDS)
-        .readTimeout(TIMEOUT_SECONDS, TimeUnit.SECONDS)
-        .writeTimeout(TIMEOUT_SECONDS, TimeUnit.SECONDS)
-        .build()
 
     /**
      * 傳送 WAV 音訊至 Whisper API 進行語音辨識
      *
      * @param wavData WAV 格式的音訊資料（含 44 byte 標頭）
-     * @param initialPrompt 提示詞，用於提升辨識精確度（包含自訂詞彙）
+     * @param initialPrompt VocabularyHintPolicy 產生的「、」分隔拼字清單；
+     * gpt-transcribe 轉為 keywords，其他模型保留 prompt。
      * @return 辨識後的文字結果
      * @throws WhisperException 當 API 呼叫失敗時拋出
      */
@@ -65,13 +68,20 @@ class WhisperClient(private val apiConfig: ApiConfig) {
                 .addFormDataPart("model", modelName)
                 .addFormDataPart("response_format", "json")
                 .apply {
-                    // auto 時刻意不送 language，讓模型保留混合語言自動偵測。
-                    apiConfig.recognitionLanguage.apiCode?.let { language ->
-                        addFormDataPart("language", language)
-                    }
-                    // 提示詞：包含自訂詞彙以提升三語混合辨識
-                    if (initialPrompt.isNotBlank()) {
-                        addFormDataPart("prompt", initialPrompt)
+                    if (!useGroq && modelName == ApiModelCatalog.OPENAI_STT_GPT_TRANSCRIBE) {
+                        // The new model replaces language with languages; never send both.
+                        apiConfig.recognitionLanguage.transcriptionLanguages.forEach {
+                            addFormDataPart("languages[]", it)
+                        }
+                        VocabularyHintPolicy.transcriptionKeywords(initialPrompt).forEach {
+                            addFormDataPart("keywords[]", it)
+                        }
+                    } else {
+                        // Legacy OpenAI/Groq models must not receive unsupported new fields.
+                        apiConfig.recognitionLanguage.apiCode?.let { language ->
+                            addFormDataPart("language", language)
+                        }
+                        if (initialPrompt.isNotBlank()) addFormDataPart("prompt", initialPrompt)
                     }
                 }
                 .build()
@@ -83,20 +93,19 @@ class WhisperClient(private val apiConfig: ApiConfig) {
                 .build()
 
             if (!apiConfig.hasCloudProcessingConsent) throw CloudProcessingConsentException()
-            val response = httpClient.awaitCall(request)
-
-            val body = response.body?.string()
-                ?: throw WhisperException("Whisper API returned empty response")
-
-            if (!response.isSuccessful) {
-                throw WhisperException("Speech recognition HTTP ${response.code}")
-            }
-
-            try {
-                val json = JSONObject(body)
-                json.getString("text").trim()
-            } catch (_: Exception) {
-                throw WhisperException("Speech recognition returned an invalid response")
+            httpClient.awaitCall(request).use { response ->
+                if (!response.isSuccessful) {
+                    throw WhisperException("Speech recognition HTTP ${response.code}")
+                }
+                val body = response.body?.string()
+                    ?: throw WhisperException("Speech recognition returned an empty response")
+                try {
+                    val text = JSONObject(body).get("text")
+                    if (text !is String) throw IllegalArgumentException()
+                    text.trim()
+                } catch (_: Exception) {
+                    throw WhisperException("Speech recognition returned an invalid response")
+                }
             }
         }
     }
@@ -112,6 +121,7 @@ class WhisperClient(private val apiConfig: ApiConfig) {
  * OkHttp Call 的協程擴充函式
  * 將回呼式呼叫轉換為 suspend 函式
  */
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 private suspend fun OkHttpClient.awaitCall(request: Request): Response {
     return suspendCancellableCoroutine { continuation ->
         val call = newCall(request)
@@ -119,13 +129,17 @@ private suspend fun OkHttpClient.awaitCall(request: Request): Response {
 
         call.enqueue(object : Callback {
             override fun onResponse(call: Call, response: Response) {
-                continuation.resumeWith(Result.success(response))
+                continuation.resume(response, onCancellation = { response.close() })
             }
 
             override fun onFailure(call: Call, e: IOException) {
                 if (!continuation.isCancelled) {
                     continuation.resumeWithException(
-                        WhisperException("Network error: ${e.message}")
+                        WhisperException(if (e is SocketTimeoutException) {
+                            "Speech recognition timed out"
+                        } else {
+                            "Speech recognition network error"
+                        })
                     )
                 }
             }

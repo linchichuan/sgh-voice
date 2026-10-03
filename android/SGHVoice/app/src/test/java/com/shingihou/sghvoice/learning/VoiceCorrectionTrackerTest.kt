@@ -59,7 +59,7 @@ class VoiceCorrectionTrackerTest {
     }
 
     @Test
-    fun `tracker finds anchored correction and consumes session`() {
+    fun `tracker observes an anchored correction and learns it when the turn ends`() {
         var elapsed = 1_000L
         val tracker = VoiceCorrectionTracker(clockElapsedMillis = { elapsed })
         val started = tracker.begin(
@@ -83,13 +83,18 @@ class VoiceCorrectionTrackerTest {
             )
         )
 
-        assertEquals(
-            VoiceCorrectionTrackingStatus.CORRECTION_FOUND,
-            result.status
-        )
-        assertEquals("cloud c", result.replacement?.wrongText)
-        assertEquals("Claude C", result.replacement?.correctedText)
+        // Observation only: nothing is learned from an intermediate state.
+        assertEquals(VoiceCorrectionTrackingStatus.EDIT_OBSERVED, result.status)
+        assertEquals("cloud code", result.originalText)
+        assertEquals("Claude Code", result.editedText)
         assertTrue(result.highConfidence)
+        assertTrue(tracker.isTracking())
+
+        val learned = tracker.finish(9L).single()
+        assertEquals("cloud code", learned.replacement.wrongText)
+        assertEquals("Claude Code", learned.replacement.correctedText)
+        assertTrue(learned.highConfidence)
+        assertEquals(CorrectionScope.LATIN, learned.scope)
         assertFalse(tracker.isTracking())
     }
 
@@ -121,15 +126,15 @@ class VoiceCorrectionTrackerTest {
             )
         )
 
-        assertEquals(
-            VoiceCorrectionTrackingStatus.CORRECTION_FOUND,
-            result.status
-        )
+        assertEquals(VoiceCorrectionTrackingStatus.EDIT_OBSERVED, result.status)
         assertTrue(result.highConfidence)
+        val learned = tracker.finish(2L).single()
+        assertEquals("新義豐" to "新義豊", learned.replacement.wrongText to learned.replacement.correctedText)
+        assertTrue(learned.highConfidence)
     }
 
     @Test
-    fun `normal continued typing is rejected as a pure insertion`() {
+    fun `normal continued typing is observed but never learned and does not end tracking`() {
         val tracker = VoiceCorrectionTracker(clockElapsedMillis = { 10L })
         tracker.begin(
             sessionId = 3L,
@@ -148,12 +153,9 @@ class VoiceCorrectionTrackerTest {
             )
         )
 
-        assertEquals(
-            VoiceCorrectionTrackingStatus.REJECTED_EDIT,
-            result.status
-        )
-        assertEquals(CorrectionDiffRejection.PURE_INSERTION, result.rejection)
-        assertFalse(tracker.isTracking())
+        assertEquals(VoiceCorrectionTrackingStatus.EDIT_OBSERVED, result.status)
+        assertTrue(tracker.isTracking())
+        assertTrue(tracker.finish(3L).isEmpty())
     }
 
     @Test
@@ -171,16 +173,16 @@ class VoiceCorrectionTrackerTest {
         // pause beyond the IME debounce, then type the replacement.
         elapsed = 1_000L
         val deleting = tracker.inspect(12L, snapshot("我使用  進行部署"))
-        assertEquals(VoiceCorrectionTrackingStatus.REJECTED_EDIT, deleting.status)
-        assertEquals(CorrectionDiffRejection.PURE_DELETION, deleting.rejection)
+        assertEquals(VoiceCorrectionTrackingStatus.EDIT_OBSERVED, deleting.status)
         assertTrue("An unfinished bounded deletion must not consume the voice turn", tracker.isTracking(12L))
 
         elapsed = 2_000L
         val corrected = tracker.inspect(12L, snapshot("我使用 Firebase 進行部署"))
-        assertEquals(VoiceCorrectionTrackingStatus.CORRECTION_FOUND, corrected.status)
-        assertEquals("Firebase", corrected.replacement?.suggestedPromptText)
-        assertTrue(corrected.highConfidence)
-        assertFalse(tracker.isTracking())
+        assertEquals(VoiceCorrectionTrackingStatus.EDIT_OBSERVED, corrected.status)
+        val learned = tracker.finish(12L).single()
+        assertEquals("Fyrebase" to "Firebase", learned.replacement.wrongText to learned.replacement.correctedText)
+        assertEquals("Firebase", learned.replacement.suggestedPromptText)
+        assertTrue(learned.highConfidence)
     }
 
     @Test
@@ -193,8 +195,8 @@ class VoiceCorrectionTrackerTest {
         tracker.begin(13L, "我使用 Fyrebase", snapshot("我使用 Fyrebase"))
         elapsed = 59_000L
         assertEquals(
-            CorrectionDiffRejection.PURE_DELETION,
-            tracker.inspect(13L, snapshot("我使用 ")).rejection
+            VoiceCorrectionTrackingStatus.EDIT_OBSERVED,
+            tracker.inspect(13L, snapshot("我使用 ")).status
         )
         assertTrue(tracker.isTracking())
         elapsed = 60_001L
@@ -203,6 +205,7 @@ class VoiceCorrectionTrackerTest {
             tracker.inspect(13L, snapshot("我使用 Firebase")).status
         )
         assertFalse(tracker.isTracking())
+        assertTrue("The replacement typed after the deadline is never learned", tracker.finish(13L).isEmpty())
     }
 
     @Test
@@ -212,16 +215,16 @@ class VoiceCorrectionTrackerTest {
             beforeCursor = "前：$text", afterCursor = "：後"
         )
         tracker.begin(14L, "這一段不需要了", snapshot("這一段不需要了"))
-        assertEquals(
-            CorrectionDiffRejection.PURE_DELETION,
-            tracker.inspect(14L, snapshot("")).rejection
-        )
-        assertFalse(tracker.isTracking())
+        val cleared = tracker.inspect(14L, snapshot(""))
+        assertEquals(VoiceCorrectionTrackingStatus.REJECTED_EDIT, cleared.status)
+        assertEquals(CorrectionDiffRejection.PURE_DELETION, cleared.rejection)
+        tracker.inspect(14L, snapshot("另外寫的話"))
+        assertTrue(tracker.finish(14L).isEmpty())
 
         val original = "a".repeat(65) + "保留"
         tracker.begin(15L, original, snapshot(original))
         tracker.inspect(15L, snapshot("保留"))
-        assertFalse(tracker.isTracking())
+        assertTrue(tracker.finish(15L).isEmpty())
     }
 
     @Test
@@ -229,12 +232,12 @@ class VoiceCorrectionTrackerTest {
         val tracker = VoiceCorrectionTracker(clockElapsedMillis = { 0L })
         tracker.begin(16L, "我使用 Fyrebase", BoundedTextSnapshot("我使用 Fyrebase", afterCursor = ""))
         val result = tracker.inspect(16L, BoundedTextSnapshot("我使用 ", afterCursor = ""))
-        assertEquals(CorrectionDiffRejection.PURE_DELETION, result.rejection)
+        assertEquals(VoiceCorrectionTrackingStatus.EDIT_OBSERVED, result.status)
         assertTrue(tracker.isTracking())
-        val corrected = tracker.inspect(16L, BoundedTextSnapshot("我使用 Firebase", afterCursor = ""))
-        assertEquals(VoiceCorrectionTrackingStatus.CORRECTION_FOUND, corrected.status)
-        assertFalse(corrected.highConfidence)
-        assertFalse(tracker.isTracking())
+        tracker.inspect(16L, BoundedTextSnapshot("我使用 Firebase", afterCursor = ""))
+        val learned = tracker.finish(16L).single()
+        assertEquals("Firebase", learned.replacement.correctedText)
+        assertFalse(learned.highConfidence)
     }
 
     @Test

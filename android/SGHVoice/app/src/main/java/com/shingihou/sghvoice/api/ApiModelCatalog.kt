@@ -7,6 +7,7 @@ package com.shingihou.sghvoice.api
  * models with different speed, accuracy, and cost characteristics.
  */
 object ApiModelCatalog {
+    const val OPENAI_STT_GPT_TRANSCRIBE = "gpt-transcribe"
     const val OPENAI_STT_WHISPER = "whisper-1"
     const val OPENAI_STT_GPT_4O_MINI = "gpt-4o-mini-transcribe"
     const val OPENAI_STT_GPT_4O = "gpt-4o-transcribe"
@@ -26,17 +27,22 @@ object ApiModelCatalog {
     const val GROQ_LLM_GPT_OSS_20B = "openai/gpt-oss-20b"
     const val GROQ_LLM_GPT_OSS_120B = "openai/gpt-oss-120b"
 
-    const val DEFAULT_OPENAI_STT_MODEL = OPENAI_STT_WHISPER
+    const val DEFAULT_OPENAI_STT_MODEL = OPENAI_STT_GPT_TRANSCRIBE
     const val DEFAULT_GROQ_STT_MODEL = GROQ_STT_TURBO
     const val DEFAULT_CLAUDE_MODEL = CLAUDE_HAIKU_4_5
     const val DEFAULT_OPENAI_LLM_MODEL = OPENAI_LLM_GPT_4O
     const val DEFAULT_GROQ_LLM_MODEL = GROQ_LLM_GPT_OSS_120B
 
     val openAiSttModels = listOf(
+        OPENAI_STT_GPT_TRANSCRIBE,
         OPENAI_STT_GPT_4O_MINI,
         OPENAI_STT_GPT_4O,
         OPENAI_STT_WHISPER
     )
+
+    /** Keep explicit choices, and the implicit Whisper default of configured older installs. */
+    fun openAiSttModelForInstallation(savedModel: String?, setupComplete: Boolean): String =
+        savedModel ?: if (setupComplete) OPENAI_STT_WHISPER else DEFAULT_OPENAI_STT_MODEL
 
     val groqSttModels = listOf(
         GROQ_STT_TURBO,

@@ -39,7 +39,14 @@ class TranscriptionPipeline(
         val translations: List<TranslationOutput> = emptyList(),
         val success: Boolean = true,
         val error: String? = null,
-        val refinementStatus: LlmClient.RefinementStatus? = null
+        val refinementStatus: LlmClient.RefinementStatus? = null,
+        /** Corrected source of a translation; never learn target-language edits as source corrections. */
+        val sourceText: String = "",
+        /**
+         * Dictation only: the text the user would have seen without AI cleanup (STT after the
+         * same dictionary/OpenCC passes). Learning may only learn spans that came from it.
+         */
+        val learningBaseline: String = ""
     )
 
     /**
@@ -73,9 +80,10 @@ class TranscriptionPipeline(
     suspend fun process(
         wavData: ByteArray,
         callback: ProgressCallback? = null,
-        includePersonalization: Boolean = false
+        includePersonalization: Boolean = false,
+        recentContext: () -> String = { "" }
     ): Result =
-        process(wavData, VoiceTask.Dictation, callback, includePersonalization)
+        process(wavData, VoiceTask.Dictation, callback, includePersonalization, recentContext)
 
     /**
      * 依任務明確分流口述與翻譯。翻譯只在來源文字套一次詞庫修正，目標文字不再
@@ -86,7 +94,8 @@ class TranscriptionPipeline(
         wavData: ByteArray,
         task: VoiceTask,
         callback: ProgressCallback? = null,
-        includePersonalization: Boolean = false
+        includePersonalization: Boolean = false,
+        recentContext: () -> String = { "" }
     ): Result {
         try {
             currentCoroutineContext().ensureActive()
@@ -110,16 +119,21 @@ class TranscriptionPipeline(
 
             // === 第二層：詞庫修正 ===
             val correctedText = dictionaryManager.applyCorrections(rawText, includePersonalization)
+            // Keep a resolver, not a private text snapshot, across asynchronous STT.
+            // Resolve only at the LLM boundary; the caller rechecks expiry, edits and focus.
+            val allowedContext = { if (includePersonalization) recentContext() else "" }
 
             val result = when (task) {
-                VoiceTask.Dictation -> processDictation(correctedText, rawText, callback, includePersonalization)
+                VoiceTask.Dictation -> processDictation(
+                    correctedText, rawText, callback, includePersonalization, allowedContext
+                )
                 VoiceTask.Compose -> Result(
                     text = correctedText,
                     rawText = rawText,
                     success = true
                 )
                 is VoiceTask.Translation ->
-                    processTranslation(correctedText, rawText, task.request, callback)
+                    processTranslation(correctedText, rawText, task.request, callback, allowedContext)
             }
             currentCoroutineContext().ensureActive()
             callback?.onCompleted(result)
@@ -160,17 +174,21 @@ class TranscriptionPipeline(
         correctedText: String,
         rawText: String,
         callback: ProgressCallback?,
-        includePersonalization: Boolean
+        includePersonalization: Boolean,
+        recentContext: () -> String
     ): Result {
         callback?.onLlmStarted()
         requireCloudProcessingConsent()
         val sceneExtra = dictionaryManager.getSceneSystemPromptExtra()
         val vocabularyHint = dictionaryManager.buildLlmVocabularyHint(correctedText, includePersonalization)
         requireCloudProcessingConsent()
+        // Re-check after STT and progress callbacks: focus/setting may have changed while awaiting audio.
+        val currentContext = recentContext()
         val refinement = try {
             llmClient.refineDictation(
                 correctedText, sceneExtra,
-                vocabularyHint = vocabularyHint
+                vocabularyHint = vocabularyHint,
+                previousContext = currentContext
             )
         } catch (error: CancellationException) {
             throw error
@@ -185,11 +203,19 @@ class TranscriptionPipeline(
         requireCloudProcessingConsent()
         val traditionalText = openCCConverter.convert(refinement.text)
         val finalText = dictionaryManager.applyCorrections(traditionalText, includePersonalization)
+        // What the user would have seen without AI cleanup: STT through the same local passes.
+        // An empty baseline disables learning for this turn (fail closed), never the dictation.
+        val learningBaseline = if (refinement.status == LlmClient.RefinementStatus.APPLIED) {
+            runCatching {
+                dictionaryManager.applyCorrections(openCCConverter.convert(correctedText), includePersonalization)
+            }.getOrNull().orEmpty()
+        } else finalText
         return Result(
             text = finalText,
             rawText = rawText,
             success = true,
-            refinementStatus = refinement.status
+            refinementStatus = refinement.status,
+            learningBaseline = learningBaseline
         )
     }
 
@@ -197,11 +223,13 @@ class TranscriptionPipeline(
         correctedText: String,
         rawText: String,
         request: TranslationRequest,
-        callback: ProgressCallback?
+        callback: ProgressCallback?,
+        recentContext: () -> String
     ): Result {
         callback?.onLlmStarted()
         requireCloudProcessingConsent()
-        val translated = llmClient.translate(correctedText, request)
+        val currentContext = recentContext()
+        val translated = llmClient.translate(correctedText, request, currentContext)
         requireCloudProcessingConsent()
         val finalized = translated.map { output ->
             if (output.language == TranslationLanguage.TRADITIONAL_CHINESE) {
@@ -214,7 +242,8 @@ class TranscriptionPipeline(
             text = finalized.first().text,
             rawText = rawText,
             translations = finalized,
-            success = true
+            success = true,
+            sourceText = correctedText
         )
     }
 

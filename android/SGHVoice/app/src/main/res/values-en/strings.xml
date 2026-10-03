@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="model_openai_stt_gpt_transcribe">GPT-Transcribe (keyword hints)</string>
+    <string name="price_openai_stt_gpt_transcribe">US$0.0045 per audio minute</string>
+    <string name="keyboard_cursor_left">Move text cursor left</string>
+    <string name="keyboard_cursor_right">Move text cursor right</string>
     <string name="voice_palette_title">Recording colors</string>
     <string name="voice_palette_hint">Tap to save. Applied next time you open the keyboard.</string>
     <string name="voice_palette_mint">Mint</string>
@@ -35,7 +39,7 @@
 
     <!-- Keyboard Status -->
     <string name="keyboard_brand">SGH Voice</string>
-    <string name="keyboard_brand_short">SGH</string>
+    <string name="keyboard_brand_short">\u0020SGH</string>
     <string name="mode_voice">Voice</string>
     <string name="mode_zhuyin">注</string>
     <string name="mode_japanese">あ</string>
@@ -67,7 +71,7 @@
     <string name="status_translation_recording_elapsed">Translation recording %1$s — tap to send, hold to cancel</string>
     <string name="status_recording_limit">Two-minute limit reached — sending</string>
     <string name="status_learning_saved">Learned locally: “%1$s → %2$s”</string>
-    <string name="status_learning_pending">Noted correction: %1$s → %2$s. It will apply after another confirmation.</string>
+    <string name="status_learning_pending">Noted correction: %1$s → %2$s. It applies after it recurs in another recording or you confirm it in Settings.</string>
     <string name="status_learning_pending_short">Correction pending</string>
     <string name="status_learning_saved_short">Dictionary updated</string>
     <string name="status_learning_disabled">Personalized learning is disabled for this field</string>
@@ -198,8 +202,22 @@
     <string name="label_correct_word">Corrected</string>
     <string name="title_personalized_learning">On-device personalization</string>
     <string name="label_personalized_learning">Learn candidate choices and voice corrections</string>
-    <string name="desc_personalized_learning">Candidate counts and short correction pairs are stored on this device; short excerpts may still contain personal information. Audio is not used as learning data. Password fields and editors that disable personalization are excluded. You can undo the latest learning or clear all learning data.</string>
-    <string name="learning_stats">%1$d candidates and %2$d corrections learned</string>
+    <string name="desc_personalized_learning">Only candidate counts and short word-correction pairs are stored, on this device; full text, audio and passwords are not. Typos you fix within 60 seconds of a voice insertion are learned after you finish editing, by comparing with the speech-recognition text. Text written by AI cleanup, translation or “Help me write” is not learned, nor are edits that change a number, date, amount or negation. A new word starts as “Pending”: it stays on this device and never replaces text. It takes effect after you make the same fix in another recording or confirm it in the list below. Active words may accompany your next recording to your selected cloud service as spelling hints. Password fields and editors that disable personalization are excluded.</string>
+    <string name="label_recent_voice_context">Use recent voice context in this field</string>
+    <string name="desc_recent_voice_context">Off by default. When enabled, up to the last 512 characters of the previous voice insertion are kept in memory for 60 seconds and sent with the current speech to your selected cloud AI for refinement or translation. Only the current content is output. Context is cleared on field changes; no cross-app article history is saved.</string>
+    <string name="learning_stats">%1$d candidates; %2$d corrections active, %3$d pending</string>
+    <string name="status_learning_multiple">Noted %1$d corrections. Review them in Settings › Dictionary.</string>
+    <string name="title_learned_corrections">Learned words</string>
+    <string name="label_learned_pending">Pending (%1$d)</string>
+    <string name="label_learned_active">Active (%1$d)</string>
+    <string name="desc_learned_pending">Pending words stay on this device. They never replace text and are not sent anywhere until you confirm them.</string>
+    <string name="msg_no_learned_corrections">No learned words yet</string>
+    <string name="btn_confirm_learned">Confirm</string>
+    <string name="btn_edit_learned">Edit</string>
+    <string name="btn_delete_learned">Delete</string>
+    <string name="title_edit_learned">Edit learned word</string>
+    <string name="msg_learned_edit_rejected">This change alters a number, date, amount or negation and cannot be saved</string>
+    <string name="label_learned_confirmed">Confirmed</string>
     <string name="btn_undo_learning">Undo last learning</string>
     <string name="btn_clear_learning">Clear learned data</string>
     <string name="msg_learning_cleared">Personalized learning data cleared</string>

@@ -2,6 +2,8 @@ package com.shingihou.sghvoice.processing
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.shingihou.sghvoice.learning.CorrectionScope
+import com.shingihou.sghvoice.learning.LearnedTerms
 import com.shingihou.sghvoice.learning.PersonalizationRepository
 import org.json.JSONArray
 import org.json.JSONObject
@@ -107,6 +109,18 @@ class DictionaryManager internal constructor(
                     "藥品名稱保持原文拼寫（アムロジピン、Opdivo 等）。"
             )
         )
+
+        /**
+         * Built-in spellings the dictation guard may accept as a repair of a misheard span
+         * (同音字／片假名 → 已知詞). Never sent to a provider by this function.
+         */
+        internal fun builtInSpellingTerms(): List<String> =
+            VocabularyHintPolicy.technicalTerms + BASE_CUSTOM_WORDS + BASE_CORRECTIONS.values +
+                SCENE_PRESETS.values.flatMap { it.customWords }
+
+        /** Built-in known mishearings (wrong -> right): base and scene correction rules. */
+        internal fun builtInSpellingAliases(): Map<String, String> =
+            SCENE_PRESETS.values.fold(BASE_CORRECTIONS) { acc, scene -> acc + scene.corrections }
     }
 
     // A denied field must not initialize/read the learned repository just to build a prompt.
@@ -131,13 +145,15 @@ class DictionaryManager internal constructor(
     /**
      * 建立 Whisper 提示詞
      * 合併使用者詞彙、人工修正學到的完整詞與場景詞彙，幫助 Whisper 辨識專有名詞。
-     * 最多 50 個完整詞、800 字元。
+     * 最多 50 個完整詞、800 字元；先選個人詞，最後排列在 Whisper 保留的提示尾端。
+     * 字元限制不是 token 計數。新式 STT 會將此拼字清單轉為獨立 keywords。
      */
     fun buildWhisperPrompt(includePersonalization: Boolean = false): String {
         refreshFromDisk()
         val sceneWords = SCENE_PRESETS[activeScene]?.customWords ?: emptyList()
         return VocabularyHintPolicy.buildWhisperPrompt(
             customWords = customWords + corrections.values,
+            // Only 已生效 words; 待確認 words stay on the device until confirmed.
             learnedWords = if (includePersonalization) personalization.getPromptWords(limit = 50) else emptyList(),
             sceneWords = sceneWords,
             baseWords = BASE_CUSTOM_WORDS
@@ -151,7 +167,9 @@ class DictionaryManager internal constructor(
         return VocabularyHintPolicy.buildLlmVocabularyHint(
             text = text,
             customWords = customWords + corrections.values,
-            learnedWords = if (includePersonalization) personalization.getPromptWords(limit = 50) else emptyList(),
+            // A learned CJK->CJK pair is STT-only: handing it to the LLM invites
+            // replacement in unrelated contexts (在家裡 → 再加裡, バスケット → パスケット).
+            learnedWords = if (includePersonalization) learnedLlmWords() else emptyList(),
             sceneWords = scene?.customWords ?: emptyList(),
             baseWords = BASE_CUSTOM_WORDS,
             corrections = BASE_CORRECTIONS + (scene?.corrections ?: emptyMap()) + corrections
@@ -171,16 +189,61 @@ class DictionaryManager internal constructor(
         val sceneCorrections = SCENE_PRESETS[activeScene]?.corrections ?: emptyMap()
         val learnedCorrections = linkedMapOf<String, String>().apply {
             // Repository 已依信心、證據與最近使用排序；同一錯字只採最高順位。
+            // Only 已生效 rules replace text, and only in the language context they were learned in.
             if (includePersonalization && personalization.isEnabled()) {
-                personalization.getActiveVoiceCorrections().forEach { rule ->
-                    putIfAbsent(rule.wrongText, rule.correctedText)
-                }
+                val textScope = LearnedTerms.textScope(text)
+                personalization.getActiveVoiceCorrections()
+                    // Han and kana have no reliable word boundaries. A learned バス→パス
+                    // must not rewrite バスケット. CJK rules are never literal replacements;
+                    // CJK->CJK is STT-only, CJK->Latin may be a guarded spelling alias.
+                    // Word-bounded Latin and user-entered manual rules are unaffected.
+                    .filter { !containsCjk(it.wrongText) && !containsCjk(it.correctedText) }
+                    .filter { it.scope == CorrectionScope.ANY || it.scope == CorrectionScope.LATIN || it.scope == textScope }
+                    .forEach { rule -> putIfAbsent(rule.wrongText, rule.correctedText) }
             }
         }
         // 合併修正規則：人工編輯學習 > 使用者自訂 > 場景 > 基底
         val merged = BASE_CORRECTIONS + sceneCorrections + corrections + learnedCorrections
         // 單次由左至右掃描可避免 A→B、B→C 產生非預期連鎖替換。
-        return VocabularyHintPolicy.applyCorrections(text, merged)
+        return VocabularyHintPolicy.applyCorrections(text, merged, learnedCorrections.keys)
+    }
+
+    private fun learnedLlmWords(): List<String> {
+        if (!personalization.isEnabled()) return emptyList()
+        return personalization.getActiveVoiceCorrections()
+            .asSequence()
+            .filterNot { isCjkToCjk(it.wrongText, it.correctedText) }
+            .map { it.promptText }
+            .filter { it.isNotBlank() }
+            .distinct()
+            .take(50)
+            .toList()
+    }
+
+    private fun isCjkToCjk(wrong: String, corrected: String): Boolean = containsCjk(wrong) && containsCjk(corrected)
+
+    private fun containsCjk(text: String): Boolean = text.codePoints().anyMatch {
+        when (Character.UnicodeScript.of(it)) {
+            Character.UnicodeScript.HAN,
+            Character.UnicodeScript.HIRAGANA,
+            Character.UnicodeScript.KATAKANA -> true
+            else -> it == 0x30FC || it == 0xFF70
+        }
+    }
+
+    /**
+     * Known mishearings the dictation guard may accept as a Han/kanji span being replaced by
+     * the right-hand spelling: built-in, active-scene and user-entered correction rules, plus
+     * 已生效 learned rules when [includeLearned] (the current field allows personalization).
+     * 待確認 learned rules are never aliases. Manual and built-in rules win over learned ones.
+     */
+    fun getSpellingAliases(includeLearned: Boolean = false): Map<String, String> {
+        refreshFromDisk()
+        val learned = if (includeLearned && personalization.isEnabled()) {
+            // CJK->ASCII terms stay aliases; CJK->CJK pairs (including pure kana) never do.
+            personalization.getLearnedSpellingAliases().filterNot { isCjkToCjk(it.key, it.value) }
+        } else emptyMap()
+        return learned + builtInSpellingAliases() + (SCENE_PRESETS[activeScene]?.corrections ?: emptyMap()) + corrections
     }
 
     /**
@@ -301,14 +364,22 @@ internal object TextCorrectionEngine {
         RegexOption.IGNORE_CASE
     )
 
-    fun apply(text: String, corrections: Map<String, String>): String {
+    /**
+     * @param nameProtectedKeys rules (learned ones) that may never touch a name next to a
+     * title (林先生, Mr. Lin). Manual/built-in rules are known aliases and may.
+     */
+    fun apply(text: String, corrections: Map<String, String>, nameProtectedKeys: Set<String> = emptySet()): String {
+        // A dictionary/learned rule may fix spelling only. Rules whose two sides differ in a
+        // number, unit, date, sign, currency or negation are never applied (problem 5).
         val sortedCorrections = corrections.entries
             .filter { it.key.isNotEmpty() && it.key != it.value }
+            .filter { FactPreservation.correctionPreservesFacts(it.key, it.value) }
             .sortedByDescending { it.key.length }
         if (sortedCorrections.isEmpty()) return text
         val protectedRanges = literalRanges(text)
+        val nameRanges = if (nameProtectedKeys.isEmpty()) emptyList() else FactPreservation.nameRanges(text)
 
-        return buildString(text.length) {
+        val corrected = buildString(text.length) {
             var offset = 0
             var rangeIndex = 0
             while (offset < text.length) {
@@ -321,11 +392,12 @@ internal object TextCorrectionEngine {
                     offset = protectedRange.last + 1
                     continue
                 }
-                val match = sortedCorrections.firstOrNull { (wrong, _) ->
-                    text.regionMatches(offset, wrong, 0, wrong.length) &&
-                        hasSafeAsciiWordBoundary(text, offset, wrong) &&
-                        (protectedRange == null || offset + wrong.length <= protectedRange.first)
+                val candidates = if (nameRanges.isEmpty()) sortedCorrections else sortedCorrections.filter { entry ->
+                    entry.key !in nameProtectedKeys || nameRanges.none {
+                        offset <= it.last && offset + entry.key.length > it.first
+                    }
                 }
+                val match = findMatch(text, offset, candidates, protectedRange)
                 if (match == null) {
                     append(text[offset])
                     offset += 1
@@ -335,6 +407,35 @@ internal object TextCorrectionEngine {
                 }
             }
         }
+        // In context a spelling rule may still touch a quantity (下五 -> 上五 in 零下五度). The
+        // dictation guard's extractor decides: any changed numeric fact keeps the original text.
+        return if (NumericFacts.sameFacts(text, corrected)) corrected else text
+    }
+
+    /**
+     * Longest rule wins. English spelling rules also match case-insensitively
+     * (Github actions, gitHub, KOTLUN); among equally long rules an exact-case match wins.
+     */
+    private fun findMatch(
+        text: String,
+        offset: Int,
+        sortedCorrections: List<Map.Entry<String, String>>,
+        protectedRange: IntRange?
+    ): Map.Entry<String, String>? {
+        var best: Map.Entry<String, String>? = null
+        for (entry in sortedCorrections) {
+            val wrong = entry.key
+            if (best != null && wrong.length < best.key.length) break
+            if (protectedRange != null && offset + wrong.length > protectedRange.first) continue
+            val exact = text.regionMatches(offset, wrong, 0, wrong.length)
+            val caseless = !exact && best == null && wrong.any { it in 'A'..'Z' || it in 'a'..'z' } &&
+                text.regionMatches(offset, wrong, 0, wrong.length, ignoreCase = true)
+            if (!exact && !caseless) continue
+            if (!hasSafeAsciiWordBoundary(text, offset, wrong)) continue
+            if (exact) return entry
+            best = entry
+        }
+        return best
     }
 
     internal fun containsUnprotectedTerm(text: String, word: String): Boolean {

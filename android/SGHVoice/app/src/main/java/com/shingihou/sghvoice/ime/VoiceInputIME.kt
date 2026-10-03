@@ -25,17 +25,17 @@ import com.shingihou.sghvoice.ime.manual.EnglishCandidateProvider
 import com.shingihou.sghvoice.ime.manual.EnglishComposer
 import com.shingihou.sghvoice.ime.manual.EnglishEdit
 import com.shingihou.sghvoice.ime.manual.KeyAction
+import com.shingihou.sghvoice.ime.manual.InputCursorMovement
 import com.shingihou.sghvoice.ime.manual.ShiftState
 import com.shingihou.sghvoice.learning.BoundedTextSnapshot
 import com.shingihou.sghvoice.learning.CorrectionRecordStatus
-import com.shingihou.sghvoice.learning.CorrectionReplacement
 import com.shingihou.sghvoice.learning.LearningLanguage
 import com.shingihou.sghvoice.learning.LearningPolicy
 import com.shingihou.sghvoice.learning.LearningPolicyDecision
 import com.shingihou.sghvoice.learning.PersonalizationRepository
-import com.shingihou.sghvoice.learning.VoiceCorrectionLearning
 import com.shingihou.sghvoice.learning.VoiceCorrectionTracker
 import com.shingihou.sghvoice.learning.VoiceCorrectionTrackingStatus
+import com.shingihou.sghvoice.learning.VoiceLearningGate
 import com.shingihou.sghvoice.processing.DictionaryManager
 import com.shingihou.sghvoice.processing.OpenCCConverter
 import com.shingihou.sghvoice.processing.RecognitionLanguage
@@ -77,6 +77,7 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
         private const val ENGLISH_CANDIDATE_LIMIT = 12
         private const val SNAPSHOT_SIDE_CODE_POINTS = 600
         private const val CORRECTION_DEBOUNCE_MS = 450L
+        private const val CORRECTION_DEADLINE_MARGIN_MS = 400L
     }
 
     enum class ImeState {
@@ -123,7 +124,12 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
     private var draftNotice: Int? = null
     private var clearComposeArmedUntil = 0L
     private var correctionInspectionJob: Job? = null
+    private var correctionDeadlineJob: Job? = null
+    /** Identifies one voice insertion; evidence from the same turn counts once. */
+    private var voiceTurnId = 0L
+    private var voiceTurnCounter = 0L
     private val voiceCorrectionTracker = VoiceCorrectionTracker()
+    private val recentVoiceContext = com.shingihou.sghvoice.learning.RecentVoiceContext()
     private var lastCommittedVoiceText = ""
     private var currentLearningDecision: LearningPolicyDecision = LearningPolicy.evaluate(null)
     private var activeVoiceTask: VoiceTask = VoiceTask.Dictation
@@ -227,6 +233,7 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
         pendingHandoffOperations.clear()
         invalidateVoiceOperation(resetState = false)
         composeJob?.cancel()
+        finalizeCorrectionTracking(reinspect = false)
         cancelCorrectionTracking()
         serviceScope.cancel()
         audioRecorder?.release()
@@ -265,7 +272,10 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
             try {
                 val config = apiConfig ?: ApiConfig(this@VoiceInputIME)
                 val whisperClient = WhisperClient(config)
-                val llmClient = LlmClient(config)
+                // 已生效 learned rules are aliases only while the current field allows personalization.
+                val llmClient = LlmClient(config) {
+                    dictionaryManager.getSpellingAliases(includeLearned = personalizationAllowed())
+                }
                 val openCCConverter = OpenCCConverter()
                 pipeline = TranscriptionPipeline(
                     whisperClient = whisperClient,
@@ -287,6 +297,8 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
     }
 
     private fun beginInputSession(editorInfo: EditorInfo?) {
+        // Learn the previous field's final edits (no re-read: the connection is already the new field).
+        finalizeCorrectionTracking(reinspect = false)
         preserveSpeechOnFocusLoss()
         inputSessionId += 1
         invalidateVoiceOperation(resetState = true, preserveInFlight = pendingHandoffOperations.isNotEmpty())
@@ -298,6 +310,7 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
     }
 
     private fun finishInputSession() {
+        finalizeCorrectionTracking(reinspect = true)
         preserveSpeechOnFocusLoss()
         inputSessionId += 1
         invalidateVoiceOperation(resetState = true, preserveInFlight = pendingHandoffOperations.isNotEmpty())
@@ -317,8 +330,11 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
     private fun cancelCorrectionTracking() {
         correctionInspectionJob?.cancel()
         correctionInspectionJob = null
+        correctionDeadlineJob?.cancel()
+        correctionDeadlineJob = null
         voiceCorrectionTracker.cancel()
         lastCommittedVoiceText = ""
+        recentVoiceContext.clear()
     }
 
     private fun invalidateVoiceOperation(
@@ -537,7 +553,7 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
             ImeState.IDLE,
             ImeState.DONE,
             ImeState.ERROR -> {
-                inspectVoiceCorrection()
+                finalizeCorrectionTracking(reinspect = true)
                 startRecording(
                     if (voiceActionMode == KeyboardView.VoiceActionMode.COMPOSE) {
                         VoiceTask.Compose
@@ -811,7 +827,7 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
             return
         }
         config.translationTargets = request.targets
-        inspectVoiceCorrection()
+        finalizeCorrectionTracking(reinspect = true)
         startRecording(VoiceTask.Translation(request))
     }
 
@@ -910,6 +926,8 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
         val task = activeVoiceTask
         val includePersonalization = personalizationAllowed()
 
+        val useRecentContext = includePersonalization && apiConfig?.recentVoiceContextEnabled == true
+
         recordingTimerJob?.cancel()
         recordingTimerJob = null
         setState(ImeState.STOPPING)
@@ -951,7 +969,8 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
                     operationId = operationId,
                     targetConnection = targetConnection,
                     task = task,
-                    includePersonalization = includePersonalization
+                    includePersonalization = includePersonalization,
+                    useRecentContext = useRecentContext
                 )
             } catch (error: CancellationException) {
                 pendingHandoffOperations.remove(sessionId to operationId)
@@ -974,7 +993,8 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
         operationId: Long,
         targetConnection: InputConnection,
         task: VoiceTask,
-        includePersonalization: Boolean
+        includePersonalization: Boolean,
+        useRecentContext: Boolean = false
     ) {
         if (isCurrentOperation(sessionId, operationId)) setState(ImeState.PROCESSING)
         transcriptionJob = serviceScope.launch {
@@ -1098,14 +1118,26 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
                                                 keyboardView?.setStatusText(getString(R.string.msg_ai_rejected))
                                             else -> Unit
                                         }
-                                        beginVoiceCorrectionTracking(
-                                            sessionId = sessionId,
-                                            connection = targetConnection,
-                                            committedText = textToCommit
-                                        )
+                                        // Learning compares edits with the STT-derived baseline, never AI text.
+                                        val baseline = VoiceLearningGate.trackingBaseline(task, result)
+                                        if (baseline != null) {
+                                            beginVoiceCorrectionTracking(
+                                                sessionId = sessionId,
+                                                connection = targetConnection,
+                                                committedText = textToCommit,
+                                                sttBaseline = baseline
+                                            )
+                                        } else {
+                                            finalizeCorrectionTracking(reinspect = false)
+                                            cancelCorrectionTracking()
+                                        }
                                     } else {
                                         // 翻譯不是錯字修正，不能寫入來源語言的學習詞庫。
+                                        finalizeCorrectionTracking(reinspect = false)
                                         cancelCorrectionTracking()
+                                        // Only the spoken source becomes temporary context, never the translation.
+                                        recentVoiceContext.remember(sessionId, result.sourceText,
+                                            personalizationAllowed() && apiConfig?.recentVoiceContextEnabled == true)
                                     }
                                 } else {
                                     saveInterruptedResult(task, result)
@@ -1138,7 +1170,16 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
                             }
                         }
                     },
-                    includePersonalization = includePersonalization
+                    includePersonalization = includePersonalization,
+                    recentContext = {
+                        // Executed on the IME main coroutine immediately before LLM processing,
+                        // after STT/progress callbacks, never retaining a pre-STT text snapshot.
+                        if (useRecentContext && isCurrentOperation(sessionId, operationId) &&
+                            currentInputConnection === targetConnection) {
+                            recentVoiceContext.get(sessionId, personalizationAllowed() &&
+                                apiConfig?.recentVoiceContextEnabled == true)
+                        } else ""
+                    }
                 )
             } catch (error: CancellationException) {
                 throw error
@@ -1293,6 +1334,14 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
     }
 
     override fun onKeyAction(action: KeyAction) {
+        if (action == KeyAction.CursorLeft || action == KeyAction.CursorRight) {
+            commitActiveComposition()
+            currentInputConnection?.let { connection ->
+                connection.finishComposingText()
+                InputCursorMovement.move(connection, toRight = action == KeyAction.CursorRight)
+            }
+            return
+        }
         when (currentInputMode) {
             KeyboardView.InputMode.VOICE -> handleVoiceKey(action)
             KeyboardView.InputMode.ZHUYIN -> handleZhuyinKey(action)
@@ -1323,6 +1372,8 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
             is KeyAction.TapJapaneseKana,
             KeyAction.TransformJapaneseKana,
             KeyAction.FinalizeJapaneseKana,
+            KeyAction.CursorLeft,
+            KeyAction.CursorRight,
             is KeyAction.SwitchLayer -> Unit
         }
     }
@@ -1371,6 +1422,8 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
             is KeyAction.TapJapaneseKana,
             KeyAction.TransformJapaneseKana,
             KeyAction.FinalizeJapaneseKana,
+            KeyAction.CursorLeft,
+            KeyAction.CursorRight,
             is KeyAction.SwitchLayer -> Unit
         }
     }
@@ -1441,6 +1494,7 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
             }
 
             KeyAction.Shift -> Unit
+            KeyAction.CursorLeft, KeyAction.CursorRight -> Unit
             is KeyAction.SwitchLayer -> Unit
         }
     }
@@ -1464,9 +1518,8 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
             KeyAction.Backspace -> applyEnglishEdit(englishComposer.backspace())
             KeyAction.Space -> applyEnglishEdit(englishComposer.commitWord(" "))
             KeyAction.Enter -> {
-                val hadComposition = englishComposer.isComposing
                 applyEnglishEdit(englishComposer.commitWord())
-                if (!hadComposition) performEnterAction()
+                performEnterAction()
             }
 
             KeyAction.Shift -> {
@@ -1480,6 +1533,8 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
             is KeyAction.TapJapaneseKana,
             KeyAction.TransformJapaneseKana,
             KeyAction.FinalizeJapaneseKana,
+            KeyAction.CursorLeft,
+            KeyAction.CursorRight,
             is KeyAction.SwitchLayer -> Unit
         }
     }
@@ -1620,11 +1675,15 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
     }
 
     private fun performEnterAction() {
-        inspectVoiceCorrection()
+        // Enter usually sends or leaves the text: treat the voice turn's edits as final.
+        finalizeCorrectionTracking(reinspect = true)
         val inputConnection = currentInputConnection ?: return
-        val actionId = currentInputEditorInfo?.imeOptions?.and(EditorInfo.IME_MASK_ACTION)
-            ?: EditorInfo.IME_ACTION_NONE
-        if (actionId != EditorInfo.IME_ACTION_NONE &&
+        val options = currentInputEditorInfo?.imeOptions ?: EditorInfo.IME_ACTION_NONE
+        val actionId = options and EditorInfo.IME_MASK_ACTION
+        // Multiline editors can carry an action but explicitly require the
+        // keyboard's Enter key to insert a newline instead of invoking it.
+        if (options and EditorInfo.IME_FLAG_NO_ENTER_ACTION == 0 &&
+            actionId != EditorInfo.IME_ACTION_NONE &&
             actionId != EditorInfo.IME_ACTION_UNSPECIFIED
         ) {
             inputConnection.performEditorAction(actionId)
@@ -1770,21 +1829,35 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
     private fun beginVoiceCorrectionTracking(
         sessionId: Long,
         connection: InputConnection,
-        committedText: String
+        committedText: String,
+        sttBaseline: String
     ) {
+        // The previous voice turn ends here; its tracker is already final (re-reading now
+        // would see this new insertion).
+        finalizeCorrectionTracking(reinspect = false)
         cancelCorrectionTracking()
         if (!personalizationAllowed() || committedText.isBlank()) return
         lastCommittedVoiceText = committedText
+        voiceTurnCounter += 1
+        val turnId = System.currentTimeMillis() * 1_000L + voiceTurnCounter % 1_000L
+        voiceTurnId = turnId
 
         fun tryBegin(): Boolean {
             if (sessionId != inputSessionId) return false
             val snapshot = readBoundedSnapshot(connection) ?: return false
-            return voiceCorrectionTracker.begin(
+            val started = voiceCorrectionTracker.begin(
                 sessionId = sessionId,
                 committedText = committedText,
                 afterCommitSnapshot = snapshot,
-                learningAllowed = true
+                learningAllowed = true,
+                sttText = sttBaseline
             )
+            if (started) {
+                recentVoiceContext.remember(sessionId, committedText,
+                    apiConfig?.recentVoiceContextEnabled == true)
+                scheduleCorrectionDeadline(sessionId, turnId)
+            }
+            return started
         }
 
         if (!tryBegin()) {
@@ -1813,6 +1886,17 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
             candidatesStart,
             candidatesEnd
         )
+        if (currentInputMode == KeyboardView.InputMode.ENGLISH &&
+            ::englishComposer.isInitialized && englishComposer.isComposing &&
+            (candidatesStart < 0 || candidatesEnd < 0 ||
+                newSelStart != candidatesEnd || newSelEnd != candidatesEnd)
+        ) {
+            // The host moved the caret, selected text or ended composition. Keep
+            // its existing text and selection; never replay the stale word there.
+            englishComposer.reset(resetShift = false)
+            currentInputConnection?.finishComposingText()
+            updateManualUi()
+        }
         if (currentInputMode == KeyboardView.InputMode.ZHUYIN &&
             ::zhuyinComposer.isInitialized &&
             !zhuyinComposer.hasComposition
@@ -1844,52 +1928,85 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
             return
         }
         val snapshot = currentInputConnection?.let(::readBoundedSnapshot) ?: return
+        // Observation only: nothing is learned from intermediate editor states (spec 1).
         val result = voiceCorrectionTracker.inspect(inputSessionId, snapshot)
-        if (result.status != VoiceCorrectionTrackingStatus.CORRECTION_FOUND) return
-
-        val replacement = result.replacement?.let(::expandShortCorrection) ?: return
-        val recorded = personalization.recordVoiceCorrection(
-            language = LearningLanguage.MIXED,
-            replacement = replacement,
-            highConfidence = result.highConfidence
-        )
-        lastCommittedVoiceText = ""
-
-        val messageResource = when (recorded.status) {
-            CorrectionRecordStatus.ACTIVATED -> R.string.status_learning_saved
-            CorrectionRecordStatus.EVIDENCE_RECORDED -> R.string.status_learning_pending
-            CorrectionRecordStatus.REJECTED -> null
+        if (result.originalText != null && result.editedText != null) {
+            recentVoiceContext.corrected(inputSessionId, result.originalText, result.editedText)
+            lastCommittedVoiceText = result.editedText
+        } else if (result.status != VoiceCorrectionTrackingStatus.NO_CHANGE) {
+            recentVoiceContext.clear()
         }
-        if (messageResource != null) {
-            val message = getString(
-                messageResource,
-                replacement.wrongText,
-                replacement.correctedText
-            )
-            val statusResource = if (recorded.status == CorrectionRecordStatus.ACTIVATED) {
-                R.string.status_learning_saved_short
-            } else {
-                R.string.status_learning_pending_short
+    }
+
+    /** Ends tracking at the turn deadline, unless the last edit is too recent to be final. */
+    private fun scheduleCorrectionDeadline(sessionId: Long, turnId: Long) {
+        correctionDeadlineJob?.cancel()
+        correctionDeadlineJob = serviceScope.launch {
+            delay(VoiceCorrectionTracker.DEFAULT_SESSION_DURATION_MILLIS - CORRECTION_DEADLINE_MARGIN_MS)
+            if (sessionId == inputSessionId && turnId == voiceTurnId &&
+                voiceCorrectionTracker.isTracking(sessionId)
+            ) {
+                finalizeCorrectionTracking(
+                    reinspect = true,
+                    requireSettledMillis = VoiceCorrectionTracker.SETTLE_MILLIS
+                )
             }
-            keyboardView?.setStatusText(getString(statusResource))
-            Toast.makeText(applicationContext, message, Toast.LENGTH_SHORT).show()
         }
     }
 
     /**
-     * 補齊英文詞界並將單一漢字擴成短語規則；不把相鄰整句加入詞庫。
+     * Ends the current voice turn and learns its corrections from the final text versus the
+     * inserted text. Recent voice context is left as is; callers clear it when appropriate.
      */
-    private fun expandShortCorrection(
-        replacement: CorrectionReplacement
-    ): CorrectionReplacement? {
-        return VoiceCorrectionLearning.prepare(lastCommittedVoiceText, replacement)
+    private fun finalizeCorrectionTracking(reinspect: Boolean, requireSettledMillis: Long = 0L) {
+        correctionInspectionJob?.cancel()
+        correctionInspectionJob = null
+        correctionDeadlineJob?.cancel()
+        correctionDeadlineJob = null
+        if (!personalizationAllowed()) {
+            voiceCorrectionTracker.cancel()
+            return
+        }
+        if (reinspect) inspectVoiceCorrection()
+        val learned = voiceCorrectionTracker.finish(requireSettledMillis = requireSettledMillis)
+        if (learned.isEmpty()) return
+        val recorded = learned.mapNotNull { correction ->
+            val result = personalization.recordVoiceCorrection(
+                LearningLanguage.MIXED,
+                correction.replacement,
+                correction.highConfidence,
+                voiceTurnId,
+                correction.scope
+            )
+            if (result.status == CorrectionRecordStatus.REJECTED) null else correction to result.status
+        }
+        if (recorded.isEmpty()) return
+        val anyActivated = recorded.any { it.second == CorrectionRecordStatus.ACTIVATED }
+        val message = if (recorded.size == 1) {
+            val (correction, status) = recorded.single()
+            getString(
+                if (status == CorrectionRecordStatus.ACTIVATED) R.string.status_learning_saved
+                else R.string.status_learning_pending,
+                correction.replacement.wrongText,
+                correction.replacement.correctedText
+            )
+        } else {
+            getString(R.string.status_learning_multiple, recorded.size)
+        }
+        keyboardView?.setStatusText(getString(
+            if (anyActivated) R.string.status_learning_saved_short else R.string.status_learning_pending_short
+        ))
+        Toast.makeText(applicationContext, message, Toast.LENGTH_SHORT).show()
     }
 
     private fun readBoundedSnapshot(connection: InputConnection): BoundedTextSnapshot? {
+        // Read no more than needed to find this voice insertion, with a hard cap.
+        val sideLimit = (lastCommittedVoiceText.codePointCount(0, lastCommittedVoiceText.length) + 24)
+            .coerceIn(SNAPSHOT_SIDE_CODE_POINTS, 2_200)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             val surrounding = connection.getSurroundingText(
-                SNAPSHOT_SIDE_CODE_POINTS,
-                SNAPSHOT_SIDE_CODE_POINTS,
+                sideLimit,
+                sideLimit,
                 0
             )
             if (surrounding != null) {
@@ -1907,12 +2024,12 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
         }
 
         val before = connection.getTextBeforeCursor(
-            SNAPSHOT_SIDE_CODE_POINTS,
+            sideLimit,
             0
         )?.toString() ?: return null
         val selected = connection.getSelectedText(0)?.toString().orEmpty()
         val after = connection.getTextAfterCursor(
-            SNAPSHOT_SIDE_CODE_POINTS,
+            sideLimit,
             0
         )?.toString() ?: return null
         return BoundedTextSnapshot(
