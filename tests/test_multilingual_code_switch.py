@@ -172,7 +172,8 @@ def test_verified_fewshot_allows_japanese_kana_to_kanji_correction(populated_mem
 def test_short_japanese_and_code_switch_do_not_skip_llm(mock_transcriber):
     assert mock_transcriber._should_skip_llm("来週確認します") is False
     assert mock_transcriber._should_skip_llm("SEO 跟 GEO") is False
-    assert mock_transcriber._should_skip_llm("純中文短句") is True
+    # Short Chinese still needs sentence punctuation after STT.
+    assert mock_transcriber._should_skip_llm("純中文短句") is False
 
 
 def test_validator_preserves_latin_and_kana_spans(mock_transcriber):

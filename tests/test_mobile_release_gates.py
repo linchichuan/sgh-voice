@@ -297,8 +297,8 @@ def test_android_rc_acceptance_tracks_the_current_sideload_release():
     source_code = re.search(r"versionCode\s*=\s*(\d+)", build_script)
     assert source_name is not None
     assert source_code is not None
-    assert public_release["versionName"] == "2.8.7"
-    assert public_release["versionCode"] == 37
+    assert public_release["versionName"] == "2.8.8"
+    assert public_release["versionCode"] == 38
     assert source_name.group(1) == public_release["versionName"]
     assert int(source_code.group(1)) == public_release["versionCode"]
-    assert "Android 2.8.7（versionCode 37）" in acceptance
+    assert "Android 2.8.8（versionCode 38）" in acceptance

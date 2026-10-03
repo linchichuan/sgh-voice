@@ -63,8 +63,8 @@ android {
         applicationId = "com.shingihou.sghvoice"
         minSdk = 26
         targetSdk = 36
-        versionCode = 37
-        versionName = "2.8.7"
+        versionCode = 38
+        versionName = "2.8.8"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {

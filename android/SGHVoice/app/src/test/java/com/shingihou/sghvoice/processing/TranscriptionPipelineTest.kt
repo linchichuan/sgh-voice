@@ -265,4 +265,37 @@ class TranscriptionPipelineTest {
         assertEquals("", result.text)
         assertEquals(CloudProcessingConsentException.MESSAGE, result.error)
     }
+
+    @Test
+    fun `disabled unavailable and rejected cleanup preserve raw paragraphs with honest status`() = runBlocking {
+        val raw = "啊，我我還不確定。\n\n先不要部署。"
+        `when`(dictionaryManager.buildWhisperPrompt()).thenReturn("")
+        `when`(whisperClient.transcribe(any(), any())).thenReturn(raw)
+        `when`(dictionaryManager.applyCorrections(raw)).thenReturn(raw)
+        `when`(dictionaryManager.getSceneSystemPromptExtra()).thenReturn("")
+        `when`(dictionaryManager.buildLlmVocabularyHint(any(), any())).thenReturn("[]")
+        for (status in listOf(LlmClient.RefinementStatus.DISABLED,
+            LlmClient.RefinementStatus.UNAVAILABLE, LlmClient.RefinementStatus.REJECTED)) {
+            `when`(llmClient.refineDictation(raw, "", "[]"))
+                .thenReturn(LlmClient.RefinementResult(raw, status))
+            val result = pipeline.process(ByteArray(100))
+            assertEquals(true, result.success)
+            assertEquals(raw, result.text)
+            assertEquals(raw, result.rawText)
+            assertEquals(status, result.refinementStatus)
+        }
+    }
+
+    @Test
+    fun `STT only explicitly bypasses cleanup without claiming applied refinement`() = runBlocking {
+        val raw = "啊，我我還不確定。\n\n先不要部署。"
+        `when`(dictionaryManager.buildWhisperPrompt()).thenReturn("")
+        `when`(whisperClient.transcribe(any(), any())).thenReturn(raw)
+        val result = pipeline.transcribeOnly(ByteArray(100))
+        assertEquals(raw, result.text)
+        assertEquals(raw, result.rawText)
+        assertEquals(null, result.refinementStatus)
+        verifyNoInteractions(llmClient)
+        Unit
+    }
 }

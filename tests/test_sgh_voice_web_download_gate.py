@@ -187,8 +187,8 @@ def test_android_release_manifest_matches_public_artifact_and_copy():
     index = read_web_file("index.html")
     llms = read_web_file("llms.txt")
 
-    assert release["versionName"] == "2.8.7"
-    assert release["versionCode"] == 37
+    assert release["versionName"] == "2.8.8"
+    assert release["versionCode"] == 38
     assert re.fullmatch(r"[0-9a-f]{64}", release["sha256"])
     assert re.fullmatch(r"[0-9A-F]{64}", release["certificateSha256"])
     assert artifact.is_file()
@@ -197,7 +197,7 @@ def test_android_release_manifest_matches_public_artifact_and_copy():
     # Owner sideload artifacts remain verifiable but are not recruitment CTAs.
     assert release["fileName"] not in index
     assert release["fileName"] not in llms
-    assert 'i18n.js?v=20261003-android287' in index
+    assert 'i18n.js?v=20261004-android288' in index
     assert 'main.js?v=20260930-alpha' in index
 
 

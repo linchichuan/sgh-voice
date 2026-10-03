@@ -29,7 +29,7 @@ from hotkey_config import (
 # `from config import APP_VERSION`，不要各自硬編一份字串（曾經各寫各的，
 # app.py 停在 2.7.0、dashboard.py 已到 2.7.4，兩邊回報的版本互相矛盾）。
 # 手動與 CHANGELOG.md 最新版本同步。
-APP_VERSION = "2.7.4"
+APP_VERSION = "2.7.5"
 
 # 跨 thread 序列化 stats.json 的 read-modify-write，避免 update_stats 與 _track_usage race
 _STATS_LOCK = threading.RLock()
@@ -727,7 +727,7 @@ DEFAULT_CONFIG = {
     "typing_speed_cpm": 50,                 # 用戶打字速度（每分鐘字元數，中文約 30-60）
     "custom_words": [],
     "filler_words": {
-        "zh": ["嗯", "啊", "那個", "就是", "然後", "對", "欸"],
+        "zh": ["嗯", "啊", "呃", "那個", "就是", "然後", "對", "欸"],
         "ja": ["えーと", "あの", "えー", "まあ", "なんか", "ちょっと"],
         "en": ["um", "uh", "like", "you know", "basically", "actually", "so yeah"],
     },

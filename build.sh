@@ -81,13 +81,19 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-APP_SOURCE_VERSION="$(sed -n 's/.*self.version = "\([^"]*\)"/\1/p' app.py | head -n 1)"
-DASHBOARD_SOURCE_VERSION="$(sed -n 's/.*>v\([0-9][0-9.]*\)<.*/\1/p' static/index.html | head -n 1)"
+# Read the same canonical version used by the app and PyInstaller bundle.
+APP_SOURCE_VERSION="$(sed -n 's/^APP_VERSION = "\([^"]*\)"/\1/p' config.py | head -n 1)"
 VERSION="${VERSION:-$APP_SOURCE_VERSION}"
 
 [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail "版本必須是 x.y.z 格式"
-[[ "$APP_SOURCE_VERSION" == "$VERSION" ]] || fail "app.py 版本 ${APP_SOURCE_VERSION:-unknown} 與建置版本 $VERSION 不一致"
-[[ "$DASHBOARD_SOURCE_VERSION" == "$VERSION" ]] || fail "Dashboard 版本 ${DASHBOARD_SOURCE_VERSION:-unknown} 與建置版本 $VERSION 不一致"
+[[ "$APP_SOURCE_VERSION" == "$VERSION" ]] || fail "config.py APP_VERSION ${APP_SOURCE_VERSION:-unknown} 與建置版本 $VERSION 不一致"
+grep -Eq '^[[:space:]]*self.version[[:space:]]*=[[:space:]]*APP_VERSION([[:space:]]|$)' app.py \
+    || fail "app.py 必須引用 config.APP_VERSION"
+grep -q 'id="app-version"' static/index.html \
+    || fail "Dashboard 缺少動態 app-version badge"
+if grep -Eq 'id="app-version"[^>]*>[^<]*v[0-9]+\.[0-9]+\.[0-9]+' static/index.html; then
+    fail "Dashboard app-version badge 不得硬編版本"
+fi
 
 ARCH="${TARGET_ARCH:-$HOST_ARCH}"
 case "$ARCH" in
@@ -214,7 +220,7 @@ BUILT_VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' 
 # missing. Gate the actual embedded PYZ, not only the build exit code.
 ARCHIVE_LIST="$(pyi-archive_viewer "$APP_PATH/Contents/MacOS/${APP_NAME}" -r -b)"
 REQUIRED_PYTHON_MODULES=(
-    app config dashboard event_ledger medical_dictionary memory transcriber translation
+    app config dashboard dictation_cleanup event_ledger medical_dictionary memory transcriber translation
     mlx mlx.nn mlx_whisper mlx_audio mlx_audio.stt
     mlx_audio.stt.models.qwen3_asr.qwen3_asr
 )
@@ -289,6 +295,9 @@ DMG_PATH="dist/${DMG_NAME}.dmg"
 rm -rf "$DMG_STAGE"
 mkdir -p "$DMG_STAGE"
 ditto "$APP_PATH" "$DMG_STAGE/${APP_NAME}.app"
+# Verify the exact copy going into the download. File Provider/Finder metadata
+# can change a visible build bundle after its first signature check.
+codesign --verify --deep --strict --verbose=1 "$DMG_STAGE/${APP_NAME}.app"
 ln -s /Applications "$DMG_STAGE/Applications"
 cp resources/icon.icns "$DMG_STAGE/.VolumeIcon.icns"
 SetFile -a C "$DMG_STAGE" 2>/dev/null || true

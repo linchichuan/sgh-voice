@@ -17,7 +17,7 @@
 
 ### Android capabilities
 
-- Current sideload update: Android 2.8.7, versionCode 37, 17.6 MB. Existing sideload users can find update instructions at https://voice.shingihou.com/android-update.html; Google Play installations should keep updating through Google Play. This does not grant closed-test membership or count toward the 12 testers
+- Current sideload update: Android 2.8.8, versionCode 38, 17.6 MB. Existing sideload users can find update instructions at https://voice.shingihou.com/android-update.html; Google Play installations should keep updating through Google Play. This does not grant closed-test membership or count toward the 12 testers
 - The 2.8.7 landing-page image is a UI preview, not evidence of real-device audio capture or recognition accuracy
 - Four modes in one Android input method: Voice, Zhuyin, Japanese, and English
 - All four modes share one height based on the original Zhuyin size; adjust it in Settings from 90% to 125% in 5% steps, or reset to 100%. Small windows apply a common height limit and scrolling where needed
@@ -59,6 +59,7 @@
 - 2.8.3 adds shared, adjustable keyboard height and replaces Japanese 12-key tap cycling with directional flick input
 - 2.8.6 refines the light mint recording surface and joins the original company logo with a larger, centred SGH label
 - 2.8.7 refines conservative cleanup, confirmation-gated short vocabulary memory, English and Japanese input handling, and the soft recording interface. Vocabulary memory is local personalization, not model training; neither cleanup nor vocabulary hints guarantee recognition accuracy
+- 2.8.8 improves filler and stutter cleanup while preserving meaningful transitions, intentional ellipses, language, and tone. Detected new ellipses replacing fillers or changes to protected content trigger the existing source-transcript fallback and notice; punctuation quality still depends on the selected model, and real-device recording quality has not been established by mocked tests
 - Notes, pending drafts and retry audio disappear when the input-method service ends or the device restarts; continuous background recording is not supported
 - Cloud consent is checked before each new request; withdrawal prevents follow-up AI requests and retry uploads
 - Automated checks and emulator inspection do not establish real-device dictation accuracy; the physical-device acceptance checklist remains pending

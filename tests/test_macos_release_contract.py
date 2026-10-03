@@ -1,6 +1,7 @@
 """Static release-safety contract for the macOS packaging entrypoint."""
 
 from pathlib import Path
+import os
 import subprocess
 
 
@@ -33,6 +34,43 @@ def test_build_does_not_mutate_sources_or_install_dependencies():
 
     assert "sed -i" not in script
     assert "pip install" not in script
+
+
+def test_preflight_uses_canonical_version_with_dynamic_dashboard(tmp_path, monkeypatch):
+    """Exercise the real version gate with harmless, offline packaging stubs."""
+    script = tmp_path / "build.sh"
+    script.write_text(_script())
+    (tmp_path / "config.py").write_text('APP_VERSION = "2.7.5"\n')
+    (tmp_path / "app.py").write_text('        self.version = APP_VERSION\n')
+    (tmp_path / "static").mkdir()
+    (tmp_path / "static" / "index.html").write_text('<span id="app-version"></span>\n')
+    (tmp_path / "requirements-dev.lock").touch()
+    venv = tmp_path / "venv"
+    binaries = venv / "bin"
+    binaries.mkdir(parents=True)
+    (binaries / "activate").write_text(f'export PATH="{binaries}:$PATH"\n')
+    for name, output in {
+        "python": "3.12", "pyinstaller": "6.19.0", "pyi-archive_viewer": "",
+        "hdiutil": "", "codesign": "", "ditto": "", "shasum": "", "security": "",
+    }.items():
+        command = binaries / name
+        command.write_text(f"#!/bin/sh\nprintf '%s\\n' '{output}'\n")
+        command.chmod(0o700)
+    monkeypatch.setenv("SGH_BUILD_VENV", str(venv))
+    monkeypatch.delenv("CODE_SIGN_IDENTITY", raising=False)
+    result = subprocess.run(
+        ["bash", str(script), "--version", "2.7.5", "--preflight"],
+        cwd=tmp_path, env=os.environ.copy(), capture_output=True, text=True,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "Preflight 完成" in result.stdout
+    assert not (tmp_path / "dist").exists()
+    mismatch = subprocess.run(
+        ["bash", str(script), "--version", "2.7.6", "--preflight"],
+        cwd=tmp_path, env=os.environ.copy(), capture_output=True, text=True,
+    )
+    assert mismatch.returncode != 0
+    assert "config.py APP_VERSION" in mismatch.stderr
 
 
 def test_build_requires_the_locked_python_minor_version():
@@ -74,6 +112,13 @@ def test_release_is_notarized_stapled_and_gatekeeper_verified():
     assert "spctl --assess" in script
 
 
+def test_download_staging_copy_is_verified_before_image_creation():
+    script = _script()
+    verification = 'codesign --verify --deep --strict --verbose=1 "$DMG_STAGE/${APP_NAME}.app"'
+    assert verification in script
+    assert script.index(verification) < script.index("hdiutil create")
+
+
 def test_packaged_runtime_modules_are_explicitly_gated():
     script = _script()
 
@@ -81,6 +126,7 @@ def test_packaged_runtime_modules_are_explicitly_gated():
     assert "REQUIRED_PYTHON_MODULES" in script
     assert "translation" in script
     assert "medical_dictionary" in script
+    assert "dictation_cleanup" in script
     assert "mlx_whisper" in script
     assert "mlx_audio" in script
     assert "mlx_audio.stt.models.qwen3_asr.qwen3_asr" in script
@@ -93,6 +139,7 @@ def test_pyinstaller_includes_medical_seed_and_qwen_runtime():
 
     assert "('medical_dictionary_seed', 'medical_dictionary_seed')" in spec
     assert "'medical_dictionary'" in spec
+    assert "'dictation_cleanup'" in spec
     assert "'mlx_audio'" in spec
     assert "'mlx_audio.stt'" in spec
     assert "'mlx_audio.stt.models.qwen3_asr.qwen3_asr'" in spec
