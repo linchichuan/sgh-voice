@@ -345,7 +345,7 @@ def test_wav_decoder_rejects_unimplemented_output_options(pcm_frontend):
 
 def test_vendored_files_match_recorded_provenance_and_only_expected_patches():
     root = Path(__file__).resolve().parents[1] / "windows_client/_vendor/faster_whisper"
-    manifest = json.loads((root / "PROVENANCE.json").read_text())
+    manifest = json.loads((root / "PROVENANCE.json").read_text(encoding="utf-8"))
     assert manifest["commit"] == "65882eee9f5cdbeeb2d877f1131d48cf241b327d"
     patched = set()
     for entry in manifest["files"]:
@@ -363,8 +363,8 @@ def test_vendored_files_match_recorded_provenance_and_only_expected_patches():
             assert b"from faster_whisper." not in content
     assert patched == {"__init__.py", "audio.py", "transcribe.py", "utils.py", "vad.py"}
     assert (root / "assets/silero_vad_v6.onnx").stat().st_size == 1245151
-    assert "Copyright (c) 2023 SYSTRAN" in (root / "LICENSE").read_text()
-    assert "Copyright (c) 2020-present Silero Team" in (root / "LICENSE.silero-vad").read_text()
+    assert "Copyright (c) 2023 SYSTRAN" in (root / "LICENSE").read_text(encoding="utf-8")
+    assert "Copyright (c) 2020-present Silero Team" in (root / "LICENSE.silero-vad").read_text(encoding="utf-8")
 
 
 def test_vendored_implicit_model_download_is_disabled():
@@ -375,7 +375,7 @@ def test_vendored_implicit_model_download_is_disabled():
     for value in ("base", "Systran/faster-whisper-base", "/missing/local/model"):
         with pytest.raises(RuntimeError, match="^SGHVoice model setup required$"):
             module.download_model(value, local_files_only=False)
-    source = path.with_name("transcribe.py").read_text()
+    source = path.with_name("transcribe.py").read_text(encoding="utf-8")
     assert "Tokenizer.from_pretrained" not in source
     assert 'raise RuntimeError("SGHVoice local tokenizer.json required")' in source
 
