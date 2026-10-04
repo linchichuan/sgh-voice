@@ -2,17 +2,18 @@
 
 ## Current status
 
-The Windows preview is being changed to local-only CPU recognition with an **unsigned,
-per-user installer**. The reviewed source commit for these offline changes is
-**pending**; the previous cloud-client commit is not the new release identity.
-No Windows installer has been built or installed in this task. Real microphone,
-hotkey and target-paste acceptance remain **NOT RUN**. macOS source tests do not
-establish Windows compatibility.
+The Windows local-only CPU preview has been built, tested and published as an
+**unsigned test prerelease**. [Download and reports](https://github.com/linchichuan/sgh-voice/releases/tag/windows-offline-preview-20261004)
+are tied to source `4750f47dbb86efd11db77292f8f03d10a8068b2d`.
+The [Windows Server 2022 run](https://github.com/linchichuan/sgh-voice/actions/runs/37202178595)
+passed 239 tests and 65 subtests, packaging, local CPU inference on synthetic silence,
+installation, installed-runtime checks and uninstallation. See
+[WINDOWS_HANDOFF.md](WINDOWS_HANDOFF.md) for exact installer size/hash and scope.
 
-The main website's stable Windows download stays `pending`. A separately labelled
-**test prerelease** may be published after an actual Windows build and its limited
-automated gates pass. It must state which desktop/hardware checks remain unverified.
-There is no downloadable Windows binary until a real build succeeds.
+Physical microphone, interactive hotkey/target-paste and standard-user Windows 10/11
+acceptance remain **NOT VERIFIED**. The main website's stable Windows manifest stays
+`pending`; its separate preview entry has not been deployed. The installer is not
+clinically validated and synthetic-silence inference is not an accuracy benchmark.
 
 Windows uses `windows_launcher.py`, `windows_client`, shared recording/configuration
 modules and `windows/sghvoice.spec`. The macOS `voiceinput.spec` / `build.sh` remain
@@ -94,7 +95,7 @@ before dispatch. A narrowly scoped
 can run from its feature branch without a main merge. Review the final workflow
 before pushing; do not create an unnecessary PR that also starts the existing CI matrix.
 
-## Recommended test-prerelease delivery — NOT RUN
+## Test-prerelease delivery procedure
 
 1. Finish integration and independent review, then record the new offline source SHA.
    Push that source to a feature branch whose workflow filters do not start a job.
@@ -121,7 +122,7 @@ relative to main, for creation and update. GITHUB_TOKEN cannot receive that perm
 The existing authorized local credential handles draft creation and final publication;
 the runner only uploads assets. [GitHub CLI supports pending draft tags](https://github.com/cli/cli/blob/trunk/pkg/cmd/release/shared/fetch.go),
 and [gh release upload](https://cli.github.com/manual/gh_release_upload) does not need
-to create or publish the release. No build, draft or publication has occurred yet.
+to create or publish the release. This procedure was completed for the preview listed above.
 
 Any new host software, VM repair, paid runner/license, code-signing purchase or
 credential change still requires the applicable session authorization. Do not change
@@ -181,16 +182,18 @@ Hashes and PE structure establish identity, not dictation accuracy or microphone
 The frozen `--self-test <report-path>` uses an isolated temporary profile, no network
 and no microphone. It checks Win32/Tk startup, audio file handling, OpenCC, local
 runtime imports and the credential backend without reading user secrets. An import
-check is not model inference. Real local inference and synthetic-silence checks are
-prepared and are **NOT RUN for the new revision**. When run, record model revision,
-sample provenance, network-disabled conditions and observed results. Silence tests
+check is not model inference. The separate frozen local-inference/synthetic-silence
+check passed for the release above
+with the pinned model and Python socket connections guarded; no Python network attempts
+were observed. This is not whole-OS/native-library network monitoring. Silence tests
 are not a clinical accuracy benchmark or proof of correct names, doses and negations.
 
-`windows/install-test.ps1` is prepared but **NOT RUN**. It refuses an existing SGH
+`windows/install-test.ps1` passed in the Windows Server 2022 runner. It refuses an existing SGH
 Voice installation, installs into an isolated directory, verifies installed bytes,
 per-user registration and shortcuts, launches the installed self-test from outside
-the checkout, and uninstalls. It records whether the runner is elevated. A future
-pass on Windows Server 2022 does not prove Windows 11 behavior, standard-user rights,
+the checkout, and uninstalls. It records whether the runner is elevated. That
+pass on an elevated Windows Server 2022 runner does not prove Windows 11 behavior,
+standard-user rights,
 physical microphone capture, hotkeys, target insertion or downloaded-file security
 acceptance. Keep these limitations in the report and test-prerelease notes.
 
@@ -241,7 +244,7 @@ the exact installer/app/smoke/source identity with its other required arguments;
 never publishes or changes the public manifest. Provide a download URL only after
 verifying publication. A test prerelease does not satisfy this stable-download gate.
 
-Current outcome: **offline source IN PROGRESS / Windows build NOT RUN / interactive
-Windows acceptance NOT RUN / publication NOT DONE**. The reviewed Release-draft route
-can produce a test installer without requiring the user to supply a Windows machine;
-full stable-download acceptance remains separate work.
+Current outcome: **offline source PUSHED / Windows build PASS / test prerelease
+PUBLISHED / interactive Windows acceptance NOT VERIFIED / own-site deployment PENDING**.
+The exact installer and evidence are linked in [WINDOWS_HANDOFF.md](WINDOWS_HANDOFF.md).
+The public preview does not satisfy the stable website acceptance gate.
