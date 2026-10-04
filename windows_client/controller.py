@@ -1,6 +1,6 @@
-"""Single-flight Windows recording lifecycle, with explicit cloud consent.
+"""Single-flight Windows recording lifecycle with local-only recognition.
 
-The existing Recorder and Transcriber remain the speech implementation. This
+The existing Recorder and the offline CPU transcriber provide speech IO. This
 module owns only desktop lifecycle, cancellation and delivery policy.
 """
 from __future__ import annotations
@@ -11,9 +11,9 @@ import threading
 import time
 
 WINDOWS_DEFAULTS = {
-    "windows_provider": "groq",
-    "windows_cloud_consent": False,
-    "windows_polish": True,
+    "windows_model_dir": "",
+    "windows_language": "ja",
+    "windows_lexicon_enabled": False,
     "windows_save_history": False,
     "windows_auto_insert": False,
     "windows_toggle_hotkey": "Ctrl+Alt+F9",
@@ -22,15 +22,12 @@ WINDOWS_DEFAULTS = {
 
 
 def runtime_config(settings):
-    """Constrain shared routing to the one provider explicitly selected here."""
+    """Strip cloud credentials and force local-only execution, even for old settings."""
     result = dict(settings)
-    provider = result.get("windows_provider", "groq")
-    if provider not in ("groq", "openai"):
-        raise ValueError("invalid_provider")
     result.update({
-        "stt_engine": "groq" if provider == "groq" else "cloud-only",
-        "llm_engine": provider,
-        "enable_claude_polish": bool(result.get("windows_polish", True)),
+        "stt_engine": "faster-whisper-local",
+        "llm_engine": "disabled",
+        "enable_claude_polish": False,
         "enable_hybrid_mode": False,
         "allow_cross_provider_llm_fallback": False,
         "enable_fewshot": False,
@@ -40,18 +37,21 @@ def runtime_config(settings):
         "enable_auto_learn": False,
         "active_scene": "general",
         "backup_audio_dir": "",
+        "sample_rate": 16000,
         # UI is toggle; Recorder's PTT mode supplies a silence safety cutoff.
         "hotkey_mode": "push_to_talk",
         "max_recording_duration": 180,
         "ptt_silence_autostop_seconds": 120,
     })
     for name in ("groq", "openai", "anthropic", "openrouter", "elevenlabs"):
-        if name != provider:
-            result[f"{name}_api_key"] = ""
+        result[f"{name}_api_key"] = ""
+    result["windows_cloud_consent"] = False
     return result
 
 
 def _new_memory(retain, cancelled):
+    if not retain:
+        return None
     from memory import Memory
 
     class WindowsMemory(Memory):
@@ -60,20 +60,21 @@ def _new_memory(retain, cancelled):
                 super().add_to_history(entry)
 
     memory = WindowsMemory()
-    if not retain:
-        memory.history = []
     return memory
 
 
 class Controller:
     def __init__(self, config, on_event, native=None, *, recorder_factory=None,
-                 transcriber_factory=None, memory_factory=None):
+                 transcriber_factory=None, memory_factory=None, model_validator=None):
         self.config = {**WINDOWS_DEFAULTS, **config}
         self._emit_callback = on_event
         self.native = native
         self._recorder_factory = recorder_factory
         self._transcriber_factory = transcriber_factory
         self._memory_factory = memory_factory or _new_memory
+        self._model_validator = model_validator
+        self._transcriber = None
+        self._transcriber_key = None
         self._lock = threading.RLock()
         self._cancelled = threading.Event()
         self._commands = queue.Queue()
@@ -113,15 +114,11 @@ class Controller:
                 return True
             if self.state != "idle":
                 return False
-            if self.config.get("windows_cloud_consent") is not True:
-                self._emit("error", "cloud_consent_required")
-                return False
-            provider = self.config.get("windows_provider")
-            if provider not in ("groq", "openai"):
-                self._emit("error", "invalid_provider")
-                return False
-            if not str(self.config.get(f"{provider}_api_key", "")).strip():
-                self._emit("error", "api_key_required")
+            from windows_client.local_stt import LocalSTTError, validate_model_directory
+            try:
+                (self._model_validator or validate_model_directory)(self.config.get("windows_model_dir", ""))
+            except LocalSTTError as exc:
+                self._emit("error", exc.code)
                 return False
             self._session += 1
             self._cancelled.clear()
@@ -131,6 +128,31 @@ class Controller:
             self._set_state("recording")
             self._commands.put((self._start, self._session))
             return True
+
+    def prepare_model(self):
+        """Only the UI's explicit, informed download action calls this method."""
+        with self._lock:
+            if self.state != "idle" or self._closed:
+                return False
+            self._session += 1
+            self._cancelled.clear()
+            self._set_state("preparing_model")
+            self._commands.put((self._prepare_model, self._session))
+            return True
+
+    def _prepare_model(self, session):
+        from windows_client.models import prepare_model, ModelDownloadError
+        try:
+            path = prepare_model(should_cancel=self._cancelled.is_set,
+                                 on_progress=lambda percent: self._emit("model_progress", {"percent": percent}))
+            with self._lock:
+                if not self._cancelled.is_set() and not self._closed:
+                    self.config["windows_model_dir"] = str(path)
+                    self._emit("model_ready", {"path": str(path)})
+        except ModelDownloadError as exc:
+            self._emit("error", exc.code)
+        finally:
+            self._set_state("idle")
 
     def cancel(self):
         with self._lock:
@@ -159,9 +181,10 @@ class Controller:
                 if session != self._session:
                     continue
                 action(session)
-            except Exception:
+            except Exception as exc:
                 # Never expose provider exception text, audio or credential data.
-                self._emit("error", "transcription_failed")
+                from windows_client.local_stt import LocalSTTError
+                self._emit("error", exc.code if isinstance(exc, LocalSTTError) else "transcription_failed")
                 self._discard(self._session)
 
     def _start(self, session):
@@ -254,9 +277,13 @@ class Controller:
                 self._cancelled.is_set,
             )
             if self._transcriber_factory is None:
-                from transcriber import Transcriber
-                self._transcriber_factory = Transcriber
-            transcriber = self._transcriber_factory(self._snapshot, memory)
+                from windows_client.local_stt import LocalTranscriber
+                self._transcriber_factory = LocalTranscriber
+            model_key = (self._snapshot.get("windows_model_dir"), self._snapshot.get("windows_language"))
+            if self._transcriber is None or self._transcriber_key != model_key:
+                self._transcriber = self._transcriber_factory(self._snapshot, memory)
+                self._transcriber_key = model_key
+            transcriber = self._transcriber
             result = transcriber.transcribe(
                 {"array": audio, "path": path}, duration, "dictate",
                 should_cancel=self._cancelled.is_set,
@@ -268,6 +295,17 @@ class Controller:
                     self._emit("error", "transcription_failed")
                     return
                 self.last_text = result["final"]
+                candidates = []
+                if self._snapshot.get("windows_lexicon_enabled"):
+                    from dataclasses import asdict
+                    from windows_client.lexicon import suggestions
+                    candidates = [asdict(item) for item in suggestions(self.last_text)]
+                if self._snapshot.get("windows_save_history"):
+                    from datetime import datetime
+                    memory.add_to_history({"timestamp": datetime.now().isoformat(),
+                                           "whisper_raw": self.last_text, "final_text": self.last_text,
+                                           "mode": "dictate", "duration": duration,
+                                           "stt_engine": "faster-whisper-local", "llm_source": None})
                 insertion = {"success": False, "reason": "preview_only"}
                 if self._snapshot.get("windows_auto_insert") and self._target and self.native:
                     try:
@@ -275,7 +313,8 @@ class Controller:
                         insertion = {"success": delivered.success, "reason": delivered.reason}
                     except Exception:
                         insertion = {"success": False, "reason": "input_failed"}
-                self._emit("result", {"text": self.last_text, "insertion": insertion})
+                self._emit("result", {"text": self.last_text, "insertion": insertion,
+                                      "lexicon_candidates": candidates})
         finally:
             self._remove(path)
             self._emit("level", 0.0)

@@ -10,7 +10,7 @@ try {
     foreach ($Command in @('python', 'git')) {
         if (-not (Get-Command $Command -ErrorAction SilentlyContinue)) { throw "Missing required tool: $Command" }
     }
-    & python -c "import sys,struct; assert sys.platform == 'win32' and sys.version_info[:2] == (3,12) and struct.calcsize('P') == 8, 'Requires Windows x64 Python 3.12'; import PyInstaller, tkinter, keyring, sounddevice, soundfile, opencc, openai, anthropic"
+    & python -c "import sys,struct; assert sys.platform == 'win32' and sys.version_info[:2] == (3,12) and struct.calcsize('P') == 8, 'Requires Windows x64 Python 3.12'; import PyInstaller, tkinter, keyring, sounddevice, soundfile, opencc, ctranslate2, tokenizers, onnxruntime; from windows_client._vendor import faster_whisper"
     if ($LASTEXITCODE -ne 0) { throw 'Python dependency/platform preflight failed. See docs/WINDOWS_BUILD.md.' }
     $Compiler = Get-Command ISCC.exe -ErrorAction SilentlyContinue
     $Iscc = if ($Compiler) { $Compiler.Source } else { Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe' }

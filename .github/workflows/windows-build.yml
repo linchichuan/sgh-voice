@@ -37,18 +37,15 @@ jobs:
       - name: Build and self-test unsigned installer
         shell: pwsh
         run: ./windows/build.ps1
-      - name: Upload unaccepted test build
-        uses: actions/upload-artifact@v6
-        with:
-          name: SGHVoice-Windows-unsigned-${{ github.sha }}
-          path: |
-            dist/windows/SGHVoice-Windows-*-x64-unsigned.exe
-            dist/windows/windows-build.json
-            dist/windows/windows-smoke.json
-          if-no-files-found: error
-          retention-days: 1
-          compression-level: 0
+      - name: Exercise bundled offline CPU inference
+        shell: pwsh
+        timeout-minutes: 5
+        run: ./windows/offline-test.ps1
+      - name: Install, self-test and uninstall
+        shell: pwsh
+        timeout-minutes: 5
+        run: ./windows/install-test.ps1
       - name: Record limited verification scope
         shell: pwsh
         run: |
-          'Unsigned test build only. No release or website deployment occurred. Real Windows microphone, global hotkey, target paste and OS security acceptance remain NOT RUN.' >> $env:GITHUB_STEP_SUMMARY
+          'Unsigned test build only. No release or website deployment occurred. Physical microphone, global hotkey, target paste, standard-user Windows 10/11 and OS security acceptance remain NOT RUN.' >> $env:GITHUB_STEP_SUMMARY

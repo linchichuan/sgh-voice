@@ -1,0 +1,102 @@
+{
+  "repository": "https://github.com/SYSTRAN/faster-whisper",
+  "tag": "v1.2.1",
+  "commit": "65882eee9f5cdbeeb2d877f1131d48cf241b327d",
+  "files": [
+    {
+      "path": "LICENSE",
+      "upstream_url": "https://raw.githubusercontent.com/SYSTRAN/faster-whisper/65882eee9f5cdbeeb2d877f1131d48cf241b327d/LICENSE",
+      "upstream_git_blob_sha1": "2d92330dc294fea86caf785fa626d22917850141",
+      "upstream_size": 1064,
+      "upstream_sha256": "af6798135e729f8aa6c853936d037dfdea449734d26b8ea6a89805fca758c0d5",
+      "vendored_sha256": "af6798135e729f8aa6c853936d037dfdea449734d26b8ea6a89805fca758c0d5"
+    },
+    {
+      "path": "__init__.py",
+      "upstream_url": "https://raw.githubusercontent.com/SYSTRAN/faster-whisper/65882eee9f5cdbeeb2d877f1131d48cf241b327d/faster_whisper/__init__.py",
+      "upstream_git_blob_sha1": "ad69277853742e3f9f0e0f020c0862cf4ad404fb",
+      "upstream_size": 430,
+      "upstream_sha256": "5396c3a025a7b0cf81246fcd680c0bb7e384e2e587cc2e18f9518cef4c26d56c",
+      "vendored_sha256": "63f6bc4f235d58db14c8d7dcacebdd81f135b36b6b8c11e736d655f26b3a3b9e"
+    },
+    {
+      "path": "assets/__init__.py",
+      "upstream_url": "https://raw.githubusercontent.com/SYSTRAN/faster-whisper/65882eee9f5cdbeeb2d877f1131d48cf241b327d/faster_whisper/assets/__init__.py",
+      "upstream_git_blob_sha1": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "upstream_size": 0,
+      "upstream_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "vendored_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "assets/silero_vad_v6.onnx",
+      "upstream_url": "https://raw.githubusercontent.com/SYSTRAN/faster-whisper/65882eee9f5cdbeeb2d877f1131d48cf241b327d/faster_whisper/assets/silero_vad_v6.onnx",
+      "upstream_git_blob_sha1": "9febab9bc0aa5ae2b27e69243d813427212bfb36",
+      "upstream_size": 1245151,
+      "upstream_sha256": "4cbf549b8326f60f80f2536d9eefeb450a9abe83365a098031c89719f1be17d2",
+      "vendored_sha256": "4cbf549b8326f60f80f2536d9eefeb450a9abe83365a098031c89719f1be17d2"
+    },
+    {
+      "path": "audio.py",
+      "upstream_url": "https://raw.githubusercontent.com/SYSTRAN/faster-whisper/65882eee9f5cdbeeb2d877f1131d48cf241b327d/faster_whisper/audio.py",
+      "upstream_git_blob_sha1": "222e73bada36d7b451ca67218cf677777902649e",
+      "upstream_size": 3506,
+      "upstream_sha256": "60a1d8638f718cbf6d245aed3e5a5aa61c1f822a0b0fe9b48a7c928d47c23909",
+      "vendored_sha256": "ac2fbed1594f05365093194a11802c638d5922728ace5c0d4487e8641ea9d539"
+    },
+    {
+      "path": "feature_extractor.py",
+      "upstream_url": "https://raw.githubusercontent.com/SYSTRAN/faster-whisper/65882eee9f5cdbeeb2d877f1131d48cf241b327d/faster_whisper/feature_extractor.py",
+      "upstream_git_blob_sha1": "cfa3aee28bb2e6d08793d32d2dbd66190ce12415",
+      "upstream_size": 7592,
+      "upstream_sha256": "e403966dbc592a53695eea2aea24fa60bab50ef6755e0076b311f907be7a397c",
+      "vendored_sha256": "e403966dbc592a53695eea2aea24fa60bab50ef6755e0076b311f907be7a397c"
+    },
+    {
+      "path": "tokenizer.py",
+      "upstream_url": "https://raw.githubusercontent.com/SYSTRAN/faster-whisper/65882eee9f5cdbeeb2d877f1131d48cf241b327d/faster_whisper/tokenizer.py",
+      "upstream_git_blob_sha1": "d75bbd7f207fca9d61b2bae7388e32b046f43019",
+      "upstream_size": 8429,
+      "upstream_sha256": "614a96b6a9660096e4f4e9fbe8860cd75ad250dce8e85a847998a3d6d48165d2",
+      "vendored_sha256": "614a96b6a9660096e4f4e9fbe8860cd75ad250dce8e85a847998a3d6d48165d2"
+    },
+    {
+      "path": "transcribe.py",
+      "upstream_url": "https://raw.githubusercontent.com/SYSTRAN/faster-whisper/65882eee9f5cdbeeb2d877f1131d48cf241b327d/faster_whisper/transcribe.py",
+      "upstream_git_blob_sha1": "51eb1c505bf1aa5d3a9fb5b7d2cd9811845b6558",
+      "upstream_size": 80403,
+      "upstream_sha256": "5d5ffb00018561d3d529b2c72e1d9f5fff055bea725f3cccc7c6c67f5cc8ffe4",
+      "vendored_sha256": "9e58d71df8046a8c7ae62d7b6a4cc1bc593a21c19fe23b664a3658f8c63f7d82"
+    },
+    {
+      "path": "utils.py",
+      "upstream_url": "https://raw.githubusercontent.com/SYSTRAN/faster-whisper/65882eee9f5cdbeeb2d877f1131d48cf241b327d/faster_whisper/utils.py",
+      "upstream_git_blob_sha1": "8ddbb49a8629bcc7b20b6c43a1a7ff0dee2cd997",
+      "upstream_size": 4946,
+      "upstream_sha256": "5b36ceb9d0fd3961de8cfb144bd82f9a4ef3151b2e5958405a11efb4f3ac4f82",
+      "vendored_sha256": "82abe0a25bd705a3aed73e34335b3ac4cf4ce4ca20f0c9b6f051ac3d36a05c82"
+    },
+    {
+      "path": "vad.py",
+      "upstream_url": "https://raw.githubusercontent.com/SYSTRAN/faster-whisper/65882eee9f5cdbeeb2d877f1131d48cf241b327d/faster_whisper/vad.py",
+      "upstream_git_blob_sha1": "305919db1523fd47b7fee1e078dfa4438e7ebba3",
+      "upstream_size": 12543,
+      "upstream_sha256": "37a9c774aefdd3162d936b896c8dcf5571b2ed938d65bffecfd631770049a18d",
+      "vendored_sha256": "7c8c82fd8695fdf6385773c414319abfb489933f94377bc3d4bc1f61a5e526dc"
+    },
+    {
+      "path": "version.py",
+      "upstream_url": "https://raw.githubusercontent.com/SYSTRAN/faster-whisper/65882eee9f5cdbeeb2d877f1131d48cf241b327d/faster_whisper/version.py",
+      "upstream_git_blob_sha1": "f713d5f5f8e81a378f61f601afa31b6af092bd32",
+      "upstream_size": 50,
+      "upstream_sha256": "70ee45276562706d9787f105fb3010417fa9621fe6a9e2fad01a209f3044d9c5",
+      "vendored_sha256": "70ee45276562706d9787f105fb3010417fa9621fe6a9e2fad01a209f3044d9c5"
+    }
+  ],
+  "additional_attribution": {
+    "project": "silero-vad",
+    "tag": "v6.0",
+    "commit": "fba061dc5559f696e62171e9a0741782b0fdc23c",
+    "url": "https://raw.githubusercontent.com/snakers4/silero-vad/fba061dc5559f696e62171e9a0741782b0fdc23c/LICENSE",
+    "sha256": "2e63e9a38b6e8fc0c7bc37ce174caca1862870856c6daf5697cfb785e925520b"
+  }
+}

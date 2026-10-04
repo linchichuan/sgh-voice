@@ -102,6 +102,9 @@ resources/*
 !resources/menubar/
 !resources/menubar/*.svg
 !resources/menubar/*.png
+!resources/windows/
+!resources/windows/*.json
+!resources/windows/*.txt
 
 # Android Studio 產物（在 android/SGHVoice/.gitignore 管理）
 android/SGHVoice/.gradle/

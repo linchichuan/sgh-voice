@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "version": "1.0.0",
+  "locale": "ja-JP",
+  "title": "精神科用語の表記候補（小規模・手動確認用）",
+  "automatic_replacement": false,
+  "clinically_validated": false,
+  "scope_note": "公的資料で確認した一般的な用語の表記のみ。定義・診断基準・治療推奨・薬剤用量は収録しない。読み仮名候補と合成テスト文は独自作成。音声認識精度の向上を示すデータではない。",
+  "matching_note": "完全な読み仮名と限定的な語境界が一致した場合のみ候補を表示する。短い同音語、疾患間の言い換え、数量、否定、推測表現を変換しない。候補の採否と文脈は利用者が確認する。",
+  "sources": [
+    {
+      "id": "ncnp-schizophrenia",
+      "title": "統合失調症｜こころの情報サイト",
+      "publisher": "国立精神・神経医療研究センター",
+      "url": "https://kokoro.ncnp.go.jp/disease.php?@uid=tQtLd1xVUp1wHJMQ",
+      "checked_on": "2026-10-04"
+    },
+    {
+      "id": "ncnp-bipolar",
+      "title": "双極性障害（躁うつ病）｜こころの情報サイト",
+      "publisher": "国立精神・神経医療研究センター",
+      "url": "https://kokoro.ncnp.go.jp/disease.php?@uid=RM3UirqngPV6bFW0",
+      "checked_on": "2026-10-04"
+    },
+    {
+      "id": "ncnp-ocd",
+      "title": "強迫性障害｜こころの情報サイト",
+      "publisher": "国立精神・神経医療研究センター",
+      "url": "https://kokoro.ncnp.go.jp/disease.php?@uid=MiyHEH6ZUZDxDeYX",
+      "checked_on": "2026-10-04"
+    },
+    {
+      "id": "ncnp-insomnia",
+      "title": "不眠症（睡眠障害）｜こころの情報サイト",
+      "publisher": "国立精神・神経医療研究センター",
+      "url": "https://kokoro.ncnp.go.jp/disease.php?@uid=XpsDJBKfyaGD0mIx",
+      "checked_on": "2026-10-04"
+    },
+    {
+      "id": "ncnp-anxiety",
+      "title": "不安症｜こころの情報サイト",
+      "publisher": "国立精神・神経医療研究センター",
+      "url": "https://kokoro.ncnp.go.jp/disease.php?@uid=BLA9JV0KhiWPIMzX",
+      "checked_on": "2026-10-04"
+    }
+  ],
+  "terms": [
+    {"id": "schizophrenia", "preferred": "統合失調症", "category": "diagnosis", "aliases": ["とうごうしっちょうしょう"], "source_ids": ["ncnp-schizophrenia"]},
+    {"id": "positive-symptoms", "preferred": "陽性症状", "category": "symptom", "aliases": ["ようせいしょうじょう"], "source_ids": ["ncnp-schizophrenia"]},
+    {"id": "negative-symptoms", "preferred": "陰性症状", "category": "symptom", "aliases": ["いんせいしょうじょう"], "source_ids": ["ncnp-schizophrenia"]},
+    {"id": "auditory-hallucination", "preferred": "幻聴", "category": "symptom", "aliases": ["げんちょう"], "source_ids": ["ncnp-schizophrenia"]},
+    {"id": "persecutory-delusion", "preferred": "被害妄想", "category": "symptom", "aliases": ["ひがいもうそう"], "source_ids": ["ncnp-schizophrenia"]},
+    {"id": "delusion-of-reference", "preferred": "関係妄想", "category": "symptom", "aliases": ["かんけいもうそう"], "source_ids": ["ncnp-schizophrenia"]},
+    {"id": "bipolar-disorder", "preferred": "双極性障害", "category": "diagnosis", "aliases": ["そうきょくせいしょうがい"], "source_ids": ["ncnp-bipolar"]},
+    {"id": "manic-state", "preferred": "躁状態", "category": "symptom", "aliases": ["そうじょうたい"], "source_ids": ["ncnp-bipolar"]},
+    {"id": "psychoeducation", "preferred": "心理教育", "category": "therapy", "aliases": ["しんりきょういく"], "source_ids": ["ncnp-bipolar"]},
+    {"id": "obsessive-compulsive-disorder", "preferred": "強迫性障害", "category": "diagnosis", "aliases": ["きょうはくせいしょうがい"], "source_ids": ["ncnp-ocd"]},
+    {"id": "obsession", "preferred": "強迫観念", "category": "symptom", "aliases": ["きょうはくかんねん"], "source_ids": ["ncnp-ocd"]},
+    {"id": "compulsion", "preferred": "強迫行為", "category": "symptom", "aliases": ["きょうはくこうい"], "source_ids": ["ncnp-ocd"]},
+    {"id": "cognitive-behavioral-therapy", "preferred": "認知行動療法", "category": "therapy", "aliases": ["にんちこうどうりょうほう"], "source_ids": ["ncnp-ocd"]},
+    {"id": "insomnia", "preferred": "不眠症", "category": "diagnosis", "aliases": ["ふみんしょう"], "source_ids": ["ncnp-insomnia"]},
+    {"id": "sleep-onset-difficulty", "preferred": "入眠困難", "category": "symptom", "aliases": ["にゅうみんこんなん"], "source_ids": ["ncnp-insomnia"]},
+    {"id": "nocturnal-awakening", "preferred": "中途覚醒", "category": "symptom", "aliases": ["ちゅうとかくせい"], "source_ids": ["ncnp-insomnia"]},
+    {"id": "early-morning-awakening", "preferred": "早朝覚醒", "category": "symptom", "aliases": ["そうちょうかくせい"], "source_ids": ["ncnp-insomnia"]},
+    {"id": "social-anxiety-disorder", "preferred": "社交不安症", "category": "diagnosis", "aliases": ["しゃこうふあんしょう"], "source_ids": ["ncnp-anxiety"]},
+    {"id": "panic-disorder", "preferred": "パニック症", "category": "diagnosis", "aliases": ["パニックしょう"], "source_ids": ["ncnp-anxiety"]},
+    {"id": "anticipatory-anxiety", "preferred": "予期不安", "category": "symptom", "aliases": ["よきふあん"], "source_ids": ["ncnp-anxiety"]}
+  ],
+  "synthetic_benchmarks": {
+    "synthetic_only": true,
+    "purpose": "候補表示と原文非改変の回帰テスト。音声データや実在患者の記録は含まない。薬剤A/Bと数値は文字保持確認用であり処方例ではない。",
+    "accuracy_claim": false,
+    "cases": [
+      {"id": "negative-symptom-statement", "text": "げんちょうはない。", "expected_ids": ["auditory-hallucination"], "protected_spans": ["はない"]},
+      {"id": "uncertain-diagnosis", "text": "とうごうしっちょうしょうの疑い。確定ではない。", "expected_ids": ["schizophrenia"], "protected_spans": ["の疑い", "確定ではない"]},
+      {"id": "dose-and-negation", "text": "合成例：薬剤A 0.5 mg、薬剤B 5 mg。げんちょうはない。増量しない。", "expected_ids": ["auditory-hallucination"], "protected_spans": ["0.5 mg", "5 mg", "はない", "増量しない"]},
+      {"id": "fullwidth-numbers", "text": "合成例：薬剤A ０．５ｍｇ、１日２回という文字列。ふみんしょうは未確認。", "expected_ids": ["insomnia"], "protected_spans": ["０．５ｍｇ", "１日２回", "未確認"]},
+      {"id": "double-negation", "text": "きょうはくかんねんを否定できない。", "expected_ids": ["obsession"], "protected_spans": ["否定できない"]},
+      {"id": "uncertain-suffix", "text": "そうきょくせいしょうがいかもしれない。", "expected_ids": ["bipolar-disorder"], "protected_spans": ["かもしれない"]},
+      {"id": "quantity-and-unit-only", "text": "合成例：薬剤A 1 mgではなく0.1 mgと記録。薬剤Bは中止していない。", "expected_ids": [], "protected_spans": ["1 mgではなく0.1 mg", "中止していない"]},
+      {"id": "already-correct-spelling", "text": "統合失調症は未確定。幻聴なし。双極性障害は否定できない。", "expected_ids": [], "protected_spans": ["未確定", "なし", "否定できない"]},
+      {"id": "not-fuzzy-matching", "text": "とうごうしちょうしょう。想像と妄想は同じではない。", "expected_ids": [], "protected_spans": ["同じではない"]},
+      {"id": "embedded-kana-not-a-term", "text": "あふみんしょうがく。もうそう。うつ。", "expected_ids": [], "protected_spans": []},
+      {"id": "multiple-contexts", "text": "にゅうみんこんなんは未確認。ちゅうとかくせいは否定。", "expected_ids": ["sleep-onset-difficulty", "nocturnal-awakening"], "protected_spans": ["未確認", "否定"]},
+      {"id": "particle-after-kanji", "text": "記録はとうごうしっちょうしょうの疑いとする合成文。", "expected_ids": ["schizophrenia"], "protected_spans": ["の疑い"]}
+    ]
+  }
+}

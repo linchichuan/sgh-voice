@@ -2,70 +2,139 @@
 
 ## Current status
 
-This branch prepares a Windows desktop client and an **unsigned, per-user installer**.
-Source tests on macOS do **not** establish Windows compatibility. No Windows installer
-has been built, installed, recorded audio, or passed target-paste acceptance in this
-task. There is no public Windows download until the checks below pass.
+The Windows preview is being changed to local-only CPU recognition with an **unsigned,
+per-user installer**. The reviewed source commit for these offline changes is
+**pending**; the previous cloud-client commit is not the new release identity.
+No Windows installer has been built or installed in this task. Real microphone,
+hotkey and target-paste acceptance remain **NOT RUN**. macOS source tests do not
+establish Windows compatibility.
 
-The original `voiceinput.spec` / `build.sh` remain the macOS build. Windows uses
-`windows_launcher.py`, the `windows_client` package, shared recording/transcription/
-configuration modules, and `windows/sghvoice.spec`. Windows does not package rumps,
-PyObjC, MLX, or the macOS dashboard. The installer does not enable paid providers or
-install an offline model. Preserve the client's actual engine availability and privacy
-policy; do not describe the Windows build as fully offline without an implemented and
-tested local recognizer.
+The main website's stable Windows download stays `pending`. A separately labelled
+**test prerelease** may be published after an actual Windows build and its limited
+automated gates pass. It must state which desktop/hardware checks remain unverified.
+There is no downloadable Windows binary until a real build succeeds.
 
-## Verified build resources (2026-10-04)
+Windows uses `windows_launcher.py`, `windows_client`, shared recording/configuration
+modules and `windows/sghvoice.spec`. The macOS `voiceinput.spec` / `build.sh` remain
+separate. Windows recognition uses faster-whisper/CTranslate2 on CPU with
+`compute_type="int8"`, without an API key or cloud fallback. LLM rewriting and
+translation are disabled in this preview; users review and edit the recognizer's
+text themselves. MLX, rumps, PyObjC and the macOS dashboard are not Windows engines.
 
-- Repository `linchichuan/sgh-voice` is public. GitHub Actions is enabled. Its registered
-  self-hosted runner count is **0**. The existing workflows are CI, Firebase Hosting,
-  and dynamic Pages deployment; none builds Windows.
-- Latest audited public main was `e096d3c977d9b9cdc98c17639ceaf6e39ebc5822`.
-  [Its CI run passed](https://github.com/linchichuan/sgh-voice/actions/runs/37163389339).
-- Current execution host is Darwin arm64. Local PyInstaller 6.19.0 is installed in
-  a Python 3.14 macOS environment, not a supported Windows build environment.
-- Parallels is installed, but `prlctl list --all --output name,status` reported its
-  `Windows 11` VM as **invalid**. It was not started, repaired, or replaced.
-- The official [`windows-2022` runner image inventory](https://github.com/actions/runner-images/blob/main/images/windows/Windows2022-Readme.md)
-  lists Python 3.12 and Inno Setup 6. A job still checks actual installed tools.
-  Image contents can change.
-- [PyInstaller requires a Windows host for Windows output](https://pyinstaller.org/en/stable/).
-  A renamed macOS file, a cross-built bootloader alone, or a macOS unit-test run is
-  not a Windows release.
+## Local model and setup
 
-## Cost and authorization boundary
+The selected model is [Systran/faster-whisper-base](https://huggingface.co/Systran/faster-whisper-base),
+a CTranslate2 conversion of OpenAI Whisper base multilingual, published under MIT.
+The pinned source revision is
+[`ebe41f70d5b6dfa9166e2c581c45c9c0cfc57b66`](https://huggingface.co/Systran/faster-whisper-base/tree/ebe41f70d5b6dfa9166e2c581c45c9c0cfc57b66).
+`resources/windows/model-base-v1.json` records sizes and SHA256 for `model.bin`,
+`config.json`, `tokenizer.json` and `vocabulary.txt`: **147,882,941 bytes, about 148 MB**
+in total. The distributed weights are FP16; CPU int8 is the application's loading
+and computation choice. Preserve the applicable license notices.
 
-[GitHub's current billing documentation](https://docs.github.com/en/billing/concepts/product-billing/github-actions)
-states that standard hosted runners are free for public repositories. Larger runners
-are always charged. Artifact storage is subject to the account's included storage
-and billing settings. This workflow uses one standard `windows-2022` job, a 25-minute
-timeout, no build matrix, no cache, and one-day artifact retention. Account-wide
-storage usage/budget was not audited; do not promise zero total billing.
+Model weights are not included in the installer. Choose a prepared local model
+folder or explicitly confirm **Download local model** after reviewing source and
+size. Startup and recording do not automatically download models. Setup downloads
+public model data from Hugging Face without an account/token; it does not upload
+recordings or transcript text. Files become active only after size and SHA256 checks.
+Cancellation or failure leaves recognition unavailable, never cloud fallback. Once
+prepared, the complete model runs locally. Network paths and incomplete model or
+tokenizer folders are refused.
 
-The workflow is **manual only** and has `contents: read`; it never creates a GitHub
-Release, changes main, or deploys the download site. No workflow was dispatched in
-this task. A new `workflow_dispatch` file must exist on the default branch before it
-can be dispatched, even when selecting another branch. See
-[GitHub's manual workflow documentation](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow).
-Do not push unreviewed application changes to main merely to enable a build.
+The target is Windows x64 with a CPU supporting at least **SSE 4.1**, as required by
+[CTranslate2's prebuilt x86-64 binaries](https://opennmt.net/CTranslate2/hardware_support.html).
+No GPU or CUDA setup is part of this path. **8 GB RAM and at least 1 GB free disk
+space are provisional engineering recommendations, not measured minimums.** The
+final app bundle, model staging and temporary audio also require space. A clean
+Windows installation must verify whether any Visual C++ runtime dependency is
+missing; report that instead of silently installing software. See
+[CTranslate2 installation requirements](https://opennmt.net/CTranslate2/installation.html).
+Latency depends on CPU, available memory and audio length. Real-time speed has
+not been measured or promised.
 
-Before activating a new builder, installing missing software, changing a workflow
-on main, or accepting any paid service/license, report the exact action and obtain
-any approval still required by the session. No new credential, VM, runner subscription,
-code-signing certificate, or security exception is part of this implementation.
+The optional local Japanese psychiatry lexicon shows sourced spelling candidates
+for manual review. It does not automatically replace transcript text, inject a
+default recognition prompt or establish clinical meaning. It is **not evidence
+of improved recognition accuracy**. Medical dictation requires human review against
+the original speech, especially exact drug names, doses, units and negations. Text
+and term candidates are transcription aids, not medical advice.
 
-[Inno Setup's license](https://jrsoftware.org/files/is/license.txt) currently permits
-commercial applications under its stated conditions; its
-[website requests commercial users to purchase a license](https://jrsoftware.org/isinfo.php).
-No purchase is made by these scripts. Preserve its notices. If policy requires a
-commercial license, settle that before building in a new environment.
+## Audited resources and cost
 
-## Build on an approved Windows environment
+The 2026-10-04 audit found public repository `linchichuan/sgh-voice`, Actions enabled
+and **0** registered self-hosted runners. Audited main was
+`e096d3c977d9b9cdc98c17639ceaf6e39ebc5822`. Existing CI/Firebase/Pages workflows do
+not build Windows. The current host is Darwin arm64; macOS PyInstaller cannot
+produce a supported Windows executable. Parallels reports its Windows 11 VM as
+**invalid**; it was not started, repaired or replaced.
 
-Prerequisites: a reviewed, clean commit; Windows x64; official Python 3.12 x64 with
-Tcl/Tk; Git; Inno Setup 6; the pinned dependencies below. An existing approved
-environment can use the commands directly. On a new environment, dependency
-installation is a separate explicit setup step; `build.ps1` never installs software.
+The [standard windows-2022 image](https://github.com/actions/runner-images/blob/main/images/windows/Windows2022-Readme.md)
+lists Python 3.12 and Inno Setup 6; preflight must check the actual image. GitHub
+states [standard public-repository runner use is free](https://docs.github.com/en/billing/concepts/product-billing/github-actions).
+Larger runners are paid. The account's Actions artifact allowance/billing summary
+is not visible with existing authorization. Do not depend on an unknown storage
+allowance or add billing access.
+
+The recommended path uses one standard Windows job, a 25-minute timeout, no matrix,
+no Actions artifact upload, no cache upload and no custom-image snapshot. GitHub
+Free includes [full-featured public repositories](https://docs.github.com/en/get-started/learning-about-github/githubs-plans#github-free-for-personal-accounts).
+[Release assets](https://docs.github.com/en/repositories/releasing-projects-on-github/about-releases#storage-and-bandwidth-quotas)
+have no total release-size or bandwidth quota; each asset must be under 2 GiB, with
+at most 1000 per release. These rules support an included Release distribution path
+with no additional runner/storage purchase. No separate Release-asset price is
+listed there. This is an assessment of published policy, not an account-bill audit
+or a guarantee about unrelated existing charges.
+
+The existing `.github/workflows/windows-build.yml` is a manual-only preparation
+with `contents: read` and no artifact/cache upload; it includes install and offline-runtime gates. It has not run and is
+not the recommended Release-only path. A new
+[workflow_dispatch file must exist on the default branch](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow)
+before dispatch. A narrowly scoped
+[push event](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#push)
+can run from its feature branch without a main merge. Review the final workflow
+before pushing; do not create an unnecessary PR that also starts the existing CI matrix.
+
+## Recommended test-prerelease delivery — NOT RUN
+
+1. Finish integration and independent review, then record the new offline source SHA.
+   Push that source to a feature branch whose workflow filters do not start a job.
+2. Using the already authorized local GitHub credential, create an unpublished draft
+   prerelease targeting that exact SHA. The source must exist remotely first. Use a
+   new tag; do not overwrite existing releases or assets.
+3. Push a reviewed, exact-branch, one-time trigger. Its single Windows job checks out
+   the fixed source SHA with persisted Git credentials disabled, runs source tests,
+   packages the app, performs frozen-runtime and local-inference checks, then tests
+   installation, installed-runtime launch and uninstallation. Failed or absent gates
+   cannot be reported as passing.
+4. Only after those gates pass, upload the named installer, SHA256/build manifest and
+   limited test reports to the existing draft. Use the job's ephemeral GITHUB_TOKEN
+   with `contents: write`; do not export the local credential, add credentials, use
+   `--clobber`, or upload Actions artifacts/caches.
+5. Download locally and verify exact bytes, source SHA and test reports. Publish only
+   as an unsigned **test prerelease**, `make_latest=false`, with physical microphone,
+   standard-user installation and interactive desktop limits visible. Keep the stable
+   website manifest pending until its separate full acceptance passes.
+
+The [Release API](https://docs.github.com/en/rest/releases/releases#create-a-release)
+requires workflow write authorization when the target changes `.github/workflows/`
+relative to main, for creation and update. GITHUB_TOKEN cannot receive that permission.
+The existing authorized local credential handles draft creation and final publication;
+the runner only uploads assets. [GitHub CLI supports pending draft tags](https://github.com/cli/cli/blob/trunk/pkg/cmd/release/shared/fetch.go),
+and [gh release upload](https://cli.github.com/manual/gh_release_upload) does not need
+to create or publish the release. No build, draft or publication has occurred yet.
+
+Any new host software, VM repair, paid runner/license, code-signing purchase or
+credential change still requires the applicable session authorization. Do not change
+main or deploy the website merely to enable a test build. Inno Setup's
+[license](https://jrsoftware.org/files/is/license.txt) and
+[commercial-use request](https://jrsoftware.org/isinfo.php) remain applicable; these
+scripts make no purchase and must preserve notices.
+
+## Build on the approved Windows environment
+
+Use a clean reviewed commit, Windows x64, Python 3.12 x64 with Tcl/Tk, Git, Inno Setup
+6 and the pinned dependencies. Dependency installation is an explicit setup step;
+`build.ps1` does not install software itself.
 
 ```powershell
 py -3.12 -m venv .venv-windows
@@ -73,96 +142,85 @@ py -3.12 -m venv .venv-windows
 python -m pip install --require-hashes --only-binary=:all: -r requirements-windows-build.txt
 .\windows\build.ps1 -PreflightOnly
 .\windows\build.ps1
+.\windows\install-test.ps1
 ```
 
-Do not disable PowerShell execution policy or OS security to make these commands
-work. Use the machine's approved execution method or resolve the policy with its owner.
+Use an approved PowerShell execution method; do not disable OS security or execution
+policy. The offline dependency closure is separately pinned to official Windows
+CPython 3.12 wheels and hashes in requirements-windows*.txt. The vendored MIT
+faster-whisper frontend reads only our PCM16 mono 16 kHz WAV recordings, with no
+PyAV/FFmpeg. See its PROVENANCE records and packaged third-party notices. The
+spec excludes cloud SDKs, GPU DLLs and media codecs, and requires the CPU/VC runtime
+DLLs. Missing compatible wheels or runtime DLLs fail visibly.
 
-`requirements-windows.txt` and `requirements-windows-build.txt` pin the applicable
-packages and SHA256 hashes from the existing `requirements-dev.lock`. Windows-only
-`pefile==2023.2.7` uses the [PyPI release hashes](https://pypi.org/project/pefile/2023.2.7/).
-The newer 2024.8.26 pefile is explicitly excluded by PyInstaller. These pins have not
-yet been installed together on Windows; the first real job must confirm resolution.
-Read-only published PyPI metadata checks confirmed all 42 pinned packages' dependency
-constraints and compatible Windows x64 CPython 3.12 wheels with matching lock hashes.
-No macOS requirements file is installed on Windows, and no unbounded dependency
-upgrade occurs. A missing compatible wheel causes a failure for review.
+`build.ps1` refuses non-Windows, non-x64/non-3.12 Python, missing tools, invalid version
+or a dirty checkout. It cleans only `build/windows` and `dist/windows`, embeds the
+exact source SHA and app version, builds an onedir bundle and unsigned Inno installer,
+and checks PE structure plus the frozen self-test. The default per-user installation
+is `%LOCALAPPDATA%\Programs\SGHVoice`, without requested elevation. Uninstall preserves
+the user's profile; this still needs actual standard-user verification.
 
-`build.ps1` refuses non-Windows, non-x64 Python, a non-3.12 interpreter, missing tools,
-an unidentifiable version, or a dirty checkout. It cleans only `build/windows` and
-`dist/windows`, embeds the exact Git source commit and `config.APP_VERSION`, builds
-an onedir bundle, executes the frozen app's offline self-test, and runs Inno Setup.
-The application installs into `%LOCALAPPDATA%\Programs\SGHVoice` without elevation.
-It provides a Start menu shortcut, optional desktop shortcut, and uninstaller.
-Uninstall does not remove the user's profile or credentials.
-
-Outputs (after a successful real Windows build):
+After a successful real build, expected outputs include:
 
 ```text
 dist/windows/SGHVoice/SGH Voice.exe
 dist/windows/SGHVoice-Windows-<version>-x64-unsigned.exe
 dist/windows/windows-build.json
 dist/windows/windows-smoke.json
+dist/windows/windows-install-test.json
+dist/windows/windows-installed-smoke.json
 ```
 
-The manifest records the source commit, version, installer size/SHA256, app SHA256,
-and frozen self-test. Its `windowsAcceptance` remains `not-run`, `published` remains
-`false`. SHA256 and valid PE headers establish artifact identity and structure,
-not safety, successful audio capture, or correct behavior in another application.
+`windows-build.json` binds installer/app hashes, size, version and source SHA.
+Its full-desktop `windowsAcceptance` remains `not-run`; a build manifest with
+`published: false` is a build-time record, not proof of current hosting state.
+Hashes and PE structure establish identity, not dictation accuracy or microphone use.
 
-## What the manual job proves
+## Automated checks and their limits
 
-The workflow installs the hashed Python dependencies, runs Windows-specific tests,
-builds the application and installer, and checks the frozen application with:
+The frozen `--self-test <report-path>` uses an isolated temporary profile, no network
+and no microphone. It checks Win32/Tk startup, audio file handling, OpenCC, local
+runtime imports and the credential backend without reading user secrets. An import
+check is not model inference. Real local inference and synthetic-silence checks are
+prepared and are **NOT RUN for the new revision**. When run, record model revision,
+sample provenance, network-disabled conditions and observed results. Silence tests
+are not a clinical accuracy benchmark or proof of correct names, doses and negations.
 
-```powershell
-& '.\dist\windows\SGHVoice\SGH Voice.exe' --self-test '.\dist\windows\windows-smoke.json'
-```
+`windows/install-test.ps1` is prepared but **NOT RUN**. It refuses an existing SGH
+Voice installation, installs into an isolated directory, verifies installed bytes,
+per-user registration and shortcuts, launches the installed self-test from outside
+the checkout, and uninstalls. It records whether the runner is elevated. A future
+pass on Windows Server 2022 does not prove Windows 11 behavior, standard-user rights,
+physical microphone capture, hotkeys, target insertion or downloaded-file security
+acceptance. Keep these limitations in the report and test-prerelease notes.
 
-The self-test uses an isolated temporary profile and no external API or microphone.
-It checks Windows architecture, required imports, native Windows bindings, Tcl/Tk
-startup, audio libraries, OpenCC, and the credential backend class without reading
-user credentials. Hardware recording, actual credential persistence, app focus,
-global hotkeys, and insertion remain separate acceptance requirements.
+## Interactive acceptance before the stable website download
 
-A successful job uploads an unsigned test artifact with one-day retention. It is
-not a permanent public download. Download the artifact before expiration and
-preserve the original installer and manifests unchanged for acceptance.
+Use an authorized Windows 11 x64 desktop and real microphone, with synthetic,
+non-sensitive samples. Record OS/build, tester/date, version, source SHA and the exact
+installer SHA256. A hosted library/inference/installer check cannot replace this.
 
-## Real Windows acceptance before opening downloads
+1. Install and launch as a standard user; verify version, settings directory and
+   shortcuts. The build is unsigned. Observe normal SmartScreen/Defender/organization
+   policy; do not disable it. If blocked, record BLOCKED and keep the stable gate closed.
+2. Explicitly prepare/select the model. Test real microphone selection, levels,
+   repeated recording, permission denial, device removal and recovery with Chinese,
+   Japanese and English samples. Disconnect networking after setup and repeat.
+3. Check local recognition, manual editing, language/settings persistence, cancellation,
+   incomplete model files and errors. Verify no cloud fallback/API-key request/LLM
+   rewrite. Check optional lexicon candidates leave the transcript unchanged. Manually
+   inspect synthetic drug names, doses, units and negations; do not claim clinical validation.
+4. Test hotkeys with Notepad and browser inputs, IME/Unicode, exactly-once insertion,
+   closed targets and focus changes during recording. An unintended foreground app
+   must not receive text. Respect normal/elevated application boundaries.
+5. Test explicit Copy, locked clipboard, user clipboard changes and failed insertion.
+   Text must remain recoverable; do not overwrite unrelated changes or retry partial
+   insertion automatically. Clipboard exclusions do not control every third-party tool.
+6. Restart, repeat, uninstall and reinstall. Verify application/shortcut removal and
+   expected profile preservation.
 
-Use an authorized Windows 11 x64 session with a working microphone and an interactive
-desktop. A hosted build runner's library self-test does not replace this session.
-Record the OS/build, tester/date, app version, exact source commit, installer SHA256,
-observed results, and any failure. Use synthetic, non-sensitive dictation only.
-
-1. Install from the exact `.exe` as a standard user. Confirm Start menu launch, no
-   admin requirement, correct version and configuration directory. Observe normal
-   Windows security behavior. The build is unsigned; do not disable SmartScreen,
-   Defender, or organizational policy. If the OS blocks it, record `BLOCKED` and
-   leave public download disabled until there is an approved resolution.
-2. Select the real microphone and record short synthetic Chinese, Japanese, and
-   English samples; verify sound level, start/stop, repeated recording, permissions
-   denied, missing device, and recovery. Verify only the offered/available recognizer
-   modes; provider calls require approved existing credentials and usage scope.
-3. Verify recognition and cleanup choices, language selection, saved settings across
-   restart, and error handling. Confirm privacy mode never silently falls back to
-   a cloud provider. If the available Windows recognizer cannot run privately, show
-   that limitation and refuse the request rather than upload audio.
-4. Test the configured global hotkey with Notepad and a browser input. Confirm the
-   original intended input receives text once, Unicode remains correct, and changing
-   foreground app during recording does not paste into a different target. Test
-   normal versus elevated target applications; use clipboard fallback where Windows
-   privilege boundaries prevent injection rather than escalating the app.
-5. Test clipboard fallback, user changes to clipboard while processing, no selection,
-   closed targets, locked clipboard, and focus refusal. Confirm text remains
-   recoverable without overwriting unrelated clipboard changes or pasting elsewhere.
-6. Restart, repeat, and uninstall. Confirm removal of application and shortcuts while
-   preserving the user's profile; reinstall and verify expected settings behavior.
-
-Save the evidence to `docs/windows-acceptance-<version>-<date>.md`. The publication
-gate requires the exact source commit and installer SHA256 plus these explicit
-results (do not prefill `PASS` before observing them):
+Save `docs/windows-acceptance-<version>-<date>.md` with the exact source SHA and
+installer SHA256. Record these only after observing them:
 
 ```text
 - installation: PASS
@@ -174,33 +232,16 @@ results (do not prefill `PASS` before observing them):
 - uninstall: PASS
 ```
 
-After independent review and real acceptance, the public
-`sgh-voice-web/downloads/windows-release.json` may be updated with matching installer
-metadata, passed build evidence, and a passed acceptance record bound to that SHA256.
-Place the original installer at the website's own `/downloads/<fileName>` path.
-Run `python -m pytest tests/test_windows_download.py -q -o addopts=` before staging
-or publishing; it verifies available-state metadata against the actual local installer
-and acceptance record. Leave the public manifest `pending` until exact-byte acceptance.
-The validator supports a final read-only check:
+After review and acceptance, update `sgh-voice-web/downloads/windows-release.json`
+with matching metadata and the hash-bound record, placing the unchanged installer at
+the website's own `/downloads/<fileName>`. Run
+`python -m pytest tests/test_windows_download.py -q -o addopts=` before staging or
+publishing. `scripts/verify_windows_release.py --public-manifest <path>` can validate
+the exact installer/app/smoke/source identity with its other required arguments; it
+never publishes or changes the public manifest. Provide a download URL only after
+verifying publication. A test prerelease does not satisfy this stable-download gate.
 
-```powershell
-python scripts/verify_windows_release.py `
-  --installer 'dist/windows/SGHVoice-Windows-<version>-x64-unsigned.exe' `
-  --app 'dist/windows/SGHVoice/SGH Voice.exe' `
-  --smoke-report 'dist/windows/windows-smoke.json' `
-  --source-commit '<40-character-commit>' `
-  --public-manifest 'sgh-voice-web/downloads/windows-release.json'
-```
-
-This validator never writes the public manifest, uploads a binary, or deploys the
-site. Review the exact destination and artifact, then use the existing approved
-publication path. Provide a real downloadable URL only after verified publication.
-
-## Remaining blocker
-
-An approved, working Windows builder and an interactive Windows acceptance session
-are still required. Options are an explicitly authorized single standard hosted
-build plus a separate real Windows tester, or an approved existing Windows machine.
-Repairing the invalid VM, adding a new VM, or buying infrastructure is not automatic.
-Until those steps succeed, report **source prepared / build NOT RUN / Windows
-acceptance NOT RUN / publication NOT DONE**.
+Current outcome: **offline source IN PROGRESS / Windows build NOT RUN / interactive
+Windows acceptance NOT RUN / publication NOT DONE**. The reviewed Release-draft route
+can produce a test installer without requiring the user to supply a Windows machine;
+full stable-download acceptance remains separate work.

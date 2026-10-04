@@ -61,7 +61,8 @@ def artifacts(tmp_path):
     smoke.write_text(json.dumps({
         "ok": True, "platform": "win32", "architecture": "AMD64", "version": version,
         "checks": {key: True for key in ("windows_native", "tk_ui", "wav_roundtrip", "credential_backend", "shared_core")},
-        "errors": [], "microphone_tested": False, "cloud_tested": False, "input_delivery_tested": False,
+        "errors": [], "microphone_tested": False, "cloud_tested": False, "input_delivery_tested": False, "recognition_mode": "local-only",
+        "model_included": False, "local_inference_tested": False,
     }), encoding="utf-8")
     return installer, app, smoke, commit
 
@@ -129,7 +130,9 @@ def test_no_automatic_windows_workflow_or_publication():
     assert "  pull_request:" not in workflow
     assert "runs-on: windows-2022" in workflow
     assert "timeout-minutes: 25" in workflow
-    assert "retention-days: 1" in workflow
+    assert "upload-artifact" not in workflow
+    assert "windows/install-test.ps1" in workflow
+    assert "windows/offline-test.ps1" in workflow
     assert "contents: write" not in workflow
     assert "gh release" not in workflow
 

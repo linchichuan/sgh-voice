@@ -81,6 +81,10 @@ def verify_smoke(report: dict, version: str) -> None:
     required = {"windows_native", "tk_ui", "wav_roundtrip", "credential_backend", "shared_core"}
     if not required.issubset(checks):
         raise ValueError("Required frozen application checks are missing")
+    if report.get("recognition_mode") != "local-only" or report.get("model_included") is not False:
+        raise ValueError("Expected local-only recognition with explicit separate model setup")
+    if report.get("local_inference_tested") is not False:
+        raise ValueError("Basic packaging smoke must not claim model inference; use the separate offline test")
     for flag in ("microphone_tested", "cloud_tested", "input_delivery_tested"):
         if report.get(flag) is not False:
             raise ValueError("Build self-test must explicitly exclude interactive / cloud acceptance")

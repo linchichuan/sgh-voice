@@ -52,9 +52,10 @@ def harness(tmp_path):
             return SimpleNamespace(success=False, reason="focus_changed")
 
     controller = Controller(
-        {"windows_cloud_consent": True, "groq_api_key": "synthetic-test-key"},
+        {"windows_model_dir": str(tmp_path)},
         lambda *event: events.append(event), Native(), recorder_factory=Recorder,
         transcriber_factory=Transcriber, memory_factory=lambda *args: object(),
+        model_validator=lambda path: path,
     )
     yield SimpleNamespace(controller=controller, events=events, calls=calls,
                           wav=wav, started=started, finish_gate=finish_gate)
@@ -63,12 +64,13 @@ def harness(tmp_path):
     wait_for(lambda: controller.state == "closed")
 
 
-def test_no_consent_does_not_start_microphone(harness):
+def test_missing_model_does_not_start_microphone(harness):
     c = harness.controller
-    c.apply_config({"groq_api_key": "synthetic-test-key"})
+    c._model_validator = None
+    c.apply_config({"windows_model_dir": ""})
     assert not c.toggle()
     assert not harness.started.is_set()
-    assert ("error", "cloud_consent_required") in harness.events
+    assert ("error", "invalid_model_path") in harness.events
 
 
 def test_single_flight_result_and_cleanup(harness):
@@ -84,7 +86,7 @@ def test_single_flight_result_and_cleanup(harness):
     assert next(e[1] for e in harness.events if e[0] == "result")["insertion"]["reason"] == "preview_only"
 
 
-def test_cancellation_discards_recording_without_cloud(harness):
+def test_cancellation_discards_recording_without_inference(harness):
     c = harness.controller
     c.toggle()
     assert harness.started.wait(1)
@@ -95,7 +97,7 @@ def test_cancellation_discards_recording_without_cloud(harness):
     assert not [e for e in harness.events if e[0] == "result"]
 
 
-def test_cancellation_while_cloud_inflight_never_inserts(harness):
+def test_cancellation_while_inference_inflight_never_inserts(harness):
     c = harness.controller
     harness.finish_gate.clear()
     c.toggle()
@@ -123,15 +125,16 @@ def test_changed_target_preserves_result_for_manual_copy(harness):
     assert len(harness.calls) == 2
 
 
-def test_runtime_routes_only_selected_provider():
+def test_runtime_cannot_enable_cloud_even_with_migrated_settings():
     c = runtime_config({"windows_provider": "openai", "openai_api_key": "test-openai",
                         "groq_api_key": "test-groq", "anthropic_api_key": "test-other",
+                        "windows_cloud_consent": True, "windows_polish": True,
                         "enable_hybrid_mode": True, "allow_cross_provider_llm_fallback": True,
                         "enable_fewshot": True, "enable_app_awareness": True})
-    assert c["stt_engine"] == "cloud-only"
-    assert c["llm_engine"] == "openai"
-    assert c["openai_api_key"] == "test-openai"
-    assert not c["groq_api_key"] and not c["anthropic_api_key"]
+    assert c["stt_engine"] == "faster-whisper-local"
+    assert c["llm_engine"] == "disabled"
+    assert not c["openai_api_key"] and not c["groq_api_key"] and not c["anthropic_api_key"]
+    assert not c["windows_cloud_consent"] and not c["enable_claude_polish"]
     assert not c["allow_cross_provider_llm_fallback"]
     assert not c["enable_hybrid_mode"] and not c["enable_fewshot"]
     assert not c["enable_app_awareness"]
@@ -195,27 +198,31 @@ def test_close_waits_for_processing_cleanup(harness):
     assert not [event for event in harness.events if event[0] == "result"]
 
 
-def test_shared_pipeline_reuses_cleanup_without_history_or_secondary_provider(
-        harness, isolated_data_dir, monkeypatch):
-    import transcriber
-    import config
-    from windows_client.controller import _new_memory
-    seen = []
-    monkeypatch.setattr(transcriber.Transcriber, "_groq_stt",
-                        lambda self, *args, **kwargs: "這是一段測試語音，Windows 可以辨識。")
-    monkeypatch.setattr(transcriber.Transcriber, "_whisper_api_fallback",
-                        lambda *args, **kwargs: pytest.fail("secondary provider invoked"))
-    monkeypatch.setattr(transcriber.Transcriber, "_groq_llm_process",
-                        lambda self, text, *args, **kwargs: seen.append(text) or text)
+def test_local_model_is_reused_between_recordings(harness):
     c = harness.controller
-    c.apply_config({**config.DEFAULT_CONFIG, **c.config, "windows_polish": True,
-                    "openai_api_key": "secondary-key-must-not-be-used"})
-    c._transcriber_factory = transcriber.Transcriber
-    c._memory_factory = _new_memory
-    c.toggle()
-    assert harness.started.wait(1)
-    c.toggle()
-    wait_for(lambda: c.state == "idle")
-    assert "Windows" in c.last_text
-    assert not (isolated_data_dir / "history.json").exists()
-    assert not harness.wav.exists()
+    for _ in range(2):
+        c.toggle()
+        wait_for(lambda: c._capture_open)
+        c.toggle()
+        wait_for(lambda: c.state == "idle")
+        if _ == 0:
+            first = c._transcriber
+    assert c._transcriber is first
+    assert len(harness.calls) == 2
+
+
+def test_model_setup_cancel_drains_before_close(harness, monkeypatch):
+    import windows_client.models as models
+    entered = threading.Event()
+    def prepare(**kwargs):
+        entered.set()
+        wait_for(kwargs["should_cancel"])
+        raise models.ModelDownloadError("model_download_cancelled")
+    monkeypatch.setattr(models, "prepare_model", prepare)
+    c = harness.controller
+    assert c.prepare_model()
+    assert entered.wait(1)
+    assert not c.toggle()
+    c.close()
+    wait_for(lambda: c.state == "closed")
+    assert not [event for event in harness.events if event[0] == "model_ready"]

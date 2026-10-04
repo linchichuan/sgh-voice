@@ -1,74 +1,53 @@
-# Windows x64 / Python 3.12 build/test pins copied from requirements-dev.lock.
+# Windows x64 / CPython 3.12 build tools; official PyPI wheel hashes.
+# Tool pins are separate from the runtime and are not copied into the app.
 -r requirements-windows.txt
 
-altgraph==0.17.5\
-    --hash=sha256:c87b395dd12fabde9c99573a9749d67da8d29ef9de0125c7f536699b4a9bc9e7 \
+# Wheel: altgraph-0.17.5-py2.py3-none-any.whl
+# https://pypi.org/pypi/altgraph/0.17.5/json
+altgraph==0.17.5 \
     --hash=sha256:f3a22400bce1b0c701683820ac4f3b159cd301acab067c51c653e06961600597
 
+# Wheel: iniconfig-2.3.0-py3-none-any.whl
+# https://pypi.org/pypi/iniconfig/2.3.0/json
 iniconfig==2.3.0 \
-    --hash=sha256:c76315c77db068650d49c5b56314774a7804df16fee4402c1f19d6d15d8c4730 \
     --hash=sha256:f631c04d2c48c52b84d0d0549c99ff3859c98df65b3101406327ecc7d53fbf12
 
-packaging==26.3 \
-    --hash=sha256:94edc256424af38762eb31306eed28beb9f0efc50a8837492c9d6fd6004aed79 \
-    --hash=sha256:d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c
+# Wheel: pefile-2024.8.26-py3-none-any.whl
+# https://pypi.org/pypi/pefile/2024.8.26/json
+pefile==2024.8.26 \
+    --hash=sha256:76f8b485dcd3b1bb8166f1128d395fa3d87af26360c2358fb75b80019b957c6f
 
+# Wheel: pluggy-1.6.0-py3-none-any.whl
+# https://pypi.org/pypi/pluggy/1.6.0/json
 pluggy==1.6.0 \
-    --hash=sha256:7dcc130b76258d33b90f61b658791dede3486c3e6bfb003ee5c9bfb396dd22f3 \
     --hash=sha256:e920276dd6813095e9377c0bc5566d94c932c33b27a3e3945d8389c374dd4746
 
+# Wheel: pygments-2.21.0-py3-none-any.whl
+# https://pypi.org/pypi/pygments/2.21.0/json
 pygments==2.21.0 \
-    --hash=sha256:2363c69b61c4a97c838da3b130dcd6468f4848992b21a82f2a63ec34377137d9 \
-    --hash=sha256:610ca751c9bc2492b38eb9a38a7fbc93edbbb2d7182edaf34e66ae493dee5c8c
+    --hash=sha256:2363c69b61c4a97c838da3b130dcd6468f4848992b21a82f2a63ec34377137d9
 
-pyinstaller==6.19.0\
-    --hash=sha256:1ec54ef967996ca61dacba676227e2b23219878ccce5ee9d6f3aada7b8ed8abf \
-    --hash=sha256:3c5c251054fe4cfaa04c34a363dcfbf811545438cb7198304cd444756bc2edd2 \
-    --hash=sha256:4190e76b74f0c4b5c5f11ac360928cd2e36ec8e3194d437bf6b8648c7bc0c134 \
-    --hash=sha256:481a909c8e60c8692fc60fcb1344d984b44b943f8bc9682f2fcdae305ad297e6 \
-    --hash=sha256:4ab2bb52e58448e14ddf9450601bdedd66800465043501c1d8f1cab87b60b122 \
-    --hash=sha256:8bd68abd812d8a6ba33b9f1810e91fee0f325969733721b78151f0065319ca11 \
-    --hash=sha256:a0fc5f6b3c55aa54353f0c74ffa59b1115433c1850c6f655d62b461a2ed6cbbe \
-    --hash=sha256:b5bb6536c6560330d364d91522250f254b107cf69129d9cbcd0e6727c570be33 \
-    --hash=sha256:c2d5a539b0bfe6159d5522c8c70e1c0e487f22c2badae0f97d45246223b798ea \
-    --hash=sha256:da6d5c6391ccefe73554b9fa29b86001c8e378e0f20c2a4004f836ba537eff63 \
-    --hash=sha256:e649ba6bd1b0b89b210ad92adb5fbdc8a42dd2c5ca4f72ef3a0bfec83a424b83 \
-    --hash=sha256:ec73aeb8bd9b7f2f1240d328a4542e90b3c6e6fbc106014778431c616592a865
+# Wheel: pyinstaller-6.22.3-py3-none-win_amd64.whl
+# https://pypi.org/pypi/pyinstaller/6.22.3/json
+pyinstaller==6.22.3 \
+    --hash=sha256:500bd58c7bf7e584a8435adccbd763a0b918d5c12b08d74ff50fd79b2915458b
 
-pyinstaller-hooks-contrib==2026.6\
-    --hash=sha256:bef5002c32f4f50bd55b005da12cff64eca8783e7eaf86a06a62410164bab725 \
-    --hash=sha256:fd13b8ac126b35361175edacd41a0d97080b75dd5f4b594ecefefff969509dd3
+# Wheel: pyinstaller_hooks_contrib-2026.8-py3-none-any.whl
+# https://pypi.org/pypi/pyinstaller-hooks-contrib/2026.8/json
+pyinstaller-hooks-contrib==2026.8 \
+    --hash=sha256:6d21d65323ea4467753afc21f52d7d0e69416ae8101dd88269bf273ad48db084
 
-pytest==9.0.3 \
-    --hash=sha256:2c5efc453d45394fdd706ade797c0a81091eccd1d6e4bccfcd476e2b8e0ab5d9 \
-    --hash=sha256:b86ada508af81d19edeb213c681b1d48246c1a91d304c6c81a427674c17eb91c
+# Wheel: pytest-9.1.1-py3-none-any.whl
+# https://pypi.org/pypi/pytest/9.1.1/json
+pytest==9.1.1 \
+    --hash=sha256:37a86b45efb9a47a61a36449063e8e18d0cab3161329fc099eb21783169c4f0c
 
-ruff==0.15.2 \
-    --hash=sha256:120691a6fdae2f16d65435648160f5b81a9625288f75544dc40637436b5d3c0d \
-    --hash=sha256:14b965afee0969e68bb871eba625343b8673375f457af4abe98553e8bbb98342 \
-    --hash=sha256:1b9164f57fc36058e9a6806eb92af185b0697c9fe4c7c52caa431c6554521e5c \
-    --hash=sha256:2dcc987551952d73cbf5c88d9fdee815618d497e4df86cd4c4824cc59d5dd75f \
-    --hash=sha256:42a47fd785cbe8c01b9ff45031af875d101b040ad8f4de7bbb716487c74c9a77 \
-    --hash=sha256:72ecc64f46f7019e2bcc3cdc05d4a7da958b629a5ab7033195e11a438403d956 \
-    --hash=sha256:80d24fcae24d42659db7e335b9e1531697a7102c19185b8dc4a028b952865fd8 \
-    --hash=sha256:8dcf243b15b561c655c1ef2f2b0050e5d50db37fe90115507f6ff37d865dc8b4 \
-    --hash=sha256:a89056d831256099658b6bba4037ac6dd06f49d194199215befe2bb10457ea5e \
-    --hash=sha256:a9fb47b6d9764677f8c0a193c0943ce9a05d6763523f132325af8a858eadc2b9 \
-    --hash=sha256:b7a672c82b5f9887576087d97be5ce439f04bbaf548ee987b92d3a7dede41d3a \
-    --hash=sha256:cabddc5822acdc8f7b5527b36ceac55cc51eec7b1946e60181de8fe83ca8876e \
-    --hash=sha256:cbe9f49354866e575b4c6943856989f966421870e85cd2ac94dccb0a9dcb2fea \
-    --hash=sha256:d20014e3dfa400f3ff84830dfb5755ece2de45ab62ecea4af6b7262d0fb4f7c5 \
-    --hash=sha256:dab6941c862c05739774677c6273166d2510d254dac0695c0e3f5efa1b5585de \
-    --hash=sha256:e36dee3a64be0ebd23c86ffa3aa3fd3ac9a712ff295e192243f814a830b6bd87 \
-    --hash=sha256:f376990f9d0d6442ea9014b19621d8f2aaf2b8e39fdbfc79220b7f0c596c9b80 \
-    --hash=sha256:fd5ff9e5f519a7e1bd99cbe8daa324010a74f5e2ebc97c6242c08f26f3714f6f
+# Wheel: ruff-0.16.10-py3-none-win_amd64.whl
+# https://pypi.org/pypi/ruff/0.16.10/json
+ruff==0.16.10 \
+    --hash=sha256:97f2015c92aa97105b0eab19eb5d224884399281cfc5da86a92db4ab5e7fb2ca
 
-setuptools==84.0.0\
-    --hash=sha256:51a52592b3b99e102b609654876bd65f19f999935166d1352678931132b0c670 \
-    --hash=sha256:f4695c21257f0d9b537ec2692c941d02ee143b7cc1276941349a546573b2ef73
-
-# Windows-only PyInstaller dependency; published PyPI SHA256 values.
-# 2024.8.26 is excluded by PyInstaller due to a performance regression.
-pefile==2023.2.7 \
-    --hash=sha256:da185cd2af68c08a6cd4481f7325ed600a88f6a813bad9dea07ab3ef73d8d8d6 \
-    --hash=sha256:82e6114004b3d6911c77c3953e3838654b04511b8b66e8583db70c65998017dc
+# Wheel: setuptools-84.0.0-py3-none-any.whl
+# https://pypi.org/pypi/setuptools/84.0.0/json
+setuptools==84.0.0 \
+    --hash=sha256:51a52592b3b99e102b609654876bd65f19f999935166d1352678931132b0c670

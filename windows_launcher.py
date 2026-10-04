@@ -32,10 +32,20 @@ def self_test(report_path):
 
         def gui_check():
             import tkinter
+            from windows_client.controller import Controller, WINDOWS_DEFAULTS
+            from windows_client.hotkeys import GlobalHotkeys, Hotkey
+            from windows_client.models import MODEL_DOWNLOAD_INFO
+            from windows_client.native import WindowsNative
+            from windows_client.ui import WindowsApp
             root = tkinter.Tk()
             root.withdraw()
+            app = WindowsApp(root, {**WINDOWS_DEFAULTS, "ui_language": "en"},
+                             controller_factory=Controller, native=WindowsNative(),
+                             hotkeys_factory=GlobalHotkeys, save_config=lambda settings: None,
+                             validate_hotkey=Hotkey.parse, model_info=MODEL_DOWNLOAD_INFO)
             root.update_idletasks()
-            root.destroy()
+            app.close()
+            root.mainloop()
 
         def audio_check():
             import numpy as np
@@ -60,10 +70,18 @@ def self_test(report_path):
         def core_check():
             import config
             from memory import Memory
-            from transcriber import Transcriber
+            from windows_client.local_stt import enforce_offline_environment
+            enforce_offline_environment()
+            import ctranslate2
+            import onnxruntime
+            onnxruntime.disable_telemetry_events()
+            from windows_client._vendor import faster_whisper
             from opencc import OpenCC
             assert OpenCC("s2twp").convert("语音") == "語音"
-            Transcriber(config.DEFAULT_CONFIG.copy(), Memory())
+            assert "int8" in ctranslate2.get_supported_compute_types("cpu")
+            assert faster_whisper.WhisperModel
+            Memory()
+            assert config.DATA_DIR == profile or str(config.DATA_DIR) == profile
 
         check("windows_native", native_check)
         check("tk_ui", gui_check)
@@ -76,9 +94,51 @@ def self_test(report_path):
             "architecture": platform.machine(), "version": APP_VERSION,
             "checks": checks, "errors": errors,
             "microphone_tested": False, "cloud_tested": False,
-            "input_delivery_tested": False,
+            "input_delivery_tested": False, "local_inference_tested": False,
+            "recognition_mode": "local-only", "model_included": False,
         }
     Path(report_path).write_text(json.dumps(report, indent=2), encoding="utf-8")
+    return 0 if report["ok"] else 1
+
+
+def offline_self_test(model_directory, report_path):
+    """Exercise the bundled CPU decoder on synthetic silence with Python IO denied.
+
+    This is a runtime/network-guard check, never a speech accuracy benchmark.
+    """
+    import socket
+    import time
+    attempts = []
+    original_connect, original_dns = socket.socket.connect, socket.getaddrinfo
+    def denied(*args, **kwargs):
+        attempts.append("blocked")
+        raise OSError("Network is disabled during the offline runtime test")
+    started = time.monotonic()
+    report = {"ok": False, "kind": "synthetic-silence-offline-runtime",
+              "platform": sys.platform, "architecture": platform.machine(),
+              "microphone_tested": False, "accuracy_tested": False,
+              "input_delivery_tested": False, "python_network_guard": True,
+              "python_network_attempts": 0}
+    try:
+        socket.socket.connect, socket.getaddrinfo = denied, denied
+        from windows_client.local_stt import LocalTranscriber
+        import numpy as np
+        import soundfile
+        with tempfile.TemporaryDirectory(prefix="sghvoice-offline-") as folder:
+            path = Path(folder) / "synthetic-silence.wav"
+            soundfile.write(path, np.zeros(16000, dtype=np.float32), 16000, subtype="PCM_16")
+            decoder = LocalTranscriber({"windows_model_dir": model_directory, "windows_language": "ja"})
+            result = decoder.transcribe({"path": str(path)}, 1.0)
+            report["local_inference_tested"] = True
+            report["engine"] = result["engine"]
+            report["ok"] = (result["raw"] == result["final"] and not attempts)
+    except Exception as exc:
+        report["error"] = type(exc).__name__
+    finally:
+        socket.socket.connect, socket.getaddrinfo = original_connect, original_dns
+        report["python_network_attempts"] = len(attempts)
+        report["elapsed_seconds"] = round(time.monotonic() - started, 3)
+        Path(report_path).write_text(json.dumps(report, indent=2), encoding="utf-8")
     return 0 if report["ok"] else 1
 
 
@@ -89,9 +149,12 @@ def main(argv=None):
             setattr(sys, stream, open(os.devnull, "w", encoding="utf-8"))
     parser = argparse.ArgumentParser(description="SGH Voice Windows preview")
     parser.add_argument("--self-test", metavar="REPORT_JSON")
+    parser.add_argument("--offline-self-test", nargs=2, metavar=("MODEL_DIR", "REPORT_JSON"))
     args = parser.parse_args(argv)
     if args.self_test:
         return self_test(args.self_test)
+    if args.offline_self_test:
+        return offline_self_test(*args.offline_self_test)
     if sys.platform != "win32":
         print("SGH Voice Windows requires Windows x64.", file=sys.stderr)
         return 2

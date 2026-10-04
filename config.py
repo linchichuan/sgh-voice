@@ -811,6 +811,9 @@ _CONFIG_NUMERIC_BOUNDS = {
 
 
 _WINDOWS_CONFIG_TYPES = {
+    "windows_model_dir": str,
+    "windows_language": str,
+    "windows_lexicon_enabled": bool,
     "windows_cloud_consent": bool,
     "windows_provider": str,
     "windows_polish": bool,
