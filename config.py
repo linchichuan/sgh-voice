@@ -1,6 +1,7 @@
 """
 config.py — 設定與資料持久化層
-所有本地資料都存在 ~/.voice-input/（可能是 symlink 指向外接 SSD）
+macOS 資料使用 ~/.voice-input/；Windows 使用 %LOCALAPPDATA%/SGHVoice。
+SGHVOICE_DATA_DIR 可指定獨立設定資料夾（例如安裝自我測試）。
 """
 import json
 import math
@@ -22,6 +23,21 @@ from hotkey_config import (
     RECOMMENDED_RECORD_HOTKEY,
     RECOMMENDED_TRANSLATION_HOTKEY,
 )
+
+_IS_WINDOWS = platform.system() == "Windows"
+
+
+def _default_data_dir():
+    """Use the current user's native application-data location."""
+    override = os.environ.get("SGHVOICE_DATA_DIR")
+    if override:
+        return os.path.abspath(os.path.expanduser(override))
+    if _IS_WINDOWS:
+        local_app_data = os.environ.get("LOCALAPPDATA") or os.path.join(
+            os.path.expanduser("~"), "AppData", "Local"
+        )
+        return os.path.join(local_app_data, "SGHVoice")
+    return os.path.expanduser("~/.voice-input")
 
 # App 發行版本號的單一來源。CHANGELOG.md 是人類可讀的版本紀錄（本輪任務禁止
 # 改動），這裡是程式碼唯一該讀取版本號的地方——app.py（CLI banner）與
@@ -182,6 +198,11 @@ def _ensure_data_dir():
     - ~/.voice-input 是真實目錄 → 不動（尚未遷移，由使用者手動跑 migration）
     - ~/.voice-input 不存在 → 建立 symlink 指向當前可用的 target
     """
+    # Windows standard-user installs must not require symlink privileges or
+    # inherit this machine's removable-volume layout.
+    if _IS_WINDOWS or os.environ.get("SGHVOICE_DATA_DIR"):
+        os.makedirs(_default_data_dir(), exist_ok=True)
+        return
     home = os.path.expanduser("~")
     link = os.path.join(home, ".voice-input")
     ssd_target = "/Volumes/Satechi_SSD/voice-input/app-data"
@@ -520,14 +541,15 @@ def detect_app_style(config):
     except Exception:
         return {"bundle_id": "", "app_name": "", "style": "default", "prompt": ""}
 
-DATA_DIR = os.path.expanduser("~/.voice-input")
+DATA_DIR = _default_data_dir()
 CONFIG_FILE = os.path.join(DATA_DIR, "config.json")
 
 # ─── macOS Keychain integration（v2.4.0 引入）─────────────────
 # API key 從 config.json 明文（chmod 600）搬到 macOS Keychain（系統加密）。
 # 行為：
 #   - macOS + keyring 安裝 → 走 Keychain（service=com.shingihou.voice）
-#   - 其他平台 / keyring 失敗 → 自動 fallback 回 config.json + chmod 600（不影響使用）
+#   - Windows 僅接受 Credential Manager；失敗時拒絕寫入 key，不存明文
+#   - 其他平台 / keyring 失敗 → 保留既有 config.json + chmod 600 fallback
 #   - load_config() 自動把 Keychain 值塞回 config dict（key 名不變），下游無感
 #   - save_config() 把 Keychain-managed key 寫進 Keychain 後從 JSON 剝離
 KEYCHAIN_SERVICE = "com.shingihou.voice"
@@ -543,7 +565,7 @@ _keychain_warned = False
 
 
 def _keychain_available():
-    """檢查 keyring 套件能否使用。失敗就回 False，呼叫端自動 fallback 到 JSON。"""
+    """Windows credentials require the native Credential Manager backend."""
     global _keychain_warned
     try:
         import keyring  # noqa: F401
@@ -551,13 +573,21 @@ def _keychain_available():
         backend = keyring.get_keyring()
         # 排除明顯不安全或 fail 的 backend（如 fail.Keyring / null.Keyring）
         mod = type(backend).__module__ or ""
+        if _IS_WINDOWS:
+            return (
+                mod == "keyring.backends.Windows"
+                and type(backend).__name__ == "WinVaultKeyring"
+            )
         if "fail" in mod or "null" in mod:
             return False
         return True
     except Exception:
         if not _keychain_warned:
             _keychain_warned = True
-            print(" ⚠️  keyring 不可用，API key 將 fallback 到 config.json（chmod 600）")
+            if _IS_WINDOWS:
+                print(" ⚠️ Windows Credential Manager 不可用；API key 不會存入明文檔案")
+            else:
+                print(" ⚠️  keyring 不可用，API key 將 fallback 到 config.json（chmod 600）")
         return False
 
 
@@ -780,11 +810,26 @@ _CONFIG_NUMERIC_BOUNDS = {
 }
 
 
+_WINDOWS_CONFIG_TYPES = {
+    "windows_cloud_consent": bool,
+    "windows_provider": str,
+    "windows_polish": bool,
+    "windows_save_history": bool,
+    "windows_auto_insert": bool,
+    "windows_toggle_hotkey": str,
+    "windows_cancel_hotkey": str,
+}
+
+
 def validate_config_update(data):
     """Validate known config values before they reach runtime threads."""
     if not isinstance(data, dict):
         raise ConfigValidationError("config", "config update must be an object")
     for field, value in data.items():
+        if field in _WINDOWS_CONFIG_TYPES:
+            if type(value) is not _WINDOWS_CONFIG_TYPES[field]:
+                raise ConfigValidationError(field, f"{field} has invalid type")
+            continue
         if field not in DEFAULT_CONFIG:
             raise ConfigValidationError(field, "unknown config field")
         default = DEFAULT_CONFIG[field]
@@ -836,6 +881,10 @@ def _sanitize_saved_config(saved):
 
 def _ensure_dir():
     os.makedirs(DATA_DIR, exist_ok=True)
+    if _IS_WINDOWS:
+        # LocalAppData inherits the user's ACL. POSIX mode bits do not express
+        # Windows access controls, and chmod cannot provide the same guarantee.
+        return
     # 確保資料目錄權限為 700（僅本人可存取）。若目錄已經安全，
     # 不要每次啟動都對外接磁碟重複 chmod：macOS 可能因可移除磁碟
     # 權限檢查讓 GUI app 的 metadata write 長時間阻塞。
@@ -889,6 +938,25 @@ def _migrate_to_keychain(saved):
     冪等：跑兩次第二次沒事做。
     回傳 (migrated_dict, did_migrate: bool)。
     前提：呼叫端已確認 _keychain_available() 為 True。"""
+    if _IS_WINDOWS:
+        # A config copied from another platform may carry a current schema and
+        # plaintext credentials. Move them before admitting the config at all.
+        migrated = False
+        for key_name in KEYCHAIN_KEYS:
+            value = saved.get(key_name, "")
+            if not value or "..." in str(value):
+                continue
+            if not _keychain_available() or not _keychain_set(key_name, value):
+                raise ConfigSaveError(
+                    f"Windows Credential Manager could not store {key_name}; "
+                    "plaintext persistence is disabled"
+                )
+            saved[key_name] = ""
+            migrated = True
+        if saved.get("config_version", 1) < 3:
+            saved["config_version"] = 3
+            migrated = True
+        return saved, migrated
     if saved.get("config_version", 1) >= 3:
         return saved, False
     moved = []
@@ -1035,7 +1103,7 @@ def load_config():
 
         # v2 → v3：若 keyring 可用，把明文 key 搬進 Keychain（idempotent）
         migrated_kc = False
-        if _keychain_available():
+        if _IS_WINDOWS or _keychain_available():
             saved, migrated_kc = _migrate_to_keychain(saved)
 
         # 熱鍵本身可在 v1/v2 先安全遷移；主 schema 只有在 Keychain migration
@@ -1065,6 +1133,8 @@ def load_config():
                     f"hotkey v{saved.get('hotkey_config_version', 0)})"
                 )
             except ConfigSaveError:
+                if _IS_WINDOWS:
+                    raise
                 pass
         return merged
     return {**DEFAULT_CONFIG, "config_version": CONFIG_VERSION}
@@ -1077,6 +1147,13 @@ def _strip_keychain_keys_for_json(config):
     2. 個別 key 不在 Keychain（_keychain_get 回空）→ 保留 JSON 明文（migration 失敗時的救命路徑）。
     3. key 在 Keychain → 從 JSON dict 清空。
     這樣即使 Keychain 寫入失敗，使用者下次啟動仍能用 JSON 中的 fallback key。"""
+    if _IS_WINDOWS:
+        # Never rely on a subsequent vault read to decide whether a credential
+        # may be serialized. An unavailable vault must not create plaintext.
+        return {
+            **config,
+            **{key_name: "" for key_name in KEYCHAIN_KEYS},
+        }
     if not _keychain_available():
         return config
     cleaned = dict(config)
@@ -1096,7 +1173,7 @@ def _atomic_write_config_json(payload):
 
 
 def _atomic_write_private_json(path, payload):
-    """Atomically replace one app-owned JSON file with mode 0600."""
+    """Atomically replace JSON; POSIX uses 0600, Windows inherits user ACLs."""
     tmp_path = None
     parent = os.path.dirname(path) or "."
     os.makedirs(parent, mode=0o700, exist_ok=True)
@@ -1106,8 +1183,9 @@ def _atomic_write_private_json(path, payload):
             prefix=f".{os.path.basename(path)}.",
             suffix=".tmp",
         )
-        os.fchmod(fd, 0o600)
         with os.fdopen(fd, "w", encoding="utf-8") as f:
+            if not _IS_WINDOWS:
+                os.fchmod(f.fileno(), 0o600)
             json.dump(payload, f, ensure_ascii=False, indent=2)
             f.flush()
             os.fsync(f.fileno())
@@ -1117,7 +1195,8 @@ def _atomic_write_private_json(path, payload):
             # mkstemp/fchmod already make the replacement 0600.  This is only
             # a defensive re-check and must not turn a successful replace into
             # a reported save failure on filesystems that reject chmod.
-            os.chmod(path, 0o600)
+            if not _IS_WINDOWS:
+                os.chmod(path, 0o600)
         except OSError:
             pass
         try:
@@ -1141,6 +1220,15 @@ def save_config(config):
     _ensure_dir()
     keychain_available = _keychain_available()
     config = dict(config)
+    if _IS_WINDOWS and not keychain_available:
+        if any(
+            value and "..." not in str(value)
+            for value in (config.get(key_name, "") for key_name in KEYCHAIN_KEYS)
+        ):
+            raise ConfigSaveError(
+                "Windows Credential Manager is unavailable; "
+                "API keys cannot be saved as plaintext"
+            )
     try:
         pre_save_version = int(config.get("config_version", CONFIG_VERSION))
     except (TypeError, ValueError):
@@ -1178,13 +1266,14 @@ def save_config(config):
                 # would let _strip_keychain_keys_for_json remove the new value
                 # and silently keep using the old credential.
                 raise ConfigSaveError(
-                    f"failed to update {key_name} in macOS Keychain"
+                    f"failed to update {key_name} in "
+                    + ("Windows Credential Manager" if _IS_WINDOWS else "macOS Keychain")
                 )
         # 寫 JSON 前先剝離 keychain key（不寫明文）
         to_write = _strip_keychain_keys_for_json(config)
     else:
         # keyring 不可用：fallback 到舊行為（明文 + chmod 600）
-        to_write = config
+        to_write = _strip_keychain_keys_for_json(config) if _IS_WINDOWS else config
 
     _atomic_write_config_json(to_write)
 

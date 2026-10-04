@@ -20,7 +20,13 @@ def test_download_links_start_locked_behind_registration():
     assert 'id="downloadPrivacyConsent"' in html
     assert 'id="apkDownloadButton"' in html
     assert 'id="macDownloadButton"' in html
-    assert html.count('download-button disabled') == 2
+    # Keep the established Mac/Android registration gates explicit as new
+    # platforms may add their own, independently locked download controls.
+    for button_id in ("apkDownloadButton", "macDownloadButton"):
+        button = re.search(r'<(?:a|button)\b[^>]*\bid="' + button_id + r'"[^>]*>', html)
+        assert button is not None
+        assert "download-button disabled" in button.group()
+        assert 'aria-disabled="true"' in button.group()
     assert not re.search(
         r'<a\b[^>]*\shref="/downloads/SGHVoice-Android-v2\.7\.3\.apk"',
         html,
@@ -197,7 +203,7 @@ def test_android_release_manifest_matches_public_artifact_and_copy():
     # Owner sideload artifacts remain verifiable but are not recruitment CTAs.
     assert release["fileName"] not in index
     assert release["fileName"] not in llms
-    assert 'i18n.js?v=20261004-android288' in index
+    assert 'i18n.js?v=20261004-windows-pending' in index
     assert 'main.js?v=20260930-alpha' in index
 
 

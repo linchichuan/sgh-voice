@@ -23,9 +23,9 @@ import threading
 import time
 from datetime import datetime
 
-from config import runtime_data_write_guard
+from config import DATA_DIR, runtime_data_write_guard
 
-EVENTS_FILE = os.path.expanduser("~/.voice-input/events.jsonl")
+EVENTS_FILE = os.path.join(DATA_DIR, "events.jsonl")
 MAX_SIZE_BYTES = 50 * 1024 * 1024  # 50MB
 ROTATED_SUFFIX = ".1"
 

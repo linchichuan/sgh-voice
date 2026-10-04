@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "status": "pending",
+  "version": null,
+  "fileName": null,
+  "sizeBytes": null,
+  "sha256": null,
+  "architecture": "x64",
+  "installerScope": "per-user",
+  "signing": "unsigned",
+  "build": {
+    "status": "pending",
+    "platform": "windows",
+    "commit": null
+  },
+  "acceptance": {
+    "status": "pending",
+    "platform": "windows",
+    "sha256": null,
+    "record": null
+  }
+}

@@ -15,6 +15,7 @@ voiceprint.py — 聲紋辨識模組
 import os
 import glob
 import numpy as np
+from config import DATA_DIR
 
 
 def _dct_ii(x, norm="ortho"):
@@ -31,7 +32,7 @@ def _dct_ii(x, norm="ortho"):
     return result
 
 # ─── Constants ───────────────────────────────────────────
-VOICEPRINT_FILE = os.path.expanduser("~/.voice-input/voiceprint.npy")
+VOICEPRINT_FILE = os.path.join(DATA_DIR, "voiceprint.npy")
 DEFAULT_THRESHOLD = 0.97
 N_MFCC = 40
 N_FFT = 512

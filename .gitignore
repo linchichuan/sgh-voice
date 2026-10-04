@@ -125,3 +125,9 @@ ios/SGHVoice/DerivedData/
 ios/SGHVoice/*.xcuserstate
 ios/SGHVoice/SGHVoice/Models/
 ios/SGHVoice/SGHVoice/Utils/
+
+# Windows source, acceptance evidence, and local build environment
+!docs/WINDOWS_BUILD.md
+!docs/WINDOWS_HANDOFF.md
+!docs/windows-acceptance-*.md
+.venv-windows/

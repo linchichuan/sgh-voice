@@ -491,8 +491,11 @@ class Recorder:
             if len(audio) < sr * 0.3:
                 return None
             fd, fp = tempfile.mkstemp(prefix="voice_input_", suffix=".wav")
-            os.fchmod(fd, 0o600)
-            os.close(fd)
+            try:
+                if hasattr(os, "fchmod"):
+                    os.fchmod(fd, 0o600)
+            finally:
+                os.close(fd)
             sf.write(fp, audio, sr)
             os.chmod(fp, 0o600)
             return fp

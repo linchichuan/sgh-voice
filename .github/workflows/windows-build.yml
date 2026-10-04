@@ -1,0 +1,54 @@
+name: Windows installer (manual, unsigned)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-installer-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    # Standard public-repository runner only; never opt into larger/paid runners.
+    runs-on: windows-2022
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+          architecture: x64
+      - name: Install pinned build dependencies
+        run: python -m pip install --require-hashes --only-binary=:all: -r requirements-windows-build.txt
+      - name: Validate Windows source and release contracts
+        shell: pwsh
+        run: |
+          $Tests = @(Get-ChildItem tests/test_windows*.py | ForEach-Object FullName)
+          if (-not $Tests.Count) { throw 'Windows tests missing' }
+          python -m ruff check windows_launcher.py windows_client scripts/verify_windows_release.py @Tests --select E9,F63,F7,F82
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m pytest @Tests -q -o addopts=
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build and self-test unsigned installer
+        shell: pwsh
+        run: ./windows/build.ps1
+      - name: Upload unaccepted test build
+        uses: actions/upload-artifact@v6
+        with:
+          name: SGHVoice-Windows-unsigned-${{ github.sha }}
+          path: |
+            dist/windows/SGHVoice-Windows-*-x64-unsigned.exe
+            dist/windows/windows-build.json
+            dist/windows/windows-smoke.json
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+      - name: Record limited verification scope
+        shell: pwsh
+        run: |
+          'Unsigned test build only. No release or website deployment occurred. Real Windows microphone, global hotkey, target paste and OS security acceptance remain NOT RUN.' >> $env:GITHUB_STEP_SUMMARY

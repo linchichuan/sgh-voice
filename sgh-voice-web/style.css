@@ -1484,6 +1484,33 @@ svg {
     background: var(--green-soft);
 }
 
+.windows-icon {
+    color: var(--blue);
+    background: var(--blue-soft);
+}
+
+.download-windows {
+    grid-column: 1 / -1;
+    min-width: 0;
+}
+
+.windows-description {
+    margin-top: 16px;
+    color: var(--muted);
+    font-size: 14px;
+}
+
+.windows-hash {
+    margin-top: 16px;
+    color: var(--muted);
+    font-size: 12px;
+    overflow-wrap: anywhere;
+}
+
+.windows-hash code {
+    display: block;
+}
+
 .release-type {
     color: var(--warning);
     font-size: 9px;
