@@ -1,0 +1,84 @@
+name: Windows offline preview — one bounded build
+
+on:
+  push:
+    branches: [codex/windows-build-offline-20261004]
+
+permissions:
+  contents: write
+
+env:
+  SOURCE_COMMIT: 6412106f6866ca3c3e24fc09bf71eca3423b7bf3
+  RELEASE_TAG: windows-offline-preview-20261004
+
+jobs:
+  build:
+    if: github.repository == 'linchichuan/sgh-voice' && github.event.created && !github.event.deleted && github.run_attempt == '1'
+    runs-on: windows-2022
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.SOURCE_COMMIT }}
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+          architecture: x64
+      - name: Check exact unpublished release target
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $Release = gh release view $env:RELEASE_TAG --repo linchichuan/sgh-voice --json isDraft,isPrerelease,targetCommitish | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0 -or $Release.isDraft -ne $true -or $Release.isPrerelease -ne $true -or $Release.targetCommitish -ne $env:SOURCE_COMMIT) { throw 'Expected exact unpublished Windows draft is missing.' }
+      - name: Install hash-pinned build dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --require-hashes --only-binary=:all: -r requirements-windows-build.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Validate Windows source
+        shell: pwsh
+        run: |
+          $Tests = @(Get-ChildItem tests/test_windows*.py | ForEach-Object FullName)
+          python -m ruff check windows_launcher.py windows_client scripts/verify_windows_release.py @Tests --select E9,F63,F7,F82
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m pytest @Tests -q -o addopts=
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build and self-test unsigned installer
+        shell: pwsh
+        run: ./windows/build.ps1
+      - name: Bundled offline CPU inference on synthetic silence
+        shell: pwsh
+        timeout-minutes: 5
+        run: ./windows/offline-test.ps1
+      - name: Install, self-test and uninstall
+        shell: pwsh
+        timeout-minutes: 5
+        run: ./windows/install-test.ps1
+      - name: Upload verified files to existing unpublished draft
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $Build = Get-Content dist/windows/windows-build.json -Raw | ConvertFrom-Json
+          $Install = Get-Content dist/windows/windows-install-test.json -Raw | ConvertFrom-Json
+          $Offline = Get-Content dist/windows/windows-offline-test.json -Raw | ConvertFrom-Json
+          if ($Build.sourceCommit -ne $env:SOURCE_COMMIT -or $Install.ok -ne $true -or $Offline.ok -ne $true) { throw 'Required build/install/offline evidence failed.' }
+          $Files = @(
+            "dist/windows/$($Build.installer.name)",
+            'dist/windows/windows-build.json', 'dist/windows/windows-smoke.json',
+            'dist/windows/windows-installed-smoke.json', 'dist/windows/windows-install-test.json',
+            'dist/windows/windows-offline-test.json', 'resources/windows/THIRD_PARTY_NOTICES.txt'
+          )
+          $Bytes = 0L
+          foreach ($File in $Files) {
+            if (-not (Test-Path -LiteralPath $File -PathType Leaf)) { throw 'A required release file is missing.' }
+            $Bytes += (Get-Item -LiteralPath $File).Length
+          }
+          if ($Bytes -gt 512MB) { throw 'Release output exceeded the 512 MiB guard.' }
+          $Release = gh release view $env:RELEASE_TAG --repo linchichuan/sgh-voice --json isDraft,targetCommitish | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0 -or $Release.isDraft -ne $true -or $Release.targetCommitish -ne $env:SOURCE_COMMIT) { throw 'Draft target changed; refusing upload.' }
+          gh release upload $env:RELEASE_TAG @Files --repo linchichuan/sgh-voice
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          'Build, synthetic offline runtime and CI install/uninstall checks passed. Draft assets only; physical microphone, standard-user desktop and target-input acceptance NOT RUN. No main, website, Actions artifact/cache or billing changes.' >> $env:GITHUB_STEP_SUMMARY
