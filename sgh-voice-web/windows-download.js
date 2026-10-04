@@ -42,13 +42,13 @@ function renderWindowsRelease() {
     windowsDownloadButton.setAttribute("aria-disabled", String(!available));
     windowsDownloadButton.querySelector("span").textContent = available
         ? translateWindows("ctaReady", "下載 Windows 安裝程式（.exe）")
-        : translateWindows("ctaPending", "Windows 下載尚未開放");
+        : translateWindows("ctaPending", "Windows 正式版尚未開放");
     document.getElementById("windowsReleaseBadge").textContent = available
         ? translateWindows("badgeReady", "WINDOWS · 已驗收")
         : translateWindows("badgePending", "WINDOWS · 開發中");
     document.getElementById("windowsReleaseStatus").textContent = available
         ? translateWindows("ready", "此版本已完成 Windows 安裝、錄音與貼字驗收。安裝程式未簽章；若 Windows 封鎖，請停止安裝並聯絡我們。")
-        : translateWindows("pending", "Windows 版開發中。尚未產出可供下載的安裝檔，也未完成 Windows 實機的安裝、錄音與貼字驗收。");
+        : translateWindows("pending", "Windows 測試版已可下載；正式版仍待實體錄音、一般使用者安裝與目標貼字驗收。");
     const metadata = document.getElementById("windowsReleaseMetadata");
     metadata.hidden = !available;
     if (available) {

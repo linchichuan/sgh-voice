@@ -24,7 +24,7 @@
 - SHA-256：`67f4f3f2c14ecccaf4c7d151641a27b9486b88f2ccf5a0ec0941b62a26795b3d`
 - 建置來源：`4750f47dbb86efd11db77292f8f03d10a8068b2d`
 - Release tag：`windows-offline-preview-20261004`
-- [成功 Windows run 37202178595](https://github.com/linchichuan/sgh-voice/actions/runs/37202178595)，耗時 2 分 38 秒。
+- [成功 Windows run 37202178595](https://github.com/linchichuan/sgh-voice/actions/runs/37202178595)，Windows job 耗時 2 分 38 秒。
 - 建置 workflow 分支：`codex/windows-build-offline-20261004-r2`，commit `f8257e8ac8d82a231984dee849dafbe5a9ba79e7`；checkout 上述固定 source。
 
 完整安裝檔下載後核對 SHA-256，與 GitHub asset digest 及 `windows-build.json` 相同。
@@ -79,6 +79,9 @@ Python socket guard 不能作為 native DLL／整個作業系統零網路流量�
 
 `voice.shingihou.com` 對應 Firebase project `sgh-meishi`、site `sgh-voice`。
 建議最小上線內容為測試版說明頁與首頁連結，EXE 留在 GitHub Release。
+`windows-preview.html` 與功能分支中的三語入口已準備，下載 gate 及既有平台流程
+共 46 tests 通過；並經獨立來源審閱。此 HTML 尚未部署至 production。
+隔離的最小 production patch 只加首頁一個連結，需在部署前核對仍符合現有首頁基線。
 Firebase 既有 production workflow 同時部署 Hosting 與 Firestore rules，不能直接重跑來做此變更。
 部署前須確認既有方案／共用流量額度與授權，或取得精確費用／部署範圍的批准；不新增 credential。
 Hosting release 會替換完整版本，不能只把兩個檔案的目錄 deploy 到 production；
