@@ -65,15 +65,27 @@ FLEURS ja_jp dev 15 段唸稿語音（CC-BY 4.0）＋ 1 段 3.5 分鐘的長錄�
 
 FLEURS 是唸稿的維基百科句子，**不代表醫療口述的準確度**。
 
-## 建置與離線測試（嚴格比對版本，run #3）
+## 建置與離線測試（run #4，commit 76ad7e8，large-v3-turbo，嚴格比對）
 
 | 項目 | 結果 |
 |---|---|
-| 建置 | PASS（模型依清單嚴格驗證 SHA-256，沒有當場鎖定） |
-| 離線日文辨識 | PASS，網路連線嘗試 0 次 |
-| 全機安裝／解除安裝 | PASS |
+| 建置 | PASS（模型依清單嚴格驗證 SHA-256） |
+| 模型 SHA-256 驗證 | 1.55 秒 |
+| 離線日文辨識 | 5 段 FLEURS，整體字錯率 4.2%（0%～6.5%），上限 15%，網路連線嘗試 0 次 |
+| 全機安裝 → 安裝後自我測試 → 解除安裝 | PASS |
 
-run #3 使用的是 kotoba；改用 turbo 後的建置，以下一輪 CI 結果為準。
+`SHA256SUMS.txt`（run #4）：
+
+```
+703d84d021f72507333444ec56cf4c5636bc93babff1bb77db238385dbf805f7  SGHVoice-Windows-2.7.5-x64-unsigned.exe
+b0253ea6c0d3bea6b1e19e91a02acfd3b53f4467362efcb5a3e6b16c9b3a9b7e  models/whisper-large-v3-turbo-ct2/config.json
+e76620f83d5f5b69efd3d87e3dc180c1bd21df9fbebacfd4335e5e1efcc018da  models/whisper-large-v3-turbo-ct2/model.bin
+7ccc62c6f2765af1f3b46c00c9b5894426835a05021c8b9c01eecb6dfb542711  models/whisper-large-v3-turbo-ct2/preprocessor_config.json
+297b13372ac43916285644fb9687add3cc62ee2a1adb60da3dc25cc94c1871fd  models/whisper-large-v3-turbo-ct2/tokenizer.json
+c69260f2ab26d659b7c398f9a2b2b48ed0df16c3b47d7326782fd9cba71690c1  models/whisper-large-v3-turbo-ct2/vocabulary.json
+```
+
+安裝檔的 SHA-256 會隨每次建置改變（內含 build metadata）；交付時以當次建置的 `SHA256SUMS.txt` 為準。CI 不上傳安裝檔（不使用 artifact／release），要交付時需另外在 Windows 上執行 `windows/build.ps1` 產出，或另行決定發佈方式。
 
 ## 尚待處理（交付前必須完成）
 
