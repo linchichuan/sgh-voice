@@ -53,7 +53,8 @@ jobs:
           paths = set(Path('windows_client').rglob('*.py'))
           paths.update(Path('tests').glob('test_windows*.py'))
           paths.update(Path('scripts').glob('*windows*.py'))
-          paths.update(Path(p) for p in ('windows_launcher.py', 'config.py', 'recorder.py', 'event_ledger.py', 'voiceprint.py'))
+          paths.update(Path(p) for p in ('windows_launcher.py', 'config.py', 'recorder.py', 'event_ledger.py', 'voiceprint.py', 'medical_dictionary.py', 'dictation_cleanup.py'))
+          # Inventory only: binary/OS/HTTP open calls are reviewed separately.
           for path in sorted(paths):
               source = path.read_text(encoding='utf-8')
               for node in ast.walk(ast.parse(source)):
