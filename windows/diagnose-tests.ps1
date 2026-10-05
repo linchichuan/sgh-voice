@@ -8,6 +8,8 @@ $Start.UseShellExecute = $false
 $Start.RedirectStandardInput = $true
 $Start.RedirectStandardOutput = $true
 $Start.RedirectStandardError = $true
+$Start.StandardOutputEncoding = [Text.UTF8Encoding]::new($false)
+$Start.StandardErrorEncoding = [Text.UTF8Encoding]::new($false)
 $Start.Environment['PYTHONUNBUFFERED'] = '1'
 $Start.Environment['PYTHONIOENCODING'] = 'utf-8'
 $Start.Environment['PYTEST_DISABLE_PLUGIN_AUTOLOAD'] = '1'
@@ -16,7 +18,9 @@ foreach ($Arg in @('-u', 'scripts/diagnose_windows_tests.py', '--evidence-dir', 
                    '--startup-timeout', '30', '--case-timeout', '30', '-vv', '--durations=20')) {
     $Start.ArgumentList.Add($Arg)
 }
-foreach ($Test in (Get-ChildItem tests/test_windows*.py | Sort-Object Name)) {
+$Tests = @(Get-ChildItem tests/test_windows*.py | Sort-Object Name)
+if (-not $Tests.Count) { throw 'Windows tests missing; refusing an implicit test selection.' }
+foreach ($Test in $Tests) {
     $Start.ArgumentList.Add($Test.FullName)
 }
 $Process = [Diagnostics.Process]::new()
