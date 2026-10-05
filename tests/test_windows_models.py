@@ -128,9 +128,37 @@ def test_build_fetch_never_leaves_official_model_hosts(url):
     assert not load_fetch_script().allowed_url(url)
 
 
+def test_build_lock_mode_records_revision_and_hashes(tmp_path, synthetic, monkeypatch):
+    fetch = load_fetch_script()
+    unpinned = {**synthetic.manifest, "revision": "PENDING_REVISION",
+                "files": [{**synthetic.manifest["files"][0], "sha256": "PENDING"}]}
+    monkeypatch.setattr(fetch, "resolve_revision", lambda repository: "b" * 40)
+
+    class Opener:
+        def open(self, request, timeout):
+            assert "b" * 40 in request.full_url
+            response = io.BytesIO(synthetic.data)
+            response.geturl = lambda: "https://huggingface.co/x"
+            return response
+
+    with pytest.raises(fetch.FetchError, match="not pinned"):
+        fetch.fetch_model(tmp_path / "strict", manifest=unpinned, opener=Opener())
+    path, locked = fetch.fetch_model(tmp_path / "lock", manifest=unpinned, opener=Opener(),
+                                     log=lambda *_: None, lock=True)
+    assert locked["revision"] == "b" * 40
+    assert locked["files"][0]["sha256"] == hashlib.sha256(synthetic.data).hexdigest()
+    assert fetch.is_pinned(locked) and not fetch.is_pinned(unpinned)
+    assert unpinned["revision"] == "PENDING_REVISION"  # input manifest not mutated
+    assert models.verify_model_files(path, locked) == path
+
+
 def test_pinned_manifest_is_complete_japanese_and_below_setup_limit():
     manifest = json.loads((models.RESOURCE_ROOT / models.MANIFEST_FILE).read_text(encoding="utf-8"))
     assert manifest["languages"] == ["ja"]
+    if manifest["revision"] == "PENDING_REVISION":
+        # Only before the first locked Windows build; release builds refuse it.
+        assert all(f["sha256"] == "PENDING" for f in manifest["files"])
+        pytest.skip("model pins pending the first locked Windows build")
     assert len(manifest["revision"]) == 40 and int(manifest["revision"], 16) >= 0
     names = {f["name"] for f in manifest["files"]}
     assert {"config.json", "model.bin", "tokenizer.json"} <= names

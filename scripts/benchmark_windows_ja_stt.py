@@ -27,11 +27,11 @@ import unicodedata
 
 ROOT = Path(__file__).resolve().parents[1]
 
-CANDIDATES = {
-    "base": {"repo": "Systran/faster-whisper-base", "label": "Whisper base (current preview)"},
-    "small": {"repo": "Systran/faster-whisper-small", "label": "Whisper small"},
+CANDIDATES = {  # most decision-relevant first: a deadline cut drops the tail
     "kotoba-v2.0": {"repo": "kotoba-tech/kotoba-whisper-v2.0-faster", "label": "kotoba-whisper v2.0 (Japanese)"},
     "large-v3-turbo": {"repo": "mobiuslabsgmbh/faster-whisper-large-v3-turbo", "label": "Whisper large-v3-turbo"},
+    "small": {"repo": "Systran/faster-whisper-small", "label": "Whisper small"},
+    "base": {"repo": "Systran/faster-whisper-base", "label": "Whisper base (current preview)"},
 }
 MODEL_FILES = ["config.json", "model.bin", "tokenizer.json", "preprocessor_config.json",
                "vocabulary.txt", "vocabulary.json"]
@@ -131,7 +131,7 @@ def peak_memory_mb():
         return None
 
 
-def run_one(work, key, threads):
+def run_one(work, key, threads, long_form=False):
     """Child process: one model, so peak memory is attributable to it."""
     sys.path.insert(0, str(ROOT))
     from windows_client.local_stt import enforce_offline_environment
@@ -157,11 +157,13 @@ def run_one(work, key, threads):
         rows.append({"audio_s": round(len(audio) / 16000, 2), "decode_s": round(elapsed, 2),
                      "cer": round(distance / max(1, len(ref)), 4), "punctuated": any(c in hypothesis for c in "、。"),
                      "reference": item["reference"], "hypothesis": hypothesis})
-    long_audio = load_pcm16k(manifest["long_form"])
-    started = time.perf_counter()
-    segments, _info = model.transcribe(long_audio, **DECODE)
-    long_text = "".join(segment.text for segment in segments).strip()
-    long_s = time.perf_counter() - started
+    long_audio, long_text, long_s = [], "", 0.0
+    if long_form:
+        long_audio = load_pcm16k(manifest["long_form"])
+        started = time.perf_counter()
+        segments, _info = model.transcribe(long_audio, **DECODE)
+        long_text = "".join(segment.text for segment in segments).strip()
+        long_s = time.perf_counter() - started
     audio_total = sum(r["audio_s"] for r in rows)
     decode_total = sum(r["decode_s"] for r in rows)
     latencies = sorted(r["decode_s"] for r in rows)
@@ -213,19 +215,31 @@ def main():
     parser.add_argument("--work-dir", required=True)
     parser.add_argument("--clips", type=int, default=40)
     parser.add_argument("--threads", type=int, default=min(4, os.cpu_count() or 1))
+    parser.add_argument("--long-form", action="store_true", help="also time a ~3.5 min recording")
+    parser.add_argument("--deadline", type=float, default=0, help="total seconds; later models are skipped")
     parser.add_argument("--only", help=argparse.SUPPRESS)
     args = parser.parse_args()
     work = Path(args.work_dir).resolve()
     work.mkdir(parents=True, exist_ok=True)
     if args.only:
-        run_one(work, args.only, args.threads)
+        run_one(work, args.only, args.threads, args.long_form)
         return
+    started = time.monotonic()
     prepare(work, args.clips)
     for key in CANDIDATES:
-        completed = subprocess.run([sys.executable, __file__, "--work-dir", str(work),
-                                    "--threads", str(args.threads), "--only", key])
-        if completed.returncode != 0:
-            print(f"::warning::{key} benchmark failed with exit code {completed.returncode}")
+        remaining = args.deadline - (time.monotonic() - started) if args.deadline else None
+        if remaining is not None and remaining < 60:
+            print(f"::warning::{key} skipped: benchmark deadline reached")
+            continue
+        command = [sys.executable, __file__, "--work-dir", str(work), "--threads", str(args.threads), "--only", key]
+        if args.long_form:
+            command.append("--long-form")
+        try:
+            completed = subprocess.run(command, timeout=remaining)
+            if completed.returncode != 0:
+                print(f"::warning::{key} benchmark failed with exit code {completed.returncode}")
+        except subprocess.TimeoutExpired:
+            print(f"::warning::{key} stopped at the benchmark deadline")
     report(work)
 
 
