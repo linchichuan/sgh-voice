@@ -30,6 +30,7 @@ def node(script):
         text=True,
         encoding="utf-8",
         check=False,
+        timeout=15,
     )
     assert result.returncode == 0, result.stdout + result.stderr
     return result.stdout
