@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   diagnose:
-    if: github.repository == 'linchichuan/sgh-voice' && github.event.created && !github.event.deleted && github.run_attempt == '1'
+    if: ${{ !cancelled() && github.repository == 'linchichuan/sgh-voice' && github.event.created && !github.event.deleted && github.run_attempt == '1' }}
     runs-on: windows-2022
     timeout-minutes: 8
     steps:
