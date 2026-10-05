@@ -1,111 +1,114 @@
-"""Explicit model-only download; recording and inference never call this module's IO.
+"""The speech model shipped inside the installer: manifest, location, integrity.
 
-Only public, pinned model URLs are requested, without authentication or user text.
-The downloaded files are data, never executed. Partial files never become active.
+The application never downloads a model and contains no network client. Build
+tooling (scripts/fetch_windows_model.py) places the pinned files next to the
+executable before the installer is compiled. At runtime this module only finds
+those files and checks them against the pinned manifest.
 """
 from __future__ import annotations
 
 import hashlib
 import json
+import os
 from pathlib import Path
-import shutil
 import sys
-import tempfile
-from urllib.parse import urlsplit
-from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 RESOURCE_ROOT = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parents[1])) / "resources" / "windows"
-MANIFEST = json.loads((RESOURCE_ROOT / "model-base-v1.json").read_text(encoding="utf-8"))
+MANIFEST_FILE = "model-ja-v1.json"
+MANIFEST = json.loads((RESOURCE_ROOT / MANIFEST_FILE).read_text(encoding="utf-8"))
 TOTAL_BYTES = sum(file["size"] for file in MANIFEST["files"])
-MODEL_DOWNLOAD_INFO = {
-    "name": MANIFEST["name"], "source_url": MANIFEST["source_url"],
-    "size_label": f"{TOTAL_BYTES / 1_000_000:.1f} MB", "size_bytes": TOTAL_BYTES,
+MODEL_INFO = {
+    "name": MANIFEST["name"], "repository": MANIFEST["repository"],
+    "revision": MANIFEST["revision"], "license": MANIFEST["license"],
+    "size_label": f"{TOTAL_BYTES / 1_000_000_000:.2f} GB", "size_bytes": TOTAL_BYTES,
 }
+VERIFIED_CACHE = "model-verified.json"
 
 
-class ModelDownloadError(RuntimeError):
-    def __init__(self, code="model_download_failed"):
+class ModelIntegrityError(RuntimeError):
+    """A stable UI error code; never carries paths or file contents."""
+
+    def __init__(self, code="model_invalid"):
         self.code = code
         super().__init__(code)
 
 
-def _allowed_url(url):
-    parsed = urlsplit(url)
-    host = (parsed.hostname or "").lower()
-    return (parsed.scheme == "https" and not parsed.username and not parsed.password
-            and parsed.port in (None, 443)
-            and (host == "huggingface.co" or host.endswith(".huggingface.co")
-                 or host == "hf.co" or host.endswith(".hf.co")))
+def bundled_model_dir():
+    """Install-relative model folder: <app>\\models\\<id>.
+
+    SGHVOICE_MODEL_DIR exists for source checkouts and tests only; the
+    installed application has no UI or setting that changes this location.
+    """
+    override = os.environ.get("SGHVOICE_MODEL_DIR")
+    if override:
+        return Path(override)
+    if getattr(sys, "frozen", False):
+        base = Path(sys.executable).resolve().parent
+    else:
+        base = Path(__file__).resolve().parents[1] / "build" / "windows"
+    return base / "models" / MANIFEST["id"]
 
 
-class _ModelRedirect(HTTPRedirectHandler):
-    def redirect_request(self, req, fp, code, msg, headers, newurl):
-        if not _allowed_url(newurl):
-            raise ModelDownloadError()
-        return super().redirect_request(req, fp, code, msg, headers, newurl)
-
-
-def _valid_file(path, spec):
-    if path.is_symlink() or not path.is_file() or path.stat().st_size != spec["size"]:
-        return False
+def file_sha256(path):
     digest = hashlib.sha256()
-    with path.open("rb") as stream:
+    with Path(path).open("rb") as stream:
         for block in iter(lambda: stream.read(1024 * 1024), b""):
             digest.update(block)
-    return digest.hexdigest() == spec["sha256"]
+    return digest.hexdigest()
 
 
-def prepare_model(destination_root=None, *, should_cancel=lambda: False,
-                  on_progress=lambda percent: None, opener=None):
-    """Download only after an explicit UI action; no import/startup auto-download."""
-    if destination_root is None:
+def _model_file(directory, spec):
+    path = Path(directory) / spec["name"]
+    if path.is_symlink() or not path.is_file() or path.stat().st_size != spec["size"]:
+        raise ModelIntegrityError("model_invalid")
+    return path
+
+
+def _fingerprint(directory, manifest):
+    files = []
+    for spec in manifest["files"]:
+        stat = _model_file(directory, spec).stat()
+        files.append([spec["name"], stat.st_size, stat.st_mtime_ns])
+    return {"revision": manifest["revision"], "directory": str(directory), "files": files}
+
+
+def verify_model_files(directory, manifest=None):
+    """Full SHA-256 check of every pinned file. Raises ModelIntegrityError."""
+    manifest = manifest or MANIFEST
+    directory = Path(directory)
+    if not directory.is_dir() or directory.is_symlink():
+        raise ModelIntegrityError("model_missing")
+    for spec in manifest["files"]:
+        if file_sha256(_model_file(directory, spec)) != spec["sha256"]:
+            raise ModelIntegrityError("model_invalid")
+    return directory.resolve()
+
+
+def verified_model_dir(directory=None, *, cache_dir=None, manifest=None):
+    """Return the bundled model folder after integrity verification.
+
+    The first launch hashes every file (seconds on an SSD). The result is cached
+    per user, keyed by revision, sizes and modification times, so later launches
+    only re-check sizes. Any change to the installed files forces a full check.
+    """
+    manifest = manifest or MANIFEST
+    directory = Path(directory) if directory is not None else bundled_model_dir()
+    if not directory.is_dir() or directory.is_symlink():
+        raise ModelIntegrityError("model_missing")
+    if cache_dir is None:
         from config import DATA_DIR
-        destination_root = Path(DATA_DIR) / "models"
-    root = Path(destination_root)
-    root.mkdir(parents=True, exist_ok=True)
-    destination = root / ("whisper-base-" + MANIFEST["revision"][:12])
-    if destination.exists():
-        if not destination.is_symlink() and all(_valid_file(destination / f["name"], f) for f in MANIFEST["files"]):
-            on_progress(100)
-            return destination.resolve()
-        # Preserve any existing incomplete/custom folder for user inspection.
-        raise ModelDownloadError("model_invalid")
-    if shutil.disk_usage(root).free < TOTAL_BYTES * 2 + 100 * 1024 * 1024:
-        raise ModelDownloadError("model_disk_space")
-    stage = Path(tempfile.mkdtemp(prefix=".sgh-model-", dir=root))
-    opener = opener or build_opener(_ModelRedirect())
-    completed = 0
+        cache_dir = DATA_DIR
+    cache = Path(cache_dir) / VERIFIED_CACHE
+    fingerprint = _fingerprint(directory, manifest)
     try:
-        for spec in MANIFEST["files"]:
-            if should_cancel():
-                raise ModelDownloadError("model_download_cancelled")
-            url = f"https://huggingface.co/{MANIFEST['repository']}/resolve/{MANIFEST['revision']}/{spec['name']}"
-            request = Request(url, headers={"User-Agent": "SGHVoice-model-setup/1", "Accept-Encoding": "identity"})
-            digest, size = hashlib.sha256(), 0
-            with opener.open(request, timeout=30) as response, (stage / spec["name"]).open("xb") as output:
-                if not _allowed_url(response.geturl()):
-                    raise ModelDownloadError()
-                for block in iter(lambda: response.read(1024 * 1024), b""):
-                    if should_cancel():
-                        raise ModelDownloadError("model_download_cancelled")
-                    size += len(block)
-                    if size > spec["size"]:
-                        raise ModelDownloadError()
-                    digest.update(block)
-                    output.write(block)
-                    on_progress(int((completed + size) * 100 / TOTAL_BYTES))
-            if size != spec["size"] or digest.hexdigest() != spec["sha256"]:
-                raise ModelDownloadError()
-            completed += size
-        if should_cancel():
-            raise ModelDownloadError("model_download_cancelled")
-        stage.rename(destination)
-        on_progress(100)
-        return destination.resolve()
-    except ModelDownloadError:
-        raise
-    except Exception:
-        raise ModelDownloadError() from None
-    finally:
-        if stage.exists():
-            shutil.rmtree(stage)
+        if json.loads(cache.read_text(encoding="utf-8")) == fingerprint:
+            return directory.resolve()
+    except (OSError, ValueError):
+        pass
+    verify_model_files(directory, manifest)
+    try:
+        cache.parent.mkdir(parents=True, exist_ok=True)
+        cache.write_text(json.dumps(fingerprint), encoding="utf-8")
+    except OSError:
+        pass  # Verification still succeeded; the next launch re-hashes.
+    return directory.resolve()

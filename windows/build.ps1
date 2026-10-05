@@ -39,6 +39,10 @@ try {
     $AppDirectory = Join-Path $DistRoot 'SGHVoice'
     $AppExe = Join-Path $AppDirectory 'SGH Voice.exe'
     if (-not (Test-Path $AppExe)) { throw 'Application executable missing.' }
+    # The pinned speech model ships inside the installer: users never download it.
+    # Every file is checked against resources/windows/model-ja-v1.json (size + SHA-256).
+    & python scripts/fetch_windows_model.py --dest (Join-Path $AppDirectory 'models')
+    if ($LASTEXITCODE -ne 0) { throw 'Pinned model fetch or verification failed.' }
     $SmokeReport = Join-Path $DistRoot 'windows-smoke.json'
     $Smoke = Start-Process -FilePath $AppExe -ArgumentList @('--self-test', "`"$SmokeReport`"") -Wait -PassThru
     if ($Smoke.ExitCode -ne 0 -or -not (Test-Path $SmokeReport)) { throw 'Frozen application self-test failed.' }
@@ -47,6 +51,14 @@ try {
     $Installer = Join-Path $DistRoot "SGHVoice-Windows-$Version-x64-unsigned.exe"
     & python scripts/verify_windows_release.py --installer $Installer --app $AppExe --smoke-report $SmokeReport --source-commit $SourceCommit --write-manifest "$DistRoot\windows-build.json"
     if ($LASTEXITCODE -ne 0) { throw 'Build verification failed.' }
+    # Checksums for hospital IT: the installer plus every bundled model file.
+    $Sums = @((Get-FileHash -LiteralPath $Installer -Algorithm SHA256).Hash.ToLowerInvariant() + '  ' + (Split-Path -Leaf $Installer))
+    foreach ($ModelFile in Get-ChildItem -LiteralPath (Join-Path $AppDirectory 'models') -Recurse -File | Sort-Object FullName) {
+        $Relative = [IO.Path]::GetRelativePath($AppDirectory, $ModelFile.FullName).Replace('\', '/')
+        $Sums += (Get-FileHash -LiteralPath $ModelFile.FullName -Algorithm SHA256).Hash.ToLowerInvariant() + '  ' + $Relative
+    }
+    [IO.File]::WriteAllLines((Join-Path $DistRoot 'SHA256SUMS.txt'), [string[]]$Sums, [Text.UTF8Encoding]::new($false))
+    Get-Content -LiteralPath (Join-Path $DistRoot 'SHA256SUMS.txt') | Write-Host
     Write-Host "PASS unsigned build: $Installer"
     Write-Host 'Windows microphone/hotkey/target-paste acceptance remains NOT RUN. Nothing was published.'
 } finally {

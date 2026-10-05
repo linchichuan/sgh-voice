@@ -52,11 +52,11 @@ def harness(tmp_path):
             return SimpleNamespace(success=False, reason="focus_changed")
 
     controller = Controller(
-        {"windows_model_dir": str(tmp_path)},
-        lambda *event: events.append(event), Native(), recorder_factory=Recorder,
+        {}, lambda *event: events.append(event), Native(), recorder_factory=Recorder,
         transcriber_factory=Transcriber, memory_factory=lambda *args: object(),
-        model_validator=lambda path: path,
+        model_locator=lambda: tmp_path,
     )
+    wait_for(lambda: controller.state == "idle")
     yield SimpleNamespace(controller=controller, events=events, calls=calls,
                           wav=wav, started=started, finish_gate=finish_gate)
     finish_gate.set()
@@ -64,13 +64,46 @@ def harness(tmp_path):
     wait_for(lambda: controller.state == "closed")
 
 
-def test_missing_model_does_not_start_microphone(harness):
-    c = harness.controller
-    c._model_validator = None
-    c.apply_config({"windows_model_dir": ""})
+@pytest.mark.parametrize("code", ["model_missing", "model_invalid"])
+def test_unverified_model_never_starts_microphone(code):
+    from windows_client.models import ModelIntegrityError
+    events, started = [], []
+
+    def locator():
+        raise ModelIntegrityError(code)
+
+    c = Controller({}, lambda *event: events.append(event), None,
+                   recorder_factory=lambda config: started.append(config), model_locator=locator)
+    wait_for(lambda: c.state == "idle")
+    assert not c.model_ready
     assert not c.toggle()
-    assert not harness.started.is_set()
-    assert ("error", "invalid_model_path") in harness.events
+    assert not started
+    assert events.count(("error", code)) == 2  # once at verification, once on record
+    c.close()
+    wait_for(lambda: c.state == "closed")
+
+
+def test_recording_waits_for_model_verification():
+    gate = __import__("threading").Event()
+    c = Controller({}, lambda *event: None, None, model_locator=lambda: gate.wait(3) and "C:/model")
+    assert c.state == "verifying_model"
+    assert not c.toggle()
+    gate.set()
+    wait_for(lambda: c.state == "idle")
+    assert c.model_ready
+    c.close()
+    wait_for(lambda: c.state == "closed")
+
+
+def test_snapshot_uses_bundled_model_and_forces_japanese(harness):
+    c = harness.controller
+    c.apply_config({"windows_language": "en", "windows_model_dir": "C:/old-download"})
+    c.toggle()
+    wait_for(lambda: c._capture_open)
+    assert c._snapshot["windows_language"] == "ja"
+    assert c._snapshot["windows_model_dir"] != "C:/old-download"
+    c.cancel()
+    wait_for(lambda: c.state == "idle")
 
 
 def test_single_flight_result_and_cleanup(harness):
@@ -209,20 +242,3 @@ def test_local_model_is_reused_between_recordings(harness):
             first = c._transcriber
     assert c._transcriber is first
     assert len(harness.calls) == 2
-
-
-def test_model_setup_cancel_drains_before_close(harness, monkeypatch):
-    import windows_client.models as models
-    entered = threading.Event()
-    def prepare(**kwargs):
-        entered.set()
-        wait_for(kwargs["should_cancel"])
-        raise models.ModelDownloadError("model_download_cancelled")
-    monkeypatch.setattr(models, "prepare_model", prepare)
-    c = harness.controller
-    assert c.prepare_model()
-    assert entered.wait(1)
-    assert not c.toggle()
-    c.close()
-    wait_for(lambda: c.state == "closed")
-    assert not [event for event in harness.events if event[0] == "model_ready"]

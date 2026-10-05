@@ -4,6 +4,7 @@ param()
 # Install only the exact artifact produced by build.ps1, into a script-owned
 # temporary directory. This proves CI packaging behavior, not microphone or
 # interactive Windows 10/11 acceptance. No credentials or network calls are used.
+# The installer is per-machine (administrator install, shared by all accounts).
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 if ($env:OS -ne 'Windows_NT' -or -not [Environment]::Is64BitProcess -or $PSVersionTable.PSVersion.Major -lt 7) {
@@ -17,17 +18,20 @@ $SmokeReport = Join-Path $DistRoot 'windows-installed-smoke.json'
 $InstallLog = Join-Path $DistRoot 'windows-install.log'
 $UninstallLog = Join-Path $DistRoot 'windows-uninstall.log'
 $AppId = '{FF155096-E838-4FF3-8AAE-23D89693E9A7}_is1'
-$UninstallKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\$AppId"
+$UninstallKey = "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\$AppId"
 $ExistingKeys = @(
     $UninstallKey,
-    "HKCU:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\$AppId",
-    "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\$AppId",
-    "HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\$AppId"
+    "HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\$AppId",
+    "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\$AppId",
+    "HKCU:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\$AppId"
 )
-$GroupDirectory = Join-Path ([Environment]::GetFolderPath('Programs')) 'SGH Voice'
-$StartShortcut = Join-Path $GroupDirectory 'SGH Voice.lnk'
-$DesktopShortcut = Join-Path ([Environment]::GetFolderPath('DesktopDirectory')) 'SGH Voice.lnk'
-$DefaultInstall = Join-Path $env:LOCALAPPDATA 'Programs\SGHVoice'
+$StartShortcut = Join-Path ([Environment]::GetFolderPath('CommonPrograms')) 'SGH Voice.lnk'
+$DesktopShortcut = Join-Path ([Environment]::GetFolderPath('CommonDesktopDirectory')) 'SGH Voice.lnk'
+# Earlier per-user preview locations must not be overwritten either.
+$LegacyGroup = Join-Path ([Environment]::GetFolderPath('Programs')) 'SGH Voice'
+$LegacyDesktop = Join-Path ([Environment]::GetFolderPath('DesktopDirectory')) 'SGH Voice.lnk'
+$DefaultInstall = Join-Path $env:ProgramFiles 'SGHVoice'
+$LegacyInstall = Join-Path $env:LOCALAPPDATA 'Programs\SGHVoice'
 
 function Invoke-SmokeProcess {
     param([string]$Executable, [string]$Arguments, [string]$WorkingDirectory)
@@ -53,7 +57,7 @@ function Assert-Smoke {
 
 # Fail before installation if an existing user/machine installation or shortcut
 # could be replaced. This script never removes another installation's resources.
-foreach ($Path in @($ExistingKeys) + @($GroupDirectory, $DesktopShortcut, $DefaultInstall)) {
+foreach ($Path in @($ExistingKeys) + @($StartShortcut, $DesktopShortcut, $DefaultInstall, $LegacyGroup, $LegacyDesktop, $LegacyInstall)) {
     if (Test-Path -LiteralPath $Path) { throw 'Existing SGH Voice installation or shortcut found; use a clean test account.' }
 }
 Assert-Smoke (Test-Path -LiteralPath $BuildManifest) 'Run build.ps1 before the installer smoke test.'
@@ -82,7 +86,7 @@ $UninstallAttempted = $false
 $TemporaryCreated = $false
 $PreviousDataDir = [Environment]::GetEnvironmentVariable('SGHVOICE_DATA_DIR', 'Process')
 $Checks = [ordered]@{
-    installation = $false; installedFiles = $false; perUserRegistration = $false
+    installation = $false; installedFiles = $false; machineRegistration = $false
     shortcuts = $false; installedSelfTest = $false; uninstall = $false
     externalSyntheticDataPreserved = $false
 }
@@ -99,6 +103,7 @@ $Report = [ordered]@{
     standardUserTested = $false; windowsDesktopAcceptance = 'not-run'; published = $false
 }
 $Identity.Dispose()
+Assert-Smoke $Report.elevatedRunner 'The per-machine installer test needs an elevated (administrator) runner.'
 
 try {
     New-Item -ItemType Directory -Path $TestRoot | Out-Null
@@ -124,14 +129,14 @@ try {
     }
     $Checks.installedFiles = $true
     $Phase = 'registration'
-    Assert-Smoke (Test-Path -LiteralPath $UninstallKey) 'Per-user uninstall registration is missing.'
+    Assert-Smoke (Test-Path -LiteralPath $UninstallKey) 'Per-machine uninstall registration is missing.'
     $Registration = Get-ItemProperty -LiteralPath $UninstallKey
-    Assert-Smoke ($Registration.InstallLocation.TrimEnd('\') -eq $InstallDirectory.TrimEnd('\')) 'Per-user registration points outside the test installation.'
+    Assert-Smoke ($Registration.InstallLocation.TrimEnd('\') -eq $InstallDirectory.TrimEnd('\')) 'Per-machine registration points outside the test installation.'
     Assert-Smoke ($Registration.DisplayVersion -eq $Build.version) 'Installed version differs from built version.'
     foreach ($OtherKey in $ExistingKeys | Where-Object { $_ -ne $UninstallKey }) {
-        Assert-Smoke (-not (Test-Path -LiteralPath $OtherKey)) 'Installer unexpectedly registered outside the current user.'
+        Assert-Smoke (-not (Test-Path -LiteralPath $OtherKey)) 'Installer unexpectedly registered outside the 64-bit machine hive.'
     }
-    $Checks.perUserRegistration = $true
+    $Checks.machineRegistration = $true
     $Phase = 'shortcuts'
     $ShortcutShell = New-Object -ComObject WScript.Shell
     try {
@@ -172,7 +177,7 @@ try {
                 Start-Sleep -Milliseconds 100
             }
             Assert-Smoke (-not (Test-Path -LiteralPath $InstallDirectory)) 'Uninstall left application files behind.'
-            foreach ($OwnedResource in @($UninstallKey, $StartShortcut, $DesktopShortcut, $GroupDirectory)) {
+            foreach ($OwnedResource in @($UninstallKey, $StartShortcut, $DesktopShortcut)) {
                 Assert-Smoke (-not (Test-Path -LiteralPath $OwnedResource)) 'Uninstall left registration or shortcuts behind.'
             }
             $Checks.uninstall = $true

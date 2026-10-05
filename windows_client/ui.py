@@ -6,15 +6,13 @@ settings boundary to be exercised without a display or Windows installation.
 from __future__ import annotations
 
 import math
-import ntpath
-import os
 import queue
 from copy import deepcopy
 
 
 LABELS = {
     'en': {
-        'title': 'SGH Voice — Windows preview (not yet verified on Windows)',
+        'title': 'SGH Voice — Windows offline edition (Japanese) · test build',
         'intro': 'Record, review, then copy. Use the global shortcut from your target application for optional insertion.',
         'record': 'Record to preview',
         'stop': 'Stop and transcribe',
@@ -23,7 +21,6 @@ LABELS = {
         'result': 'Result — review before use',
         'level': 'Microphone level',
         'settings': 'Settings',
-        'language': 'Speech language (ja / zh / en)',
         'ui_language': 'Interface language',
         'toggle_hotkey': 'Record / stop shortcut',
         'cancel_hotkey': 'Cancel shortcut',
@@ -46,8 +43,8 @@ LABELS = {
         'hotkeys_ready': 'Shortcuts active: {toggle} / cancel {cancel}',
         'hotkeys_failed': 'Shortcuts unavailable. Check their format or whether another application uses them. Preview recording still works.',
         'save_failed': 'Settings were not saved. Check access to the application data folder.',
-        'invalid_settings': 'Choose a supported language, an absolute model folder path, and two distinct valid shortcuts.',
-        'busy': 'Wait until recording, processing, or model preparation finishes before changing settings.',
+        'invalid_settings': 'Choose a supported interface language and two distinct valid shortcuts.',
+        'busy': 'Wait until recording, processing, or model verification finishes before changing settings.',
         'microphone_failed': 'Could not open the microphone. Check Windows microphone permissions and the default input device.',
         'audio_unavailable': 'No usable audio was captured. Check the microphone and try again.',
         'transcription_failed': 'Local transcription failed. Check the model and microphone, then record again.',
@@ -55,31 +52,20 @@ LABELS = {
         'error': 'The operation failed. Check the settings and try again.',
         'startup_failed': 'SGH Voice could not start. Check the installation and application data access.',
         'dirty': 'Settings changed — save before recording.',
-        'model_dir': 'Local model folder',
-        'browse': 'Choose folder…',
-        'model_source': 'Model source / files',
-        'prepare_model': 'Download local model…',
-        'offline_notice': 'Speech recognition runs on this computer’s CPU. SGH Voice does not upload recordings or transcripts for recognition. No cloud fallback or API key is used.',
-        'model_required': 'A local speech model is required. Choose a prepared model folder, or explicitly download the model before recording.',
-        'model_invalid': 'The selected model folder is incomplete or unsupported. Choose a prepared model folder.',
-        'model_load_failed': 'Could not load the local model. Check the model files, available memory, and the installed CPU runtime.',
-        'model_missing': 'The local model is missing. Choose a prepared model folder or download the model.',
-        'model_metadata_unavailable': 'Model download details are unavailable. You can still choose an already prepared model folder.',
-        'model_selected': 'Selected model folder: {path}. Files are checked before recording.',
-        'model_details': '{name} · {size}\nSource: {source}',
-        'model_download_confirm': 'Download {name} now?\n\nSource: {source}\nDownload size: {size}\n\nThis one-time public model download uses your internet connection and disk space. No recording or transcript is uploaded. Recording afterward works locally. Nothing downloads unless you confirm.',
-        'model_download_failed': 'Model preparation failed. Check disk space and your connection, then retry. No cloud recognition was used.',
-        'model_download_cancelled': 'Model preparation was cancelled. No cloud recognition was used.',
-        'model_ready': 'Model prepared and settings saved.',
-        'model_progress': 'Preparing the local model… {progress}',
-        'preparing_model': 'Preparing the local model…',
+        'offline_notice': 'Japanese speech recognition runs on this computer’s CPU with the built-in model. SGH Voice has no cloud recognition, makes no network connection, and needs no API key or model download.',
+        'model_required': 'The built-in speech model is not ready. Wait for model verification to finish.',
+        'model_invalid': 'The built-in speech model is damaged or incomplete. Reinstall SGH Voice from the original installer.',
+        'model_load_failed': 'Could not load the built-in model. Check available memory, then restart SGH Voice.',
+        'model_missing': 'The built-in speech model was not found. Reinstall SGH Voice from the original installer.',
         'lexicon_enabled': 'Show local Japanese psychiatry term candidates for manual review',
         'lexicon_notice': 'Term candidates do not rewrite the transcript or establish clinical meaning. Verify the wording and context before editing or using the result.',
         'lexicon_candidates': 'Term candidates — review only',
         'loading_model': 'Loading the local model…',
+        'model_builtin': 'Speech model: {name} · {size} · built in (offline)',
+        'verifying_model': 'Checking the built-in speech model…',
     },
     'zh-TW': {
-        'title': 'SGH Voice — Windows 預覽版（尚未完成 Windows 實機驗收）',
+        'title': 'SGH Voice — Windows 離線版（日文）· 測試版',
         'intro': '錄音後先檢視文字，再複製。若要自動貼字，請從目標程式按全域快捷鍵開始。',
         'record': '錄音並預覽',
         'stop': '停止並辨識',
@@ -88,7 +74,6 @@ LABELS = {
         'result': '辨識結果 — 使用前請先確認',
         'level': '麥克風音量',
         'settings': '設定',
-        'language': '語音語言（ja／zh／en）',
         'ui_language': '介面語言',
         'toggle_hotkey': '錄音／停止快捷鍵',
         'cancel_hotkey': '取消快捷鍵',
@@ -111,8 +96,8 @@ LABELS = {
         'hotkeys_ready': '快捷鍵啟用：{toggle}／取消 {cancel}',
         'hotkeys_failed': '無法啟用快捷鍵，請檢查格式或是否被其他程式占用。仍可使用視窗錄音預覽。',
         'save_failed': '未儲存設定，請檢查程式資料夾的存取權限。',
-        'invalid_settings': '請選擇支援的語言、模型資料夾完整路徑，以及兩組不同的有效快捷鍵。',
-        'busy': '請等候錄音、辨識或模型準備完成後再更改設定。',
+        'invalid_settings': '請選擇支援的介面語言，並設定兩個不同且有效的快捷鍵。',
+        'busy': '請等錄音、辨識或模型檢查結束後再變更設定。',
         'microphone_failed': '無法開啟麥克風，請檢查 Windows 麥克風權限及預設輸入裝置。',
         'audio_unavailable': '未取得可用音訊，請檢查麥克風後重試。',
         'transcription_failed': '本機辨識失敗，請檢查模型與麥克風後重新錄音。',
@@ -120,31 +105,20 @@ LABELS = {
         'error': '操作失敗，請檢查設定後重試。',
         'startup_failed': '無法啟動 SGH Voice，請檢查安裝及程式資料存取權限。',
         'dirty': '設定已變更，錄音前請先儲存。',
-        'model_dir': '本機模型資料夾',
-        'browse': '選擇資料夾…',
-        'model_source': '模型來源／檔案',
-        'prepare_model': '下載本機模型…',
-        'offline_notice': '語音辨識在此電腦的 CPU 執行。SGH Voice 不會上傳錄音或逐字稿進行辨識，也不會退回雲端或使用 API 金鑰。',
-        'model_required': '尚需本機語音模型。請選擇已準備的模型資料夾，或明確點選下載模型後再錄音。',
-        'model_invalid': '選取的模型資料夾不完整或不受支援，請選擇已準備的模型資料夾。',
-        'model_load_failed': '無法載入本機模型，請檢查模型檔案、可用記憶體與已安裝的 CPU 執行元件。',
-        'model_missing': '找不到本機模型，請選擇已準備的模型資料夾或下載模型。',
-        'model_metadata_unavailable': '目前缺少模型下載資訊；仍可選擇已準備的本機模型資料夾。',
-        'model_selected': '已選擇模型資料夾：{path}。開始錄音前會檢查檔案。',
-        'model_details': '{name} · {size}\n來源：{source}',
-        'model_download_confirm': '現在下載 {name} 嗎？\n\n來源：{source}\n下載容量：{size}\n\n這是一次性的公開模型下載，會使用網路與磁碟空間，不會上傳錄音或逐字稿。之後的錄音辨識在本機執行；只有確認後才會開始下載。',
-        'model_download_failed': '模型準備失敗，請檢查磁碟空間及網路後重試；未使用雲端辨識。',
-        'model_download_cancelled': '已取消模型準備；未使用雲端辨識。',
-        'model_ready': '模型已準備，並已儲存設定。',
-        'model_progress': '正在準備本機模型… {progress}',
-        'preparing_model': '正在準備本機模型…',
+        'offline_notice': '日文語音辨識使用內建模型，在這台電腦的 CPU 上執行。SGH Voice 沒有雲端辨識、不連線網路，也不需要 API Key 或下載模型。',
+        'model_required': '內建語音模型尚未就緒，請等待模型檢查完成。',
+        'model_invalid': '內建語音模型已損壞或不完整，請用原始安裝檔重新安裝 SGH Voice。',
+        'model_load_failed': '無法載入內建模型，請確認可用記憶體後重新啟動 SGH Voice。',
+        'model_missing': '找不到內建語音模型，請用原始安裝檔重新安裝 SGH Voice。',
         'lexicon_enabled': '顯示本機日文精神科詞彙候選，供人工確認',
         'lexicon_notice': '詞彙候選不會改寫逐字稿，也不能用來確定臨床意義。編輯或使用結果前，請先確認用字與上下文。',
         'lexicon_candidates': '詞彙候選 — 僅供人工確認',
         'loading_model': '正在載入本機模型…',
+        'model_builtin': '語音模型：{name} · {size} · 內建（離線）',
+        'verifying_model': '正在檢查內建語音模型…',
     },
     'ja': {
-        'title': 'SGH Voice — Windows プレビュー（Windows 実機未検証）',
+        'title': 'SGH Voice — Windows オフライン版（日本語）· テスト版',
         'intro': '録音後に文字を確認してコピーしてください。自動入力は入力先のアプリでショートカットを押して開始します。',
         'record': '録音してプレビュー',
         'stop': '停止して文字起こし',
@@ -153,7 +127,6 @@ LABELS = {
         'result': '結果 — 使用前に確認してください',
         'level': 'マイク音量',
         'settings': '設定',
-        'language': '音声の言語（ja / zh / en）',
         'ui_language': '表示言語',
         'toggle_hotkey': '録音／停止ショートカット',
         'cancel_hotkey': 'キャンセルショートカット',
@@ -176,8 +149,8 @@ LABELS = {
         'hotkeys_ready': 'ショートカット有効：{toggle}／キャンセル {cancel}',
         'hotkeys_failed': 'ショートカットを登録できません。形式と他のアプリとの競合を確認してください。録音ボタンは使用できます。',
         'save_failed': '設定を保存できません。アプリデータへのアクセス権を確認してください。',
-        'invalid_settings': '対応言語、モデルフォルダーの絶対パス、異なる有効なショートカットを選択してください。',
-        'busy': '録音、認識、モデルの準備が終了してから設定を変更してください。',
+        'invalid_settings': '対応する表示言語と、異なる有効なショートカットを2つ選択してください。',
+        'busy': '録音、認識、モデル確認が終わってから設定を変更してください。',
         'microphone_failed': 'マイクを開けません。Windows のマイク権限と既定の入力機器を確認してください。',
         'audio_unavailable': '有効な音声がありません。マイクを確認して再試行してください。',
         'transcription_failed': 'ローカルの文字起こしに失敗しました。モデルとマイクを確認して録音し直してください。',
@@ -185,56 +158,45 @@ LABELS = {
         'error': '操作に失敗しました。設定を確認して再試行してください。',
         'startup_failed': 'SGH Voice を起動できません。インストールとアプリデータへのアクセスを確認してください。',
         'dirty': '設定が変更されています。録音前に保存してください。',
-        'model_dir': 'ローカルモデルのフォルダー',
-        'browse': 'フォルダーを選択…',
-        'model_source': 'モデルの配布元／ファイル',
-        'prepare_model': 'ローカルモデルをダウンロード…',
-        'offline_notice': '音声認識はこのパソコンの CPU で実行します。SGH Voice は認識のために録音や文字起こしを送信しません。クラウドへの切り替えや API キーは使用しません。',
-        'model_required': 'ローカル音声モデルが必要です。準備済みフォルダーを選ぶか、モデルのダウンロードを明示的に開始してから録音してください。',
-        'model_invalid': '選択したモデルのフォルダーが不完全か未対応です。準備済みのフォルダーを選択してください。',
-        'model_load_failed': 'ローカルモデルを読み込めません。モデルのファイル、空きメモリ、CPU 実行環境を確認してください。',
-        'model_missing': 'ローカルモデルが見つかりません。準備済みフォルダーを選択するか、モデルをダウンロードしてください。',
-        'model_metadata_unavailable': 'モデルのダウンロード情報がありません。準備済みのローカルフォルダーは選択できます。',
-        'model_selected': '選択したフォルダー：{path}。録音前にファイルを確認します。',
-        'model_details': '{name} · {size}\n配布元：{source}',
-        'model_download_confirm': '{name} を今ダウンロードしますか？\n\n配布元：{source}\nダウンロード容量：{size}\n\n公開モデルを一度ダウンロードし、通信とディスク容量を使用します。録音や文字起こしは送信しません。その後の認識はローカルで実行します。確認するまでダウンロードは始まりません。',
-        'model_download_failed': 'モデルを準備できませんでした。空き容量と接続を確認して再試行してください。クラウド認識は使用していません。',
-        'model_download_cancelled': 'モデルの準備をキャンセルしました。クラウド認識は使用していません。',
-        'model_ready': 'モデルを準備し、設定を保存しました。',
-        'model_progress': 'ローカルモデルを準備しています… {progress}',
-        'preparing_model': 'ローカルモデルを準備しています…',
+        'offline_notice': '日本語の音声認識は、内蔵モデルを使ってこのパソコンの CPU で実行します。SGH Voice はクラウド認識を行わず、ネットワークに接続せず、API キーやモデルのダウンロードも必要ありません。',
+        'model_required': '内蔵の音声モデルの準備ができていません。モデルの確認が終わるまでお待ちください。',
+        'model_invalid': '内蔵の音声モデルが破損しているか不完全です。元のインストーラーで SGH Voice を再インストールしてください。',
+        'model_load_failed': '内蔵モデルを読み込めません。空きメモリを確認し、SGH Voice を再起動してください。',
+        'model_missing': '内蔵の音声モデルが見つかりません。元のインストーラーで SGH Voice を再インストールしてください。',
         'lexicon_enabled': 'ローカルの日本語精神科用語候補を表示し、手動で確認する',
         'lexicon_notice': '用語候補は文字起こしを自動変更せず、臨床的意味を確定しません。編集・使用前に表記と文脈を確認してください。',
         'lexicon_candidates': '用語候補 — 手動確認用',
         'loading_model': 'ローカルモデルを読み込んでいます…',
+        'model_builtin': '音声モデル：{name} · {size} · 内蔵（オフライン）',
+        'verifying_model': '内蔵の音声モデルを確認しています…',
     },
 }
 
 
 _LOCAL_MESSAGES = {
     "en": {
-        "needs_model": "Prepare a local model before recording",
-        "invalid_language": "Choose Japanese (ja), Chinese (zh), or English (en) and save settings.",
+        "needs_model": 'Wait until the built-in model check finishes',
+        "invalid_language": 'Recognition is Japanese only in this edition.',
         "invalid_cpu_threads": "The CPU thread setting is invalid. Restore the application’s default CPU setting.",
         "local_runtime_missing": "The local speech runtime is missing. Use a complete SGH Voice Windows installation.",
-        "invalid_mode": "This Windows preview supports local dictation only.",
-        "model_disk_space": "There is not enough free disk space to prepare the model. Free space and retry the download.",
+        "invalid_mode": 'This Windows edition supports local dictation only.',
+        "invalid_decode_options": 'The model decoding settings are invalid. Reinstall SGH Voice.',
     },
     "zh-TW": {
-        "needs_model": "錄音前請先準備本機模型",
-        "invalid_language": "請選擇日文（ja）、中文（zh）或英文（en），並儲存設定。",
+        "needs_model": '請等待內建模型檢查完成',
+        "invalid_language": '此版本僅支援日文辨識。',
         "invalid_cpu_threads": "CPU 執行緒設定無效，請還原程式預設的 CPU 設定。",
         "local_runtime_missing": "缺少本機語音辨識元件，請使用完整的 SGH Voice Windows 安裝程式。",
-        "invalid_mode": "此 Windows 預覽版僅支援本機聽寫。",
-        "model_disk_space": "可用磁碟空間不足，請釋放空間後重新下載模型。",
+        "invalid_mode": '此 Windows 版本僅支援本機聽寫。',
+        "invalid_decode_options": '模型解碼設定無效，請重新安裝 SGH Voice。',
     },
     "ja": {
-        "needs_model": "録音前にローカルモデルを準備してください",
-        "invalid_language": "日本語（ja）、中国語（zh）、英語（en）を選択し、設定を保存してください。",
+        "needs_model": '内蔵モデルの確認が終わるまでお待ちください',
+        "invalid_language": 'この版の音声認識は日本語専用です。',
         "invalid_cpu_threads": "CPU スレッド設定が無効です。アプリの既定の CPU 設定に戻してください。",
         "local_runtime_missing": "ローカル音声認識の実行環境がありません。完全な SGH Voice Windows インストーラーを使用してください。",
-        "invalid_mode": "この Windows プレビューはローカル音声入力のみ対応しています。",
-        "model_disk_space": "モデルを準備する空き容量が不足しています。容量を確保してダウンロードし直してください。",
+        "invalid_mode": 'この Windows 版はローカル音声入力のみ対応しています。',
+        "invalid_decode_options": 'モデルのデコード設定が無効です。SGH Voice を再インストールしてください。',
     },
 }
 for _language, _messages in LABELS.items():
@@ -264,14 +226,7 @@ def result_message(payload):
 
 def settings_snapshot(current, values):
     """Validate UI choices while preserving unrelated existing configuration."""
-    if (values.get("windows_language") not in ("zh", "ja", "en")
-            or values.get("ui_language") not in LABELS):
-        raise ValueError("invalid_settings")
-    model_dir = values.get("windows_model_dir", "")
-    if not isinstance(model_dir, str):
-        raise ValueError("invalid_settings")
-    model_dir = model_dir.strip()
-    if model_dir and not (os.path.isabs(model_dir) or ntpath.isabs(model_dir)):
+    if values.get("ui_language") not in LABELS:
         raise ValueError("invalid_settings")
     toggle = values.get("windows_toggle_hotkey", "").strip()
     cancel = values.get("windows_cancel_hotkey", "").strip()
@@ -279,8 +234,10 @@ def settings_snapshot(current, values):
         raise ValueError("invalid_settings")
     updated = deepcopy(current)
     updated.update(values)
+    # The bundled model is Japanese-only and has a fixed install location.
+    updated.pop("windows_model_dir", None)
     updated.update(windows_toggle_hotkey=toggle, windows_cancel_hotkey=cancel,
-                   windows_model_dir=model_dir)
+                   windows_language="ja")
     return updated
 
 
@@ -303,8 +260,7 @@ class WindowsApp:
     """Single Tk-thread owner; local speech, microphone and hotkeys use a queue."""
 
     def __init__(self, root, config, *, controller_factory, native, hotkeys_factory,
-                 save_config, validate_hotkey=None, model_info=None,
-                 choose_directory=None, confirm_download=None, open_url=None):
+                 save_config, validate_hotkey=None, model_info=None):
         self.root = root
         self.config = deepcopy(config)
         self.native = native
@@ -312,15 +268,11 @@ class WindowsApp:
         self.save_config = save_config
         self.validate_hotkey = validate_hotkey
         self.model_info = dict(model_info or {})
-        self.choose_directory = choose_directory
-        self.confirm_download = confirm_download
-        self.open_url = open_url
         self.events = queue.SimpleQueue()
         self.closed = False
         self.hotkeys = None
         self._after_id = None
         self._close_after_id = None
-        self._pending_model_save = False
         self.lang = interface_language(config.get("ui_language"))
         self._status_key = "idle"
         self._notice_key = ""
@@ -407,7 +359,6 @@ class WindowsApp:
         self.vars = {}
         self._setting_widgets = []
         fields = (
-            ("windows_language", "language", ("ja", "zh", "en"), "ja"),
             ("ui_language", "ui_language", ("zh-TW", "ja", "en"), self.lang),
         )
         for row, (field, key, choices, default) in enumerate(fields):
@@ -418,23 +369,7 @@ class WindowsApp:
             combo.grid(row=row, column=1, sticky="ew", pady=3)
             self._setting_widgets.append((combo, "readonly"))
         label(self.settings_frame, "offline_notice", wraplength=760).grid(row=2, column=0, columnspan=2, sticky="ew", pady=6)
-        label(self.settings_frame, "model_dir").grid(row=3, column=0, sticky="w")
-        self.vars["windows_model_dir"] = tk.StringVar(value=self.config.get("windows_model_dir", ""))
-        model_entry = ttk.Entry(self.settings_frame, textvariable=self.vars["windows_model_dir"])
-        model_entry.grid(row=3, column=1, sticky="ew", pady=3)
-        self._setting_widgets.append((model_entry, "normal"))
-        model_buttons = ttk.Frame(self.settings_frame)
-        model_buttons.grid(row=4, column=0, columnspan=2, sticky="ew", pady=4)
-        self.browse_button = ttk.Button(model_buttons, text=self.tr("browse"), command=self._browse_model)
-        self.browse_button.pack(side="left")
-        self._labels.append((self.browse_button, "browse"))
-        self._setting_widgets.append((self.browse_button, "normal"))
-        self.source_button = ttk.Button(model_buttons, text=self.tr("model_source"), command=self._open_model_source)
-        self.source_button.pack(side="left", padx=6)
-        self._labels.append((self.source_button, "model_source"))
-        self.prepare_button = ttk.Button(model_buttons, text=self.tr("prepare_model"), command=self._prepare_model)
-        self.prepare_button.pack(side="left")
-        self._labels.append((self.prepare_button, "prepare_model"))
+        # The model is part of the installation: shown, never chosen or downloaded.
         self.model_details, self.model_notice = tk.StringVar(), tk.StringVar()
         ttk.Label(self.settings_frame, textvariable=self.model_details, wraplength=760).grid(row=5, column=0, columnspan=2, sticky="ew")
         ttk.Label(self.settings_frame, textvariable=self.model_notice, wraplength=760).grid(row=6, column=0, columnspan=2, sticky="ew", pady=(4, 8))
@@ -472,64 +407,22 @@ class WindowsApp:
         self._dirty = True
         self._set_notice("dirty")
 
-    def _browse_model(self):
-        if self.controller.state != "idle":
-            self._set_notice("busy")
-            return
-        choose = self.choose_directory
-        if choose is None:
-            from tkinter import filedialog
-            choose = filedialog.askdirectory
-        path = choose(parent=self.root, title=self.tr("model_dir"), mustexist=True)
-        if path:
-            self.vars["windows_model_dir"].set(path)
-            self._mark_dirty()
-            self._render_model_info()
-
-    def _model_metadata_ready(self):
-        return (all(self.model_info.get(key) for key in ("name", "source_url", "size_label"))
-                and self.model_info["source_url"].startswith("https://"))
+    def _model_ready(self):
+        return bool(getattr(self.controller, "model_ready", False))
 
     def _render_model_info(self):
-        if self._model_metadata_ready():
-            self.model_details.set(self.tr("model_details").format(
-                name=self.model_info["name"], size=self.model_info["size_label"],
-                source=self.model_info["source_url"]))
+        if self.model_info.get("name"):
+            self.model_details.set(self.tr("model_builtin").format(
+                name=self.model_info["name"], size=self.model_info.get("size_label", "")))
         else:
-            self.model_details.set(self.tr("model_metadata_unavailable"))
-        path = self.vars["windows_model_dir"].get().strip()
-        self.model_notice.set(self.tr("model_selected").format(path=path) if path else self.tr("model_required"))
-        idle = self.controller.state == "idle" and not self.closed
-        self.prepare_button.configure(state="normal" if idle and self._model_metadata_ready() else "disabled")
-        self.source_button.configure(state="normal" if self._model_metadata_ready() and not self.closed else "disabled")
-
-    def _open_model_source(self):
-        if not self._model_metadata_ready() or self.closed:
-            return
-        opener = self.open_url
-        if opener is None:
-            import webbrowser
-            opener = webbrowser.open
-        opener(self.model_info["source_url"])
-
-    def _prepare_model(self):
-        if self.controller.state != "idle":
-            self._set_notice("busy")
-            return
-        if not self._model_metadata_ready():
-            self._set_notice("model_metadata_unavailable")
-            return
-        confirm = self.confirm_download
-        if confirm is None:
-            from tkinter import messagebox
-            confirm = messagebox.askyesno
-        accepted = confirm(self.tr("prepare_model"), self.tr("model_download_confirm").format(
-            name=self.model_info["name"], source=self.model_info["source_url"],
-            size=self.model_info["size_label"]), parent=self.root)
-        if not accepted:
-            return
-        self.controller.prepare_model()
-        self._render_state()
+            self.model_details.set("")
+        state = self.controller.state
+        if state == "verifying_model":
+            self.model_notice.set(self.tr("verifying_model"))
+        elif not self._model_ready() and self._notice_key not in ("model_invalid", "model_missing", "model_load_failed"):
+            self.model_notice.set(self.tr("model_required"))
+        else:
+            self.model_notice.set("")
 
     def _set_notice(self, key):
         self._notice_key = key
@@ -537,12 +430,12 @@ class WindowsApp:
 
     def _render_state(self):
         state = self.controller.state
-        self._status_key = state if state in ("idle", "recording", "stopping", "processing", "preparing_model", "loading_model", "closed") else "idle"
-        if state == "idle" and not self.vars["windows_model_dir"].get().strip():
+        self._status_key = state if state in ("idle", "recording", "stopping", "processing", "verifying_model", "loading_model", "closed") else "idle"
+        if state == "idle" and not self._model_ready():
             self._status_key = "needs_model"
         self.status.set(self.tr(self._status_key))
         self.record_button.configure(text=self.tr("stop" if state == "recording" else "record"), state="normal" if state in ("idle", "recording") else "disabled")
-        self.cancel_button.configure(state="normal" if state in ("recording", "stopping", "processing", "preparing_model", "loading_model") else "disabled")
+        self.cancel_button.configure(state="normal" if state in ("recording", "stopping", "processing", "loading_model") else "disabled")
         self.save_button.configure(state="normal" if state == "idle" else "disabled")
         for widget, enabled_state in self._setting_widgets:
             widget.configure(state=enabled_state if state == "idle" else "disabled")
@@ -656,12 +549,6 @@ class WindowsApp:
         self._set_notice("saved")
         return True
 
-    def _save_prepared_model(self):
-        if self._pending_model_save and self.controller.state == "idle":
-            self._pending_model_save = False
-            if self._save():
-                self._set_notice("model_ready")
-
     def _pump(self):
         if self.closed:
             return
@@ -680,18 +567,6 @@ class WindowsApp:
                 self._render_hotkeys()
             elif event == "status":
                 self._render_state()
-                self._save_prepared_model()
-            elif event == "model_progress" and isinstance(payload, dict):
-                percent = payload.get("percent")
-                if isinstance(percent, (int, float)) and math.isfinite(percent):
-                    self.model_notice.set(self.tr("model_progress").format(progress=f"{max(0, min(100, int(percent)))}%"))
-            elif event == "model_ready" and isinstance(payload, dict):
-                path = payload.get("path")
-                if isinstance(path, str) and path:
-                    self.vars["windows_model_dir"].set(path)
-                    self._dirty = True
-                    self._pending_model_save = True
-                    self._save_prepared_model()
             elif event == "level":
                 try:
                     level = float(payload)
@@ -722,7 +597,7 @@ class WindowsApp:
             self.root.after_cancel(self._after_id)
         self.status.set(self.tr("closed"))
         for widget in (self.record_button, self.cancel_button, self.save_button,
-                       self.copy_button, self.prepare_button, self.source_button):
+                       self.copy_button):
             widget.configure(state="disabled")
         for widget, _enabled_state in self._setting_widgets:
             widget.configure(state="disabled")
@@ -757,7 +632,7 @@ def run():
     from windows_client.controller import Controller, WINDOWS_DEFAULTS
     from windows_client.hotkeys import GlobalHotkeys, Hotkey
     from windows_client.native import WindowsNative
-    from windows_client.models import MODEL_DOWNLOAD_INFO
+    from windows_client.models import MODEL_INFO
 
     root = tk.Tk()
     root.withdraw()
@@ -765,7 +640,7 @@ def run():
         config = {**WINDOWS_DEFAULTS, **load_config()}
         WindowsApp(root, config, controller_factory=Controller, native=WindowsNative(),
                    hotkeys_factory=GlobalHotkeys, save_config=save_config,
-                   validate_hotkey=Hotkey.parse, model_info=MODEL_DOWNLOAD_INFO)
+                   validate_hotkey=Hotkey.parse, model_info=MODEL_INFO)
     except Exception:
         messagebox.showerror("SGH Voice", LABELS["en"]["startup_failed"], parent=root)
         root.destroy()

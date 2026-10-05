@@ -1,4 +1,4 @@
-"""Headless UI boundary tests: no GUI, microphone, model downloads, or credential writes."""
+"""Headless UI boundary tests: no GUI, microphone, network, or credential writes."""
 import threading
 
 import pytest
@@ -71,11 +71,7 @@ class Controller:
         self.toggles = []
         self.cancelled = False
         self.closed = False
-        self.prepare_calls = 0
-
-    def prepare_model(self):
-        self.prepare_calls += 1
-        self.state = "preparing_model"
+        self.model_ready = True
 
     def toggle(self, target=None):
         self.toggles.append(target)
@@ -128,7 +124,7 @@ class HeadlessApp(WindowsApp):
         self._labels = []
         self._setting_widgets = []
         defaults = {
-            "windows_model_dir": "", "windows_language": "ja", "ui_language": "en",
+            "ui_language": "en",
             "windows_lexicon_enabled": False, "windows_auto_insert": False,
             "windows_save_history": False, "windows_toggle_hotkey": "Ctrl+Alt+F9",
             "windows_cancel_hotkey": "Ctrl+Alt+F10",
@@ -138,19 +134,16 @@ class HeadlessApp(WindowsApp):
         self.model_notice, self.model_details, self.candidates = Value(), Value(), Value()
         self.record_button, self.cancel_button, self.save_button = Widget(), Widget(), Widget()
         self.meter, self.result, self.copy_button = Widget(), Widget(), Widget()
-        self.prepare_button, self.source_button = Widget(), Widget()
 
 
 @pytest.fixture
 def app():
     saved = []
     instance = HeadlessApp(
-        Root(), {**WINDOWS_DEFAULTS, "windows_model_dir": "", "windows_language": "ja",
-                 "windows_lexicon_enabled": False, "ui_language": "en"},
+        Root(), {**WINDOWS_DEFAULTS, "windows_lexicon_enabled": False, "ui_language": "en"},
         controller_factory=Controller, native=Native(), hotkeys_factory=Hotkeys,
         save_config=saved.append, validate_hotkey=Hotkey.parse,
-        model_info={"name": "Synthetic local model", "source_url": "https://example.invalid/model",
-                    "size_label": "10 MiB (test fixture)"},
+        model_info={"name": "Synthetic local model", "size_label": "0.01 GB (test fixture)"},
     )
     instance.saved = saved
     return instance
@@ -319,98 +312,36 @@ def test_close_keeps_tk_alive_until_worker_audio_cleanup_finishes(app):
     assert app.root.calls[-1] == ("destroy",)
 
 
-def test_settings_snapshot_preserves_unrelated_config():
-    current = {"monthly_budget_jpy": 100}
-    values = {**WINDOWS_DEFAULTS, "windows_model_dir": "C:\\Models\\whisper-base",
-              "windows_language": "ja", "ui_language": "en"}
+def test_settings_snapshot_preserves_unrelated_config_and_forces_japanese():
+    current = {"keep": "me", "windows_model_dir": "C:\\Models\\old-download"}
+    values = {**WINDOWS_DEFAULTS, "windows_language": "en", "ui_language": "en"}
     updated = settings_snapshot(current, values)
-    assert updated["windows_model_dir"] == "C:\\Models\\whisper-base"
-    assert updated["monthly_budget_jpy"] == 100
-    assert "windows_model_dir" not in current
+    assert updated["keep"] == "me"
+    assert updated["windows_language"] == "ja"
+    assert "windows_model_dir" not in updated
+    assert current["windows_model_dir"] == "C:\\Models\\old-download"
 
 
-def test_relative_model_path_is_not_accepted_as_model_identifier(app):
-    app.vars["windows_model_dir"].set("base")
-    app._save()
-    assert app.saved == []
-    assert app.notice.get() == LABELS["en"]["invalid_settings"]
+def test_builtin_model_is_shown_and_cannot_be_chosen_or_downloaded(app):
+    assert app.model_details.get() == LABELS["en"]["model_builtin"].format(
+        name="Synthetic local model", size="0.01 GB (test fixture)")
+    for removed in ("_browse_model", "_prepare_model", "_open_model_source", "prepare_button", "source_button"):
+        assert not hasattr(app, removed)
+    assert "windows_model_dir" not in app.vars and "windows_language" not in app.vars
 
 
-def test_no_model_download_or_source_open_on_launch_or_save(app):
-    opened = []
-    app.open_url = opened.append
-    assert app.controller.prepare_calls == 0
-    assert app.model_notice.get() == LABELS["en"]["model_required"]
-    app._save()
-    assert app.controller.prepare_calls == 0
-    assert opened == []
-
-
-def test_model_download_requires_explicit_confirmation_with_source_and_size(app):
-    confirmations = []
-    def decline(title, message, **kwargs):
-        confirmations.append((title, message))
-        return False
-    app.confirm_download = decline
-    app._prepare_model()
-    assert app.controller.prepare_calls == 0
-    assert "https://example.invalid/model" in confirmations[0][1]
-    assert "10 MiB" in confirmations[0][1]
-    assert "No recording or transcript is uploaded" in confirmations[0][1]
-    app.confirm_download = lambda *_args, **_kwargs: True
-    app._prepare_model()
-    assert app.controller.prepare_calls == 1
-    assert app.prepare_button.options["state"] == "disabled"
-    assert app.cancel_button.options["state"] == "normal"
-
-
-def test_missing_metadata_prevents_download(app):
-    app.model_info = {}
-    app.confirm_download = lambda *_args, **_kwargs: pytest.fail("No valid disclosure")
-    app._prepare_model()
-    assert app.controller.prepare_calls == 0
-    assert app.notice.get() == LABELS["en"]["model_metadata_unavailable"]
-
-
-def test_source_link_opens_only_on_click(app):
-    opened = []
-    app.open_url = opened.append
-    assert opened == []
-    app._open_model_source()
-    assert opened == ["https://example.invalid/model"]
-
-
-def test_model_directory_picker_uses_existing_directory_and_never_downloads(app):
-    calls = []
-    def choose(**kwargs):
-        calls.append(kwargs)
-        return "C:\\Models\\whisper-base"
-    app.choose_directory = choose
-    app._browse_model()
-    assert calls[0]["mustexist"] is True
-    assert app.vars["windows_model_dir"].get() == "C:\\Models\\whisper-base"
-    assert app.controller.prepare_calls == 0
-
-
-def test_model_ready_waits_for_idle_before_saving_path(app):
-    app.controller.state = "preparing_model"
-    app.enqueue("model_ready", {"path": "C:\\Models\\whisper-base"})
-    app._pump()
-    assert app.saved == []
-    assert app._pending_model_save
+def test_status_waits_for_model_verification(app):
+    app.controller.state = "verifying_model"
+    app.controller.model_ready = False
+    app._render_state()
+    assert app.status.get() == LABELS["en"]["verifying_model"]
+    assert app.model_notice.get() == LABELS["en"]["verifying_model"]
     app.controller.state = "idle"
-    app.enqueue("status", "idle")
+    app._render_state()
+    assert app.status.get() == LABELS["en"]["needs_model"]
+    app.enqueue("error", "model_invalid")
     app._pump()
-    assert app.saved[0]["windows_model_dir"] == "C:\\Models\\whisper-base"
-    assert not app._pending_model_save
-    assert app.notice.get() == LABELS["en"]["model_ready"]
-
-
-def test_model_preparation_progress_never_exposes_raw_messages(app):
-    app.enqueue("model_progress", {"percent": 45, "message": "private-path-or-secret"})
-    app._pump()
-    assert "45%" in app.model_notice.get()
-    assert "private" not in app.model_notice.get()
+    assert app.notice.get() == LABELS["en"]["model_invalid"]
 
 
 def test_lexicon_candidates_are_opt_in_and_never_replace_transcript(app):
@@ -438,10 +369,10 @@ def test_candidate_rendering_is_bounded_and_handles_bad_payloads():
 
 
 def test_local_model_errors_are_localized(app):
-    for code in ("model_required", "model_invalid", "model_load_failed", "model_download_failed",
+    for code in ("model_required", "model_invalid", "model_load_failed", "model_missing",
                  "invalid_model_path", "model_not_ready", "invalid_language", "invalid_cpu_threads",
                  "local_runtime_missing", "local_model_load_failed", "local_transcription_failed",
-                 "audio_unavailable", "invalid_mode", "model_disk_space"):
+                 "audio_unavailable", "invalid_mode", "invalid_decode_options"):
         app.enqueue("error", code)
         app._pump()
         assert app.notice.get() == LABELS["en"][code]
@@ -452,5 +383,5 @@ def test_offline_controls_have_no_cloud_or_key_fields(app):
     assert "windows_cloud_consent" not in app.vars
     assert "windows_polish" not in app.vars
     assert not hasattr(app, "key_var")
-    assert app.vars["windows_language"].get() == "ja"
+    assert app.config["windows_language"] == "ja"
     assert app.vars["windows_lexicon_enabled"].get() is False

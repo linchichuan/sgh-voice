@@ -1,5 +1,6 @@
 SGH Voice for Windows — Third-party notices
-Prepared 2026-10-04 for the locked CPython 3.12 x64 CPU distribution.
+Prepared 2026-10-04 for the locked CPython 3.12 x64 CPU distribution;
+bundled-model section added 2026-10-05.
 
 This file identifies included third-party components. It does not change the
 license of SGH Voice. Original licenses and notices accompany the corresponding
@@ -22,6 +23,22 @@ The included Silero VAD asset's MIT license is retained alongside the fork at
 windows_client/_vendor/faster_whisper/LICENSE.silero-vad.
 No PyAV, FFmpeg, libx264, libx265, external cloud STT SDK, Torch, MLX, CUDA/cuDNN
 DLL or NVIDIA package is distributed by this CPU bundle.
+
+Bundled Japanese speech model
+-----------------------------
+The installer contains the speech model listed in resources/windows/model-ja-v1.json
+(repository, pinned revision, file sizes and SHA-256). It is installed under
+<installation folder>\models\ and is data loaded by CTranslate2, not executed code.
+
+kotoba-whisper v2.0 for CTranslate2 (kotoba-tech/kotoba-whisper-v2.0-faster)
+  Conversion published by Kotoba Technologies under the MIT license.
+  https://huggingface.co/kotoba-tech/kotoba-whisper-v2.0-faster
+kotoba-whisper v2.0 (kotoba-tech/kotoba-whisper-v2.0), the converted model
+  Copyright Kotoba Technologies; Apache License 2.0 (full text is reproduced in
+  the Tokenizers section below). Distilled from OpenAI Whisper large-v3 (MIT).
+  https://huggingface.co/kotoba-tech/kotoba-whisper-v2.0
+The model files are redistributed unmodified; SGH Voice loads them with int8
+CPU quantization at runtime, which does not change the files.
 
 Native components
 -----------------

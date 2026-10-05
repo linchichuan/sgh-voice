@@ -53,7 +53,17 @@ def test_uninstall_waits_for_inno_second_phase_process_tree():
     assert "$Process.WaitForExit(" not in SCRIPT
 
 
-def test_installer_remains_per_user_and_silent_mode_skips_interactive_launch():
-    assert "PrivilegesRequired=lowest" in INSTALLER
+def test_installer_is_per_machine_and_silent_mode_skips_interactive_launch():
+    assert "PrivilegesRequired=admin" in INSTALLER
+    assert "{autoprograms}" in INSTALLER and "{autodesktop}" in INSTALLER
     assert "Flags: nowait postinstall skipifsilent" in INSTALLER
     assert "[UninstallDelete]" not in INSTALLER
+
+
+def test_installer_smoke_checks_machine_registration_and_legacy_per_user_paths():
+    assert '$UninstallKey = "HKLM:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\$AppId"' in SCRIPT
+    assert "GetFolderPath('CommonPrograms')" in SCRIPT
+    assert "GetFolderPath('CommonDesktopDirectory')" in SCRIPT
+    assert "$LegacyInstall" in SCRIPT and "$LegacyDesktop" in SCRIPT
+    assert "Assert-Smoke $Report.elevatedRunner" in SCRIPT
+    assert "$Checks.machineRegistration = $true" in SCRIPT

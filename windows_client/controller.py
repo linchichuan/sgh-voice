@@ -11,7 +11,6 @@ import threading
 import time
 
 WINDOWS_DEFAULTS = {
-    "windows_model_dir": "",
     "windows_language": "ja",
     "windows_lexicon_enabled": False,
     "windows_save_history": False,
@@ -46,7 +45,15 @@ def runtime_config(settings):
     for name in ("groq", "openai", "anthropic", "openrouter", "elevenlabs"):
         result[f"{name}_api_key"] = ""
     result["windows_cloud_consent"] = False
+    # The bundled model is Japanese-only; old multilingual settings cannot override it.
+    result["windows_language"] = "ja"
     return result
+
+
+def _installed_model():
+    from windows_client.local_stt import validate_model_directory
+    from windows_client.models import verified_model_dir
+    return validate_model_directory(verified_model_dir())
 
 
 def _new_memory(retain, cancelled):
@@ -65,14 +72,17 @@ def _new_memory(retain, cancelled):
 
 class Controller:
     def __init__(self, config, on_event, native=None, *, recorder_factory=None,
-                 transcriber_factory=None, memory_factory=None, model_validator=None):
+                 transcriber_factory=None, memory_factory=None, model_locator=None):
         self.config = {**WINDOWS_DEFAULTS, **config}
         self._emit_callback = on_event
         self.native = native
         self._recorder_factory = recorder_factory
         self._transcriber_factory = transcriber_factory
         self._memory_factory = memory_factory or _new_memory
-        self._model_validator = model_validator
+        self._model_locator = model_locator
+        self._model_dir = None
+        self._model_error = "model_missing"
+        self._decode_options = {}
         self._transcriber = None
         self._transcriber_key = None
         self._lock = threading.RLock()
@@ -87,6 +97,9 @@ class Controller:
         self.last_text = ""
         self._worker = threading.Thread(target=self._work, daemon=True, name="windows-voice")
         self._worker.start()
+        # Verify the installed model off the UI thread before the first recording.
+        self._set_state("verifying_model")
+        self._commands.put((self._verify_model, self._session))
 
     def _emit(self, event, payload):
         try:
@@ -97,6 +110,10 @@ class Controller:
     def _set_state(self, state):
         self.state = state
         self._emit("status", state)
+
+    @property
+    def model_ready(self):
+        return self._model_dir is not None
 
     def apply_config(self, config):
         with self._lock:
@@ -114,45 +131,38 @@ class Controller:
                 return True
             if self.state != "idle":
                 return False
-            from windows_client.local_stt import LocalSTTError, validate_model_directory
-            try:
-                (self._model_validator or validate_model_directory)(self.config.get("windows_model_dir", ""))
-            except LocalSTTError as exc:
-                self._emit("error", exc.code)
+            if self._model_dir is None:
+                self._emit("error", self._model_error)
                 return False
             self._session += 1
             self._cancelled.clear()
             self.last_text = ""
             self._target = target
             self._snapshot = runtime_config(self.config)
+            self._snapshot["windows_model_dir"] = str(self._model_dir)
+            self._snapshot["windows_decode_options"] = dict(self._decode_options)
             self._set_state("recording")
             self._commands.put((self._start, self._session))
             return True
 
-    def prepare_model(self):
-        """Only the UI's explicit, informed download action calls this method."""
-        with self._lock:
-            if self.state != "idle" or self._closed:
-                return False
-            self._session += 1
-            self._cancelled.clear()
-            self._set_state("preparing_model")
-            self._commands.put((self._prepare_model, self._session))
-            return True
-
-    def _prepare_model(self, session):
-        from windows_client.models import prepare_model, ModelDownloadError
+    def _verify_model(self, session):
+        """Locate and hash-check the installed model; never downloads anything."""
+        from windows_client.models import MANIFEST, ModelIntegrityError
         try:
-            path = prepare_model(should_cancel=self._cancelled.is_set,
-                                 on_progress=lambda percent: self._emit("model_progress", {"percent": percent}))
+            path = (self._model_locator or _installed_model)()
             with self._lock:
-                if not self._cancelled.is_set() and not self._closed:
-                    self.config["windows_model_dir"] = str(path)
-                    self._emit("model_ready", {"path": str(path)})
-        except ModelDownloadError as exc:
+                self._model_dir = path
+                self._decode_options = dict(MANIFEST.get("decode", {}))
+        except ModelIntegrityError as exc:
+            self._model_error = exc.code
             self._emit("error", exc.code)
+        except Exception as exc:
+            self._model_error = getattr(exc, "code", None) or "model_invalid"
+            self._emit("error", self._model_error)
         finally:
-            self._set_state("idle")
+            with self._lock:
+                if not self._closed:
+                    self._set_state("idle")
 
     def cancel(self):
         with self._lock:

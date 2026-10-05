@@ -60,9 +60,9 @@ def artifacts(tmp_path):
     smoke = tmp_path / "smoke.json"
     smoke.write_text(json.dumps({
         "ok": True, "platform": "win32", "architecture": "AMD64", "version": version,
-        "checks": {key: True for key in ("windows_native", "tk_ui", "wav_roundtrip", "credential_backend", "shared_core")},
+        "checks": {key: True for key in ("windows_native", "tk_ui", "wav_roundtrip", "credential_backend", "shared_core", "bundled_model")},
         "errors": [], "microphone_tested": False, "cloud_tested": False, "input_delivery_tested": False, "recognition_mode": "local-only",
-        "model_included": False, "local_inference_tested": False,
+        "model_included": True, "local_inference_tested": False,
     }), encoding="utf-8")
     return installer, app, smoke, commit
 
@@ -102,7 +102,7 @@ def test_public_gate_requires_exact_acceptance_record(artifacts, tmp_path):
     manifest = {
         "schemaVersion": 1, "status": "available", "version": release.read_version(),
         "fileName": installer.name, "sizeBytes": installer.stat().st_size, "sha256": digest,
-        "architecture": "x64", "installerScope": "per-user", "signing": "unsigned",
+        "architecture": "x64", "installerScope": "per-machine", "signing": "unsigned",
         "build": {"status": "passed", "platform": "windows", "commit": commit},
         "acceptance": {"status": "passed", "platform": "windows", "sha256": digest,
                        "record": "docs/windows-acceptance-test.md"},
@@ -140,8 +140,19 @@ def test_no_automatic_windows_workflow_or_publication():
     assert "gh release" not in workflow
 
 
-def test_installer_is_per_user_without_admin_or_profile_deletion():
+def test_installer_is_per_machine_with_bundled_model_and_no_profile_deletion():
     installer = (ROOT / "windows/installer.iss").read_text(encoding="utf-8")
-    assert "PrivilegesRequired=lowest" in installer
-    assert "DefaultDirName={localappdata}\\Programs\\SGHVoice" in installer
+    assert "PrivilegesRequired=admin" in installer
+    assert "DefaultDirName={autopf}\\SGHVoice" in installer
+    assert 'Source: "{#SourceDir}\\models\\*"; DestDir: "{app}\\models"' in installer
+    assert "nocompression" in installer
     assert "[UninstallDelete]" not in installer
+
+
+def test_smoke_without_bundled_model_is_rejected(artifacts, tmp_path):
+    installer, app, smoke, commit = artifacts
+    report = json.loads(smoke.read_text(encoding="utf-8"))
+    report["model_included"] = False
+    smoke.write_text(json.dumps(report), encoding="utf-8")
+    with pytest.raises(ValueError, match="bundled"):
+        release.verify_build(installer, app, smoke, commit)

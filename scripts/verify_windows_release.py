@@ -78,11 +78,11 @@ def verify_smoke(report: dict, version: str) -> None:
     checks = report.get("checks")
     if not isinstance(checks, dict) or not checks or any(value is not True for value in checks.values()):
         raise ValueError("Self-test checks are missing or failed")
-    required = {"windows_native", "tk_ui", "wav_roundtrip", "credential_backend", "shared_core"}
+    required = {"windows_native", "tk_ui", "wav_roundtrip", "credential_backend", "shared_core", "bundled_model"}
     if not required.issubset(checks):
         raise ValueError("Required frozen application checks are missing")
-    if report.get("recognition_mode") != "local-only" or report.get("model_included") is not False:
-        raise ValueError("Expected local-only recognition with explicit separate model setup")
+    if report.get("recognition_mode") != "local-only" or report.get("model_included") is not True:
+        raise ValueError("Expected local-only recognition with the pinned model bundled in the application")
     if report.get("local_inference_tested") is not False:
         raise ValueError("Basic packaging smoke must not claim model inference; use the separate offline test")
     for flag in ("microphone_tested", "cloud_tested", "input_delivery_tested"):
@@ -98,7 +98,7 @@ def verify_public_manifest(manifest: dict, installer: Path, source_commit: str, 
         raise ValueError("Public Windows manifest is not available")
     expected = {
         "version": version, "fileName": installer.name, "sizeBytes": installer.stat().st_size,
-        "sha256": digest, "architecture": "x64", "installerScope": "per-user", "signing": "unsigned",
+        "sha256": digest, "architecture": "x64", "installerScope": "per-machine", "signing": "unsigned",
     }
     if any(manifest.get(key) != value for key, value in expected.items()):
         raise ValueError("Public manifest does not match the verified installer")

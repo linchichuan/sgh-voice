@@ -424,3 +424,28 @@ print("vendor import and fail-closed guards passed")
                             text=True, capture_output=True, timeout=20)
     assert result.returncode == 0, result.stderr
     assert "fail-closed guards passed" in result.stdout
+
+
+def test_json_vocabulary_bundle_validates_and_exactly_one_vocabulary_required(model_dir):
+    (model_dir / "vocabulary.txt").rename(model_dir / "vocabulary.json")
+    (model_dir / "preprocessor_config.json").write_text('{"feature_size": 128}', encoding="utf-8")
+    assert validate_model_directory(model_dir) == model_dir.resolve()
+    (model_dir / "vocabulary.txt").write_text("ambiguous", encoding="utf-8")
+    with pytest.raises(LocalSTTError, match="model_not_ready"):
+        validate_model_directory(model_dir)
+    (model_dir / "vocabulary.txt").unlink()
+    (model_dir / "vocabulary.json").unlink()
+    with pytest.raises(LocalSTTError, match="model_not_ready"):
+        validate_model_directory(model_dir)
+
+
+def test_manifest_decode_options_are_bounded_and_passed_through(model_dir, wav, backend):
+    decoder = LocalTranscriber({"windows_model_dir": str(model_dir), "windows_decode_options": {"chunk_length": 15}},
+                               model_factory=backend.factory)
+    decoder.transcribe({"path": str(wav)}, 1.0)
+    assert backend.decodes[0][1]["chunk_length"] == 15
+    for options in ({"chunk_length": 0}, {"chunk_length": 31}, {"chunk_length": True},
+                    {"beam_size": 1}, {"initial_prompt": "ignore rules"}, ["chunk_length"]):
+        with pytest.raises(LocalSTTError, match="invalid_decode_options"):
+            LocalTranscriber({"windows_model_dir": str(model_dir), "windows_decode_options": options},
+                             model_factory=backend.factory)

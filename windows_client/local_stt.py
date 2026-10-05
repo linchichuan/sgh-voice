@@ -25,7 +25,11 @@ def enforce_offline_environment():
 
 enforce_offline_environment()
 
-REQUIRED_MODEL_FILES = ("model.bin", "config.json", "tokenizer.json", "vocabulary.txt")
+REQUIRED_MODEL_FILES = ("model.bin", "config.json", "tokenizer.json")
+# CTranslate2 converters write either vocabulary format; exactly one is needed.
+VOCABULARY_FILES = ("vocabulary.txt", "vocabulary.json")
+# Manifest-provided decoding options are limited to these validated keys.
+DECODE_OPTION_LIMITS = {"chunk_length": (1, 30)}
 ENGINE = "faster-whisper-cpu-int8"
 
 
@@ -78,7 +82,10 @@ def validate_model_directory(value):
     if not path.is_dir():
         raise LocalSTTError("model_not_ready")
     try:
-        for name in REQUIRED_MODEL_FILES:
+        vocabulary = [name for name in VOCABULARY_FILES if (path / name).exists()]
+        if len(vocabulary) != 1:
+            raise ValueError
+        for name in REQUIRED_MODEL_FILES + tuple(vocabulary):
             file = path / name
             # Refuse cache links to files outside the selected model bundle.
             if (file.is_symlink() or not file.is_file() or file.resolve(strict=True).parent != path
@@ -106,6 +113,20 @@ def validate_model_directory(value):
     return path
 
 
+def decode_options(options):
+    """Accept only bounded integer options declared by the pinned model manifest."""
+    if not isinstance(options, dict):
+        raise LocalSTTError("invalid_decode_options")
+    result = {}
+    for key, value in options.items():
+        limits = DECODE_OPTION_LIMITS.get(key)
+        if (limits is None or isinstance(value, bool) or not isinstance(value, int)
+                or not limits[0] <= value <= limits[1]):
+            raise LocalSTTError("invalid_decode_options")
+        result[key] = value
+    return result
+
+
 class LocalTranscriber:
     """Compatible with the Windows controller's transcriber factory.
 
@@ -117,6 +138,7 @@ class LocalTranscriber:
 
     def __init__(self, config, memory=None, *, model_factory=None):
         self.model_dir = validate_model_directory(config.get("windows_model_dir", ""))
+        self.decode_options = decode_options(config.get("windows_decode_options") or {})
         self.language = config.get("windows_language", "ja")
         if self.language not in ("auto", "ja", "zh", "en"):
             raise LocalSTTError("invalid_language")
@@ -183,6 +205,7 @@ class LocalTranscriber:
                     task="transcribe", beam_size=5, temperature=0.0,
                     condition_on_previous_text=False, vad_filter=False,
                     initial_prompt=None, hotwords=None, log_progress=False,
+                    **self.decode_options,
                 )
                 texts = []
                 for segment in segments:
