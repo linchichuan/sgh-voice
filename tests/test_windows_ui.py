@@ -163,9 +163,10 @@ def test_all_languages_have_same_messages():
 def test_worker_events_touch_no_ui_until_pumped(app):
     app.controller.state = "recording"
     calls = list(app.root.calls)
-    worker = threading.Thread(target=lambda: app.enqueue("level", 0.4))
+    worker = threading.Thread(target=lambda: app.enqueue("level", 0.4), daemon=True)
     worker.start()
-    worker.join()
+    worker.join(timeout=2)
+    assert not worker.is_alive(), "UI event producer did not finish"
     assert app.root.calls == calls
     assert "value" not in app.meter.options or app.meter.options["value"] == 0
     app._pump()
@@ -175,9 +176,10 @@ def test_worker_events_touch_no_ui_until_pumped(app):
 def test_global_shortcut_captures_target_on_worker_before_queue(app):
     main_thread = threading.get_ident()
     calls = list(app.root.calls)
-    worker = threading.Thread(target=app.hotkeys.on_toggle)
+    worker = threading.Thread(target=app.hotkeys.on_toggle, daemon=True)
     worker.start()
-    worker.join()
+    worker.join(timeout=2)
+    assert not worker.is_alive(), "Shortcut target capture did not finish"
     assert app.native.capture_threads and app.native.capture_threads[0] != main_thread
     assert app.controller.toggles == []
     assert app.root.calls == calls
