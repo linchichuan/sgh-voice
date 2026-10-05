@@ -1,7 +1,7 @@
-"""Single-flight Windows recording lifecycle with local-only recognition.
+"""Single-flight Windows recording lifecycle with explicit recognition modes.
 
-The existing Recorder and the offline CPU transcriber provide speech IO. This
-module owns only desktop lifecycle, cancellation and delivery policy.
+The default CPU transcriber stays offline. Cloud dictation requires a separately
+selected mode and explicit consent; neither path uses the shared provider router.
 """
 from __future__ import annotations
 
@@ -11,6 +11,8 @@ import threading
 import time
 
 WINDOWS_DEFAULTS = {
+    "windows_recognition_mode": "local",
+    "windows_cloud_consent": False,
     "windows_model_dir": "",
     "windows_language": "ja",
     "windows_lexicon_enabled": False,
@@ -22,10 +24,18 @@ WINDOWS_DEFAULTS = {
 
 
 def runtime_config(settings):
-    """Strip cloud credentials and force local-only execution, even for old settings."""
+    """Freeze one recording's mode and remove all unrelated provider authority."""
+    from windows_client.cloud_stt import CloudSTTError, validate_cloud_settings
+
+    mode = settings.get("windows_recognition_mode", "local")
+    if mode not in ("local", "openai-cloud"):
+        raise CloudSTTError("invalid_recognition_mode")
+    if mode == "openai-cloud":
+        validate_cloud_settings(settings)
     result = dict(settings)
     result.update({
-        "stt_engine": "faster-whisper-local",
+        "windows_recognition_mode": mode,
+        "stt_engine": "openai-whisper-1" if mode == "openai-cloud" else "faster-whisper-local",
         "llm_engine": "disabled",
         "enable_claude_polish": False,
         "enable_hybrid_mode": False,
@@ -44,8 +54,9 @@ def runtime_config(settings):
         "ptt_silence_autostop_seconds": 120,
     })
     for name in ("groq", "openai", "anthropic", "openrouter", "elevenlabs"):
-        result[f"{name}_api_key"] = ""
-    result["windows_cloud_consent"] = False
+        if name != "openai" or mode == "local":
+            result[f"{name}_api_key"] = ""
+    result["windows_cloud_consent"] = mode == "openai-cloud"
     return result
 
 
@@ -75,6 +86,7 @@ class Controller:
         self._model_validator = model_validator
         self._transcriber = None
         self._transcriber_key = None
+        self._config_revision = 0
         self._lock = threading.RLock()
         self._cancelled = threading.Event()
         self._commands = queue.Queue()
@@ -98,11 +110,23 @@ class Controller:
         self.state = state
         self._emit("status", state)
 
+    def _processing_error(self, exc):
+        # Never expose provider exception text, audio or credential data.
+        from windows_client.local_stt import LocalSTTError
+        from windows_client.cloud_stt import CloudSTTError
+        if not self._cancelled.is_set():
+            self._emit("error", exc.code if isinstance(exc, (LocalSTTError, CloudSTTError))
+                       else "transcription_failed")
+
     def apply_config(self, config):
         with self._lock:
             if self.state != "idle" or self._closed:
                 raise RuntimeError("busy")
             self.config = {**WINDOWS_DEFAULTS, **config}
+            self._config_revision += 1
+            # Release cached credentials/models at an explicit settings change.
+            self._transcriber = None
+            self._transcriber_key = None
 
     def toggle(self, target=None):
         with self._lock:
@@ -115,16 +139,19 @@ class Controller:
             if self.state != "idle":
                 return False
             from windows_client.local_stt import LocalSTTError, validate_model_directory
+            from windows_client.cloud_stt import CloudSTTError
             try:
-                (self._model_validator or validate_model_directory)(self.config.get("windows_model_dir", ""))
-            except LocalSTTError as exc:
+                snapshot = runtime_config(self.config)
+                if snapshot["windows_recognition_mode"] == "local":
+                    (self._model_validator or validate_model_directory)(snapshot.get("windows_model_dir", ""))
+            except (LocalSTTError, CloudSTTError) as exc:
                 self._emit("error", exc.code)
                 return False
             self._session += 1
             self._cancelled.clear()
             self.last_text = ""
             self._target = target
-            self._snapshot = runtime_config(self.config)
+            self._snapshot = snapshot
             self._set_state("recording")
             self._commands.put((self._start, self._session))
             return True
@@ -182,9 +209,7 @@ class Controller:
                     continue
                 action(session)
             except Exception as exc:
-                # Never expose provider exception text, audio or credential data.
-                from windows_client.local_stt import LocalSTTError
-                self._emit("error", exc.code if isinstance(exc, LocalSTTError) else "transcription_failed")
+                self._processing_error(exc)
                 self._discard(self._session)
 
     def _start(self, session):
@@ -276,12 +301,21 @@ class Controller:
                 bool(self._snapshot.get("windows_save_history", False)),
                 self._cancelled.is_set,
             )
-            if self._transcriber_factory is None:
-                from windows_client.local_stt import LocalTranscriber
-                self._transcriber_factory = LocalTranscriber
-            model_key = (self._snapshot.get("windows_model_dir"), self._snapshot.get("windows_language"))
+            factory = self._transcriber_factory
+            recognition_mode = self._snapshot["windows_recognition_mode"]
+            if factory is None:
+                if recognition_mode == "openai-cloud":
+                    from windows_client.cloud_stt import CloudTranscriber
+                    factory = CloudTranscriber
+                else:
+                    from windows_client.local_stt import LocalTranscriber
+                    factory = LocalTranscriber
+            if self._cancelled.is_set():
+                return
+            model_key = (recognition_mode, self._snapshot.get("windows_model_dir"),
+                         self._snapshot.get("windows_language"), self._config_revision)
             if self._transcriber is None or self._transcriber_key != model_key:
-                self._transcriber = self._transcriber_factory(self._snapshot, memory)
+                self._transcriber = factory(self._snapshot, memory)
                 self._transcriber_key = model_key
             transcriber = self._transcriber
             result = transcriber.transcribe(
@@ -295,6 +329,7 @@ class Controller:
                     self._emit("error", "transcription_failed")
                     return
                 self.last_text = result["final"]
+                engine = result.get("engine") or self._snapshot["stt_engine"]
                 candidates = []
                 if self._snapshot.get("windows_lexicon_enabled"):
                     from dataclasses import asdict
@@ -305,7 +340,8 @@ class Controller:
                     memory.add_to_history({"timestamp": datetime.now().isoformat(),
                                            "whisper_raw": self.last_text, "final_text": self.last_text,
                                            "mode": "dictate", "duration": duration,
-                                           "stt_engine": "faster-whisper-local", "llm_source": None})
+                                           "stt_engine": engine,
+                                           "llm_source": None})
                 insertion = {"success": False, "reason": "preview_only"}
                 if self._snapshot.get("windows_auto_insert") and self._target and self.native:
                     try:
@@ -314,7 +350,11 @@ class Controller:
                     except Exception:
                         insertion = {"success": False, "reason": "input_failed"}
                 self._emit("result", {"text": self.last_text, "insertion": insertion,
-                                      "lexicon_candidates": candidates})
+                                      "lexicon_candidates": candidates, "engine": engine})
+        except Exception as exc:
+            # Report failures before returning to idle. Otherwise the worker's
+            # error cleanup could discard a new session started by the UI.
+            self._processing_error(exc)
         finally:
             self._remove(path)
             self._emit("level", 0.0)

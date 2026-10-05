@@ -78,14 +78,21 @@ def verify_smoke(report: dict, version: str) -> None:
     checks = report.get("checks")
     if not isinstance(checks, dict) or not checks or any(value is not True for value in checks.values()):
         raise ValueError("Self-test checks are missing or failed")
-    required = {"windows_native", "tk_ui", "wav_roundtrip", "credential_backend", "shared_core"}
+    required = {"windows_native", "tk_ui", "wav_roundtrip", "credential_backend", "shared_core", "cloud_mock"}
     if not required.issubset(checks):
         raise ValueError("Required frozen application checks are missing")
-    if report.get("recognition_mode") != "local-only" or report.get("model_included") is not False:
-        raise ValueError("Expected local-only recognition with explicit separate model setup")
+    if (report.get("default_recognition_mode") != "local"
+            or report.get("available_recognition_modes") != ["local", "openai-cloud"]
+            or report.get("model_included") is not False):
+        raise ValueError("Expected local default, optional OpenAI cloud and explicit separate model setup")
+    if (report.get("cloud_mock_tested") is not True
+            or report.get("cloud_mock_python_network_guard") is not True
+            or type(report.get("cloud_mock_python_network_attempts")) is not int
+            or report["cloud_mock_python_network_attempts"] != 0):
+        raise ValueError("Cloud adapter mock must pass with zero Python network attempts")
     if report.get("local_inference_tested") is not False:
         raise ValueError("Basic packaging smoke must not claim model inference; use the separate offline test")
-    for flag in ("microphone_tested", "cloud_tested", "input_delivery_tested"):
+    for flag in ("microphone_tested", "cloud_live_tested", "input_delivery_tested"):
         if report.get(flag) is not False:
             raise ValueError("Build self-test must explicitly exclude interactive / cloud acceptance")
 

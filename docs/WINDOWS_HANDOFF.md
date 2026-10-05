@@ -1,5 +1,10 @@
 # SGH Voice Windows 離線測試版交接 — 2026-10-04
 
+> 本文件保存 2.7.5 安裝檔的歷史建置紀錄。官網其後已完成部署，文中早期
+> 「尚未部署／需要 Firebase 登入」狀態已被取代。2.7.6 原始碼的本機／選用
+> OpenAI 雲端模式請見 [WINDOWS_CLOUD_MODE.md](WINDOWS_CLOUD_MODE.md)，
+> 不可把新原始碼能力套用到本文件的 2.7.5 binary。
+
 ## 已交付與剩餘範圍
 
 [下載 Windows x64 測試安裝檔](https://github.com/linchichuan/sgh-voice/releases/download/windows-offline-preview-20261004/SGHVoice-Windows-2.7.5-x64-unsigned.exe)

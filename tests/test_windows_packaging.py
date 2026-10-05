@@ -1,5 +1,6 @@
 """Windows-only wheel and CPU bundle invariants, without installing packages."""
 import builtins
+import json
 from pathlib import Path
 import re
 import sys
@@ -39,9 +40,10 @@ def test_every_windows_pin_has_exact_compatible_wheel_and_hash():
             seen.add(name)
 
 
-def test_runtime_uses_vendored_pcm_engine_without_cloud_or_gpu_packages():
+def test_runtime_reuses_http_stack_without_cloud_sdk_or_gpu_packages():
     packages = {name for _, name, _, _ in lock_entries("requirements-windows.txt")}
-    assert {"ctranslate2", "tokenizers", "numpy", "onnxruntime", "keyring", "sounddevice", "soundfile"} <= packages
+    assert {"ctranslate2", "tokenizers", "numpy", "onnxruntime", "keyring", "sounddevice", "soundfile",
+            "httpx", "httpcore", "certifi", "anyio", "h11", "idna"} <= packages
     assert not packages & {"av", "faster-whisper", "openai", "anthropic", "torch", "torchaudio", "mlx", "onnxruntime-gpu"}
     assert not any(name.startswith(("nvidia-", "cuda-")) for name in packages)
     assert "--only-binary=:all:" in (ROOT / "requirements-windows.txt").read_text(encoding="utf-8")
@@ -92,11 +94,12 @@ def run_spec(monkeypatch, tmp_path, *, missing_dll=None, extra_data=None):
     return namespace, captured, copied
 
 
-def test_bundle_preserves_license_metadata_and_excludes_gpu_cloud_and_ffmpeg(monkeypatch, tmp_path):
+def test_bundle_keeps_cloud_adapter_but_excludes_cloud_sdks_gpu_and_ffmpeg(monkeypatch, tmp_path):
     namespace, analysis, copied = run_spec(monkeypatch, tmp_path)
     assert set(copied) == {name for _, name, _, _ in lock_entries("requirements-windows.txt")}
     assert {"av", "faster_whisper", "transcriber", "anthropic", "openai", "torch"} <= set(analysis["excludes"])
     assert "windows_client._vendor.faster_whisper" in analysis["hiddenimports"]
+    assert {"windows_client.cloud_stt", "httpx", "httpx._transports.default", "httpx._transports.mock", "httpcore"} <= set(analysis["hiddenimports"])
     assert not any("cudnn" in item[0].lower() for item in analysis["binaries"])
     assert not any("cudnn" in item[0].lower() for item in namespace["a"].binaries)
     assert (str(ROOT / "resources/windows"), "resources/windows") in analysis["datas"]
@@ -112,3 +115,45 @@ def test_missing_native_dependency_blocks_bundle(monkeypatch, tmp_path, dll):
 def test_hooks_cannot_reintroduce_disallowed_libraries_as_data(monkeypatch, tmp_path, path):
     with pytest.raises(SystemExit, match="must not include"):
         run_spec(monkeypatch, tmp_path, extra_data=path)
+
+
+def test_frozen_cloud_mock_exercises_adapter_without_profile_keys_or_network(isolated_data_dir, monkeypatch):
+    import config
+    import socket
+    from windows_launcher import cloud_mock_check
+
+    monkeypatch.setattr(config, "load_config", lambda: pytest.fail("Smoke must not load saved credentials"))
+    monkeypatch.setenv("OPENAI_API_KEY", "unused-synthetic-environment-key")
+    monkeypatch.setenv("HTTPS_PROXY", "https://unused-synthetic-proxy.invalid")
+    original_connect = socket.socket.connect
+    original_dns = socket.getaddrinfo
+    evidence = {}
+    cloud_mock_check(evidence)
+    assert evidence == {"cloud_mock_python_network_guard": True,
+                        "cloud_mock_python_network_attempts": 0}
+    assert socket.socket.connect is original_connect
+    assert socket.getaddrinfo is original_dns
+    assert "synthetic-key" not in json.dumps(evidence)
+    assert "api.openai.com" not in json.dumps(evidence)
+
+
+def test_frozen_cloud_mock_blocks_network_regression_and_restores_sockets(isolated_data_dir, monkeypatch):
+    import socket
+    from windows_client.cloud_stt import CloudTranscriber
+    from windows_launcher import cloud_mock_check
+
+    def attempted_network(*args, **kwargs):
+        socket.create_connection(("example.invalid", 443))
+
+    monkeypatch.setattr(CloudTranscriber, "transcribe", attempted_network)
+    original_connect = socket.socket.connect
+    original_create = socket.create_connection
+    original_dns = socket.getaddrinfo
+    evidence = {}
+    with pytest.raises(OSError, match="Network is disabled"):
+        cloud_mock_check(evidence)
+    assert evidence == {"cloud_mock_python_network_guard": True,
+                        "cloud_mock_python_network_attempts": 1}
+    assert socket.socket.connect is original_connect
+    assert socket.create_connection is original_create
+    assert socket.getaddrinfo is original_dns

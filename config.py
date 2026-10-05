@@ -45,7 +45,7 @@ def _default_data_dir():
 # `from config import APP_VERSION`，不要各自硬編一份字串（曾經各寫各的，
 # app.py 停在 2.7.0、dashboard.py 已到 2.7.4，兩邊回報的版本互相矛盾）。
 # 手動與 CHANGELOG.md 最新版本同步。
-APP_VERSION = "2.7.5"
+APP_VERSION = "2.7.6"
 
 # 跨 thread 序列化 stats.json 的 read-modify-write，避免 update_stats 與 _track_usage race
 _STATS_LOCK = threading.RLock()
@@ -811,6 +811,7 @@ _CONFIG_NUMERIC_BOUNDS = {
 
 
 _WINDOWS_CONFIG_TYPES = {
+    "windows_recognition_mode": str,
     "windows_model_dir": str,
     "windows_language": str,
     "windows_lexicon_enabled": bool,
@@ -832,6 +833,8 @@ def validate_config_update(data):
         if field in _WINDOWS_CONFIG_TYPES:
             if type(value) is not _WINDOWS_CONFIG_TYPES[field]:
                 raise ConfigValidationError(field, f"{field} has invalid type")
+            if field == "windows_recognition_mode" and value not in ("local", "openai-cloud"):
+                raise ConfigValidationError(field, "unsupported Windows recognition mode")
             continue
         if field not in DEFAULT_CONFIG:
             raise ConfigValidationError(field, "unknown config field")

@@ -168,6 +168,7 @@ def test_windows_imported_key_fails_closed_without_vault(windows_config, monkeyp
 def test_windows_settings_survive_reload_and_reject_wrong_types(windows_config):
     cfg, _ = windows_config
     settings = {
+        "windows_recognition_mode": "openai-cloud",
         "windows_cloud_consent": True,
         "windows_provider": "openai",
         "windows_polish": False,
@@ -182,3 +183,11 @@ def test_windows_settings_survive_reload_and_reject_wrong_types(windows_config):
     assert cfg._sanitize_saved_config({"windows_cloud_consent": "true"}) == {}
     with pytest.raises(cfg.ConfigValidationError):
         cfg.validate_config_update({"windows_secret_unknown": True})
+
+
+@pytest.mark.parametrize("value", ["groq", "cloud", "", None, True])
+def test_windows_recognition_mode_rejects_unsupported_values(windows_config, value):
+    cfg, _ = windows_config
+    assert cfg._sanitize_saved_config({"windows_recognition_mode": value}) == {}
+    with pytest.raises(cfg.ConfigValidationError):
+        cfg.validate_config_update({"windows_recognition_mode": value})

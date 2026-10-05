@@ -2,7 +2,13 @@
 
 ## Current status
 
-The Windows local-only CPU preview has been built, tested and published as an
+The 2.7.6 source adds an explicitly selected OpenAI cloud mode alongside the
+default local CPU mode. See [WINDOWS_CLOUD_MODE.md](WINDOWS_CLOUD_MODE.md) for the
+data route, user-key requirements and test boundaries. It requires a new,
+versioned installer; the following build evidence applies to 2.7.5 only until a
+new source-specific report is published.
+
+The Windows 2.7.5 local-only CPU preview has been built, tested and published as an
 **unsigned test prerelease**. [Download and reports](https://github.com/linchichuan/sgh-voice/releases/tag/windows-offline-preview-20261004)
 are tied to source `4750f47dbb86efd11db77292f8f03d10a8068b2d`.
 The [Windows Server 2022 run](https://github.com/linchichuan/sgh-voice/actions/runs/37202178595)
@@ -12,13 +18,15 @@ installation, installed-runtime checks and uninstallation. See
 
 Physical microphone, interactive hotkey/target-paste and standard-user Windows 10/11
 acceptance remain **NOT VERIFIED**. The main website's stable Windows manifest stays
-`pending`; its separate preview entry has not been deployed. The installer is not
-clinically validated and synthetic-silence inference is not an accuracy benchmark.
+`pending`; its separate [preview download page](https://voice.shingihou.com/windows-preview.html)
+is deployed. Synthetic-silence inference is not an accuracy benchmark.
 
 Windows uses `windows_launcher.py`, `windows_client`, shared recording/configuration
 modules and `windows/sghvoice.spec`. The macOS `voiceinput.spec` / `build.sh` remain
-separate. Windows recognition uses faster-whisper/CTranslate2 on CPU with
-`compute_type="int8"`, without an API key or cloud fallback. LLM rewriting and
+separate. Default local recognition uses faster-whisper/CTranslate2 on CPU with
+`compute_type="int8"`, without an API key or cloud fallback. Optional cloud
+recognition uses the user's OpenAI key only after explicit mode selection and
+consent. LLM rewriting and
 translation are disabled in this preview; users review and edit the recognizer's
 text themselves. MLX, rumps, PyObjC and the macOS dashboard are not Windows engines.
 
@@ -97,14 +105,14 @@ before pushing; do not create an unnecessary PR that also starts the existing CI
 
 ## Test-prerelease delivery procedure
 
-1. Finish integration and independent review, then record the new offline source SHA.
+1. Finish integration and independent review, then record the new source SHA.
    Push that source to a feature branch whose workflow filters do not start a job.
 2. Using the already authorized local GitHub credential, create an unpublished draft
    prerelease targeting that exact SHA. The source must exist remotely first. Use a
    new tag; do not overwrite existing releases or assets.
 3. Push a reviewed, exact-branch, one-time trigger. Its single Windows job checks out
    the fixed source SHA with persisted Git credentials disabled, runs source tests,
-   packages the app, performs frozen-runtime and local-inference checks, then tests
+   packages the app, performs frozen-runtime, cloud-adapter mock and local-inference checks, then tests
    installation, installed-runtime launch and uninstallation. Failed or absent gates
    cannot be reported as passing.
 4. Only after those gates pass, upload the named installer, SHA256/build manifest and
@@ -113,7 +121,7 @@ before pushing; do not create an unnecessary PR that also starts the existing CI
    `--clobber`, or upload Actions artifacts/caches.
 5. Download locally and verify exact bytes, source SHA and test reports. Publish only
    as an unsigned **test prerelease**, `make_latest=false`, with physical microphone,
-   standard-user installation and interactive desktop limits visible. Keep the stable
+   standard-user installation, live cloud API and interactive desktop limits visible. Keep the stable
    website manifest pending until its separate full acceptance passes.
 
 The [Release API](https://docs.github.com/en/rest/releases/releases#create-a-release)

@@ -11,9 +11,84 @@ import tempfile
 from pathlib import Path
 
 
+def cloud_mock_check(evidence):
+    """Exercise the packaged HTTP adapter with synthetic data and blocked sockets.
+
+    The MockTransport consumes a real multipart request in memory. No saved
+    settings or credentials are loaded, and no provider endpoint is contacted.
+    """
+    import socket
+    import ssl
+    import wave
+    from email import policy
+    from email.parser import BytesParser
+
+    attempts, requests = [], []
+    guarded = [(socket.socket, "connect"), (socket.socket, "connect_ex"),
+               (socket, "create_connection"), (socket, "getaddrinfo")]
+    originals = [(owner, name, getattr(owner, name)) for owner, name in guarded]
+
+    def denied(*args, **kwargs):
+        attempts.append("blocked")
+        raise OSError("Network is disabled during the cloud adapter mock test")
+
+    try:
+        for owner, name in guarded:
+            setattr(owner, name, denied)
+        evidence["cloud_mock_python_network_guard"] = True
+        import certifi
+        import httpx
+        from windows_client.cloud_stt import CloudTranscriber
+
+        # MockTransport itself does not exercise TLS; separately verify that the
+        # frozen app can load its bundled public CA certificates without network IO.
+        ssl.create_default_context(cafile=certifi.where())
+        synthetic_key = "sghvoice-self-test-synthetic-key"
+        text = "SGH Voice synthetic adapter test."
+        with tempfile.TemporaryDirectory(prefix="sghvoice-cloud-mock-") as folder:
+            wav = Path(folder) / "synthetic-silence.wav"
+            with wave.open(str(wav), "wb") as audio:
+                audio.setnchannels(1)
+                audio.setsampwidth(2)
+                audio.setframerate(16000)
+                audio.writeframes(b"\0\0" * 16000)
+            wav_bytes = wav.read_bytes()
+
+            def handle(request):
+                assert request.method == "POST"
+                assert str(request.url) == "https://api.openai.com/v1/audio/transcriptions"
+                assert request.headers["authorization"] == "Bearer " + synthetic_key
+                body = request.read()
+                header = ("Content-Type: " + request.headers["content-type"] + "\r\n\r\n").encode("ascii")
+                message = BytesParser(policy=policy.default).parsebytes(header + body)
+                fields = {part.get_param("name", header="content-disposition"): part
+                          for part in message.iter_parts()}
+                assert fields["model"].get_payload(decode=True) == b"whisper-1"
+                assert fields["file"].get_payload(decode=True) == wav_bytes
+                assert synthetic_key.encode() not in body
+                requests.append("mock")
+                return httpx.Response(200, json={"text": text})
+
+            decoder = CloudTranscriber({
+                "windows_recognition_mode": "openai-cloud", "windows_cloud_consent": True,
+                "openai_api_key": synthetic_key, "windows_language": "en",
+            }, transport=httpx.MockTransport(handle))
+            result = decoder.transcribe({"path": str(wav)}, duration=1.0)
+            assert result["raw"] == result["final"] == text
+            assert result["engine"] == "openai-whisper-1"
+        if requests != ["mock"] or attempts:
+            raise RuntimeError("Expected one mock request with zero Python network attempts")
+    finally:
+        for owner, name, original in originals:
+            setattr(owner, name, original)
+        evidence["cloud_mock_python_network_attempts"] = len(attempts)
+
+
 def self_test(report_path):
     """Frozen packaging smoke test. No credentials, microphone or network IO."""
     checks, errors = {}, []
+    cloud_evidence = {"cloud_mock_python_network_guard": False,
+                      "cloud_mock_python_network_attempts": 0}
     with tempfile.TemporaryDirectory(prefix="sghvoice-smoke-") as profile:
         os.environ["SGHVOICE_DATA_DIR"] = profile
         def check(name, action):
@@ -70,6 +145,7 @@ def self_test(report_path):
         def core_check():
             import config
             from memory import Memory
+            from windows_client.controller import WINDOWS_DEFAULTS
             from windows_client.local_stt import enforce_offline_environment
             enforce_offline_environment()
             import ctranslate2
@@ -80,6 +156,7 @@ def self_test(report_path):
             assert OpenCC("s2twp").convert("语音") == "語音"
             assert "int8" in ctranslate2.get_supported_compute_types("cpu")
             assert faster_whisper.WhisperModel
+            assert WINDOWS_DEFAULTS["windows_recognition_mode"] == "local"
             Memory()
             assert config.DATA_DIR == profile or str(config.DATA_DIR) == profile
 
@@ -88,14 +165,17 @@ def self_test(report_path):
         check("wav_roundtrip", audio_check)
         check("credential_backend", credential_backend_check)
         check("shared_core", core_check)
+        check("cloud_mock", lambda: cloud_mock_check(cloud_evidence))
         from config import APP_VERSION
         report = {
             "ok": all(checks.values()), "platform": sys.platform,
             "architecture": platform.machine(), "version": APP_VERSION,
             "checks": checks, "errors": errors,
-            "microphone_tested": False, "cloud_tested": False,
+            "microphone_tested": False, "cloud_live_tested": False,
+            "cloud_mock_tested": checks["cloud_mock"], **cloud_evidence,
             "input_delivery_tested": False, "local_inference_tested": False,
-            "recognition_mode": "local-only", "model_included": False,
+            "default_recognition_mode": "local",
+            "available_recognition_modes": ["local", "openai-cloud"], "model_included": False,
         }
     Path(report_path).write_text(json.dumps(report, indent=2), encoding="utf-8")
     return 0 if report["ok"] else 1

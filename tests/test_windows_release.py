@@ -60,8 +60,11 @@ def artifacts(tmp_path):
     smoke = tmp_path / "smoke.json"
     smoke.write_text(json.dumps({
         "ok": True, "platform": "win32", "architecture": "AMD64", "version": version,
-        "checks": {key: True for key in ("windows_native", "tk_ui", "wav_roundtrip", "credential_backend", "shared_core")},
-        "errors": [], "microphone_tested": False, "cloud_tested": False, "input_delivery_tested": False, "recognition_mode": "local-only",
+        "checks": {key: True for key in ("windows_native", "tk_ui", "wav_roundtrip", "credential_backend", "shared_core", "cloud_mock")},
+        "errors": [], "microphone_tested": False, "cloud_live_tested": False, "input_delivery_tested": False,
+        "default_recognition_mode": "local", "available_recognition_modes": ["local", "openai-cloud"],
+        "cloud_mock_tested": True, "cloud_mock_python_network_guard": True,
+        "cloud_mock_python_network_attempts": 0,
         "model_included": False, "local_inference_tested": False,
     }), encoding="utf-8")
     return installer, app, smoke, commit
@@ -86,12 +89,31 @@ def test_wrong_source_commit_fails(artifacts):
     {"platform": "darwin"}, {"ok": False}, {"checks": {}},
     {"checks": {"tk": "true"}}, {"errors": ["failed"]}, {"version": "0.0.0"},
     {"checks": {"tk": True}}, {"microphone_tested": True},
+    {"cloud_live_tested": True}, {"cloud_live_tested": None},
+    {"default_recognition_mode": "openai-cloud"},
+    {"available_recognition_modes": ["local"]},
+    {"cloud_mock_tested": False}, {"cloud_mock_tested": "true"},
+    {"cloud_mock_python_network_guard": False},
+    {"cloud_mock_python_network_attempts": 1},
+    {"cloud_mock_python_network_attempts": False},
 ])
 def test_selftest_rejects_incomplete_or_nonwindows_claims(artifacts, patch):
     _, _, smoke, _ = artifacts
     report = release.read_json(smoke)
     report.update(patch)
     with pytest.raises(ValueError):
+        release.verify_smoke(report, release.read_version())
+
+
+def test_old_local_only_report_cannot_describe_cloud_capable_binary(artifacts):
+    _, _, smoke, _ = artifacts
+    report = release.read_json(smoke)
+    for key in ("default_recognition_mode", "available_recognition_modes", "cloud_mock_tested",
+                "cloud_mock_python_network_guard", "cloud_mock_python_network_attempts", "cloud_live_tested"):
+        report.pop(key)
+    report.update(recognition_mode="local-only", cloud_tested=False)
+    report["checks"].pop("cloud_mock")
+    with pytest.raises(ValueError, match="checks are missing"):
         release.verify_smoke(report, release.read_version())
 
 

@@ -20,13 +20,16 @@ datas = [
 ]
 binaries = []
 hiddenimports = [
-    "windows_client", "windows_client.local_stt", "windows_client.models",
+    "windows_client", "windows_client.local_stt", "windows_client.cloud_stt", "windows_client.models",
     "windows_client.lexicon", "windows_client._vendor.faster_whisper",
     "config", "hotkey_config", "recorder",
     "memory", "medical_dictionary", "multilingual", "dictation_cleanup",
     "event_ledger",
     "tkinter", "tkinter.ttk", "tkinter.messagebox", "keyring.backends.Windows",
     "win32ctypes.pywin32.win32cred", "anyio._backends._asyncio",
+    # Optional cloud dictation uses the existing pinned HTTP stack, not an SDK.
+    # Keep its sync transport and the no-network frozen smoke transport explicit.
+    "httpx", "httpx._transports.default", "httpx._transports.mock", "httpcore",
     "ctranslate2._ext", "ctranslate2.models", "tokenizers.tokenizers",
     "onnxruntime.capi.onnxruntime_pybind11_state",
 ]

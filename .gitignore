@@ -57,6 +57,7 @@ docs/*
 !docs/ANDROID_RC_ACCEPTANCE.md
 !docs/MEDICAL_DICTIONARY_ROADMAP.md
 !docs/MACOS_RELEASE_RUNBOOK.md
+!docs/WINDOWS_CLOUD_MODE.md
 !docs/reviews/
 !docs/reviews/*.md
 !docs/app-store/

@@ -24,6 +24,7 @@ class Widget:
         self.options = {}
         self.text = ""
         self.undo_resets = 0
+        self.visible = True
 
     def configure(self, **kwargs):
         self.options.update(kwargs)
@@ -39,6 +40,12 @@ class Widget:
 
     def edit_reset(self):
         self.undo_resets += 1
+
+    def grid(self, **_kwargs):
+        self.visible = True
+
+    def grid_remove(self):
+        self.visible = False
 
 
 class Root:
@@ -128,6 +135,8 @@ class HeadlessApp(WindowsApp):
         self._labels = []
         self._setting_widgets = []
         defaults = {
+            "windows_recognition_mode": "local", "windows_cloud_consent": False,
+            "openai_api_key": "",
             "windows_model_dir": "", "windows_language": "ja", "ui_language": "en",
             "windows_lexicon_enabled": False, "windows_auto_insert": False,
             "windows_save_history": False, "windows_toggle_hotkey": "Ctrl+Alt+F9",
@@ -139,6 +148,7 @@ class HeadlessApp(WindowsApp):
         self.record_button, self.cancel_button, self.save_button = Widget(), Widget(), Widget()
         self.meter, self.result, self.copy_button = Widget(), Widget(), Widget()
         self.prepare_button, self.source_button = Widget(), Widget()
+        self.cloud_frame, self.local_model_frame, self.mode_notice = Widget(), Widget(), Value()
 
 
 @pytest.fixture
@@ -445,10 +455,229 @@ def test_local_model_errors_are_localized(app):
         assert app.notice.get() == LABELS["en"][code]
 
 
-def test_offline_controls_have_no_cloud_or_key_fields(app):
+def test_local_remains_default_with_only_explicit_openai_option(app):
     assert "windows_provider" not in app.vars
-    assert "windows_cloud_consent" not in app.vars
     assert "windows_polish" not in app.vars
-    assert not hasattr(app, "key_var")
+    assert app.vars["windows_recognition_mode"].get() == "local"
+    assert app.vars["windows_cloud_consent"].get() is False
     assert app.vars["windows_language"].get() == "ja"
     assert app.vars["windows_lexicon_enabled"].get() is False
+    assert not app.cloud_frame.visible
+    assert app.local_model_frame.visible
+
+
+def select_cloud(app, *, consent=True, key="synthetic-key"):
+    app.vars["windows_recognition_mode"].set("openai-cloud")
+    app._mode_changed()
+    app.vars["openai_api_key"].set(key)
+    app.vars["windows_cloud_consent"].set(consent)
+
+
+def test_cloud_startup_retains_mode_but_never_reuses_consent():
+    original = {**WINDOWS_DEFAULTS, "windows_recognition_mode": "openai-cloud",
+                "windows_cloud_consent": True, "openai_api_key": "synthetic-key", "ui_language": "en"}
+    saved = []
+    app = HeadlessApp(Root(), original, controller_factory=Controller, native=Native(),
+                      hotkeys_factory=Hotkeys, save_config=saved.append)
+    assert original["windows_cloud_consent"] is True
+    assert app.config["windows_recognition_mode"] == "openai-cloud"
+    assert app.config["windows_cloud_consent"] is False
+    assert app.controller.config["windows_cloud_consent"] is False
+    assert app.vars["windows_cloud_consent"].get() is False
+    assert "OpenAI" in app.status.get()
+    assert app._status_key == "needs_cloud_consent"
+    assert saved == []
+    app._toggle_preview()
+    assert app.controller.toggles == []
+    assert app.notice.get() == LABELS["en"]["cloud_consent_required"]
+
+
+def test_cloud_requires_save_even_after_checkbox_checked(app):
+    select_cloud(app)
+    app._toggle_preview()
+    assert app.controller.toggles == []
+    assert app.notice.get() == LABELS["en"]["dirty"]
+
+
+@pytest.mark.parametrize("consent,key,error", [(False, "synthetic", "cloud_consent_required"),
+                                               (True, "", "cloud_key_required")])
+def test_cloud_missing_requirements_never_toggle_controller(app, consent, key, error):
+    select_cloud(app, consent=consent, key=key)
+    app._save()
+    app._toggle_preview()
+    assert app.controller.toggles == []
+    assert app.notice.get() == LABELS["en"][error]
+
+
+def test_consent_is_session_only_and_cloud_does_not_need_local_model(app):
+    select_cloud(app)
+    assert app._save() is True
+    assert app.saved[-1]["windows_cloud_consent"] is False
+    assert app.saved[-1]["openai_api_key"] == "synthetic-key"
+    assert app.controller.config["windows_cloud_consent"] is True
+    assert app.controller.config["windows_model_dir"] == ""
+    assert app.cloud_frame.visible
+    assert not app.local_model_frame.visible
+    assert app.model_notice.get() == ""
+    assert app._status_key == "idle"
+    app._toggle_preview()
+    assert app.controller.toggles == [None]
+
+
+def test_mode_switch_revokes_consent_and_cannot_silently_fallback(app):
+    select_cloud(app)
+    app._save()
+    app.vars["windows_recognition_mode"].set("local")
+    app._mode_changed()
+    assert app.vars["windows_cloud_consent"].get() is False
+    app._save()
+    assert app.controller.config["windows_recognition_mode"] == "local"
+    assert app.controller.config["windows_cloud_consent"] is False
+    app.vars["windows_recognition_mode"].set("openai-cloud")
+    app._mode_changed()
+    assert app.vars["windows_cloud_consent"].get() is False
+    app._save()
+    app._toggle_preview()
+    assert app.controller.toggles == []
+
+
+def test_key_persistence_failure_leaves_cloud_unavailable_and_masks_error(app):
+    select_cloud(app)
+    def fail(_config):
+        raise RuntimeError("synthetic-key in credential failure")
+    app.save_config = fail
+    app._save()
+    assert app.controller.config["windows_recognition_mode"] == "local"
+    assert app.controller.config["windows_cloud_consent"] is False
+    assert "synthetic-key" not in app.notice.get()
+    assert app.notice.get() == LABELS["en"]["save_failed"]
+    app._toggle_preview()
+    assert app.controller.toggles == []
+
+
+def test_blank_key_preserves_existing_credential_as_disclosed(app):
+    app.config["openai_api_key"] = "previous-synthetic-key"
+    select_cloud(app, key="")
+    app._save()
+    assert app.controller.config["openai_api_key"] == "previous-synthetic-key"
+    assert app.saved[-1]["openai_api_key"] == "previous-synthetic-key"
+
+
+def test_cloud_processing_and_cancel_disclosure_are_mode_aware(app):
+    select_cloud(app)
+    app._save()
+    app.controller.state = "processing"
+    app._render_state()
+    assert app._status_key == "processing_cloud"
+    assert "OpenAI" in app.status.get()
+    assert LABELS["en"]["processing"] not in app.status.get()
+    app._cancel()
+    assert app.controller.cancelled
+    assert app.notice.get() == LABELS["en"]["cloud_cancelled"]
+
+
+def test_cloud_recording_cancel_does_not_claim_audio_was_sent(app):
+    select_cloud(app)
+    app._save()
+    app.controller.state = "recording"
+    app._cancel()
+    assert app.notice.get() == ""
+
+
+def test_cloud_errors_do_not_switch_recognition_mode(app):
+    select_cloud(app)
+    app._save()
+    for code in ("cloud_key_required", "cloud_audio_invalid", "cloud_request_failed",
+                 "cloud_auth_failed", "cloud_rate_limited", "cloud_timeout", "cloud_invalid_response"):
+        app.enqueue("error", code)
+        app._pump()
+        assert app.notice.get() == LABELS["en"][code]
+        assert app.config["windows_recognition_mode"] == "openai-cloud"
+        assert app.controller.prepare_calls == 0
+
+
+def test_cloud_model_controls_cannot_trigger_download_or_folder_picker(app):
+    select_cloud(app)
+    app._save()
+    app.confirm_download = lambda *_args, **_kwargs: pytest.fail("Unexpected model prompt")
+    app.choose_directory = lambda **_kwargs: pytest.fail("Unexpected folder picker")
+    app.open_url = lambda _url: pytest.fail("Unexpected model source navigation")
+    app._prepare_model()
+    app._browse_model()
+    app._open_model_source()
+    assert app.controller.prepare_calls == 0
+    assert app.prepare_button.options["state"] == "disabled"
+
+
+def test_generic_cloud_failure_never_claims_local_processing(app):
+    select_cloud(app)
+    app._save()
+    app.enqueue("error", "transcription_failed")
+    app._pump()
+    assert app.notice.get() == LABELS["en"]["cloud_request_failed"]
+
+
+def test_cloud_can_save_when_unused_model_path_is_invalid(app):
+    app.vars["windows_model_dir"].set("obsolete-relative-model")
+    select_cloud(app)
+    assert app._save() is True
+    assert app._status_key == "idle"
+
+
+def test_invalid_recognition_mode_cannot_be_saved(app):
+    app.vars["windows_recognition_mode"].set("automatic-cloud-fallback")
+    app._save()
+    assert app.saved == []
+    assert app.notice.get() == LABELS["en"]["invalid_settings"]
+
+
+def test_real_widget_builder_masks_key_and_keeps_mode_controls_visible(monkeypatch):
+    """Exercise _build itself with fake Tk surfaces, without an OS GUI."""
+    import sys
+    from types import ModuleType
+
+    widgets = []
+    class TkWidget(Widget):
+        def __init__(self, parent=None, **options):
+            super().__init__()
+            self.parent = parent
+            self.options.update(options)
+            widgets.append(self)
+        def pack(self, **_kwargs):
+            pass
+        def bind(self, *_args):
+            pass
+        def rowconfigure(self, *_args, **_kwargs):
+            pass
+        columnconfigure = rowconfigure
+        def create_window(self, *_args, **_kwargs):
+            return 1
+        def yview(self, *_args):
+            pass
+        def set(self, *_args):
+            pass
+    class TkValue(Value):
+        def trace_add(self, *_args):
+            pass
+    tk = ModuleType("tkinter")
+    ttk = ModuleType("tkinter.ttk")
+    tk.StringVar = tk.BooleanVar = TkValue
+    tk.Canvas = tk.Text = TkWidget
+    for name in ("Frame", "Label", "LabelFrame", "Button", "Radiobutton", "Checkbutton",
+                 "Entry", "Combobox", "Progressbar", "Scrollbar"):
+        setattr(ttk, name, TkWidget)
+    tk.ttk = ttk
+    monkeypatch.setitem(sys.modules, "tkinter", tk)
+    monkeypatch.setitem(sys.modules, "tkinter.ttk", ttk)
+    root = Root()
+    root.geometry = root.minsize = lambda *_args: None
+    config = {**WINDOWS_DEFAULTS, "windows_recognition_mode": "openai-cloud",
+              "windows_cloud_consent": True, "openai_api_key": "synthetic-secret", "ui_language": "en"}
+    actual = WindowsApp(root, config, controller_factory=Controller, native=Native(),
+                        hotkeys_factory=Hotkeys, save_config=lambda _config: None)
+    assert actual.key_entry.options["show"] == "•"
+    assert actual.key_entry.options["textvariable"].get() == "synthetic-secret"
+    assert not any("synthetic-secret" in str(widget.options.get("text", "")) for widget in widgets)
+    assert actual.cloud_frame.visible and not actual.local_model_frame.visible
+    assert actual.vars["windows_cloud_consent"].get() is False
+    assert {widget.options.get("value") for widget in widgets if "value" in widget.options} >= {"local", "openai-cloud"}
