@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([double]$MaxCer = 0.25, [int]$BenchmarkSeconds = 900)
+param([double]$MaxCer = 0.15, [int]$BenchmarkSeconds = 2100)
 
 # CI entry point for the Windows offline (Japanese, medical) edition, called by
 # .github/workflows/windows-medical.yml. Keeping the steps here lets the build
@@ -8,6 +8,7 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 if ($env:OS -ne 'Windows_NT') { throw 'Windows CI only.' }
 $RepoRoot = Split-Path -Parent $PSScriptRoot
+$env:PYTHONIOENCODING = 'utf-8'
 Push-Location $RepoRoot
 try {
     function Step([string]$Name, [scriptblock]$Body) {
@@ -44,7 +45,7 @@ try {
         Step 'Model selection benchmark (public FLEURS ja_jp)' {
             & python -m pip install --only-binary=:all: psutil==7.0.0 | Out-Null
             Get-CimInstance Win32_Processor | Select-Object Name, NumberOfCores, NumberOfLogicalProcessors | Format-List | Out-String | Write-Host
-            & python scripts/benchmark_windows_ja_stt.py --work-dir (Join-Path $env:RUNNER_TEMP 'ja-stt-bench') --clips 20 --deadline $BenchmarkSeconds --long-form
+            & python scripts/benchmark_windows_ja_stt.py --work-dir (Join-Path $env:RUNNER_TEMP 'ja-stt-bench') --clips 15 --deadline $BenchmarkSeconds --long-form
             if ($LASTEXITCODE -ne 0) { Write-Host "::warning::benchmark exited with $LASTEXITCODE" }
         }
     }
@@ -55,6 +56,8 @@ try {
     'Not tested here: physical microphone, global hotkeys, target-app input, standard-user rights, LTSC/VDI, medical dictation accuracy. Unsigned; nothing published.' |
         Out-File -Append -Encoding utf8 $env:GITHUB_STEP_SUMMARY
     Write-Host 'PASS Windows offline edition CI.'
+    # The optional benchmark may leave a non-zero native exit code behind.
+    $global:LASTEXITCODE = 0
 } finally {
     Pop-Location
 }

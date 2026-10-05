@@ -181,6 +181,8 @@ def run_one(work, key, threads, long_form=False):
         "long_form_excerpt": long_text[:200], "peak_mb": peak_memory_mb(), "rows": rows,
     }
     (work / f"result-{key}.json").write_text(json.dumps(result, ensure_ascii=False, indent=1), encoding="utf-8")
+    summary = {k: v for k, v in result.items() if k not in ("rows", "long_form_excerpt")}
+    print("BENCHMARK_RESULT " + json.dumps(summary), flush=True)
 
 
 def report(work):
@@ -211,6 +213,10 @@ def report(work):
 
 
 def main():
+    # Windows CI consoles default to cp1252; Japanese report text must not crash.
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
     parser = argparse.ArgumentParser()
     parser.add_argument("--work-dir", required=True)
     parser.add_argument("--clips", type=int, default=40)

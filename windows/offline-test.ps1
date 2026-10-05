@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([double]$MaxCer = 0.20)
+param([double]$MaxCer = 0.15)
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 if ($env:OS -ne 'Windows_NT') { throw 'Offline frozen-runtime test requires Windows.' }

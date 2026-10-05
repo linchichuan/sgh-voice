@@ -3,15 +3,37 @@
   "id": "kotoba-whisper-v2.0-ct2",
   "name": "kotoba-whisper v2.0 (Japanese, CPU int8)",
   "repository": "kotoba-tech/kotoba-whisper-v2.0-faster",
-  "revision": "PENDING_REVISION",
+  "revision": "f44edd35eaeb2274e85ac7b31fb2c6f59ff1c4bc",
   "source_url": "https://huggingface.co/kotoba-tech/kotoba-whisper-v2.0-faster",
   "license": "MIT (CTranslate2 conversion); base model kotoba-tech/kotoba-whisper-v2.0 is Apache-2.0",
-  "languages": ["ja"],
+  "languages": [
+    "ja"
+  ],
   "files": [
-    {"name": "config.json", "size": 2394, "sha256": "PENDING"},
-    {"name": "model.bin", "size": 1512927867, "sha256": "PENDING"},
-    {"name": "preprocessor_config.json", "size": 340, "sha256": "PENDING"},
-    {"name": "tokenizer.json", "size": 2481381, "sha256": "PENDING"},
-    {"name": "vocabulary.json", "size": 1068114, "sha256": "PENDING"}
+    {
+      "name": "config.json",
+      "size": 2394,
+      "sha256": "a9306624f5ec14270a014b647e5c316b6e03a662c369758d1b90697a7b0655b9"
+    },
+    {
+      "name": "model.bin",
+      "size": 1512927867,
+      "sha256": "60d2bc2e33de9d43f2745be09caefe1161acab670f6796d4a750d8d848382b36"
+    },
+    {
+      "name": "preprocessor_config.json",
+      "size": 340,
+      "sha256": "7ccc62c6f2765af1f3b46c00c9b5894426835a05021c8b9c01eecb6dfb542711"
+    },
+    {
+      "name": "tokenizer.json",
+      "size": 2481381,
+      "sha256": "f70c9740a90657b489cf05b0fa0605c1d497db542f11a70a8cc80a025c94c7d8"
+    },
+    {
+      "name": "vocabulary.json",
+      "size": 1068114,
+      "sha256": "c69260f2ab26d659b7c398f9a2b2b48ed0df16c3b47d7326782fd9cba71690c1"
+    }
   ]
 }

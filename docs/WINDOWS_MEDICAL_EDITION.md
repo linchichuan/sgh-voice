@@ -36,23 +36,27 @@ SGHVoice-Windows-<ver>-x64-unsigned.exe（全機安裝）
 
 ## 驗證方式（CI）
 
-GitHub App 沒有修改 workflow 的權限，所以沿用既有的手動 workflow `windows-build.yml`，由人在 GitHub 上觸發（Actions → Windows installer (manual, unsigned) → Run workflow → 選擇分支）。它會依序執行：
+`.github/workflows/windows-medical.yml`（由使用者建立）在這條分支每次 push 時，於 GitHub 標準 Windows runner 執行 `windows/ci-medical.ps1`：
 
-1. Windows 原始碼測試
-2. `windows/build.ps1`：PyInstaller → 下載並驗證模型 → frozen 自我測試（含 `bundled_model`）→ Inno Setup → 發行檢查 → 產生 `SHA256SUMS.txt`
-3. `windows/offline-test.ps1`：在封鎖 Python 網路連線的狀態下，用安裝包內的模型（完整 SHA-256 驗證）辨識 5 段 FLEURS 日文語音，字錯率需低於上限
+1. Windows 原始碼測試（ruff + pytest）
+2. `windows/build.ps1`：PyInstaller → 依清單下載並驗證模型 → frozen 自我測試（含 `bundled_model`）→ Inno Setup → 發行檢查 → `SHA256SUMS.txt`
+3. `windows/offline-test.ps1`：封鎖 Python 網路連線，用安裝包內的模型（完整 SHA-256 驗證）辨識 5 段 FLEURS 日文語音，字錯率上限 15%
 4. `windows/install-test.ps1`：全機安裝 → 逐檔比對 → HKLM 登錄 → 共用捷徑 → 安裝後自我測試 → 解除安裝
+5. 模型比較（kotoba／large-v3-turbo／small／base）
 
-## 狀態
+## 實測結果（2026-10-05，Windows Server 2022 runner，AMD EPYC 2 核 4 執行緒）
 
-| 項目 | 狀態 |
+| 項目 | 結果 |
 |---|---|
-| W1 以 r2 為基礎、移植 CI 監控 | 完成 |
-| W2 日文模型評測 | 腳本完成；Windows CI 執行結果見下方 |
-| W3–W7 實作 | 完成；本機（Linux）Windows 測試全數通過；Windows CI 建置待執行 |
-| W8 程式碼簽章 | 未開始（需購買憑證） |
-| W9 實機驗證 | 未開始（需實體 Windows 端末） |
-| W10 文件 | 日文導入手順書 `docs/ja/windows-offline-install-guide.md`、SHA256SUMS 自動產生、授權聲明已加入模型段落 |
+| 建置 | PASS；安裝檔 `SGHVoice-Windows-2.7.5-x64-unsigned.exe`（run #2，鎖定測試建置） |
+| 模型 | `kotoba-tech/kotoba-whisper-v2.0-faster@f44edd35eaeb2274e85ac7b31fb2c6f59ff1c4bc`，已固定於 `model-ja-v1.json` |
+| 模型 SHA-256 驗證 | 1.55 秒（1.5 GB） |
+| 離線日文辨識 | 5 段 FLEURS 唸稿，整體字錯率 6.5%（0%～10.3%），網路連線嘗試 0 次 |
+| 速度 | 每段約 10～15 秒的語音，辨識約 12 秒（runner 只有 2 核；一般辦公室電腦需實測） |
+| 全機安裝／解除安裝 | PASS |
+| 模型比較 | 已執行，但報表輸出時遇到 cp1252 編碼錯誤而遺失；已修正，下一輪重新取得 |
+
+FLEURS 是唸稿的維基百科句子，**不代表醫療口述的準確度**。錯誤例：「NSA→NASA」「正常化→成長化」「人質事件→一時試験」「森林→神殿」，同音詞與專有名詞仍需人工確認。
 
 ## 尚待處理（交付前必須完成）
 
