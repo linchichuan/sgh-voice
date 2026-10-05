@@ -27,3 +27,7 @@ jobs:
       - name: Build and verify (steps live in windows/ci-medical.ps1)
         shell: pwsh
         run: ./windows/ci-medical.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SGHVoice-Windows-offline
+          path: dist/windows/*.exe
