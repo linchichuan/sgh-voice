@@ -41,9 +41,7 @@ try {
     if (-not (Test-Path $AppExe)) { throw 'Application executable missing.' }
     # The pinned speech model ships inside the installer: users never download it.
     # Every file is checked against resources/windows/model-ja-v1.json (size + SHA-256).
-    # TEMPORARY (first locked test build; reverted once pins are committed):
-    # pin the unpinned manifest from the Hub and write it into the bundle.
-    & python scripts/fetch_windows_model.py --dest (Join-Path $AppDirectory 'models') --lock-unpinned --write-manifest (Join-Path $AppDirectory '_internal\resources\windows\model-ja-v1.json')
+    & python scripts/fetch_windows_model.py --dest (Join-Path $AppDirectory 'models')
     if ($LASTEXITCODE -ne 0) { throw 'Pinned model fetch or verification failed.' }
     $SmokeReport = Join-Path $DistRoot 'windows-smoke.json'
     $Smoke = Start-Process -FilePath $AppExe -ArgumentList @('--self-test', "`"$SmokeReport`"") -Wait -PassThru
@@ -62,11 +60,6 @@ try {
     [IO.File]::WriteAllLines((Join-Path $DistRoot 'SHA256SUMS.txt'), [string[]]$Sums, [Text.UTF8Encoding]::new($false))
     Get-Content -LiteralPath (Join-Path $DistRoot 'SHA256SUMS.txt') | Write-Host
     Write-Host "PASS unsigned build: $Installer"
-    # TEMPORARY model-selection benchmark (reverted with the lock flag above).
-    & python -m pip install --only-binary=:all: psutil==7.0.0 | Out-Null
-    Get-CimInstance Win32_Processor | Select-Object Name, NumberOfCores, NumberOfLogicalProcessors | Format-List | Out-String | Write-Host
-    & python scripts/benchmark_windows_ja_stt.py --work-dir (Join-Path $env:RUNNER_TEMP 'ja-stt-bench') --clips 12 --deadline 360
-    if ($LASTEXITCODE -ne 0) { Write-Host "::warning::benchmark exited with $LASTEXITCODE" }
     Write-Host 'Windows microphone/hotkey/target-paste acceptance remains NOT RUN. Nothing was published.'
 } finally {
     Remove-Item Env:SGH_WINDOWS_BUILD_INFO -ErrorAction SilentlyContinue
