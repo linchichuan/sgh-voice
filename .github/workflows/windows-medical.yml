@@ -1,0 +1,29 @@
+name: Windows medical offline build
+
+on:
+  push:
+    branches: [ccr-0bdb0e97-3m6efc]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-medical-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: windows-2022
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+          architecture: x64
+      - name: Build and verify (steps live in windows/ci-medical.ps1)
+        shell: pwsh
+        run: ./windows/ci-medical.ps1
