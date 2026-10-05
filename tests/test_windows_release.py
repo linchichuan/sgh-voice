@@ -124,7 +124,10 @@ def test_public_gate_requires_exact_acceptance_record(artifacts, tmp_path):
 
 
 def test_no_automatic_windows_workflow_or_publication():
+    import yaml
     workflow = (ROOT / ".github/workflows/windows-build.yml").read_text(encoding="utf-8")
+    parsed = yaml.load(workflow, Loader=yaml.BaseLoader)
+    assert set(parsed["on"]) == {"workflow_dispatch"}
     assert "workflow_dispatch:" in workflow
     assert "  push:" not in workflow
     assert "  pull_request:" not in workflow

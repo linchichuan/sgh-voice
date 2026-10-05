@@ -60,7 +60,7 @@ def test_existing_unknown_folder_is_preserved(tmp_path, fixture):
     (dest / "user.txt").write_text("keep")
     with pytest.raises(models.ModelDownloadError, match="model_invalid"):
         models.prepare_model(tmp_path, opener=fixture.opener)
-    assert (dest / "user.txt").read_text() == "keep"
+    assert (dest / "user.txt").read_text(encoding="utf-8") == "keep"
 
 
 @pytest.mark.parametrize("url", ["http://huggingface.co/a", "https://evil.test/a",

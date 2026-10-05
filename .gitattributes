@@ -1,0 +1,3 @@
+# Preserve reviewed upstream/vendor hashes identically on Windows checkouts.
+windows_client/_vendor/faster_whisper/** text eol=lf
+windows_client/_vendor/faster_whisper/assets/*.onnx -text

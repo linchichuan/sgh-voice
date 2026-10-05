@@ -1,0 +1,100 @@
+name: Windows offline repair verification (bounded, no upload)
+
+on:
+  push:
+    branches: [codex/windows-build-offline-20261004-r2]
+    paths: [.github/workflows/windows-repair-verify-once.yml]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-offline-repair-verification-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    if: github.repository == 'linchichuan/sgh-voice' && !github.event.deleted && github.run_attempt == '1'
+    runs-on: windows-2022
+    timeout-minutes: 25
+    env:
+      PYTHONUTF8: '0'
+      PYTHONIOENCODING: utf-8
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+          architecture: x64
+      - name: Install existing hash-pinned dependencies
+        shell: pwsh
+        timeout-minutes: 3
+        run: |
+          python -m pip install --require-hashes --only-binary=:all: -r requirements-windows-build.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Run both original regressions first without UTF-8 mode
+        shell: pwsh
+        timeout-minutes: 2
+        run: |
+          python -c "import locale,sys; print('locale encoding:', locale.getencoding()); assert sys.flags.utf8_mode == 0"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m pytest tests/test_windows_local_stt.py::test_vendored_files_match_recorded_provenance_and_only_expected_patches tests/test_windows_local_stt.py::test_vendored_implicit_model_download_is_disabled -vv -o addopts=
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Audit remaining locale-dependent text reads
+        shell: pwsh
+        timeout-minutes: 1
+        run: |
+          @'
+          import ast
+          from pathlib import Path
+          paths = set(Path('windows_client').rglob('*.py'))
+          paths.update(Path('tests').glob('test_windows*.py'))
+          paths.update(Path('scripts').glob('*windows*.py'))
+          paths.update(Path(p) for p in ('windows_launcher.py', 'config.py', 'recorder.py', 'event_ledger.py', 'voiceprint.py', 'medical_dictionary.py', 'dictation_cleanup.py'))
+          # Inventory only: binary/OS/HTTP open calls are reviewed separately.
+          for path in sorted(paths):
+              source = path.read_text(encoding='utf-8')
+              for node in ast.walk(ast.parse(source)):
+                  if not isinstance(node, ast.Call):
+                      continue
+                  func = node.func
+                  name = func.attr if isinstance(func, ast.Attribute) else func.id if isinstance(func, ast.Name) else ''
+                  if name not in {'read_text', 'open'} or any(k.arg == 'encoding' for k in node.keywords):
+                      continue
+                  if name == 'read_text' and node.args:
+                      continue
+                  mode = next((k.value for k in node.keywords if k.arg == 'mode'), node.args[1] if len(node.args) > 1 else None)
+                  if isinstance(mode, ast.Constant) and isinstance(mode.value, str) and 'b' in mode.value:
+                      continue
+                  print(f'{path.as_posix()}:{node.lineno}: {ast.get_source_segment(source, node)}')
+          '@ | python -
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Validate all Windows source tests
+        shell: pwsh
+        timeout-minutes: 4
+        run: |
+          $Tests = @(Get-ChildItem tests/test_windows*.py | Sort-Object Name | ForEach-Object FullName)
+          if (-not $Tests.Count) { throw 'Windows tests missing' }
+          python -m ruff check windows_launcher.py windows_client scripts/verify_windows_release.py @Tests --select E9,F63,F7,F82
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m pytest @Tests -q -o addopts=
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build and self-test unsigned installer
+        shell: pwsh
+        timeout-minutes: 10
+        run: ./windows/build.ps1
+      - name: Verify bundled offline CPU inference
+        shell: pwsh
+        timeout-minutes: 5
+        run: ./windows/offline-test.ps1
+      - name: Install, self-test and uninstall
+        shell: pwsh
+        timeout-minutes: 5
+        run: ./windows/install-test.ps1
+      - name: Record scope without publishing or uploading
+        shell: pwsh
+        run: |
+          'Both original regressions, all Windows tests, unsigned build, synthetic offline inference and CI install/uninstall passed. No release, draft asset, website, artifact or cache upload. Microphone, real speech accuracy, hotkey/paste and standard-user Windows 10/11 acceptance remain NOT RUN.' >> $env:GITHUB_STEP_SUMMARY

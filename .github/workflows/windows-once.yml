@@ -2,13 +2,13 @@ name: Windows offline preview — one bounded build
 
 on:
   push:
-    branches: [codex/windows-build-offline-20261004]
+    branches: [codex/windows-build-offline-20261004-r2]
 
 permissions:
   contents: write
 
 env:
-  SOURCE_COMMIT: 6412106f6866ca3c3e24fc09bf71eca3423b7bf3
+  SOURCE_COMMIT: 4750f47dbb86efd11db77292f8f03d10a8068b2d
   RELEASE_TAG: windows-offline-preview-20261004
 
 jobs:
