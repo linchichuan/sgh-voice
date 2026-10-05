@@ -3,6 +3,7 @@ import hashlib
 import importlib.util
 import io
 import json
+import os
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -51,7 +52,10 @@ def test_modified_model_is_rehashed_and_rejected(tmp_path, synthetic):
     folder = write_model(tmp_path / "model", synthetic.data)
     cache = tmp_path / "profile"
     models.verified_model_dir(folder, cache_dir=cache, manifest=synthetic.manifest)
-    (folder / "model.bin").write_bytes(b"X" * len(synthetic.data))  # same size, new mtime
+    # Same size, and on Windows often the same mtime tick: the edge digest differs.
+    stat = (folder / "model.bin").stat()
+    (folder / "model.bin").write_bytes(b"X" * len(synthetic.data))
+    os.utime(folder / "model.bin", ns=(stat.st_atime_ns, stat.st_mtime_ns))
     with pytest.raises(models.ModelIntegrityError, match="model_invalid"):
         models.verified_model_dir(folder, cache_dir=cache, manifest=synthetic.manifest)
 

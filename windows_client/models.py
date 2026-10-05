@@ -64,11 +64,27 @@ def _model_file(directory, spec):
     return path
 
 
+SAMPLE_BYTES = 1024 * 1024
+
+
+def _edge_digest(path):
+    """SHA-256 of the first and last MiB: cheap, catches rewrites that keep the
+    size and land within the filesystem's timestamp resolution."""
+    digest = hashlib.sha256()
+    with Path(path).open("rb") as stream:
+        digest.update(stream.read(SAMPLE_BYTES))
+        size = stream.seek(0, 2)
+        stream.seek(max(0, size - SAMPLE_BYTES))
+        digest.update(stream.read(SAMPLE_BYTES))
+    return digest.hexdigest()
+
+
 def _fingerprint(directory, manifest):
     files = []
     for spec in manifest["files"]:
-        stat = _model_file(directory, spec).stat()
-        files.append([spec["name"], stat.st_size, stat.st_mtime_ns])
+        path = _model_file(directory, spec)
+        stat = path.stat()
+        files.append([spec["name"], stat.st_size, stat.st_mtime_ns, _edge_digest(path)])
     return {"revision": manifest["revision"], "directory": str(directory), "files": files}
 
 
@@ -88,8 +104,9 @@ def verified_model_dir(directory=None, *, cache_dir=None, manifest=None):
     """Return the bundled model folder after integrity verification.
 
     The first launch hashes every file (seconds on an SSD). The result is cached
-    per user, keyed by revision, sizes and modification times, so later launches
-    only re-check sizes. Any change to the installed files forces a full check.
+    per user, keyed by revision, sizes, modification times and the first/last
+    MiB of each file, so later launches stay fast. Any detected change to the
+    installed files forces a full check.
     """
     manifest = manifest or MANIFEST
     directory = Path(directory) if directory is not None else bundled_model_dir()
