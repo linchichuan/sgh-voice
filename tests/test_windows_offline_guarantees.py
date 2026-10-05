@@ -39,7 +39,8 @@ def test_model_download_tooling_is_build_time_only():
     assert "benchmark_windows_ja_stt" not in spec
     assert "prepare_windows_speech_fixture" not in spec
     build = (ROOT / "windows/build.ps1").read_text(encoding="utf-8")
-    assert "scripts/fetch_windows_model.py --dest (Join-Path $AppDirectory 'models')" in build
+    assert "@('scripts/fetch_windows_model.py', '--dest', (Join-Path $AppDirectory 'models'))" in build
+    assert "if ($LockUnpinnedModel)" in build  # lock mode is opt-in only
     assert build.index("fetch_windows_model.py") < build.index("--self-test")
 
 

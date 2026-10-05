@@ -1,5 +1,8 @@
 [CmdletBinding()]
-param([switch]$PreflightOnly)
+# -LockUnpinnedModel: TEST BUILDS ONLY. While resources/windows/model-ja-v1.json
+# is not yet pinned, pin it from what the Hub serves now and write the locked
+# manifest into the bundle. A pinned manifest is always verified strictly.
+param([switch]$PreflightOnly, [switch]$LockUnpinnedModel)
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
@@ -41,7 +44,11 @@ try {
     if (-not (Test-Path $AppExe)) { throw 'Application executable missing.' }
     # The pinned speech model ships inside the installer: users never download it.
     # Every file is checked against resources/windows/model-ja-v1.json (size + SHA-256).
-    & python scripts/fetch_windows_model.py --dest (Join-Path $AppDirectory 'models')
+    $FetchArguments = @('scripts/fetch_windows_model.py', '--dest', (Join-Path $AppDirectory 'models'))
+    if ($LockUnpinnedModel) {
+        $FetchArguments += @('--lock-unpinned', '--write-manifest', (Join-Path $AppDirectory '_internal\resources\windows\model-ja-v1.json'))
+    }
+    & python @FetchArguments
     if ($LASTEXITCODE -ne 0) { throw 'Pinned model fetch or verification failed.' }
     $SmokeReport = Join-Path $DistRoot 'windows-smoke.json'
     $Smoke = Start-Process -FilePath $AppExe -ArgumentList @('--self-test', "`"$SmokeReport`"") -Wait -PassThru
