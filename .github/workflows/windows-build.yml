@@ -26,15 +26,18 @@ jobs:
       - name: Install pinned build dependencies
         run: |
           python -m pip install --require-hashes --only-binary=:all: -r requirements-windows-build.txt
-      - name: Validate Windows source and release contracts
+      - name: Check Windows source and release contracts with Ruff
         shell: pwsh
+        timeout-minutes: 3
         run: |
           $Tests = @(Get-ChildItem tests/test_windows*.py | ForEach-Object FullName)
           if (-not $Tests.Count) { throw 'Windows tests missing' }
           python -m ruff check windows_launcher.py windows_client scripts/verify_windows_release.py @Tests --select E9,F63,F7,F82
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          python -m pytest @Tests -q -o addopts=
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Supervise Windows source tests with durable hang diagnostics
+        shell: pwsh
+        timeout-minutes: 4
+        run: ./windows/diagnose-tests.ps1
       - name: Build and self-test unsigned installer
         shell: pwsh
         run: ./windows/build.ps1
