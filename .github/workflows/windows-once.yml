@@ -2,7 +2,7 @@ name: Windows 2.7.6 preview — one bounded build
 
 on:
   push:
-    branches: [codex/windows-build-cloud-20261005]
+    branches: [codex/windows-build-cloud-20261005-r2]
 
 permissions:
   contents: write
@@ -37,13 +37,19 @@ jobs:
         run: |
           python -m pip install --require-hashes --only-binary=:all: -r requirements-windows-build.txt
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: Validate Windows source
+      - name: Check Windows source with Ruff
         shell: pwsh
+        timeout-minutes: 3
         run: |
           $Tests = @(Get-ChildItem tests/test_windows*.py | ForEach-Object FullName)
           python -m ruff check windows_launcher.py windows_client scripts/verify_windows_release.py @Tests --select E9,F63,F7,F82
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          python -m pytest @Tests -q -o addopts=
+      - name: Test Windows source with hang diagnostics
+        shell: pwsh
+        timeout-minutes: 5
+        run: |
+          $Tests = @(Get-ChildItem tests/test_windows*.py | ForEach-Object FullName)
+          python -m pytest @Tests -vv --durations=20 -o addopts= -o faulthandler_timeout=45 -o faulthandler_exit_on_timeout=True
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Build and self-test unsigned installer
         shell: pwsh
