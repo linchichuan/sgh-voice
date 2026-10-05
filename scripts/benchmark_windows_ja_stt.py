@@ -14,6 +14,7 @@ Usage (Windows CI):
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -82,8 +83,18 @@ def prepare(work, clips):
         allow = [name for name in MODEL_FILES if name in names]
         path = snapshot_download(spec["repo"], revision=info.sha, allow_patterns=allow,
                                  local_dir=str(work / "models" / key))
-        models[key] = {**spec, "revision": info.sha, "path": path,
+        files = []
+        for name in allow:
+            digest = hashlib.sha256()
+            with open(Path(path) / name, "rb") as stream:
+                for block in iter(lambda: stream.read(1024 * 1024), b""):
+                    digest.update(block)
+            files.append({"name": name, "size": names[name], "sha256": digest.hexdigest()})
+        models[key] = {**spec, "revision": info.sha, "path": path, "files": files,
                        "bytes": sum(names[n] for n in allow)}
+        print("MODEL_PIN " + json.dumps({"key": key, "repository": spec["repo"], "revision": info.sha,
+                                         "license": getattr(info.card_data, "license", None) if info.card_data else None,
+                                         "files": files}))
     tsv = Path(hf_hub_download(FLEURS_REPO, FLEURS_TSV, repo_type="dataset"))
     seen, chosen = set(), {}
     for line in tsv.read_text(encoding="utf-8").splitlines():
