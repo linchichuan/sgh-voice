@@ -247,12 +247,14 @@
                     </article>
                     <article class="download-card platform-card platform-card-windows" id="windowsPreviewEntry" aria-labelledby="platform-windows-title">
                         <span class="release-type"><span class="platform-copy" lang="zh-Hant">未簽章測試版</span><span class="platform-copy" lang="ja">未署名テスト版</span><span class="platform-copy" lang="en">UNSIGNED TEST PREVIEW</span></span>
+                        <!-- TODO_WINDOWS_276_RELEASE: Draft only. Update Windows version, installer metadata and links together after the real 2.7.6 build; keep Mac and Android entries unchanged. -->
                         <h3 id="platform-windows-title">Windows</h3>
                         <p class="platform-version">2.7.5 <span aria-hidden="true">·</span> x64</p>
-                        <p><span class="platform-copy" lang="zh-Hant">本機 CPU 語音辨識，不需要 API 金鑰，不會退回雲端辨識。首次需另行準備約 148 MB 模型。</span><span class="platform-copy" lang="ja">CPU でローカル音声認識。API キーやクラウドへの切り替えはありません。初回は約148 MBのモデルを別途準備します。</span><span class="platform-copy" lang="en">Local CPU speech recognition with no API key or cloud fallback. Prepare a separate model of about 148 MB on first use.</span></p>
-                        <p class="platform-detail"><span class="platform-copy" lang="zh-Hant">.exe 安裝檔 · 43.6 MB · 實機麥克風與日常貼字尚待驗證，請先閱讀限制。</span><span class="platform-copy" lang="ja">.exe · 43.6 MB · 実機マイクと普段のアプリへの入力は未検証です。制限をご確認ください。</span><span class="platform-copy" lang="en">.exe · 43.6 MB · Real microphone capture and everyday text insertion remain unverified. Read the limitations first.</span></p>
-                        <a class="btn btn-primary" href="windows-preview.html"><span class="platform-copy" lang="zh-Hant">查看並下載 Windows 測試版</span><span class="platform-copy" lang="ja">Windows テスト版の詳細・ダウンロード</span><span class="platform-copy" lang="en">Get the Windows test preview</span></a>
-                        <a class="text-link" href="windows-preview.html#verification-title"><span class="platform-copy" lang="zh-Hant">查看驗證範圍與安裝說明 →</span><span class="platform-copy" lang="ja">検証範囲とセットアップ →</span><span class="platform-copy" lang="en">Verification and setup details →</span></a>
+                        <p><span class="platform-copy" lang="zh-Hant">Windows 程式免費。本機 CPU 語音轉文字，不需 API 金鑰；準備好約 148 MB 模型後即可離線使用。</span><span class="platform-copy" lang="ja">Windowsアプリは無料。PCのCPUで文字起こしを行い、APIキーは不要です。約148 MBのモデルを準備すればオフラインで使えます。</span><span class="platform-copy" lang="en">Free Windows app with local CPU transcription. No API key needed. Prepare the roughly 148 MB model, then use it offline.</span></p>
+                        <p class="platform-detail"><span class="platform-copy" lang="zh-Hant">.exe · 43.6 MB · 目前 2.7.5 僅支援本機模式。</span><span class="platform-copy" lang="ja">.exe · 43.6 MB · 現在の2.7.5はローカルのみ。</span><span class="platform-copy" lang="en">.exe · 43.6 MB · Current 2.7.5: local only.</span></p>
+                        <p class="platform-detail"><span class="platform-copy" lang="zh-Hant">2.7.6 雲端模式開發中，尚未提供下載；預計使用自備 OpenAI API 金鑰，費用由你的 API 帳戶另計。</span><span class="platform-copy" lang="ja">2.7.6のクラウド機能は開発中・未配布です。ご自身のOpenAI APIキーを使い、API料金は別途かかる予定です。</span><span class="platform-copy" lang="en">Cloud mode for 2.7.6 is in development and not available yet. It will use your OpenAI API key, with usage billed separately to your API account.</span></p>
+                        <a class="btn btn-primary" href="windows-preview.html" data-windows-preview-link><span class="platform-copy" lang="zh-Hant">查看並下載 Windows 測試版</span><span class="platform-copy" lang="ja">Windows テスト版の詳細・ダウンロード</span><span class="platform-copy" lang="en">Get the Windows test preview</span></a>
+                        <a class="text-link" href="windows-preview.html#modes-title" data-windows-preview-link><span class="platform-copy" lang="zh-Hant">本機／雲端差異與安裝說明 →</span><span class="platform-copy" lang="ja">ローカル・クラウドの違いと使い方 →</span><span class="platform-copy" lang="en">Local, cloud and setup details →</span></a>
                     </article>
                     <article class="download-card platform-card" aria-labelledby="platform-android-title">
                         <span class="release-type"><span class="platform-copy" lang="zh-Hant">既有側載版更新</span><span class="platform-copy" lang="ja">既存サイドロード版の更新</span><span class="platform-copy" lang="en">EXISTING SIDELOAD UPDATE</span></span>
@@ -519,7 +521,8 @@
                     <span class="section-kicker" data-i18n="privacy.kicker">KNOW THE DATA ROUTE</span>
                     <h2 data-i18n="privacy.title">你的資料，先說清楚。</h2>
                     <p data-i18n="privacy.subtitle">語音與文字會交由所選 STT／AI 處理；API 金鑰加密保存在裝置。</p>
-                    <p><span class="platform-copy" lang="zh-Hant">本節說明 Android 版。Windows 測試版在模型準備完成後於本機辨識，不使用雲端辨識或 LLM 整理；請以 <a href="windows-preview.html">Windows 說明頁</a>的資料流程為準。</span><span class="platform-copy" lang="ja">この節は Android 版の説明です。Windows テスト版はモデル準備後にローカルで認識し、クラウド認識や LLM 整理を行いません。データの扱いは <a href="windows-preview.html">Windows の説明</a>をご確認ください。</span><span class="platform-copy" lang="en">This section describes Android. The Windows preview recognizes speech locally after model setup, without cloud recognition or LLM rewriting. See the <a href="windows-preview.html">Windows data-flow details</a>.</span></p>
+                    <!-- TODO_WINDOWS_276_RELEASE: Update this Windows privacy scope with the verified 2.7.6 release; current 2.7.5 remains local-only. -->
+                    <p id="privacy-scope-note"><span class="platform-copy" lang="zh-Hant">本節說明 Android 版。目前 Windows 2.7.5 僅本機辨識；開發中的 2.7.6 仍預設本機，選用 OpenAI 雲端時須由使用者確認傳送。Windows 不含 LLM 文章整理，詳見 <a href="windows-preview.html#modes-title" data-windows-preview-link>Windows 說明</a>。</span><span class="platform-copy" lang="ja">この節はAndroid版の説明です。現在のWindows 2.7.5はローカル認識のみです。開発中の2.7.6も初期設定はローカルで、OpenAIクラウドを選んだ場合は利用者が送信を確認します。Windows版にはLLMによる文章整理はありません。詳しくは <a href="windows-preview.html#modes-title" data-windows-preview-link>Windowsの説明</a>をご覧ください。</span><span class="platform-copy" lang="en">This section describes Android. Windows 2.7.5 is local-only. The planned 2.7.6 keeps local mode as the default and requires user confirmation before sending audio to OpenAI cloud transcription. Windows does not include LLM editing. See the <a href="windows-preview.html#modes-title" data-windows-preview-link>Windows details</a>.</span></p>
                 </div>
 
                 <details class="compact-details privacy-details">
@@ -619,6 +622,21 @@
     <script src="i18n.js?v=20261004-android288"></script>
     <script src="firebase.js?v=20260926-v283"></script>
     <script src="main.js?v=20260930-alpha"></script>
+
+    <script>
+        (() => {
+            function updateWindowsPreviewLinks() {
+                const lang = document.documentElement.lang.startsWith('zh') ? 'zh' : document.documentElement.lang.startsWith('ja') ? 'ja' : 'en';
+                document.querySelectorAll('[data-windows-preview-link]').forEach(link => {
+                    const target = new URL(link.href, window.location.href);
+                    target.searchParams.set('lang', lang);
+                    link.href = target.href;
+                });
+            }
+            window.addEventListener('sgh:languagechange', updateWindowsPreviewLinks);
+            document.addEventListener('DOMContentLoaded', updateWindowsPreviewLinks);
+        })();
+    </script>
 </body>
 
 </html>
