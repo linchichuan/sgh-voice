@@ -30,13 +30,34 @@ The installer contains the speech model listed in resources/windows/model-ja-v1.
 (repository, pinned revision, file sizes and SHA-256). It is installed under
 <installation folder>\models\ and is data loaded by CTranslate2, not executed code.
 
-kotoba-whisper v2.0 for CTranslate2 (kotoba-tech/kotoba-whisper-v2.0-faster)
-  Conversion published by Kotoba Technologies under the MIT license.
-  https://huggingface.co/kotoba-tech/kotoba-whisper-v2.0-faster
-kotoba-whisper v2.0 (kotoba-tech/kotoba-whisper-v2.0), the converted model
-  Copyright Kotoba Technologies; Apache License 2.0 (full text is reproduced in
-  the Tokenizers section below). Distilled from OpenAI Whisper large-v3 (MIT).
-  https://huggingface.co/kotoba-tech/kotoba-whisper-v2.0
+Whisper large-v3-turbo for CTranslate2 (mobiuslabsgmbh/faster-whisper-large-v3-turbo)
+  CTranslate2 conversion of OpenAI's Whisper large-v3-turbo, published under MIT.
+  https://huggingface.co/mobiuslabsgmbh/faster-whisper-large-v3-turbo
+OpenAI Whisper large-v3-turbo model weights
+  https://github.com/openai/whisper  /  https://huggingface.co/openai/whisper-large-v3-turbo
+
+  MIT License
+
+  Copyright (c) 2022 OpenAI
+
+  Permission is hereby granted, free of charge, to any person obtaining a copy
+  of this software and associated documentation files (the "Software"), to deal
+  in the Software without restriction, including without limitation the rights
+  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+  copies of the Software, and to permit persons to whom the Software is
+  furnished to do so, subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be included in all
+  copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+  SOFTWARE.
+
 The model files are redistributed unmodified; SGH Voice loads them with int8
 CPU quantization at runtime, which does not change the files.
 

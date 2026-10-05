@@ -42,21 +42,38 @@ SGHVoice-Windows-<ver>-x64-unsigned.exe（全機安裝）
 2. `windows/build.ps1`：PyInstaller → 依清單下載並驗證模型 → frozen 自我測試（含 `bundled_model`）→ Inno Setup → 發行檢查 → `SHA256SUMS.txt`
 3. `windows/offline-test.ps1`：封鎖 Python 網路連線，用安裝包內的模型（完整 SHA-256 驗證）辨識 5 段 FLEURS 日文語音，字錯率上限 15%
 4. `windows/install-test.ps1`：全機安裝 → 逐檔比對 → HKLM 登錄 → 共用捷徑 → 安裝後自我測試 → 解除安裝
-5. 模型比較（kotoba／large-v3-turbo／small／base）
+5. 模型比較（選用，預設關閉；用 `-BenchmarkSeconds 2100` 開啟）
 
-## 實測結果（2026-10-05，Windows Server 2022 runner，AMD EPYC 2 核 4 執行緒）
+## 模型選擇（2026-10-05 Windows CI 實測，AMD EPYC 2 核 4 執行緒，CPU int8）
+
+FLEURS ja_jp dev 15 段唸稿語音（CC-BY 4.0）＋ 1 段 3.5 分鐘的長錄音：
+
+| 模型 | 字錯率 | 每段處理時間（中位數） | 自動標點 | 長錄音 | 記憶體峰值 |
+|---|---|---|---|---|---|
+| **Whisper large-v3-turbo（採用）** | **5.9%** | 11.4 秒 | 40% | 內容完整 | 1.96 GB |
+| kotoba-whisper v2.0 | 6.3% | 11.1 秒 | 13% | **漏掉整段內容** | 1.85 GB |
+| Whisper small | 15.3% | 3.1 秒 | 87% | 完整，錯字多 | 0.71 GB |
+| Whisper base（舊預覽版） | 25.4% | 1.1 秒 | 80% | 錯字很多 | 0.35 GB |
+
+採用 `mobiuslabsgmbh/faster-whisper-large-v3-turbo@0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf`：
+
+- 字錯率最低；長錄音不漏字（kotoba 在 3.5 分鐘錄音中整段漏字，對病歷口述是嚴重缺陷）。
+- 第一版沒有 LLM 整理，標點只能靠辨識模型自己加；turbo 的標點比例較高。
+- 授權單純：OpenAI Whisper 權重與 CTranslate2 轉換版都是 MIT，沒有 kotoba 訓練資料（ReazonSpeech）的授權疑慮。
+- 速度和 kotoba 相同：在 2 核 runner 上，處理時間約等於語音長度（RTF 約 0.87）。一般 4 核以上的辦公室電腦應該較快，需實測。
+- small 是低規格端末的備案（速度約快 3.7 倍，但字錯率高 2.6 倍）。
+
+FLEURS 是唸稿的維基百科句子，**不代表醫療口述的準確度**。
+
+## 建置與離線測試（嚴格比對版本，run #3）
 
 | 項目 | 結果 |
 |---|---|
-| 建置 | PASS；安裝檔 `SGHVoice-Windows-2.7.5-x64-unsigned.exe`（run #2，鎖定測試建置） |
-| 模型 | `kotoba-tech/kotoba-whisper-v2.0-faster@f44edd35eaeb2274e85ac7b31fb2c6f59ff1c4bc`，已固定於 `model-ja-v1.json` |
-| 模型 SHA-256 驗證 | 1.55 秒（1.5 GB） |
-| 離線日文辨識 | 5 段 FLEURS 唸稿，整體字錯率 6.5%（0%～10.3%），網路連線嘗試 0 次 |
-| 速度 | 每段約 10～15 秒的語音，辨識約 12 秒（runner 只有 2 核；一般辦公室電腦需實測） |
+| 建置 | PASS（模型依清單嚴格驗證 SHA-256，沒有當場鎖定） |
+| 離線日文辨識 | PASS，網路連線嘗試 0 次 |
 | 全機安裝／解除安裝 | PASS |
-| 模型比較 | 已執行，但報表輸出時遇到 cp1252 編碼錯誤而遺失；已修正，下一輪重新取得 |
 
-FLEURS 是唸稿的維基百科句子，**不代表醫療口述的準確度**。錯誤例：「NSA→NASA」「正常化→成長化」「人質事件→一時試験」「森林→神殿」，同音詞與專有名詞仍需人工確認。
+run #3 使用的是 kotoba；改用 turbo 後的建置，以下一輪 CI 結果為準。
 
 ## 尚待處理（交付前必須完成）
 
@@ -64,5 +81,4 @@ FLEURS 是唸稿的維基百科句子，**不代表醫療口述的準確度**。
 2. **實機驗證**（W9）：實機麥克風、全域快捷鍵、電子病歷輸入欄、日文 IME、一般使用者權限、Windows 10/11 Enterprise LTSC、VDI／遠端桌面、低規格端末的速度。
 3. **授權的法務確認**：
    - Intel OpenMP（`libiomp5md.dll`，CTranslate2 CPU 版的依賴）授權條款 3.3：用在醫療系統時，要求使用者賠償 Intel 並使其免責。需要法務判斷能否接受，或改用不依賴 Intel OpenMP 的 CTranslate2 建置。
-   - kotoba-whisper 的訓練資料來自 ReazonSpeech。模型本身標示 Apache-2.0，但訓練資料授權對商業散布的影響尚未確認。
 4. **醫療口述評測**：FLEURS 是唸稿的維基百科句子，不代表醫療口述的準確度。需要準備不含患者資料的角色扮演錄音再評測一次。

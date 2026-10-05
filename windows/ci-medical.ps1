@@ -1,9 +1,10 @@
 [CmdletBinding()]
-param([double]$MaxCer = 0.15, [int]$BenchmarkSeconds = 2100)
+param([double]$MaxCer = 0.15, [int]$BenchmarkSeconds = 0)
 
 # CI entry point for the Windows offline (Japanese, medical) edition, called by
 # .github/workflows/windows-medical.yml. Keeping the steps here lets the build
-# evolve without editing the workflow. Public data only; nothing is uploaded.
+# evolve without editing the workflow. The model benchmark is opt-in
+# (-BenchmarkSeconds 2100); the 2026-10-05 comparison is in docs/WINDOWS_MEDICAL_EDITION.md. Public data only; nothing is uploaded.
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 if ($env:OS -ne 'Windows_NT') { throw 'Windows CI only.' }
