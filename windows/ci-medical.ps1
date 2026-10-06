@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([double]$MaxCer = 0.15, [int]$BenchmarkSeconds = 0)
+param([double]$MaxCer = 0.15, [int]$BenchmarkSeconds = 0, [int]$SoapBenchmarkSeconds = 2400)
 
 # CI entry point for the Windows offline (Japanese, medical) edition, called by
 # .github/workflows/windows-medical.yml. Keeping the steps here lets the build
@@ -48,6 +48,15 @@ try {
             Get-CimInstance Win32_Processor | Select-Object Name, NumberOfCores, NumberOfLogicalProcessors | Format-List | Out-String | Write-Host
             & python scripts/benchmark_windows_ja_stt.py --work-dir (Join-Path $env:RUNNER_TEMP 'ja-stt-bench') --clips 15 --deadline $BenchmarkSeconds --long-form
             if ($LASTEXITCODE -ne 0) { Write-Host "::warning::benchmark exited with $LASTEXITCODE" }
+        }
+    }
+    if ($SoapBenchmarkSeconds -gt 0) {
+        # Local LLM candidates for Japanese SOAP drafts (fictional transcript, CPU only).
+        Step 'Local LLM SOAP benchmark (fictional transcript)' {
+            & python -m pip install --only-binary=:all: psutil==7.0.0 | Out-Null
+            Get-CimInstance Win32_Processor | Select-Object Name, NumberOfCores, NumberOfLogicalProcessors | Format-List | Out-String | Write-Host
+            & python scripts/benchmark_windows_soap_llm.py --work-dir (Join-Path $env:RUNNER_TEMP 'soap-llm-bench') --deadline $SoapBenchmarkSeconds
+            if ($LASTEXITCODE -ne 0) { Write-Host "::warning::SOAP benchmark exited with $LASTEXITCODE" }
         }
     }
     $Installer = Get-ChildItem dist/windows -Filter 'SGHVoice-Windows-*-x64-unsigned.exe' | Select-Object -First 1
