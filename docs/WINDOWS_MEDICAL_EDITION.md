@@ -87,6 +87,15 @@ c69260f2ab26d659b7c398f9a2b2b48ed0df16c3b47d7326782fd9cba71690c1  models/whisper
 
 安裝檔的 SHA-256 會隨每次建置改變（內含 build metadata）；交付時以當次建置的 `SHA256SUMS.txt` 為準。CI 不上傳安裝檔（不使用 artifact／release），要交付時需另外在 Windows 上執行 `windows/build.ps1` 產出，或另行決定發佈方式。
 
+## 音檔匯入（WAV／MP3）
+
+- `windows_client/audio_import.py`：以安裝包內既有的 libsndfile（soundfile）解碼 WAV／MP3，轉單聲道，先低通濾波（避免高頻折疊）再轉成 16 kHz PCM16 WAV，以 30 秒為單位分段處理，長錄音不會整個載入記憶體。上限 3 小時或 2 GB。不使用 FFmpeg，也不連網。
+- 辨識使用「檔案模式」：開啟內建的 Silero VAD 跳過靜音段，每個段落換行，並回報進度。
+- UI：「音声ファイルを文字起こし…」「テキストを保存…」（UTF-8 BOM、CRLF，記事本可直接開啟）；可隨時取消；結果只做預覽，不自動貼入其他程式。
+- 原始檔不修改、不上傳；轉檔用的暫存檔辨識後即刪除。
+- **未支援 M4A（AAC）**：iPhone 語音備忘錄和多數 Android 錄音 App 預設是 M4A，需要另外加 AAC 解碼，列為下一步。
+- CI：把 3 段 FLEURS 語音接成 44.1 kHz 立體聲 MP3（中間有 2 秒停頓），在封鎖網路的狀態下，用 frozen App 讀入並辨識，字錯率需低於上限。
+
 ## 尚待處理（交付前必須完成）
 
 1. **程式碼簽章**（W8）：未簽章的安裝檔可能被醫院的防毒軟體或白名單擋下。

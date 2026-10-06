@@ -63,6 +63,18 @@ LABELS = {
         'loading_model': 'Loading the local model…',
         'model_builtin': 'Speech model: {name} · {size} · built in (offline)',
         'verifying_model': 'Checking the built-in speech model…',
+        'import_file': 'Transcribe audio file…',
+        'save_text': 'Save text…',
+        'importing': 'Reading the audio file…',
+        'file_progress': 'Transcribing the audio file locally… {progress}',
+        'import_notice': 'WAV and MP3 recordings (for example from a phone or IC recorder) are transcribed on this computer. The file is not uploaded or changed; a temporary converted copy is deleted afterwards. Long recordings take about as long as their duration.',
+        'audio_format_unsupported': 'This file format is not supported. Choose a WAV or MP3 file (convert M4A recordings to MP3 first).',
+        'audio_file_unreadable': 'The audio file could not be read. Check that it is a complete WAV or MP3 file.',
+        'audio_file_empty': 'The audio file contains no usable audio.',
+        'audio_file_too_long': 'The audio file is too long. Split it into recordings of up to 3 hours.',
+        'text_saved': 'Text saved.',
+        'text_save_failed': 'The text could not be saved. Check the folder and try again.',
+        'file_done': 'Audio file transcribed. Review the text before copying or saving it.',
     },
     'zh-TW': {
         'title': 'SGH Voice — Windows 離線版（日文）· 測試版',
@@ -116,6 +128,18 @@ LABELS = {
         'loading_model': '正在載入本機模型…',
         'model_builtin': '語音模型：{name} · {size} · 內建（離線）',
         'verifying_model': '正在檢查內建語音模型…',
+        'import_file': '讀入音檔並辨識…',
+        'save_text': '儲存文字…',
+        'importing': '正在讀取音檔…',
+        'file_progress': '正在本機辨識音檔… {progress}',
+        'import_notice': '可讀入手機或錄音筆錄下的 WAV、MP3 檔，在這台電腦上轉成文字。不會上傳或修改原始檔；轉檔用的暫存檔辨識後即刪除。長錄音所需時間約等於錄音長度。',
+        'audio_format_unsupported': '不支援這個檔案格式。請選擇 WAV 或 MP3 檔（M4A 請先轉成 MP3）。',
+        'audio_file_unreadable': '無法讀取音檔，請確認是完整的 WAV 或 MP3 檔。',
+        'audio_file_empty': '音檔中沒有可辨識的聲音。',
+        'audio_file_too_long': '音檔太長，請分割成每段 3 小時以內。',
+        'text_saved': '已儲存文字。',
+        'text_save_failed': '無法儲存文字，請確認資料夾後再試一次。',
+        'file_done': '音檔辨識完成。複製或儲存前請先確認內容。',
     },
     'ja': {
         'title': 'SGH Voice — Windows オフライン版（日本語）· テスト版',
@@ -169,6 +193,18 @@ LABELS = {
         'loading_model': 'ローカルモデルを読み込んでいます…',
         'model_builtin': '音声モデル：{name} · {size} · 内蔵（オフライン）',
         'verifying_model': '内蔵の音声モデルを確認しています…',
+        'import_file': '音声ファイルを文字起こし…',
+        'save_text': 'テキストを保存…',
+        'importing': '音声ファイルを読み込んでいます…',
+        'file_progress': '音声ファイルをローカルで文字起こし中… {progress}',
+        'import_notice': 'スマートフォンや IC レコーダーで録音した WAV・MP3 ファイルを、このパソコン上で文字にします。元のファイルは送信も変更もしません。変換用の一時ファイルは処理後に削除します。長い録音は、録音時間と同程度の処理時間がかかります。',
+        'audio_format_unsupported': 'このファイル形式には対応していません。WAV または MP3 ファイルを選択してください（M4A は MP3 に変換してください）。',
+        'audio_file_unreadable': '音声ファイルを読み込めません。完全な WAV または MP3 ファイルか確認してください。',
+        'audio_file_empty': '音声ファイルに認識できる音声がありません。',
+        'audio_file_too_long': '音声ファイルが長すぎます。3 時間以内に分割してください。',
+        'text_saved': 'テキストを保存しました。',
+        'text_save_failed': 'テキストを保存できません。保存先を確認して再試行してください。',
+        'file_done': '音声ファイルの文字起こしが完了しました。コピー・保存の前に内容を確認してください。',
     },
 }
 
@@ -216,6 +252,8 @@ def interface_language(value):
 
 def result_message(payload):
     """Never infer successful text delivery from a sent paste command."""
+    if payload.get("source") == "file":
+        return "file_done"
     insertion = payload.get("insertion") or {}
     if insertion.get("success"):
         return "paste_sent"
@@ -260,7 +298,8 @@ class WindowsApp:
     """Single Tk-thread owner; local speech, microphone and hotkeys use a queue."""
 
     def __init__(self, root, config, *, controller_factory, native, hotkeys_factory,
-                 save_config, validate_hotkey=None, model_info=None):
+                 save_config, validate_hotkey=None, model_info=None,
+                 choose_audio_file=None, choose_save_path=None):
         self.root = root
         self.config = deepcopy(config)
         self.native = native
@@ -268,6 +307,8 @@ class WindowsApp:
         self.save_config = save_config
         self.validate_hotkey = validate_hotkey
         self.model_info = dict(model_info or {})
+        self.choose_audio_file = choose_audio_file
+        self.choose_save_path = choose_save_path
         self.events = queue.SimpleQueue()
         self.closed = False
         self.hotkeys = None
@@ -345,8 +386,16 @@ class WindowsApp:
         scroll = ttk.Scrollbar(result_frame, orient="vertical", command=self.result.yview)
         scroll.grid(row=0, column=1, sticky="ns")
         self.result.configure(yscrollcommand=scroll.set)
-        self.copy_button = ttk.Button(frame, text=self.tr("copy"), command=self._copy)
-        self.copy_button.grid(row=5, column=0, sticky="w")
+        file_row = ttk.Frame(frame)
+        file_row.grid(row=5, column=0, sticky="w")
+        self.copy_button = ttk.Button(file_row, text=self.tr("copy"), command=self._copy)
+        self.copy_button.pack(side="left")
+        self.save_text_button = ttk.Button(file_row, text=self.tr("save_text"), command=self._save_text)
+        self.save_text_button.pack(side="left", padx=8)
+        self._labels.append((self.save_text_button, "save_text"))
+        self.import_button = ttk.Button(controls, text=self.tr("import_file"), command=self._import_file)
+        self.import_button.pack(side="left", padx=(16, 0))
+        self._labels.append((self.import_button, "import_file"))
         self._labels.append((self.copy_button, "copy"))
         self.notice = tk.StringVar(value="")
         ttk.Label(frame, textvariable=self.notice, wraplength=790).grid(row=6, column=0, sticky="ew", pady=(5, 8))
@@ -430,12 +479,13 @@ class WindowsApp:
 
     def _render_state(self):
         state = self.controller.state
-        self._status_key = state if state in ("idle", "recording", "stopping", "processing", "verifying_model", "loading_model", "closed") else "idle"
+        self._status_key = state if state in ("idle", "recording", "stopping", "processing", "verifying_model", "loading_model", "importing", "closed") else "idle"
         if state == "idle" and not self._model_ready():
             self._status_key = "needs_model"
         self.status.set(self.tr(self._status_key))
         self.record_button.configure(text=self.tr("stop" if state == "recording" else "record"), state="normal" if state in ("idle", "recording") else "disabled")
-        self.cancel_button.configure(state="normal" if state in ("recording", "stopping", "processing", "loading_model") else "disabled")
+        self.cancel_button.configure(state="normal" if state in ("recording", "stopping", "processing", "loading_model", "importing") else "disabled")
+        self.import_button.configure(state="normal" if state == "idle" and self._model_ready() else "disabled")
         self.save_button.configure(state="normal" if state == "idle" else "disabled")
         for widget, enabled_state in self._setting_widgets:
             widget.configure(state=enabled_state if state == "idle" else "disabled")
@@ -469,6 +519,48 @@ class WindowsApp:
         self._clear_result()
         self._set_notice("")
         self._render_state()
+
+    def _import_file(self):
+        if self.controller.state != "idle":
+            self._set_notice("busy")
+            return
+        if self._dirty:
+            self._set_notice("dirty")
+            return
+        choose = self.choose_audio_file
+        if choose is None:
+            from tkinter import filedialog
+            choose = filedialog.askopenfilename
+        path = choose(parent=self.root, title=self.tr("import_file"),
+                      filetypes=[("WAV / MP3", "*.wav *.mp3"), ("WAV", "*.wav"), ("MP3", "*.mp3")])
+        if not path:
+            return
+        if self.controller.import_file(path):
+            self._drop_results = False
+            self._clear_result()
+            self._set_notice("import_notice")
+        self._render_state()
+
+    def _save_text(self):
+        value = self.result.get("1.0", "end-1c")
+        if not value.strip():
+            return
+        choose = self.choose_save_path
+        if choose is None:
+            from tkinter import filedialog
+            choose = filedialog.asksaveasfilename
+        path = choose(parent=self.root, title=self.tr("save_text"), defaultextension=".txt",
+                      filetypes=[("Text", "*.txt")])
+        if not path:
+            return
+        try:
+            # UTF-8 with BOM opens correctly in Notepad and older Japanese tools.
+            with open(path, "w", encoding="utf-8-sig", newline="\r\n") as stream:
+                stream.write(value)
+        except OSError:
+            self._set_notice("text_save_failed")
+            return
+        self._set_notice("text_saved")
 
     def _copy(self):
         value = self.result.get("1.0", "end-1c")
@@ -567,6 +659,10 @@ class WindowsApp:
                 self._render_hotkeys()
             elif event == "status":
                 self._render_state()
+            elif event == "file_progress" and isinstance(payload, dict):
+                percent = payload.get("percent")
+                if isinstance(percent, (int, float)) and math.isfinite(percent) and not self._drop_results:
+                    self.notice.set(self.tr("file_progress").format(progress=f"{max(0, min(100, int(percent)))}%"))
             elif event == "level":
                 try:
                     level = float(payload)
@@ -597,7 +693,7 @@ class WindowsApp:
             self.root.after_cancel(self._after_id)
         self.status.set(self.tr("closed"))
         for widget in (self.record_button, self.cancel_button, self.save_button,
-                       self.copy_button):
+                       self.copy_button, self.import_button, self.save_text_button):
             widget.configure(state="disabled")
         for widget, _enabled_state in self._setting_widgets:
             widget.configure(state="disabled")

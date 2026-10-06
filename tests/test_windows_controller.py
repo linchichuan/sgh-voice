@@ -1,6 +1,7 @@
 """Windows orchestration checks with no microphone, API calls or user data."""
 import threading
 import time
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -242,3 +243,82 @@ def test_local_model_is_reused_between_recordings(harness):
             first = c._transcriber
     assert c._transcriber is first
     assert len(harness.calls) == 2
+
+
+def _write_tone(path, rate, seconds, channels=1, fmt="WAV", subtype="PCM_16"):
+    import numpy as np
+    import soundfile
+    samples = 0.2 * np.sin(2 * np.pi * 440 * np.arange(int(rate * seconds)) / rate).astype("float32")
+    if channels > 1:
+        samples = np.stack([samples] * channels, axis=1)
+    soundfile.write(str(path), samples, rate, format=fmt, subtype=subtype)
+    return path
+
+
+def test_import_file_converts_transcribes_in_file_mode_and_cleans_up(tmp_path):
+    import soundfile
+    events, seen = [], []
+
+    class Transcriber:
+        def __init__(self, config, memory):
+            self.config = config
+        def transcribe(self, audio, duration, mode, should_cancel=None, on_progress=None):
+            info = soundfile.info(audio["path"])
+            seen.append((mode, info.samplerate, info.channels, info.subtype, round(duration, 1), audio["path"]))
+            on_progress(0.5)
+            return {"final": "一行目\n二行目"}
+
+    source = _write_tone(tmp_path / "phone.mp3", 44100, 3, channels=2, fmt="MP3", subtype="MPEG_LAYER_III")
+    c = Controller({}, lambda *event: events.append(event), None, transcriber_factory=Transcriber,
+                   model_locator=lambda: tmp_path)
+    wait_for(lambda: c.state == "idle")
+    assert c.import_file(source)
+    wait_for(lambda: any(e[0] == "result" for e in events) and c.state == "idle")
+    assert seen[0][:5] == ("file", 16000, 1, "PCM_16", 3.0)
+    assert not Path(seen[0][5]).exists()  # temporary conversion removed
+    assert source.exists()                # original never modified or removed
+    result = next(e[1] for e in events if e[0] == "result")
+    assert result["source"] == "file" and result["insertion"]["reason"] == "preview_only"
+    percents = [e[1]["percent"] for e in events if e[0] == "file_progress"]
+    assert percents == sorted(percents) and percents[-1] == 100
+    c.close()
+    wait_for(lambda: c.state == "closed")
+
+
+def test_import_rejects_unsupported_format_without_transcribing(tmp_path):
+    events, calls = [], []
+    source = tmp_path / "voice.m4a"
+    source.write_bytes(b"not decoded")
+    c = Controller({}, lambda *event: events.append(event), None,
+                   transcriber_factory=lambda *a: calls.append(a), model_locator=lambda: tmp_path)
+    wait_for(lambda: c.state == "idle")
+    assert c.import_file(source)
+    wait_for(lambda: ("error", "audio_format_unsupported") in events and c.state == "idle")
+    assert not calls
+    c.close()
+    wait_for(lambda: c.state == "closed")
+
+
+def test_import_cancel_produces_no_result(tmp_path):
+    events = []
+    gate = threading.Event()
+
+    class Transcriber:
+        def __init__(self, config, memory):
+            pass
+        def transcribe(self, audio, duration, mode, should_cancel=None, on_progress=None):
+            gate.set()
+            wait_for(should_cancel)
+            return {"final": "should be dropped"}
+
+    source = _write_tone(tmp_path / "rec.wav", 48000, 2)
+    c = Controller({}, lambda *event: events.append(event), None, transcriber_factory=Transcriber,
+                   model_locator=lambda: tmp_path)
+    wait_for(lambda: c.state == "idle")
+    assert c.import_file(source)
+    assert gate.wait(3)
+    c.cancel()
+    wait_for(lambda: c.state == "idle")
+    assert not [e for e in events if e[0] == "result"]
+    c.close()
+    wait_for(lambda: c.state == "closed")

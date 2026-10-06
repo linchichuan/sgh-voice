@@ -15,7 +15,7 @@ try {
     # by CI tooling first. The application itself then runs with Python
     # network connections denied and uses only the model inside its bundle.
     $Fixture = Join-Path $TestRoot 'speech'
-    & python scripts/prepare_windows_speech_fixture.py --out $Fixture --count 5 --skip 40
+    & python scripts/prepare_windows_speech_fixture.py --out $Fixture --count 5 --skip 40 --phone-mp3
     if ($LASTEXITCODE -ne 0) { throw 'Public speech fixture preparation failed.' }
     $Clips = Join-Path $Fixture 'clips.json'
     $Arguments = @('--offline-self-test', 'bundled', "`"$ReportPath`"", '--speech-set', "`"$Clips`"",
@@ -30,16 +30,18 @@ try {
     } finally { $Process.Dispose() }
     $Report = Get-Content -LiteralPath $ReportPath -Raw -Encoding utf8 | ConvertFrom-Json
     foreach ($Clip in @($Report.speech)) {
-        Write-Host ("CER {0:P1} in {1}s`n  REF {2}`n  HYP {3}" -f $Clip.cer, $Clip.seconds, $Clip.reference, $Clip.hypothesis)
+        $Kind = if ($Clip.imported) { 'IMPORTED MP3' } else { 'WAV' }
+        Write-Host ("[{4}] CER {0:P1} in {1}s`n  REF {2}`n  HYP {3}" -f $Clip.cer, $Clip.seconds, $Clip.reference, $Clip.hypothesis, $Kind)
     }
     Write-Host ("Model hash check {0}s; first inference {1}s; overall CER {2:P1} (ceiling {3:P0})" -f `
         $Report.model_hash_seconds, $Report.first_inference_seconds, $Report.cer, $MaxCer)
     if ($ExitCode -ne 0 -or $Report.ok -ne $true -or $Report.local_inference_tested -ne $true `
             -or $Report.accuracy_tested -ne $true -or $Report.python_network_attempts -ne 0 `
-            -or $Report.platform -ne 'win32' -or -not $Report.model_verified) {
+            -or $Report.platform -ne 'win32' -or -not $Report.model_verified `
+            -or -not (@($Report.speech) | Where-Object { $_.imported -and $_.cer -le $MaxCer })) {
         throw 'Offline runtime evidence is missing or failed.'
     }
-    Write-Host 'PASS bundled model: SHA-256 verified, Japanese speech recognized under the CER ceiling, Python network denied.'
+    Write-Host 'PASS bundled model: SHA-256 verified, Japanese speech (WAV and an imported phone-style MP3) recognized under the CER ceiling, Python network denied.'
     Write-Host 'Public read speech only: microphone, medical dictation accuracy and target-input acceptance were not tested.'
 } finally {
     Pop-Location

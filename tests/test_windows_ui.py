@@ -72,6 +72,12 @@ class Controller:
         self.cancelled = False
         self.closed = False
         self.model_ready = True
+        self.imports = []
+
+    def import_file(self, path):
+        self.imports.append(path)
+        self.state = "importing"
+        return True
 
     def toggle(self, target=None):
         self.toggles.append(target)
@@ -134,6 +140,7 @@ class HeadlessApp(WindowsApp):
         self.model_notice, self.model_details, self.candidates = Value(), Value(), Value()
         self.record_button, self.cancel_button, self.save_button = Widget(), Widget(), Widget()
         self.meter, self.result, self.copy_button = Widget(), Widget(), Widget()
+        self.import_button, self.save_text_button = Widget(), Widget()
 
 
 @pytest.fixture
@@ -385,3 +392,50 @@ def test_offline_controls_have_no_cloud_or_key_fields(app):
     assert not hasattr(app, "key_var")
     assert app.config["windows_language"] == "ja"
     assert app.vars["windows_lexicon_enabled"].get() is False
+
+
+def test_audio_import_uses_chosen_file_and_shows_privacy_notice(app):
+    chosen = []
+    app.choose_audio_file = lambda **kwargs: chosen.append(kwargs["filetypes"]) or "C:\\rec\\visit.mp3"
+    app._import_file()
+    assert app.controller.imports == ["C:\\rec\\visit.mp3"]
+    assert "*.wav *.mp3" in chosen[0][0][1]
+    assert app.notice.get() == LABELS["en"]["import_notice"]
+    assert app.import_button.options["state"] == "disabled"
+    assert app.cancel_button.options["state"] == "normal"
+
+
+def test_audio_import_cancelled_dialog_does_nothing(app):
+    app.choose_audio_file = lambda **kwargs: ""
+    app._import_file()
+    assert app.controller.imports == []
+
+
+def test_file_progress_and_result_are_preview_only(app):
+    app.controller.state = "processing"
+    app.enqueue("file_progress", {"percent": 42, "message": "private"})
+    app._pump()
+    assert "42%" in app.notice.get() and "private" not in app.notice.get()
+    app.controller.last_text = "一行目\n二行目"
+    app.enqueue("result", {"text": "一行目\n二行目", "source": "file",
+                           "insertion": {"success": False, "reason": "preview_only"}})
+    app._pump()
+    assert app.result.get() == "一行目\n二行目"
+    assert app.notice.get() == LABELS["en"]["file_done"]
+
+
+def test_save_text_writes_utf8_with_bom_for_notepad(app, tmp_path):
+    target = tmp_path / "visit.txt"
+    app.result.insert("1.0", "診察メモ\n二行目")
+    app.choose_save_path = lambda **kwargs: str(target)
+    app._save_text()
+    assert target.read_bytes().startswith(b"\xef\xbb\xbf")
+    assert target.read_text(encoding="utf-8-sig").splitlines() == ["診察メモ", "二行目"]
+    assert app.notice.get() == LABELS["en"]["text_saved"]
+
+
+def test_audio_import_errors_are_localized(app):
+    for code in ("audio_format_unsupported", "audio_file_unreadable", "audio_file_empty", "audio_file_too_long"):
+        app.enqueue("error", code)
+        app._pump()
+        assert app.notice.get() == LABELS["en"][code]

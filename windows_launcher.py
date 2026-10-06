@@ -177,12 +177,20 @@ def offline_self_test(model_directory, report_path, speech_set=None, max_cer=Non
                 report["speech"] = []
                 for clip in clips:
                     began = time.monotonic()
-                    text = decoder.transcribe({"path": str(Path(clip["wav"]).resolve())}, 0)["final"]
+                    if clip.get("import"):
+                        from windows_client.audio_import import convert_to_pcm16k
+                        converted = Path(folder) / "imported.wav"
+                        length = convert_to_pcm16k(Path(clip["wav"]).resolve(), converted)
+                        text = decoder.transcribe({"path": str(converted)}, length, "file")["final"]
+                        converted.unlink()
+                    else:
+                        text = decoder.transcribe({"path": str(Path(clip["wav"]).resolve())}, 0)["final"]
                     reference = _normalized(clip["reference"])
                     distance = _edit_distance(reference, _normalized(text))
                     errors += distance
                     characters += len(reference)
                     report["speech"].append({"reference": clip["reference"], "hypothesis": text,
+                                             "imported": bool(clip.get("import")),
                                              "cer": round(distance / max(1, len(reference)), 4),
                                              "seconds": round(time.monotonic() - began, 2)})
                 report["cer"] = round(errors / max(1, characters), 4)

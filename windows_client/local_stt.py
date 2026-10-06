@@ -175,14 +175,23 @@ class LocalTranscriber:
                 raise LocalSTTError("local_model_load_failed") from None
         return self._model
 
-    def transcribe(self, audio, duration=0, mode="dictate", *, should_cancel=None):
-        """Return recognizer text verbatim, without prompting or LLM cleanup."""
+    def transcribe(self, audio, duration=0, mode="dictate", *, should_cancel=None, on_progress=None):
+        """Return recognizer text verbatim, without prompting or LLM cleanup.
+
+        mode "dictate": a short live recording, decoded exactly as before.
+        mode "file": an imported recording already converted to 16 kHz PCM16.
+        Long files may contain pauses, so Silero VAD (bundled) skips silence,
+        each recognized segment becomes its own line, and on_progress receives
+        the decoded fraction of ``duration``.
+        """
         cancelled = should_cancel or (lambda: False)
+        report = on_progress or (lambda fraction: None)
         empty = {"raw": "", "final": "", "engine": ENGINE, "cancelled": True}
         if cancelled():
             return empty
-        if mode != "dictate":
+        if mode not in ("dictate", "file"):
             raise LocalSTTError("invalid_mode")
+        file_mode = mode == "file"
         value = audio.get("path") if isinstance(audio, dict) else audio
         path = _local_path(value, "audio_unavailable")
         try:
@@ -203,7 +212,7 @@ class LocalTranscriber:
                 segments, info = model.transcribe(
                     str(path), language=None if self.language == "auto" else self.language,
                     task="transcribe", beam_size=5, temperature=0.0,
-                    condition_on_previous_text=False, vad_filter=False,
+                    condition_on_previous_text=False, vad_filter=file_mode,
                     initial_prompt=None, hotwords=None, log_progress=False,
                     **self.decode_options,
                 )
@@ -211,10 +220,12 @@ class LocalTranscriber:
                 for segment in segments:
                     if cancelled():
                         return empty
-                    texts.append(segment.text)
+                    texts.append(segment.text.strip() if file_mode else segment.text)
+                    if file_mode and duration:
+                        report(min(1.0, float(segment.end) / float(duration)))
                 if cancelled():
                     return empty
-                text = "".join(texts).strip()
+                text = ("\n".join(t for t in texts if t) if file_mode else "".join(texts)).strip()
                 return {"raw": text, "final": text, "engine": ENGINE,
                         "language": info.language, "cancelled": False}
             except Exception:

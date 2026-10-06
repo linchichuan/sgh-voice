@@ -6,6 +6,7 @@ module owns only desktop lifecycle, cancellation and delivery policy.
 from __future__ import annotations
 
 import os
+from pathlib import Path
 import queue
 import threading
 import time
@@ -164,6 +165,80 @@ class Controller:
                 if not self._closed:
                     self._set_state("idle")
 
+    def import_file(self, path):
+        """Transcribe a chosen WAV/MP3 recording; preview only, never auto-inserted."""
+        with self._lock:
+            if self._closed or self.state != "idle":
+                return False
+            if self._model_dir is None:
+                self._emit("error", self._model_error)
+                return False
+            self._session += 1
+            self._cancelled.clear()
+            self.last_text = ""
+            self._target = None
+            self._snapshot = runtime_config(self.config)
+            self._snapshot["windows_model_dir"] = str(self._model_dir)
+            self._snapshot["windows_decode_options"] = dict(self._decode_options)
+            self._set_state("importing")
+            self._commands.put((lambda session: self._import(session, str(path)), self._session))
+            return True
+
+    def _import(self, session, source):
+        import shutil
+        import tempfile
+        from windows_client.audio_import import AudioImportError, convert_to_pcm16k
+        folder = tempfile.mkdtemp(prefix="sghvoice-import-")
+        progress = lambda fraction: self._emit("file_progress", {"percent": int(max(0.0, min(1.0, fraction)) * 100)})
+        try:
+            wav = Path(folder) / "import.wav"
+            try:
+                duration = convert_to_pcm16k(source, wav, should_cancel=self._cancelled.is_set,
+                                             on_progress=lambda f: progress(0.1 * f))
+            except AudioImportError as exc:
+                if exc.code != "cancelled" and not self._cancelled.is_set():
+                    self._emit("error", exc.code)
+                return
+            with self._lock:
+                self._set_state("processing")
+            transcriber = self._get_transcriber(None)
+            result = transcriber.transcribe(
+                {"path": str(wav)}, duration, "file", should_cancel=self._cancelled.is_set,
+                on_progress=lambda f: progress(0.1 + 0.9 * f))
+            with self._lock:
+                if self._cancelled.is_set() or self._closed:
+                    return
+                if not result or not result.get("final"):
+                    self._emit("error", "transcription_failed")
+                    return
+                self.last_text = result["final"]
+                progress(1.0)
+                self._emit("result", {"text": self.last_text, "source": "file",
+                                      "insertion": {"success": False, "reason": "preview_only"},
+                                      "lexicon_candidates": self._lexicon(self.last_text)})
+        finally:
+            shutil.rmtree(folder, ignore_errors=True)
+            with self._lock:
+                if not self._closed:
+                    self._set_state("idle")
+
+    def _get_transcriber(self, memory):
+        if self._transcriber_factory is None:
+            from windows_client.local_stt import LocalTranscriber
+            self._transcriber_factory = LocalTranscriber
+        model_key = (self._snapshot.get("windows_model_dir"), self._snapshot.get("windows_language"))
+        if self._transcriber is None or self._transcriber_key != model_key:
+            self._transcriber = self._transcriber_factory(self._snapshot, memory)
+            self._transcriber_key = model_key
+        return self._transcriber
+
+    def _lexicon(self, text):
+        if not self._snapshot.get("windows_lexicon_enabled"):
+            return []
+        from dataclasses import asdict
+        from windows_client.lexicon import suggestions
+        return [asdict(item) for item in suggestions(text)]
+
     def cancel(self):
         with self._lock:
             self._cancelled.set()
@@ -286,14 +361,7 @@ class Controller:
                 bool(self._snapshot.get("windows_save_history", False)),
                 self._cancelled.is_set,
             )
-            if self._transcriber_factory is None:
-                from windows_client.local_stt import LocalTranscriber
-                self._transcriber_factory = LocalTranscriber
-            model_key = (self._snapshot.get("windows_model_dir"), self._snapshot.get("windows_language"))
-            if self._transcriber is None or self._transcriber_key != model_key:
-                self._transcriber = self._transcriber_factory(self._snapshot, memory)
-                self._transcriber_key = model_key
-            transcriber = self._transcriber
+            transcriber = self._get_transcriber(memory)
             result = transcriber.transcribe(
                 {"array": audio, "path": path}, duration, "dictate",
                 should_cancel=self._cancelled.is_set,
@@ -305,11 +373,7 @@ class Controller:
                     self._emit("error", "transcription_failed")
                     return
                 self.last_text = result["final"]
-                candidates = []
-                if self._snapshot.get("windows_lexicon_enabled"):
-                    from dataclasses import asdict
-                    from windows_client.lexicon import suggestions
-                    candidates = [asdict(item) for item in suggestions(self.last_text)]
+                candidates = self._lexicon(self.last_text)
                 if self._snapshot.get("windows_save_history"):
                     from datetime import datetime
                     memory.add_to_history({"timestamp": datetime.now().isoformat(),
