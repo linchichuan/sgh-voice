@@ -7,7 +7,10 @@ from __future__ import annotations
 
 import math
 import queue
+import time
 from copy import deepcopy
+
+from windows_client.controller import MAX_RECORDING_SECONDS
 
 
 LABELS = {
@@ -32,6 +35,9 @@ LABELS = {
         'saved': 'Settings saved.',
         'idle': 'Ready',
         'recording': 'Recording — press Stop or the shortcut again',
+        'recording_elapsed': 'Recording {elapsed} (up to {limit}) — press Stop or the shortcut again',
+        'recording_limit': 'The recording reached the 60-minute limit, was stopped and transcribed. Review the text.',
+        'long_done': 'Recording transcribed. Review the text before copying it.',
         'stopping': 'Stopping recording…',
         'processing': 'Transcribing locally…',
         'closed': 'Closing…',
@@ -97,6 +103,9 @@ LABELS = {
         'saved': '已儲存設定。',
         'idle': '就緒',
         'recording': '錄音中 — 按停止或再次按快捷鍵',
+        'recording_elapsed': '錄音中 {elapsed}（最長 {limit}）— 按停止或再次按快捷鍵',
+        'recording_limit': '錄音已達 60 分鐘上限，已自動停止並完成辨識。請確認內容。',
+        'long_done': '錄音辨識完成。複製前請先確認內容。',
         'stopping': '正在停止錄音…',
         'processing': '正在本機辨識…',
         'closed': '正在關閉…',
@@ -162,6 +171,9 @@ LABELS = {
         'saved': '設定を保存しました。',
         'idle': '準備完了',
         'recording': '録音中 — 停止ボタンかショートカットで停止',
+        'recording_elapsed': '録音中 {elapsed}（最長 {limit}）— 停止ボタンかショートカットで停止',
+        'recording_limit': '録音が上限の 60 分に達したため自動で停止し、文字起こししました。内容を確認してください。',
+        'long_done': '録音の文字起こしが完了しました。コピーの前に内容を確認してください。',
         'stopping': '録音を停止しています…',
         'processing': 'ローカルで文字起こし中…',
         'closed': '終了しています…',
@@ -250,13 +262,22 @@ def interface_language(value):
     return value if value in LABELS else "zh-TW"
 
 
+def _clock(seconds):
+    seconds = max(0, int(seconds))
+    return f"{seconds // 60:02d}:{seconds % 60:02d}"
+
+
 def result_message(payload):
     """Never infer successful text delivery from a sent paste command."""
     if payload.get("source") == "file":
         return "file_done"
+    if payload.get("limit_reached"):
+        return "recording_limit"
     insertion = payload.get("insertion") or {}
     if insertion.get("success"):
         return "paste_sent"
+    if payload.get("long"):
+        return "long_done"
     if insertion.get("reason") in (None, "", "preview_only", "auto_insert_disabled", "no_target"):
         return "preview"
     return "paste_fallback"
@@ -320,6 +341,7 @@ class WindowsApp:
         self._hotkeys_ready = False
         self._dirty = False
         self._drop_results = False
+        self._recording_since = None
         self._build()
         self.controller = controller_factory(self.config, self.enqueue, native=native)
         self._render_state()
@@ -482,7 +504,12 @@ class WindowsApp:
         self._status_key = state if state in ("idle", "recording", "stopping", "processing", "verifying_model", "loading_model", "importing", "closed") else "idle"
         if state == "idle" and not self._model_ready():
             self._status_key = "needs_model"
-        self.status.set(self.tr(self._status_key))
+        if state == "recording":
+            if self._recording_since is None:
+                self._recording_since = time.monotonic()
+        else:
+            self._recording_since = None
+        self.status.set(self._status_text())
         self.record_button.configure(text=self.tr("stop" if state == "recording" else "record"), state="normal" if state in ("idle", "recording") else "disabled")
         self.cancel_button.configure(state="normal" if state in ("recording", "stopping", "processing", "loading_model", "importing") else "disabled")
         self.import_button.configure(state="normal" if state == "idle" and self._model_ready() else "disabled")
@@ -492,6 +519,12 @@ class WindowsApp:
         if state != "recording":
             self.meter.configure(value=0)
         self._render_model_info()
+
+    def _status_text(self):
+        if self._status_key != "recording" or self._recording_since is None:
+            return self.tr(self._status_key)
+        return self.tr("recording_elapsed").format(
+            elapsed=_clock(time.monotonic() - self._recording_since), limit=_clock(MAX_RECORDING_SECONDS))
 
     def _toggle_preview(self):
         self._toggle(None)
@@ -683,6 +716,10 @@ class WindowsApp:
             elif event == "error":
                 self._set_notice(payload if isinstance(payload, str) and payload in LABELS[self.lang] else "error")
                 self._render_state()
+        if self._recording_since is not None and self.controller.state == "recording":
+            text = self._status_text()
+            if self.status.get() != text:
+                self.status.set(text)
         self._after_id = self.root.after(40, self._pump)
 
     def close(self):

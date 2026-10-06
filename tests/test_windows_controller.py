@@ -322,3 +322,60 @@ def test_import_cancel_produces_no_result(tmp_path):
     assert not [e for e in events if e[0] == "result"]
     c.close()
     wait_for(lambda: c.state == "closed")
+
+
+def test_runtime_config_allows_a_whole_consultation():
+    snapshot = runtime_config({"max_recording_duration": 180, "ptt_silence_autostop_seconds": 30})
+    assert snapshot["max_recording_duration"] == 60 * 60
+    assert snapshot["ptt_silence_autostop_seconds"] == 10 * 60
+
+
+@pytest.mark.parametrize("duration,mode,long,limit", [
+    (12.0, "dictate", False, False),
+    (25 * 60.0, "file", True, False),
+    (60 * 60.0, "file", True, True),
+])
+def test_long_recordings_decode_like_files_with_progress(tmp_path, duration, mode, long, limit):
+    events, calls = [], []
+    wav = tmp_path / "long.wav"
+
+    class Recorder:
+        is_recording = False
+        def __init__(self, config):
+            self.config = config
+        def set_level_listener(self, callback):
+            pass
+        def start(self, **kwargs):
+            self.is_recording = True
+            return True
+        def stop(self):
+            self.is_recording = False
+            wav.write_bytes(b"synthetic audio")
+            return object(), str(wav), duration
+
+    class Transcriber:
+        def __init__(self, config, memory):
+            pass
+        def transcribe(self, audio, seconds, decode_mode, *, should_cancel=None, on_progress=None):
+            calls.append((audio, seconds, decode_mode))
+            if on_progress:
+                on_progress(0.5)
+            return {"final": "一行目\n二行目"}
+
+    c = Controller({}, lambda *event: events.append(event), None, recorder_factory=Recorder,
+                   transcriber_factory=Transcriber, memory_factory=lambda *args: None,
+                   model_locator=lambda: tmp_path)
+    wait_for(lambda: c.state == "idle")
+    c.toggle()
+    wait_for(lambda: c._capture_open)
+    c.toggle()
+    wait_for(lambda: c.state == "idle" and any(e[0] == "result" for e in events))
+    # Only the WAV path is handed over; the in-memory array is released.
+    assert calls == [({"path": str(wav)}, duration, mode)]
+    result = next(e[1] for e in events if e[0] == "result")
+    assert (result["long"], result["limit_reached"]) == (long, limit)
+    assert result["text"] == "一行目\n二行目"
+    assert (("file_progress", {"percent": 50}) in events) == long
+    assert not wav.exists()
+    c.close()
+    wait_for(lambda: c.state == "closed")

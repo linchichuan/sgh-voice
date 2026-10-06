@@ -11,6 +11,15 @@ import queue
 import threading
 import time
 
+# A whole consultation fits in one recording. Recordings longer than
+# LONG_RECORDING_SECONDS are decoded like imported files (VAD, one line per
+# segment, progress) so pauses during an examination do not stall decoding.
+MAX_RECORDING_SECONDS = 60 * 60
+LONG_RECORDING_SECONDS = 30
+# Safety stop for a recording left running in a silent room; long enough for
+# a quiet physical examination.
+SILENCE_AUTOSTOP_SECONDS = 10 * 60
+
 WINDOWS_DEFAULTS = {
     "windows_language": "ja",
     "windows_lexicon_enabled": False,
@@ -40,8 +49,8 @@ def runtime_config(settings):
         "sample_rate": 16000,
         # UI is toggle; Recorder's PTT mode supplies a silence safety cutoff.
         "hotkey_mode": "push_to_talk",
-        "max_recording_duration": 180,
-        "ptt_silence_autostop_seconds": 120,
+        "max_recording_duration": MAX_RECORDING_SECONDS,
+        "ptt_silence_autostop_seconds": SILENCE_AUTOSTOP_SECONDS,
     })
     for name in ("groq", "openai", "anthropic", "openrouter", "elevenlabs"):
         result[f"{name}_api_key"] = ""
@@ -350,6 +359,8 @@ class Controller:
         path = None
         try:
             audio, path, duration = self._take_recording()
+            # Decoding reads the WAV; drop the in-memory copy (up to an hour of audio).
+            del audio
             if self._cancelled.is_set():
                 return
             if not path:
@@ -361,10 +372,13 @@ class Controller:
                 bool(self._snapshot.get("windows_save_history", False)),
                 self._cancelled.is_set,
             )
+            long_recording = duration >= LONG_RECORDING_SECONDS
             transcriber = self._get_transcriber(memory)
             result = transcriber.transcribe(
-                {"array": audio, "path": path}, duration, "dictate",
+                {"path": path}, duration, "file" if long_recording else "dictate",
                 should_cancel=self._cancelled.is_set,
+                on_progress=(lambda f: self._emit("file_progress", {"percent": int(max(0.0, min(1.0, f)) * 100)}))
+                if long_recording else None,
             )
             with self._lock:
                 if self._cancelled.is_set() or self._closed:
@@ -388,7 +402,8 @@ class Controller:
                     except Exception:
                         insertion = {"success": False, "reason": "input_failed"}
                 self._emit("result", {"text": self.last_text, "insertion": insertion,
-                                      "lexicon_candidates": candidates})
+                                      "lexicon_candidates": candidates, "long": long_recording,
+                                      "limit_reached": duration >= MAX_RECORDING_SECONDS - 1})
         finally:
             self._remove(path)
             self._emit("level", 0.0)

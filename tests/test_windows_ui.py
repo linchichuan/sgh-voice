@@ -439,3 +439,22 @@ def test_audio_import_errors_are_localized(app):
         app.enqueue("error", code)
         app._pump()
         assert app.notice.get() == LABELS["en"][code]
+
+
+def test_long_recording_messages_and_elapsed_clock(app, monkeypatch):
+    assert result_message({"long": True, "insertion": {"success": False, "reason": "preview_only"}}) == "long_done"
+    assert result_message({"long": True, "limit_reached": True, "insertion": {}}) == "recording_limit"
+    assert result_message({"long": True, "insertion": {"success": True}}) == "paste_sent"
+    for lang in LABELS:
+        assert "{" not in LABELS[lang]["recording_limit"] and "{elapsed}" in LABELS[lang]["recording_elapsed"]
+    import windows_client.ui as ui
+    now = [1000.0]
+    monkeypatch.setattr(ui.time, "monotonic", lambda: now[0])
+    app.controller.state = "recording"
+    app._render_state()
+    now[0] += 25 * 60 + 7
+    app._pump()
+    assert app.status.get() == LABELS["en"]["recording_elapsed"].format(elapsed="25:07", limit="60:00")
+    app.controller.state = "idle"
+    app._render_state()
+    assert app._recording_since is None
