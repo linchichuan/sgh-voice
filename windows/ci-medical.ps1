@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([double]$MaxCer = 0.15, [int]$BenchmarkSeconds = 0, [int]$SoapBenchmarkSeconds = 2400)
+param([double]$MaxCer = 0.15, [int]$BenchmarkSeconds = 0, [int]$SoapBenchmarkSeconds = 0)
 
 # CI entry point for the Windows offline (Japanese, medical) edition, called by
 # .github/workflows/windows-medical.yml. Keeping the steps here lets the build
@@ -26,7 +26,7 @@ try {
     }
     Step 'Windows source tests' {
         $Tests = @(Get-ChildItem tests/test_windows*.py | Sort-Object Name | ForEach-Object FullName)
-        & python -m ruff check windows_launcher.py windows_client scripts/verify_windows_release.py scripts/fetch_windows_model.py @Tests --select E9,F63,F7,F82
+        & python -m ruff check windows_launcher.py windows_client scripts/verify_windows_release.py scripts/fetch_windows_model.py scripts/fetch_windows_llm.py scripts/check_soap_report.py scripts/benchmark_windows_soap_llm.py @Tests --select E9,F63,F7,F82
         if ($LASTEXITCODE -ne 0) { throw 'Ruff failed.' }
         & python -m pytest @Tests -q -o addopts=
         if ($LASTEXITCODE -ne 0) { throw 'Windows tests failed.' }
@@ -51,7 +51,8 @@ try {
         }
     }
     if ($SoapBenchmarkSeconds -gt 0) {
-        # Local LLM candidates for Japanese SOAP drafts (fictional transcript, CPU only).
+        # Local LLM candidates for Japanese SOAP drafts (fictional transcript, CPU only);
+        # opt-in (-SoapBenchmarkSeconds 2400). The 2026-10-06 comparison is in docs/WINDOWS_MEDICAL_EDITION.md.
         Step 'Local LLM SOAP benchmark (fictional transcript)' {
             & python -m pip install --only-binary=:all: psutil==7.0.0 | Out-Null
             Get-CimInstance Win32_Processor | Select-Object Name, NumberOfCores, NumberOfLogicalProcessors | Format-List | Out-String | Write-Host

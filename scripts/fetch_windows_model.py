@@ -56,7 +56,7 @@ def resolve_revision(repository):
     return HfApi().model_info(repository).sha
 
 
-def fetch_model(destination_root, *, manifest=None, opener=None, log=print, lock=False):
+def fetch_model(destination_root, *, manifest=None, opener=None, log=print, lock=False, content_pinned=False):
     """Download and verify; lock=True instead records revision + SHA-256.
 
     Lock mode exists to pin a new model version. It returns the locked manifest
@@ -65,6 +65,10 @@ def fetch_model(destination_root, *, manifest=None, opener=None, log=print, lock
     manifest = copy.deepcopy(manifest or MANIFEST)
     if lock:
         manifest["revision"] = resolve_revision(manifest["repository"])
+    elif content_pinned:
+        # Branch name allowed only because every file is pinned by size + SHA-256.
+        if not all(re.fullmatch(r"[0-9a-f]{64}", f.get("sha256", "")) for f in manifest["files"]):
+            raise FetchError("model manifest is not pinned by SHA-256")
     elif not is_pinned(manifest):
         raise FetchError("model manifest is not pinned; use --lock-unpinned only for a test build")
     root = Path(destination_root)

@@ -34,9 +34,12 @@ CloseApplications=yes
 RestartApplications=no
 SetupLogging=yes
 ; User profile/configuration data is deliberately outside the install directory.
-; The ~1.5 GB model is stored uncompressed: FP16 weights barely compress and
-; LZMA over them would only slow building and installation. Total stays
-; below the 2 GB single-file setup limit, so no disk spanning is needed.
+; The speech model (~1.6 GB) and the SOAP language model (~2.7 GB) are stored
+; uncompressed: quantized weights barely compress and LZMA would only slow
+; building and installation. Together they exceed one setup file, so Setup is
+; split into the .exe plus .bin slices that must stay in the same folder.
+DiskSpanning=yes
+DiskSliceSize=max
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
@@ -46,8 +49,9 @@ Name: "japanese"; MessagesFile: "compiler:Languages\Japanese.isl"
 Name: "desktopicon"; Description: "Create a desktop shortcut"; Flags: unchecked
 
 [Files]
-Source: "{#SourceDir}\*"; DestDir: "{app}"; Excludes: "\models,\models\*"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#SourceDir}\*"; DestDir: "{app}"; Excludes: "\models,\models\*,\llm,\llm\*"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "{#SourceDir}\models\*"; DestDir: "{app}\models"; Flags: ignoreversion recursesubdirs createallsubdirs nocompression
+Source: "{#SourceDir}\llm\*"; DestDir: "{app}\llm"; Flags: ignoreversion recursesubdirs createallsubdirs nocompression
 
 [Icons]
 Name: "{autoprograms}\SGH Voice"; Filename: "{app}\SGH Voice.exe"

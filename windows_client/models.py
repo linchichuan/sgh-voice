@@ -100,7 +100,7 @@ def verify_model_files(directory, manifest=None):
     return directory.resolve()
 
 
-def verified_model_dir(directory=None, *, cache_dir=None, manifest=None):
+def verified_model_dir(directory=None, *, cache_dir=None, manifest=None, cache_name=VERIFIED_CACHE):
     """Return the bundled model folder after integrity verification.
 
     The first launch hashes every file (seconds on an SSD). The result is cached
@@ -115,7 +115,7 @@ def verified_model_dir(directory=None, *, cache_dir=None, manifest=None):
     if cache_dir is None:
         from config import DATA_DIR
         cache_dir = DATA_DIR
-    cache = Path(cache_dir) / VERIFIED_CACHE
+    cache = Path(cache_dir) / cache_name
     fingerprint = _fingerprint(directory, manifest)
     try:
         if json.loads(cache.read_text(encoding="utf-8")) == fingerprint:

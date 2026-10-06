@@ -379,3 +379,145 @@ def test_long_recordings_decode_like_files_with_progress(tmp_path, duration, mod
     assert not wav.exists()
     c.close()
     wait_for(lambda: c.state == "closed")
+
+
+class FakeSoap:
+    def __init__(self, text="S（主観的情報）:\n-\nO（客観的情報）:\n-\nA（評価）:\n-\nP（計画）:\n-", error=None, gate=None):
+        self.text, self.error, self.gate, self.calls = text, error, gate, []
+
+    def __call__(self):
+        return self
+
+    def locate(self):
+        return "llama-completion.exe"
+
+    def draft(self, transcript, *, should_cancel, on_progress):
+        self.calls.append(transcript)
+        on_progress(3)
+        if self.gate is not None:
+            while not self.gate.wait(0.01):
+                if should_cancel():
+                    from windows_client.soap import SoapError
+                    raise SoapError("cancelled")
+        if self.error:
+            from windows_client.soap import SoapError
+            raise SoapError(self.error)
+        return {"text": self.text, "unverified": [], "seconds": 3}
+
+
+def soap_controller(tmp_path, soap, duration=120.0, auto=True):
+    events, inserted = [], []
+    wav = tmp_path / "consult.wav"
+
+    class Recorder:
+        is_recording = False
+        def __init__(self, config):
+            self.config = config
+        def set_level_listener(self, callback):
+            pass
+        def start(self, **kwargs):
+            self.is_recording = True
+            return True
+        def stop(self):
+            self.is_recording = False
+            wav.write_bytes(b"synthetic audio")
+            return None, str(wav), duration
+
+    class Transcriber:
+        def __init__(self, config, memory):
+            pass
+        def transcribe(self, audio, seconds, mode, **kwargs):
+            return {"final": "架空の診察の文字起こし"}
+
+    class Native:
+        def send_text(self, target, text):
+            inserted.append(text)
+            return SimpleNamespace(success=True, reason="sent")
+
+    c = Controller({"windows_auto_insert": True, "windows_soap_auto": auto},
+                   lambda *event: events.append(event), Native(), recorder_factory=Recorder,
+                   transcriber_factory=Transcriber, memory_factory=lambda *args: None,
+                   model_locator=lambda: tmp_path, soap_factory=soap)
+    wait_for(lambda: c.state == "idle")
+    return c, events, inserted, wav
+
+
+def finish_recording(c, events, target="EHR"):
+    c.toggle(target=target)
+    wait_for(lambda: c._capture_open)
+    c.toggle()
+
+
+def test_long_recording_drafts_soap_and_inserts_only_the_draft(tmp_path):
+    soap = FakeSoap()
+    c, events, inserted, wav = soap_controller(tmp_path, soap)
+    assert c.soap_ready
+    finish_recording(c, events)
+    wait_for(lambda: c.state == "idle" and any(e[0] == "soap_result" for e in events))
+    result = next(e[1] for e in events if e[0] == "result")
+    assert result["soap_follows"] and result["insertion"]["reason"] == "preview_only"
+    soap_result = next(e[1] for e in events if e[0] == "soap_result")
+    assert soap.calls == ["架空の診察の文字起こし"]
+    assert soap_result["transcript"] == "架空の診察の文字起こし"
+    assert inserted == [soap.text] and soap_result["insertion"]["success"]
+    assert ("status", "drafting_soap") in events and ("soap_progress", {"seconds": 3}) in events
+    assert c.last_soap == soap.text and not wav.exists()
+    c.close()
+    wait_for(lambda: c.state == "closed")
+
+
+@pytest.mark.parametrize("duration,auto", [(10.0, True), (120.0, False)])
+def test_short_dictation_or_disabled_setting_skips_soap(tmp_path, duration, auto):
+    soap = FakeSoap()
+    c, events, inserted, _wav = soap_controller(tmp_path, soap, duration=duration, auto=auto)
+    finish_recording(c, events)
+    wait_for(lambda: c.state == "idle" and any(e[0] == "result" for e in events))
+    assert soap.calls == [] and not any(e[0] == "soap_result" for e in events)
+    assert inserted == ["架空の診察の文字起こし"]  # previous dictation behaviour
+    c.close()
+    wait_for(lambda: c.state == "closed")
+
+
+def test_soap_failure_keeps_transcript_and_reports_code(tmp_path):
+    c, events, inserted, _wav = soap_controller(tmp_path, FakeSoap(error="soap_failed"))
+    finish_recording(c, events)
+    wait_for(lambda: c.state == "idle" and ("error", "soap_failed") in events)
+    assert c.last_text == "架空の診察の文字起こし" and inserted == []
+    c.close()
+    wait_for(lambda: c.state == "closed")
+
+
+def test_cancel_during_soap_discards_draft(tmp_path):
+    gate = threading.Event()
+    c, events, inserted, _wav = soap_controller(tmp_path, FakeSoap(gate=gate))
+    finish_recording(c, events)
+    wait_for(lambda: c.state == "drafting_soap")
+    c.cancel()
+    wait_for(lambda: c.state == "idle")
+    assert not any(e[0] == "soap_result" for e in events) and inserted == []
+    assert not any(e == ("error", "cancelled") for e in events)
+    c.close()
+    wait_for(lambda: c.state == "closed")
+
+
+def test_manual_draft_and_missing_model(tmp_path):
+    soap = FakeSoap()
+    c, events, inserted, _wav = soap_controller(tmp_path, soap)
+    assert not c.draft_soap("   ")
+    assert c.draft_soap("編集した文字起こし")
+    wait_for(lambda: c.state == "idle" and any(e[0] == "soap_result" for e in events))
+    assert soap.calls == ["編集した文字起こし"] and inserted == []  # manual drafts are never inserted
+    c.close()
+    wait_for(lambda: c.state == "closed")
+
+    def missing():
+        from windows_client.soap import SoapError
+        raise SoapError("soap_unavailable")
+    events2 = []
+    c2 = Controller({}, lambda *event: events2.append(event), None, model_locator=lambda: tmp_path,
+                    soap_factory=lambda: SimpleNamespace(locate=missing))
+    wait_for(lambda: c2.state == "idle")
+    assert not c2.soap_ready and ("soap_status", "soap_unavailable") in events2
+    assert not c2.draft_soap("text")
+    c2.close()
+    wait_for(lambda: c2.state == "closed")

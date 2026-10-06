@@ -73,6 +73,14 @@ class Controller:
         self.closed = False
         self.model_ready = True
         self.imports = []
+        self.soap_ready = True
+        self.last_soap = ""
+        self.soap_requests = []
+
+    def draft_soap(self, transcript):
+        self.soap_requests.append(transcript)
+        self.state = "drafting_soap"
+        return True
 
     def import_file(self, path):
         self.imports.append(path)
@@ -133,7 +141,7 @@ class HeadlessApp(WindowsApp):
             "ui_language": "en",
             "windows_lexicon_enabled": False, "windows_auto_insert": False,
             "windows_save_history": False, "windows_toggle_hotkey": "Ctrl+Alt+F9",
-            "windows_cancel_hotkey": "Ctrl+Alt+F10",
+            "windows_cancel_hotkey": "Ctrl+Alt+F10", "windows_soap_auto": True,
         }
         self.vars = {field: Value(self.config.get(field, default)) for field, default in defaults.items()}
         self.status, self.notice, self.hotkey_notice = Value(), Value(), Value()
@@ -141,6 +149,7 @@ class HeadlessApp(WindowsApp):
         self.record_button, self.cancel_button, self.save_button = Widget(), Widget(), Widget()
         self.meter, self.result, self.copy_button = Widget(), Widget(), Widget()
         self.import_button, self.save_text_button = Widget(), Widget()
+        self.soap_button = Widget()
 
 
 @pytest.fixture
@@ -458,3 +467,42 @@ def test_long_recording_messages_and_elapsed_clock(app, monkeypatch):
     app.controller.state = "idle"
     app._render_state()
     assert app._recording_since is None
+
+
+def test_soap_result_shows_draft_unverified_terms_and_transcript(app):
+    app.controller.last_text = "血圧は148の92です。"
+    app.enqueue("result", {"text": app.controller.last_text, "insertion": {"success": False},
+                           "long": True, "soap_follows": True})
+    app._pump()
+    assert app.notice.get() == LABELS["en"]["soap_pending"]
+    app.controller.state = "drafting_soap"
+    app._render_state()
+    assert app.cancel_button.options["state"] == "normal"
+    assert app.soap_button.options["state"] == "disabled"
+    app.enqueue("soap_progress", {"seconds": 75})
+    app._pump()
+    assert app.status.get() == LABELS["en"]["soap_elapsed"].format(elapsed="01:15")
+    soap = {"text": "S（主観的情報）:\n- 記載なし\nO（客観的情報）:\n- 血圧 148/92\nA（評価）:\n- 記載なし\nP（計画）:\n- インスリン",
+            "unverified": ["インスリン"], "seconds": 80}
+    app.enqueue("soap_result", {"soap": soap, "transcript": app.controller.last_text, "insertion": {}})
+    app._pump()  # stale: controller.last_soap differs
+    assert "SOAP" not in app.result.get("1.0", "end-1c")
+    app.controller.last_soap = soap["text"]
+    app.controller.state = "idle"
+    app.enqueue("soap_result", {"soap": soap, "transcript": app.controller.last_text, "insertion": {}})
+    app._pump()
+    text = app.result.get("1.0", "end-1c")
+    assert text.startswith(LABELS["en"]["soap_heading"])
+    assert LABELS["en"]["soap_unverified"] + "インスリン" in text
+    assert text.rstrip().endswith(LABELS["en"]["transcript_heading"] + "\n血圧は148の92です。")
+    assert app.notice.get() == LABELS["en"]["soap_done"]
+    assert app.soap_button.options["state"] == "normal"
+    # Re-drafting sends only the transcript part of the result box.
+    app._draft_soap()
+    assert app.controller.soap_requests == ["\n血圧は148の92です。"]
+
+
+def test_soap_button_disabled_without_model(app):
+    app.controller.soap_ready = False
+    app._render_state()
+    assert app.soap_button.options["state"] == "disabled"

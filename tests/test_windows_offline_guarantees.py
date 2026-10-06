@@ -38,6 +38,8 @@ def test_model_download_tooling_is_build_time_only():
     assert "fetch_windows_model" not in spec
     assert "benchmark_windows_ja_stt" not in spec
     assert "prepare_windows_speech_fixture" not in spec
+    for tool in ("fetch_windows_llm", "benchmark_windows_soap_llm", "check_soap_report"):
+        assert tool not in spec
     build = (ROOT / "windows/build.ps1").read_text(encoding="utf-8")
     assert "@('scripts/fetch_windows_model.py', '--dest', (Join-Path $AppDirectory 'models'))" in build
     assert "if ($LockUnpinnedModel)" in build  # lock mode is opt-in only
@@ -49,3 +51,10 @@ def test_runtime_forces_offline_hub_environment_before_engine_import():
     assert source.index("enforce_offline_environment()\n") < source.index("class LocalTranscriber")
     for name in ("HF_HUB_OFFLINE", "HF_HUB_DISABLE_TELEMETRY", "DO_NOT_TRACK"):
         assert name in source
+
+
+def test_soap_runtime_is_a_child_process_without_network_arguments():
+    source = (ROOT / "windows_client/soap.py").read_text(encoding="utf-8")
+    assert "llama-server" not in source and "--host" not in source and "--port" not in source
+    for flag in ("-hf", "--hf-repo", "-mu", "--model-url"):
+        assert f'"{flag}"' not in source

@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "id": "qwen3.5-4b-q4km",
+  "name": "Qwen3.5-4B (Q4_K_M GGUF, CPU)",
+  "repository": "unsloth/Qwen3.5-4B-GGUF",
+  "revision": "main",
+  "source_url": "https://huggingface.co/unsloth/Qwen3.5-4B-GGUF",
+  "license": "Apache-2.0 (Qwen3.5-4B weights by Alibaba Qwen; GGUF quantization by Unsloth)",
+  "purpose": "Japanese SOAP draft from a local transcript; never sees audio, never connects to a network",
+  "files": [
+    {
+      "name": "Qwen3.5-4B-Q4_K_M.gguf",
+      "size": 2740937888,
+      "sha256": "00fe7986ff5f6b463e62455821146049db6f9313603938a70800d1fb69ef11a4"
+    }
+  ],
+  "runtime": {
+    "project": "ggml-org/llama.cpp",
+    "tag": "b11435",
+    "asset": "llama-b11435-bin-win-cpu-x64.zip",
+    "sha256": "3ed50261147e260d80f5cdc7bdccfa13a94882be560a4438e7a69fa519c93fb7",
+    "license": "MIT",
+    "executable": "llama-completion.exe"
+  },
+  "generation": {
+    "max_tokens": 1500,
+    "temperature": 0.2,
+    "top_p": 0.9,
+    "max_context": 16384
+  }
+}

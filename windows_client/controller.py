@@ -27,7 +27,11 @@ WINDOWS_DEFAULTS = {
     "windows_auto_insert": False,
     "windows_toggle_hotkey": "Ctrl+Alt+F9",
     "windows_cancel_hotkey": "Ctrl+Alt+F10",
+    # Draft a Japanese SOAP note locally after a long recording or a file import.
+    "windows_soap_auto": True,
 }
+# Below this much RAM the speech model is unloaded while the LLM runs.
+LOW_MEMORY_BYTES = 16 * 1024 ** 3
 
 
 def runtime_config(settings):
@@ -82,7 +86,8 @@ def _new_memory(retain, cancelled):
 
 class Controller:
     def __init__(self, config, on_event, native=None, *, recorder_factory=None,
-                 transcriber_factory=None, memory_factory=None, model_locator=None):
+                 transcriber_factory=None, memory_factory=None, model_locator=None,
+                 soap_factory=None):
         self.config = {**WINDOWS_DEFAULTS, **config}
         self._emit_callback = on_event
         self.native = native
@@ -90,6 +95,9 @@ class Controller:
         self._transcriber_factory = transcriber_factory
         self._memory_factory = memory_factory or _new_memory
         self._model_locator = model_locator
+        self._soap_factory = soap_factory
+        self._soap = None
+        self.last_soap = ""
         self._model_dir = None
         self._model_error = "model_missing"
         self._decode_options = {}
@@ -105,6 +113,7 @@ class Controller:
         self._target = None
         self.state = "idle"
         self.last_text = ""
+        self.last_soap = ""
         self._worker = threading.Thread(target=self._work, daemon=True, name="windows-voice")
         self._worker.start()
         # Verify the installed model off the UI thread before the first recording.
@@ -147,6 +156,7 @@ class Controller:
             self._session += 1
             self._cancelled.clear()
             self.last_text = ""
+            self.last_soap = ""
             self._target = target
             self._snapshot = runtime_config(self.config)
             self._snapshot["windows_model_dir"] = str(self._model_dir)
@@ -169,10 +179,84 @@ class Controller:
         except Exception as exc:
             self._model_error = getattr(exc, "code", None) or "model_invalid"
             self._emit("error", self._model_error)
+        else:
+            self._locate_soap()
         finally:
             with self._lock:
                 if not self._closed:
                     self._set_state("idle")
+
+    def _locate_soap(self):
+        """The SOAP model is optional: speech recognition works without it."""
+        try:
+            if self._soap_factory is None:
+                from windows_client.soap import SoapDrafter
+                self._soap_factory = SoapDrafter
+            drafter = self._soap_factory()
+            drafter.locate()
+            self._soap = drafter
+        except Exception as exc:
+            self._soap = None
+            self._emit("soap_status", getattr(exc, "code", None) or "soap_unavailable")
+
+    @property
+    def soap_ready(self):
+        return self._soap is not None
+
+    def draft_soap(self, transcript):
+        """Draft a SOAP note from text in the result box (for example after editing)."""
+        with self._lock:
+            if self._closed or self.state != "idle" or self._soap is None or not (transcript or "").strip():
+                return False
+            self._session += 1
+            self._cancelled.clear()
+            self._target = None
+            self._snapshot = runtime_config(self.config)
+            self._set_state("drafting_soap")
+            self._commands.put((lambda session: self._run_soap(session, transcript, insert=False), self._session))
+            return True
+
+    def _run_soap(self, session, transcript, *, insert):
+        """Worker thread. Emits soap_result; the transcript result was already shown."""
+        from windows_client.soap import SoapError, physical_memory_bytes
+        try:
+            with self._lock:
+                if self._cancelled.is_set() or self._closed:
+                    return
+                self._set_state("drafting_soap")
+            memory = physical_memory_bytes()
+            if memory is not None and memory < LOW_MEMORY_BYTES:
+                # Free the speech model (about 2 GB) while the LLM runs; it reloads on demand.
+                self._transcriber = None
+                self._transcriber_key = None
+                import gc
+                gc.collect()
+            try:
+                soap = self._soap.draft(transcript, should_cancel=self._cancelled.is_set,
+                                        on_progress=lambda seconds: self._emit("soap_progress", {"seconds": int(seconds)}))
+            except SoapError as exc:
+                if exc.code != "cancelled" and not self._cancelled.is_set():
+                    self._emit("error", exc.code)
+                return
+            with self._lock:
+                if self._cancelled.is_set() or self._closed:
+                    return
+                self.last_soap = soap["text"]
+                insertion = {"success": False, "reason": "preview_only"}
+                if insert and self._snapshot.get("windows_auto_insert") and self._target and self.native:
+                    try:
+                        delivered = self.native.send_text(self._target, soap["text"])
+                        insertion = {"success": delivered.success, "reason": delivered.reason}
+                    except Exception:
+                        insertion = {"success": False, "reason": "input_failed"}
+                self._emit("soap_result", {"soap": soap, "transcript": transcript, "insertion": insertion})
+        finally:
+            with self._lock:
+                if not self._closed:
+                    self._set_state("idle")
+
+    def _soap_follows(self):
+        return self._soap is not None and bool(self._snapshot.get("windows_soap_auto", True))
 
     def import_file(self, path):
         """Transcribe a chosen WAV/MP3 recording; preview only, never auto-inserted."""
@@ -185,6 +269,7 @@ class Controller:
             self._session += 1
             self._cancelled.clear()
             self.last_text = ""
+            self.last_soap = ""
             self._target = None
             self._snapshot = runtime_config(self.config)
             self._snapshot["windows_model_dir"] = str(self._model_dir)
@@ -224,7 +309,11 @@ class Controller:
                 progress(1.0)
                 self._emit("result", {"text": self.last_text, "source": "file",
                                       "insertion": {"success": False, "reason": "preview_only"},
-                                      "lexicon_candidates": self._lexicon(self.last_text)})
+                                      "lexicon_candidates": self._lexicon(self.last_text),
+                                      "soap_follows": self._soap_follows()})
+                transcript = self.last_text if self._soap_follows() else None
+            if transcript:
+                self._run_soap(session, transcript, insert=False)
         finally:
             shutil.rmtree(folder, ignore_errors=True)
             with self._lock:
@@ -252,6 +341,7 @@ class Controller:
         with self._lock:
             self._cancelled.set()
             self.last_text = ""
+            self.last_soap = ""
             if self.state == "recording":
                 self._set_state("stopping")
                 self._commands.put((self._discard, self._session))
@@ -395,7 +485,10 @@ class Controller:
                                            "mode": "dictate", "duration": duration,
                                            "stt_engine": "faster-whisper-local", "llm_source": None})
                 insertion = {"success": False, "reason": "preview_only"}
-                if self._snapshot.get("windows_auto_insert") and self._target and self.native:
+                soap_follows = long_recording and self._soap_follows()
+                # With a SOAP draft coming, only the draft is inserted (once, at the end).
+                if (not soap_follows and self._snapshot.get("windows_auto_insert")
+                        and self._target and self.native):
                     try:
                         delivered = self.native.send_text(self._target, self.last_text)
                         insertion = {"success": delivered.success, "reason": delivered.reason}
@@ -403,7 +496,14 @@ class Controller:
                         insertion = {"success": False, "reason": "input_failed"}
                 self._emit("result", {"text": self.last_text, "insertion": insertion,
                                       "lexicon_candidates": candidates, "long": long_recording,
-                                      "limit_reached": duration >= MAX_RECORDING_SECONDS - 1})
+                                      "limit_reached": duration >= MAX_RECORDING_SECONDS - 1,
+                                      "soap_follows": soap_follows})
+                transcript = self.last_text if soap_follows else None
+            if transcript:
+                # The recording is no longer needed while the draft is written.
+                self._remove(path)
+                path = None
+                self._run_soap(session, transcript, insert=True)
         finally:
             self._remove(path)
             self._emit("level", 0.0)

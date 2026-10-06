@@ -60,9 +60,9 @@ def artifacts(tmp_path):
     smoke = tmp_path / "smoke.json"
     smoke.write_text(json.dumps({
         "ok": True, "platform": "win32", "architecture": "AMD64", "version": version,
-        "checks": {key: True for key in ("windows_native", "tk_ui", "wav_roundtrip", "credential_backend", "shared_core", "bundled_model")},
+        "checks": {key: True for key in ("windows_native", "tk_ui", "wav_roundtrip", "credential_backend", "shared_core", "bundled_model", "bundled_llm")},
         "errors": [], "microphone_tested": False, "cloud_tested": False, "input_delivery_tested": False, "recognition_mode": "local-only",
-        "model_included": True, "local_inference_tested": False,
+        "model_included": True, "llm_included": True, "local_inference_tested": False,
     }), encoding="utf-8")
     return installer, app, smoke, commit
 
@@ -145,7 +145,8 @@ def test_installer_is_per_machine_with_bundled_model_and_no_profile_deletion():
     assert "PrivilegesRequired=admin" in installer
     assert "DefaultDirName={autopf}\\SGHVoice" in installer
     assert 'Source: "{#SourceDir}\\models\\*"; DestDir: "{app}\\models"' in installer
-    assert "nocompression" in installer
+    assert 'Source: "{#SourceDir}\\llm\\*"; DestDir: "{app}\\llm"' in installer
+    assert "nocompression" in installer and "DiskSpanning=yes" in installer
     assert "[UninstallDelete]" not in installer
 
 
@@ -156,3 +157,20 @@ def test_smoke_without_bundled_model_is_rejected(artifacts, tmp_path):
     smoke.write_text(json.dumps(report), encoding="utf-8")
     with pytest.raises(ValueError, match="bundled"):
         release.verify_build(installer, app, smoke, commit)
+
+
+def test_smoke_without_bundled_llm_is_rejected(artifacts):
+    installer, app, smoke, commit = artifacts
+    report = json.loads(smoke.read_text(encoding="utf-8"))
+    report["llm_included"] = False
+    smoke.write_text(json.dumps(report), encoding="utf-8")
+    with pytest.raises(ValueError, match="SOAP"):
+        release.verify_build(installer, app, smoke, commit)
+
+
+def test_disk_spanning_slices_are_recorded(artifacts):
+    installer, app, smoke, commit = artifacts
+    (installer.parent / (installer.stem + "-1.bin")).write_bytes(b"slice one")
+    (installer.parent / (installer.stem + "-2.bin")).write_bytes(b"slice two")
+    result = release.verify_build(installer, app, smoke, commit)
+    assert [part["name"] for part in result["slices"]] == [installer.stem + "-1.bin", installer.stem + "-2.bin"]

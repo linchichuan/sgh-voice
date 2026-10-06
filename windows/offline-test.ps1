@@ -19,10 +19,11 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Public speech fixture preparation failed.' }
     $Clips = Join-Path $Fixture 'clips.json'
     $Arguments = @('--offline-self-test', 'bundled', "`"$ReportPath`"", '--speech-set', "`"$Clips`"",
-                   '--max-cer', $MaxCer.ToString([Globalization.CultureInfo]::InvariantCulture))
+                   '--max-cer', $MaxCer.ToString([Globalization.CultureInfo]::InvariantCulture),
+                   '--soap-transcript', "`"$(Join-Path $RepoRoot 'scripts\fixtures\consultation-ja-fictional.txt')`"")
     $Process = Start-Process -FilePath $AppExe -ArgumentList $Arguments -WorkingDirectory $TestRoot -PassThru
     try {
-        if (-not $Process.WaitForExit(300000)) {
+        if (-not $Process.WaitForExit(900000)) {
             $Process.Kill($true)
             throw 'Offline inference exceeded the time limit.'
         }
@@ -37,11 +38,13 @@ try {
         $Report.model_hash_seconds, $Report.first_inference_seconds, $Report.cer, $MaxCer)
     if ($ExitCode -ne 0 -or $Report.ok -ne $true -or $Report.local_inference_tested -ne $true `
             -or $Report.accuracy_tested -ne $true -or $Report.python_network_attempts -ne 0 `
-            -or $Report.platform -ne 'win32' -or -not $Report.model_verified `
+            -or $Report.platform -ne 'win32' -or -not $Report.model_verified -or $Report.soap_tested -ne $true `
             -or -not (@($Report.speech) | Where-Object { $_.imported -and $_.format -eq 'MP3' -and $_.cer -le $MaxCer }) `
             -or -not (@($Report.speech) | Where-Object { $_.imported -and $_.format -eq 'WAV' -and $_.cer -le $MaxCer })) {
         throw 'Offline runtime evidence is missing or failed.'
     }
+    & python scripts/check_soap_report.py $ReportPath
+    if ($LASTEXITCODE -ne 0) { throw 'Bundled SOAP draft check failed.' }
     Write-Host 'PASS bundled model: SHA-256 verified; Japanese WAV clips plus imported MP3 and WAV files (Japanese folder/file names) recognized under the CER ceiling; Python network denied.'
     Write-Host 'Public read speech only: microphone, medical dictation accuracy and target-input acceptance were not tested.'
 } finally {

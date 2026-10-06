@@ -97,7 +97,13 @@ def self_test(report_path):
         check("wav_roundtrip", audio_check)
         check("credential_backend", credential_backend_check)
         check("shared_core", core_check)
+        def bundled_llm_check():
+            # Full SHA-256 of the pinned GGUF (cached in this throwaway profile) and runtime presence.
+            from windows_client.soap import SoapDrafter
+            SoapDrafter(cache_dir=profile).locate()
+
         check("bundled_model", bundled_model_check)
+        check("bundled_llm", bundled_llm_check)
         from config import APP_VERSION
         report = {
             "ok": all(checks.values()), "platform": sys.platform,
@@ -106,6 +112,7 @@ def self_test(report_path):
             "microphone_tested": False, "cloud_tested": False,
             "input_delivery_tested": False, "local_inference_tested": False,
             "recognition_mode": "local-only", "model_included": checks.get("bundled_model") is True,
+            "llm_included": checks.get("bundled_llm") is True, "soap_tested": False,
         }
     Path(report_path).write_text(json.dumps(report, indent=2), encoding="utf-8")
     return 0 if report["ok"] else 1
@@ -128,7 +135,7 @@ def _edit_distance(a, b):
     return previous[-1]
 
 
-def offline_self_test(model_directory, report_path, speech_set=None, max_cer=None):
+def offline_self_test(model_directory, report_path, speech_set=None, max_cer=None, soap_transcript=None):
     """Exercise the bundled CPU decoder with Python network IO denied.
 
     MODEL_DIR "bundled" uses the installed model after a full SHA-256 check.
@@ -197,6 +204,16 @@ def offline_self_test(model_directory, report_path, speech_set=None, max_cer=Non
                 report["cer"] = round(errors / max(1, characters), 4)
                 report["max_cer"] = max_cer
                 ok = ok and bool(clips) and max_cer is not None and report["cer"] <= max_cer
+            if soap_transcript:
+                # The bundled llama.cpp child process drafts SOAP from a fictional transcript.
+                from windows_client.soap import SoapDrafter, has_soap_headings
+                transcript = Path(soap_transcript).read_text(encoding="utf-8")
+                drafted = SoapDrafter(cache_dir=folder).draft(transcript)
+                report["soap"] = {"text": drafted["text"], "unverified": drafted["unverified"],
+                                  "seconds": drafted["seconds"], "transcript_chars": len(transcript),
+                                  "headings": has_soap_headings(drafted["text"])}
+                report["soap_tested"] = True
+                ok = ok and report["soap"]["headings"]
             report["ok"] = ok and not attempts
     except Exception as exc:
         report["error"] = type(exc).__name__
@@ -218,11 +235,13 @@ def main(argv=None):
     parser.add_argument("--offline-self-test", nargs=2, metavar=("MODEL_DIR", "REPORT_JSON"))
     parser.add_argument("--speech-set", metavar="CLIPS_JSON")
     parser.add_argument("--max-cer", type=float)
+    parser.add_argument("--soap-transcript", metavar="TEXT_FILE")
     args = parser.parse_args(argv)
     if args.self_test:
         return self_test(args.self_test)
     if args.offline_self_test:
-        return offline_self_test(*args.offline_self_test, speech_set=args.speech_set, max_cer=args.max_cer)
+        return offline_self_test(*args.offline_self_test, speech_set=args.speech_set, max_cer=args.max_cer,
+                                 soap_transcript=args.soap_transcript)
     if sys.platform != "win32":
         print("SGH Voice Windows requires Windows x64.", file=sys.stderr)
         return 2

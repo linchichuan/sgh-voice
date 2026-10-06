@@ -50,6 +50,10 @@ try {
     }
     & python @FetchArguments
     if ($LASTEXITCODE -ne 0) { throw 'Pinned model fetch or verification failed.' }
+    # The SOAP language model and the official llama.cpp CPU runtime, pinned by
+    # resources/windows/llm-ja-v1.json (release zip SHA-256 + GGUF size/SHA-256).
+    & python scripts/fetch_windows_llm.py --dest (Join-Path $AppDirectory 'llm')
+    if ($LASTEXITCODE -ne 0) { throw 'Pinned SOAP model/runtime fetch or verification failed.' }
     $SmokeReport = Join-Path $DistRoot 'windows-smoke.json'
     $Smoke = Start-Process -FilePath $AppExe -ArgumentList @('--self-test', "`"$SmokeReport`"") -Wait -PassThru
     if ($Smoke.ExitCode -ne 0 -or -not (Test-Path $SmokeReport)) { throw 'Frozen application self-test failed.' }
@@ -58,9 +62,13 @@ try {
     $Installer = Join-Path $DistRoot "SGHVoice-Windows-$Version-x64-unsigned.exe"
     & python scripts/verify_windows_release.py --installer $Installer --app $AppExe --smoke-report $SmokeReport --source-commit $SourceCommit --write-manifest "$DistRoot\windows-build.json"
     if ($LASTEXITCODE -ne 0) { throw 'Build verification failed.' }
-    # Checksums for hospital IT: the installer plus every bundled model file.
+    # Checksums for hospital IT: the installer, its slices, and every bundled model/runtime file.
     $Sums = @((Get-FileHash -LiteralPath $Installer -Algorithm SHA256).Hash.ToLowerInvariant() + '  ' + (Split-Path -Leaf $Installer))
-    foreach ($ModelFile in Get-ChildItem -LiteralPath (Join-Path $AppDirectory 'models') -Recurse -File | Sort-Object FullName) {
+    foreach ($Slice in Get-ChildItem -LiteralPath $DistRoot -Filter "SGHVoice-Windows-$Version-x64-unsigned-*.bin" | Sort-Object Name) {
+        $Sums += (Get-FileHash -LiteralPath $Slice.FullName -Algorithm SHA256).Hash.ToLowerInvariant() + '  ' + $Slice.Name
+    }
+    $Bundled = @(Get-ChildItem -LiteralPath (Join-Path $AppDirectory 'models') -Recurse -File) + @(Get-ChildItem -LiteralPath (Join-Path $AppDirectory 'llm') -Recurse -File)
+    foreach ($ModelFile in $Bundled | Sort-Object FullName) {
         $Relative = [IO.Path]::GetRelativePath($AppDirectory, $ModelFile.FullName).Replace('\', '/')
         $Sums += (Get-FileHash -LiteralPath $ModelFile.FullName -Algorithm SHA256).Hash.ToLowerInvariant() + '  ' + $Relative
     }

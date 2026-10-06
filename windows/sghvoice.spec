@@ -21,7 +21,7 @@ datas = [
 binaries = []
 hiddenimports = [
     "windows_client", "windows_client.local_stt", "windows_client.models",
-    "windows_client.audio_import",
+    "windows_client.audio_import", "windows_client.soap",
     "windows_client.lexicon", "windows_client._vendor.faster_whisper",
     "config", "hotkey_config", "recorder",
     "memory", "medical_dictionary", "multilingual", "dictation_cleanup",

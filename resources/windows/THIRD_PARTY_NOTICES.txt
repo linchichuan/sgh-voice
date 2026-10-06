@@ -1,6 +1,6 @@
 SGH Voice for Windows — Third-party notices
 Prepared 2026-10-04 for the locked CPython 3.12 x64 CPU distribution;
-bundled-model section added 2026-10-05.
+bundled-model section added 2026-10-05; SOAP model and llama.cpp runtime added 2026-10-06.
 
 This file identifies included third-party components. It does not change the
 license of SGH Voice. Original licenses and notices accompany the corresponding
@@ -60,6 +60,27 @@ OpenAI Whisper large-v3-turbo model weights
 
 The model files are redistributed unmodified; SGH Voice loads them with int8
 CPU quantization at runtime, which does not change the files.
+
+Bundled SOAP draft language model and runtime
+---------------------------------------------
+Listed in resources/windows/llm-ja-v1.json (file sizes and SHA-256) and
+installed under <installation folder>\llm\. The runtime is started as a local
+child process with a prompt file; no network option is used.
+
+Qwen3.5-4B, GGUF Q4_K_M quantization (unsloth/Qwen3.5-4B-GGUF)
+  Model weights by the Qwen team (Alibaba Cloud), Apache License 2.0:
+  https://huggingface.co/Qwen/Qwen3.5-4B  (LICENSE in that repository)
+  GGUF conversion/quantization published by Unsloth under Apache License 2.0:
+  https://huggingface.co/unsloth/Qwen3.5-4B-GGUF
+  The GGUF file is redistributed unmodified. The full Apache License 2.0 text
+  is included as resources\windows\licenses\Qwen3.5-4B-Apache-2.0.txt; the
+  weights are provided "AS IS", without warranties or conditions of any kind.
+
+llama.cpp (ggml-org/llama.cpp), official Windows CPU x64 release build
+  Tag and archive SHA-256 are pinned in llm-ja-v1.json. MIT License,
+  Copyright (c) 2023-2026 The ggml authors. The license file shipped in the
+  release archive is installed beside the executable (llm\runtime\).
+  Only llama-completion.exe and its DLLs are included.
 
 Native components
 -----------------

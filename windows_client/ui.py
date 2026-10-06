@@ -67,6 +67,23 @@ LABELS = {
         'lexicon_notice': 'Term candidates do not rewrite the transcript or establish clinical meaning. Verify the wording and context before editing or using the result.',
         'lexicon_candidates': 'Term candidates — review only',
         'loading_model': 'Loading the local model…',
+        'drafting_soap': 'Writing the SOAP draft locally…',
+        'soap_elapsed': 'Writing the SOAP draft locally… {elapsed}',
+        'soap_button': 'Create SOAP draft',
+        'soap_auto': 'After a recording over 30 seconds or a file import, create a SOAP draft automatically (on this computer)',
+        'soap_notice': 'The SOAP draft is written by a built-in language model on this computer, without a network connection. It can contain errors: the clinician must check it against the transcript. Numbers and terms not found in the transcript are listed for checking. Diagnosis and treatment decisions remain with the physician.',
+        'soap_pending': 'Transcript ready. Writing the SOAP draft next (about 1–5 minutes)…',
+        'soap_done': 'SOAP draft created. Check every item against the transcript below before using it.',
+        'soap_heading': '【SOAP draft (generated on this computer; must be checked)】',
+        'soap_unverified': '【Check: not found in the transcript】',
+        'transcript_heading': '【Transcript】',
+        'soap_unavailable': 'The SOAP language model is not installed. Speech recognition still works.',
+        'soap_model_invalid': 'The built-in SOAP language model is damaged. Reinstall from the original installer.',
+        'soap_failed': 'The SOAP draft could not be created. The transcript is unchanged.',
+        'soap_timeout': 'The SOAP draft took too long and was stopped. The transcript is unchanged.',
+        'soap_transcript_too_long': 'The transcript is too long for one SOAP draft. Split it and try again.',
+        'soap_empty': 'There is no text for a SOAP draft.',
+        'llm_builtin': 'SOAP model: {name} · {size} · built in (offline)',
         'model_builtin': 'Speech model: {name} · {size} · built in (offline)',
         'verifying_model': 'Checking the built-in speech model…',
         'import_file': 'Transcribe audio file…',
@@ -135,6 +152,23 @@ LABELS = {
         'lexicon_notice': '詞彙候選不會改寫逐字稿，也不能用來確定臨床意義。編輯或使用結果前，請先確認用字與上下文。',
         'lexicon_candidates': '詞彙候選 — 僅供人工確認',
         'loading_model': '正在載入本機模型…',
+        'drafting_soap': '正在本機產生 SOAP 草稿…',
+        'soap_elapsed': '正在本機產生 SOAP 草稿… {elapsed}',
+        'soap_button': '產生 SOAP 草稿',
+        'soap_auto': '錄音超過 30 秒或匯入音檔後，自動在本機產生 SOAP 草稿',
+        'soap_notice': 'SOAP 草稿由本機內建的語言模型產生，不連網。內容可能有誤，必須由醫療人員對照逐字稿確認；逐字稿中找不到的數字與用語會列出供確認。診斷與治療由醫師判斷。',
+        'soap_pending': '逐字稿完成，接著產生 SOAP 草稿（約 1～5 分鐘）…',
+        'soap_done': 'SOAP 草稿已產生。使用前請逐項對照下方逐字稿確認。',
+        'soap_heading': '【SOAP 草稿（本機產生・需確認）】',
+        'soap_unverified': '【需確認：逐字稿中找不到】',
+        'transcript_heading': '【逐字稿】',
+        'soap_unavailable': '未安裝 SOAP 語言模型；語音辨識仍可使用。',
+        'soap_model_invalid': '內建 SOAP 語言模型已損壞，請用原安裝檔重新安裝。',
+        'soap_failed': '無法產生 SOAP 草稿，逐字稿未變更。',
+        'soap_timeout': 'SOAP 草稿處理過久已停止，逐字稿未變更。',
+        'soap_transcript_too_long': '逐字稿過長，無法一次產生 SOAP 草稿，請分段後再試。',
+        'soap_empty': '沒有可產生 SOAP 草稿的文字。',
+        'llm_builtin': 'SOAP 模型：{name} · {size} · 內建（離線）',
         'model_builtin': '語音模型：{name} · {size} · 內建（離線）',
         'verifying_model': '正在檢查內建語音模型…',
         'import_file': '讀入音檔並辨識…',
@@ -203,6 +237,23 @@ LABELS = {
         'lexicon_notice': '用語候補は文字起こしを自動変更せず、臨床的意味を確定しません。編集・使用前に表記と文脈を確認してください。',
         'lexicon_candidates': '用語候補 — 手動確認用',
         'loading_model': 'ローカルモデルを読み込んでいます…',
+        'drafting_soap': 'SOAP 下書きをローカルで作成中…',
+        'soap_elapsed': 'SOAP 下書きをローカルで作成中… {elapsed}',
+        'soap_button': 'SOAP 下書きを作成',
+        'soap_auto': '30 秒を超える録音や音声ファイルの取り込み後に、SOAP 下書きを自動で作成する（このパソコン内で処理）',
+        'soap_notice': 'SOAP 下書きは、このパソコンに内蔵された言語モデルがネットワークに接続せずに作成します。誤りを含むことがあるため、必ず医療従事者が文字起こしと照合して確認してください。文字起こしに見当たらない数値や用語は確認用に表示します。診断・治療の判断は医師が行います。',
+        'soap_pending': '文字起こしが完了しました。続けて SOAP 下書きを作成しています（1～5 分程度）…',
+        'soap_done': 'SOAP 下書きを作成しました。使用する前に、下の文字起こしと照合して各項目を確認してください。',
+        'soap_heading': '【SOAP 下書き（このパソコンで自動作成・要確認）】',
+        'soap_unverified': '【要確認：文字起こしに見当たらない語句】',
+        'transcript_heading': '【文字起こし】',
+        'soap_unavailable': 'SOAP 用の言語モデルがインストールされていません。音声認識は利用できます。',
+        'soap_model_invalid': '内蔵の SOAP 用言語モデルが破損しています。元のインストーラーで再インストールしてください。',
+        'soap_failed': 'SOAP 下書きを作成できませんでした。文字起こしは変更されていません。',
+        'soap_timeout': 'SOAP 下書きの作成に時間がかかりすぎたため中止しました。文字起こしは変更されていません。',
+        'soap_transcript_too_long': '文字起こしが長すぎるため、1 回で SOAP 下書きを作成できません。分割して再度お試しください。',
+        'soap_empty': 'SOAP 下書きを作成する文字がありません。',
+        'llm_builtin': 'SOAP 用モデル：{name} · {size} · 内蔵（オフライン）',
         'model_builtin': '音声モデル：{name} · {size} · 内蔵（オフライン）',
         'verifying_model': '内蔵の音声モデルを確認しています…',
         'import_file': '音声ファイルを文字起こし…',
@@ -319,7 +370,7 @@ class WindowsApp:
     """Single Tk-thread owner; local speech, microphone and hotkeys use a queue."""
 
     def __init__(self, root, config, *, controller_factory, native, hotkeys_factory,
-                 save_config, validate_hotkey=None, model_info=None,
+                 save_config, validate_hotkey=None, model_info=None, llm_info=None,
                  choose_audio_file=None, choose_save_path=None):
         self.root = root
         self.config = deepcopy(config)
@@ -328,6 +379,7 @@ class WindowsApp:
         self.save_config = save_config
         self.validate_hotkey = validate_hotkey
         self.model_info = dict(model_info or {})
+        self.llm_info = dict(llm_info or {})
         self.choose_audio_file = choose_audio_file
         self.choose_save_path = choose_save_path
         self.events = queue.SimpleQueue()
@@ -342,6 +394,7 @@ class WindowsApp:
         self._dirty = False
         self._drop_results = False
         self._recording_since = None
+        self._soap_seconds = None
         self._build()
         self.controller = controller_factory(self.config, self.enqueue, native=native)
         self._render_state()
@@ -415,6 +468,9 @@ class WindowsApp:
         self.save_text_button = ttk.Button(file_row, text=self.tr("save_text"), command=self._save_text)
         self.save_text_button.pack(side="left", padx=8)
         self._labels.append((self.save_text_button, "save_text"))
+        self.soap_button = ttk.Button(file_row, text=self.tr("soap_button"), command=self._draft_soap)
+        self.soap_button.pack(side="left")
+        self._labels.append((self.soap_button, "soap_button"))
         self.import_button = ttk.Button(controls, text=self.tr("import_file"), command=self._import_file)
         self.import_button.pack(side="left", padx=(16, 0))
         self._labels.append((self.import_button, "import_file"))
@@ -457,7 +513,8 @@ class WindowsApp:
         for row, field, key, default in (
                 (10, "windows_lexicon_enabled", "lexicon_enabled", False),
                 (12, "windows_auto_insert", "auto_insert", False),
-                (14, "windows_save_history", "save_history", False)):
+                (14, "windows_save_history", "save_history", False),
+                (17, "windows_soap_auto", "soap_auto", True)):
             self.vars[field] = tk.BooleanVar(value=bool(self.config.get(field, default)))
             check = ttk.Checkbutton(self.settings_frame, text=self.tr(key), variable=self.vars[field])
             check.grid(row=row, column=0, columnspan=2, sticky="w", pady=2)
@@ -467,7 +524,8 @@ class WindowsApp:
         label(self.settings_frame, "insert_notice", wraplength=760).grid(row=13, column=0, columnspan=2, sticky="ew", pady=(0, 4))
         label(self.settings_frame, "history_notice", wraplength=760).grid(row=15, column=0, columnspan=2, sticky="ew")
         self.save_button = ttk.Button(self.settings_frame, text=self.tr("save"), command=self._save)
-        self.save_button.grid(row=16, column=0, columnspan=2, sticky="w", pady=(8, 0))
+        label(self.settings_frame, "soap_notice", wraplength=760).grid(row=18, column=0, columnspan=2, sticky="ew", pady=(0, 4))
+        self.save_button.grid(row=19, column=0, columnspan=2, sticky="w", pady=(8, 0))
         self._labels.append((self.save_button, "save"))
         self.candidates = tk.StringVar()
         ttk.Label(frame, textvariable=self.candidates, wraplength=790).grid(row=7, column=0, sticky="ew", pady=8)
@@ -482,11 +540,14 @@ class WindowsApp:
         return bool(getattr(self.controller, "model_ready", False))
 
     def _render_model_info(self):
+        details = []
         if self.model_info.get("name"):
-            self.model_details.set(self.tr("model_builtin").format(
+            details.append(self.tr("model_builtin").format(
                 name=self.model_info["name"], size=self.model_info.get("size_label", "")))
-        else:
-            self.model_details.set("")
+        if self.llm_info.get("name") and getattr(self.controller, "soap_ready", False):
+            details.append(self.tr("llm_builtin").format(
+                name=self.llm_info["name"], size=self.llm_info.get("size_label", "")))
+        self.model_details.set("\n".join(details))
         state = self.controller.state
         if state == "verifying_model":
             self.model_notice.set(self.tr("verifying_model"))
@@ -501,7 +562,7 @@ class WindowsApp:
 
     def _render_state(self):
         state = self.controller.state
-        self._status_key = state if state in ("idle", "recording", "stopping", "processing", "verifying_model", "loading_model", "importing", "closed") else "idle"
+        self._status_key = state if state in ("idle", "recording", "stopping", "processing", "verifying_model", "loading_model", "importing", "drafting_soap", "closed") else "idle"
         if state == "idle" and not self._model_ready():
             self._status_key = "needs_model"
         if state == "recording":
@@ -509,9 +570,12 @@ class WindowsApp:
                 self._recording_since = time.monotonic()
         else:
             self._recording_since = None
+        if state != "drafting_soap":
+            self._soap_seconds = None
         self.status.set(self._status_text())
         self.record_button.configure(text=self.tr("stop" if state == "recording" else "record"), state="normal" if state in ("idle", "recording") else "disabled")
-        self.cancel_button.configure(state="normal" if state in ("recording", "stopping", "processing", "loading_model", "importing") else "disabled")
+        self.cancel_button.configure(state="normal" if state in ("recording", "stopping", "processing", "loading_model", "importing", "drafting_soap") else "disabled")
+        self.soap_button.configure(state="normal" if state == "idle" and getattr(self.controller, "soap_ready", False) else "disabled")
         self.import_button.configure(state="normal" if state == "idle" and self._model_ready() else "disabled")
         self.save_button.configure(state="normal" if state == "idle" else "disabled")
         for widget, enabled_state in self._setting_widgets:
@@ -521,6 +585,8 @@ class WindowsApp:
         self._render_model_info()
 
     def _status_text(self):
+        if self._status_key == "drafting_soap" and self._soap_seconds is not None:
+            return self.tr("soap_elapsed").format(elapsed=_clock(self._soap_seconds))
         if self._status_key != "recording" or self._recording_since is None:
             return self.tr(self._status_key)
         return self.tr("recording_elapsed").format(
@@ -572,6 +638,24 @@ class WindowsApp:
             self._drop_results = False
             self._clear_result()
             self._set_notice("import_notice")
+        self._render_state()
+
+    def _draft_soap(self):
+        if self.controller.state != "idle":
+            self._set_notice("busy")
+            return
+        text = self.result.get("1.0", "end-1c")
+        # Re-drafting uses only the (possibly edited) transcript, not the old draft.
+        for lang in LABELS.values():
+            if lang["transcript_heading"] in text:
+                text = text.split(lang["transcript_heading"], 1)[1]
+                break
+        if not text.strip():
+            self._set_notice("soap_empty")
+            return
+        if self.controller.draft_soap(text):
+            self._drop_results = False
+            self._set_notice("soap_pending")
         self._render_state()
 
     def _save_text(self):
@@ -711,7 +795,25 @@ class WindowsApp:
                 self.result.edit_reset()
                 terms = candidate_lines(payload.get("lexicon_candidates", [])) if self.config.get("windows_lexicon_enabled") else ""
                 self.candidates.set(f"{self.tr('lexicon_candidates')}\n{terms}" if terms else "")
-                self._set_notice(result_message(payload))
+                self._set_notice("soap_pending" if payload.get("soap_follows") else result_message(payload))
+                self._render_state()
+            elif event == "soap_progress" and isinstance(payload, dict):
+                seconds = payload.get("seconds")
+                if isinstance(seconds, (int, float)) and math.isfinite(seconds) and not self._drop_results:
+                    self._soap_seconds = max(0, int(seconds))
+                    self.status.set(self._status_text())
+            elif event == "soap_result" and isinstance(payload, dict):
+                soap = payload.get("soap")
+                if self._drop_results or not isinstance(soap, dict) or soap.get("text") != self.controller.last_soap:
+                    continue
+                from windows_client.soap import compose_result
+                self._clear_result()
+                self.result.insert("1.0", compose_result(soap, payload.get("transcript", ""), LABELS[self.lang]))
+                self.result.edit_reset()
+                insertion = payload.get("insertion") or {}
+                self._set_notice("paste_sent" if insertion.get("success") else "soap_done")
+                self._render_state()
+            elif event == "soap_status":
                 self._render_state()
             elif event == "error":
                 self._set_notice(payload if isinstance(payload, str) and payload in LABELS[self.lang] else "error")
@@ -766,6 +868,7 @@ def run():
     from windows_client.hotkeys import GlobalHotkeys, Hotkey
     from windows_client.native import WindowsNative
     from windows_client.models import MODEL_INFO
+    from windows_client.soap import LLM_INFO
 
     root = tk.Tk()
     root.withdraw()
@@ -773,7 +876,7 @@ def run():
         config = {**WINDOWS_DEFAULTS, **load_config()}
         WindowsApp(root, config, controller_factory=Controller, native=WindowsNative(),
                    hotkeys_factory=GlobalHotkeys, save_config=save_config,
-                   validate_hotkey=Hotkey.parse, model_info=MODEL_INFO)
+                   validate_hotkey=Hotkey.parse, model_info=MODEL_INFO, llm_info=LLM_INFO)
     except Exception:
         messagebox.showerror("SGH Voice", LABELS["en"]["startup_failed"], parent=root)
         root.destroy()
