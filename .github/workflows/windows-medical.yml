@@ -30,4 +30,6 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: SGHVoice-Windows-offline
-          path: dist/windows/*.exe
+          path: |
+            dist/windows/*.exe
+            dist/windows/SHA256SUMS.txt
