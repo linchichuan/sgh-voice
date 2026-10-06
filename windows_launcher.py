@@ -217,6 +217,8 @@ def offline_self_test(model_directory, report_path, speech_set=None, max_cer=Non
             report["ok"] = ok and not attempts
     except Exception as exc:
         report["error"] = type(exc).__name__
+        if getattr(exc, "code", None):
+            report["error_code"] = exc.code
     finally:
         socket.socket.connect, socket.getaddrinfo = original_connect, original_dns
         report["python_network_attempts"] = len(attempts)

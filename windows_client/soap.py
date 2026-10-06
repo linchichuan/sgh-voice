@@ -151,6 +151,7 @@ class SoapDrafter:
         self._cache_dir = cache_dir
         self._popen = popen
         self._model = None
+        self.last_returncode = None
 
     def locate(self):
         """Verify the pinned GGUF (cached) and the runtime; raise SoapError."""
@@ -198,9 +199,16 @@ class SoapDrafter:
                 flags = subprocess.CREATE_NO_WINDOW | subprocess.BELOW_NORMAL_PRIORITY_CLASS
             environment = {key: os.environ[key] for key in ("SYSTEMROOT", "WINDIR", "TEMP", "TMP", "PATH")
                            if key in os.environ}
-            process = self._popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
-                                  stderr=subprocess.DEVNULL, cwd=str(folder), env=environment,
-                                  creationflags=flags)
+            # CI diagnostics only (fictional transcript): runtime log to a file.
+            diagnostics = os.environ.get("SGHVOICE_SOAP_STDERR")
+            stderr = open(diagnostics, "wb") if diagnostics else subprocess.DEVNULL
+            try:
+                process = self._popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                                      stderr=stderr, cwd=str(folder), env=environment,
+                                      creationflags=flags)
+            finally:
+                if diagnostics:
+                    stderr.close()
             chunks = []
             reader = threading.Thread(target=lambda: chunks.append(process.stdout.read()), daemon=True)
             reader.start()
@@ -215,10 +223,14 @@ class SoapDrafter:
             reader.join(10)
             if should_cancel():
                 raise SoapError("cancelled")
+            self.last_returncode = process.returncode
             if process.returncode != 0:
                 raise SoapError("soap_failed")
-            text = clean_output(b"".join(c for c in chunks if c).decode("utf-8", errors="replace"))
+            raw = b"".join(c for c in chunks if c).decode("utf-8", errors="replace")
+            text = clean_output(raw)
             if not has_soap_headings(text):
+                if diagnostics:
+                    Path(diagnostics).with_suffix(".stdout.txt").write_text(raw, encoding="utf-8")
                 raise SoapError("soap_failed")
             return {"text": text, "unverified": unverified_terms(text, transcript),
                     "seconds": round(time.monotonic() - started, 1)}

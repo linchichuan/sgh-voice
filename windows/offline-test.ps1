@@ -21,6 +21,8 @@ try {
     $Arguments = @('--offline-self-test', 'bundled', "`"$ReportPath`"", '--speech-set', "`"$Clips`"",
                    '--max-cer', $MaxCer.ToString([Globalization.CultureInfo]::InvariantCulture),
                    '--soap-transcript', "`"$(Join-Path $RepoRoot 'scripts\fixtures\consultation-ja-fictional.txt')`"")
+    # Fictional transcript only: keep the llama.cpp log for diagnosis.
+    $env:SGHVOICE_SOAP_STDERR = Join-Path $TestRoot 'soap-runtime.log'
     $Process = Start-Process -FilePath $AppExe -ArgumentList $Arguments -WorkingDirectory $TestRoot -PassThru
     try {
         if (-not $Process.WaitForExit(900000)) {
@@ -29,7 +31,15 @@ try {
         }
         $ExitCode = $Process.ExitCode
     } finally { $Process.Dispose() }
+    Remove-Item Env:SGHVOICE_SOAP_STDERR -ErrorAction SilentlyContinue
     $Report = Get-Content -LiteralPath $ReportPath -Raw -Encoding utf8 | ConvertFrom-Json
+    if ($Report.PSObject.Properties.Name -contains 'error') {
+        Write-Host ("Self-test error: {0} {1}" -f $Report.error, $(if ($Report.PSObject.Properties.Name -contains 'error_code') { $Report.error_code } else { '' }))
+        foreach ($Log in @('soap-runtime.log', 'soap-runtime.stdout.txt')) {
+            $LogPath = Join-Path $TestRoot $Log
+            if (Test-Path -LiteralPath $LogPath) { Write-Host "--- $Log (tail)"; Get-Content -LiteralPath $LogPath -Tail 60 -Encoding utf8 | Write-Host }
+        }
+    }
     foreach ($Clip in @($Report.speech)) {
         $Kind = if ($Clip.imported) { 'IMPORTED ' + $Clip.format } else { 'WAV' }
         Write-Host ("[{4}] CER {0:P1} in {1}s`n  REF {2}`n  HYP {3}" -f $Clip.cer, $Clip.seconds, $Clip.reference, $Clip.hypothesis, $Kind)
