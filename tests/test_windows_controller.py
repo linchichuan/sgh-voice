@@ -434,6 +434,9 @@ def soap_controller(tmp_path, soap, duration=120.0, auto=True):
             inserted.append(text)
             return SimpleNamespace(success=True, reason="sent")
 
+        def copy_text(self, text):
+            inserted.append(("copied", text))
+
     c = Controller({"windows_auto_insert": True, "windows_soap_auto": auto},
                    lambda *event: events.append(event), Native(), recorder_factory=Recorder,
                    transcriber_factory=Transcriber, memory_factory=lambda *args: None,
@@ -448,7 +451,7 @@ def finish_recording(c, events, target="EHR"):
     c.toggle()
 
 
-def test_long_recording_drafts_soap_and_inserts_only_the_draft(tmp_path):
+def test_long_recording_drafts_soap_and_copies_only_the_draft(tmp_path):
     soap = FakeSoap()
     c, events, inserted, wav = soap_controller(tmp_path, soap)
     assert c.soap_ready
@@ -459,7 +462,8 @@ def test_long_recording_drafts_soap_and_inserts_only_the_draft(tmp_path):
     soap_result = next(e[1] for e in events if e[0] == "soap_result")
     assert soap.calls == ["架空の診察の文字起こし"]
     assert soap_result["transcript"] == "架空の診察の文字起こし"
-    assert inserted == [soap.text] and soap_result["insertion"]["success"]
+    # Multi-line drafts are never typed into another app: copied for Ctrl+V instead.
+    assert inserted == [("copied", soap.text)] and soap_result["insertion"]["reason"] == "copied"
     assert ("status", "drafting_soap") in events and ("soap_progress", {"seconds": 3}) in events
     assert c.last_soap == soap.text and not wav.exists()
     c.close()

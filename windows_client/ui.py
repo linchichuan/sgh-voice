@@ -73,6 +73,8 @@ LABELS = {
         'soap_auto': 'After a recording over 30 seconds or a file import, create a SOAP draft automatically (on this computer)',
         'soap_notice': 'The SOAP draft is written by a built-in language model on this computer, without a network connection. It can contain errors: the clinician must check it against the transcript. Numbers and terms not found in the transcript are listed for checking. Diagnosis and treatment decisions remain with the physician.',
         'soap_pending': 'Transcript ready. Writing the SOAP draft next (about 1–5 minutes)…',
+        'soap_copy': 'Copy a finished SOAP draft to the clipboard automatically (paste it into the record with Ctrl+V)',
+        'soap_copied': 'SOAP draft created and copied to the clipboard. Check it against the transcript below, then paste it with Ctrl+V.',
         'soap_done': 'SOAP draft created. Check every item against the transcript below before using it.',
         'soap_heading': '【SOAP draft (generated on this computer; must be checked)】',
         'soap_unverified': '【Check: not found in the transcript】',
@@ -158,6 +160,8 @@ LABELS = {
         'soap_auto': '錄音超過 30 秒或匯入音檔後，自動在本機產生 SOAP 草稿',
         'soap_notice': 'SOAP 草稿由本機內建的語言模型產生，不連網。內容可能有誤，必須由醫療人員對照逐字稿確認；逐字稿中找不到的數字與用語會列出供確認。診斷與治療由醫師判斷。',
         'soap_pending': '逐字稿完成，接著產生 SOAP 草稿（約 1～5 分鐘）…',
+        'soap_copy': 'SOAP 草稿完成後自動複製到剪貼簿（在病歷中按 Ctrl+V 貼上）',
+        'soap_copied': 'SOAP 草稿已產生並複製到剪貼簿。請先對照下方逐字稿確認，再按 Ctrl+V 貼上。',
         'soap_done': 'SOAP 草稿已產生。使用前請逐項對照下方逐字稿確認。',
         'soap_heading': '【SOAP 草稿（本機產生・需確認）】',
         'soap_unverified': '【需確認：逐字稿中找不到】',
@@ -243,6 +247,8 @@ LABELS = {
         'soap_auto': '30 秒を超える録音や音声ファイルの取り込み後に、SOAP 下書きを自動で作成する（このパソコン内で処理）',
         'soap_notice': 'SOAP 下書きは、このパソコンに内蔵された言語モデルがネットワークに接続せずに作成します。誤りを含むことがあるため、必ず医療従事者が文字起こしと照合して確認してください。文字起こしに見当たらない数値や用語は確認用に表示します。診断・治療の判断は医師が行います。',
         'soap_pending': '文字起こしが完了しました。続けて SOAP 下書きを作成しています（1～5 分程度）…',
+        'soap_copy': 'SOAP 下書きができたら自動でクリップボードにコピーする（カルテに Ctrl+V で貼り付け）',
+        'soap_copied': 'SOAP 下書きを作成し、クリップボードにコピーしました。下の文字起こしと照合して確認してから、Ctrl+V で貼り付けてください。',
         'soap_done': 'SOAP 下書きを作成しました。使用する前に、下の文字起こしと照合して各項目を確認してください。',
         'soap_heading': '【SOAP 下書き（このパソコンで自動作成・要確認）】',
         'soap_unverified': '【要確認：文字起こしに見当たらない語句】',
@@ -514,7 +520,8 @@ class WindowsApp:
                 (10, "windows_lexicon_enabled", "lexicon_enabled", False),
                 (12, "windows_auto_insert", "auto_insert", False),
                 (14, "windows_save_history", "save_history", False),
-                (17, "windows_soap_auto", "soap_auto", True)):
+                (17, "windows_soap_auto", "soap_auto", True),
+                (18, "windows_soap_copy", "soap_copy", True)):
             self.vars[field] = tk.BooleanVar(value=bool(self.config.get(field, default)))
             check = ttk.Checkbutton(self.settings_frame, text=self.tr(key), variable=self.vars[field])
             check.grid(row=row, column=0, columnspan=2, sticky="w", pady=2)
@@ -524,8 +531,8 @@ class WindowsApp:
         label(self.settings_frame, "insert_notice", wraplength=760).grid(row=13, column=0, columnspan=2, sticky="ew", pady=(0, 4))
         label(self.settings_frame, "history_notice", wraplength=760).grid(row=15, column=0, columnspan=2, sticky="ew")
         self.save_button = ttk.Button(self.settings_frame, text=self.tr("save"), command=self._save)
-        label(self.settings_frame, "soap_notice", wraplength=760).grid(row=18, column=0, columnspan=2, sticky="ew", pady=(0, 4))
-        self.save_button.grid(row=19, column=0, columnspan=2, sticky="w", pady=(8, 0))
+        label(self.settings_frame, "soap_notice", wraplength=760).grid(row=19, column=0, columnspan=2, sticky="ew", pady=(0, 4))
+        self.save_button.grid(row=20, column=0, columnspan=2, sticky="w", pady=(8, 0))
         self._labels.append((self.save_button, "save"))
         self.candidates = tk.StringVar()
         ttk.Label(frame, textvariable=self.candidates, wraplength=790).grid(row=7, column=0, sticky="ew", pady=8)
@@ -811,7 +818,7 @@ class WindowsApp:
                 self.result.insert("1.0", compose_result(soap, payload.get("transcript", ""), LABELS[self.lang]))
                 self.result.edit_reset()
                 insertion = payload.get("insertion") or {}
-                self._set_notice("paste_sent" if insertion.get("success") else "soap_done")
+                self._set_notice("soap_copied" if insertion.get("reason") == "copied" else "soap_done")
                 self._render_state()
             elif event == "soap_status":
                 self._render_state()

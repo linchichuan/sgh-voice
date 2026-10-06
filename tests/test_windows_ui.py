@@ -141,7 +141,7 @@ class HeadlessApp(WindowsApp):
             "ui_language": "en",
             "windows_lexicon_enabled": False, "windows_auto_insert": False,
             "windows_save_history": False, "windows_toggle_hotkey": "Ctrl+Alt+F9",
-            "windows_cancel_hotkey": "Ctrl+Alt+F10", "windows_soap_auto": True,
+            "windows_cancel_hotkey": "Ctrl+Alt+F10", "windows_soap_auto": True, "windows_soap_copy": True,
         }
         self.vars = {field: Value(self.config.get(field, default)) for field, default in defaults.items()}
         self.status, self.notice, self.hotkey_notice = Value(), Value(), Value()
@@ -506,3 +506,11 @@ def test_soap_button_disabled_without_model(app):
     app.controller.soap_ready = False
     app._render_state()
     assert app.soap_button.options["state"] == "disabled"
+
+
+def test_copied_soap_draft_tells_clinician_to_paste(app):
+    soap = {"text": "S:\nO:\nA:\nP:", "unverified": []}
+    app.controller.last_soap = soap["text"]
+    app.enqueue("soap_result", {"soap": soap, "transcript": "t", "insertion": {"success": False, "reason": "copied"}})
+    app._pump()
+    assert app.notice.get() == LABELS["en"]["soap_copied"]

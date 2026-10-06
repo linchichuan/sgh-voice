@@ -29,6 +29,9 @@ WINDOWS_DEFAULTS = {
     "windows_cancel_hotkey": "Ctrl+Alt+F10",
     # Draft a Japanese SOAP note locally after a long recording or a file import.
     "windows_soap_auto": True,
+    # Copy a finished SOAP draft to the clipboard (multi-line text is never
+    # typed into another application; the clinician pastes it with Ctrl+V).
+    "windows_soap_copy": True,
 }
 # Below this much RAM the speech model is unloaded while the LLM runs.
 LOW_MEMORY_BYTES = 16 * 1024 ** 3
@@ -243,12 +246,12 @@ class Controller:
                     return
                 self.last_soap = soap["text"]
                 insertion = {"success": False, "reason": "preview_only"}
-                if insert and self._snapshot.get("windows_auto_insert") and self._target and self.native:
+                if insert and self._snapshot.get("windows_soap_copy", True) and self.native:
                     try:
-                        delivered = self.native.send_text(self._target, soap["text"])
-                        insertion = {"success": delivered.success, "reason": delivered.reason}
+                        copied = self.native.copy_text(soap["text"])
+                        insertion = {"success": False, "reason": "copied" if copied is not False else "copy_failed"}
                     except Exception:
-                        insertion = {"success": False, "reason": "input_failed"}
+                        insertion = {"success": False, "reason": "copy_failed"}
                 self._emit("soap_result", {"soap": soap, "transcript": transcript, "insertion": insertion})
         finally:
             with self._lock:
@@ -486,7 +489,7 @@ class Controller:
                                            "stt_engine": "faster-whisper-local", "llm_source": None})
                 insertion = {"success": False, "reason": "preview_only"}
                 soap_follows = long_recording and self._soap_follows()
-                # With a SOAP draft coming, only the draft is inserted (once, at the end).
+                # With a SOAP draft coming, the transcript is not inserted; the draft is copied at the end.
                 if (not soap_follows and self._snapshot.get("windows_auto_insert")
                         and self._target and self.native):
                     try:
