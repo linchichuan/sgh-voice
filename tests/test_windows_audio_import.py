@@ -20,6 +20,7 @@ def tone(path, rate, seconds, freq=1000.0, channels=1, fmt="WAV", subtype="PCM_1
     ("recorder.wav", 48000, 1, "WAV", "PCM_16"),
     ("call.wav", 8000, 1, "WAV", "PCM_16"),
     ("float.wav", 22050, 2, "WAV", "FLOAT"),
+    ("recorder24.wav", 48000, 2, "WAV", "PCM_24"),
 ])
 def test_conversion_to_16k_mono_pcm16_preserves_duration_and_pitch(tmp_path, name, rate, channels, fmt, subtype):
     source = tone(tmp_path / name, rate, 65, channels=channels, fmt=fmt, subtype=subtype)
@@ -33,6 +34,15 @@ def test_conversion_to_16k_mono_pcm16_preserves_duration_and_pitch(tmp_path, nam
     spectrum = np.abs(np.fft.rfft(audio[16000:32000]))
     assert int(np.argmax(spectrum)) == 1000
     assert progress[-1] == 1.0 and progress == sorted(progress)
+
+
+def test_japanese_folder_and_file_names_with_spaces_are_imported(tmp_path):
+    folder = tmp_path / "スマホ 録音"
+    folder.mkdir()
+    source = tone(folder / "ボイスメモ 0001.MP3", 44100, 3, channels=2, fmt="MP3", subtype="MPEG_LAYER_III")
+    target = tmp_path / "変換 後.wav"
+    assert abs(convert_to_pcm16k(source, target) - 3) < 0.05
+    assert soundfile.info(str(target)).samplerate == 16000
 
 
 def test_frequencies_above_target_nyquist_are_filtered_not_aliased(tmp_path):

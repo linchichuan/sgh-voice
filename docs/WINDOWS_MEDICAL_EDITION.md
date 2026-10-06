@@ -25,13 +25,13 @@ SGHVoice-Windows-<ver>-x64-unsigned.exe（全機安裝）
 
 %LOCALAPPDATA%\SGHVoice\（各使用者）
    ├─ config.json
-   └─ model-verified.json（模型驗證快取：版本號 + 檔案大小 + 修改時間）
+   └─ model-verified.json（模型驗證快取：版本號 + 檔案大小 + 修改時間 + 檔頭檔尾 1 MiB 雜湊）
 ```
 
 - `resources/windows/model-ja-v1.json`：固定的 repository、revision、各檔案大小與 SHA-256。
 - `windows_client/models.py`：只負責「找到」並「驗證」內建模型，沒有任何網路程式碼。
 - `scripts/fetch_windows_model.py`：只在建置時使用，依清單下載並驗證模型，放進 bundle。不會打包進 App。
-- 第一次啟動時會完整計算 SHA-256；之後只要檔案的大小和修改時間沒變，就跳過完整計算。
+- 第一次啟動時會完整計算 SHA-256；之後只要檔案大小、修改時間和檔頭檔尾 1 MiB 的雜湊都沒變，就跳過完整計算。
 - 驗證未完成或失敗時不能錄音，畫面會請使用者重新安裝。
 
 ## 驗證方式（CI）
@@ -85,7 +85,7 @@ e76620f83d5f5b69efd3d87e3dc180c1bd21df9fbebacfd4335e5e1efcc018da  models/whisper
 c69260f2ab26d659b7c398f9a2b2b48ed0df16c3b47d7326782fd9cba71690c1  models/whisper-large-v3-turbo-ct2/vocabulary.json
 ```
 
-安裝檔的 SHA-256 會隨每次建置改變（內含 build metadata）；交付時以當次建置的 `SHA256SUMS.txt` 為準。CI 不上傳安裝檔（不使用 artifact／release），要交付時需另外在 Windows 上執行 `windows/build.ps1` 產出，或另行決定發佈方式。
+安裝檔的 SHA-256 會隨每次建置改變（內含 build metadata）；交付時以當次建置的 `SHA256SUMS.txt` 為準。CI 全部通過後，會把安裝檔和 `SHA256SUMS.txt` 上傳成 artifact `SGHVoice-Windows-offline`（在該次 Actions run 頁面最下方下載，GitHub 預設保留 90 天；下載後是 zip，需先解壓）。
 
 ## 音檔匯入（WAV／MP3）
 
@@ -94,7 +94,7 @@ c69260f2ab26d659b7c398f9a2b2b48ed0df16c3b47d7326782fd9cba71690c1  models/whisper
 - UI：「音声ファイルを文字起こし…」「テキストを保存…」（UTF-8 BOM、CRLF，記事本可直接開啟）；可隨時取消；結果只做預覽，不自動貼入其他程式。
 - 原始檔不修改、不上傳；轉檔用的暫存檔辨識後即刪除。
 - **未支援 M4A（AAC）**：iPhone 語音備忘錄和多數 Android 錄音 App 預設是 M4A，需要另外加 AAC 解碼，列為下一步。
-- CI：把 3 段 FLEURS 語音接成 44.1 kHz 立體聲 MP3（中間有 2 秒停頓），在封鎖網路的狀態下，用 frozen App 讀入並辨識，字錯率需低於上限。
+- CI：把 FLEURS 語音接成 44.1 kHz 立體聲 MP3（3 段）和 48 kHz 立體聲 24-bit WAV（2 段），中間有 2 秒停頓，放在日文且含空白的資料夾／檔名下（`スマホ 録音\ボイスメモ 0001.mp3`、`ICレコーダー 録音.wav`），在封鎖網路的狀態下用 frozen App 讀入並辨識，兩種格式的字錯率都需低於上限。
 
 ## 尚待處理（交付前必須完成）
 

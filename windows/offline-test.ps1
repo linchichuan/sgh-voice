@@ -22,7 +22,7 @@ try {
                    '--max-cer', $MaxCer.ToString([Globalization.CultureInfo]::InvariantCulture))
     $Process = Start-Process -FilePath $AppExe -ArgumentList $Arguments -WorkingDirectory $TestRoot -PassThru
     try {
-        if (-not $Process.WaitForExit(200000)) {
+        if (-not $Process.WaitForExit(300000)) {
             $Process.Kill($true)
             throw 'Offline inference exceeded the time limit.'
         }
@@ -30,7 +30,7 @@ try {
     } finally { $Process.Dispose() }
     $Report = Get-Content -LiteralPath $ReportPath -Raw -Encoding utf8 | ConvertFrom-Json
     foreach ($Clip in @($Report.speech)) {
-        $Kind = if ($Clip.imported) { 'IMPORTED MP3' } else { 'WAV' }
+        $Kind = if ($Clip.imported) { 'IMPORTED ' + $Clip.format } else { 'WAV' }
         Write-Host ("[{4}] CER {0:P1} in {1}s`n  REF {2}`n  HYP {3}" -f $Clip.cer, $Clip.seconds, $Clip.reference, $Clip.hypothesis, $Kind)
     }
     Write-Host ("Model hash check {0}s; first inference {1}s; overall CER {2:P1} (ceiling {3:P0})" -f `
@@ -38,10 +38,11 @@ try {
     if ($ExitCode -ne 0 -or $Report.ok -ne $true -or $Report.local_inference_tested -ne $true `
             -or $Report.accuracy_tested -ne $true -or $Report.python_network_attempts -ne 0 `
             -or $Report.platform -ne 'win32' -or -not $Report.model_verified `
-            -or -not (@($Report.speech) | Where-Object { $_.imported -and $_.cer -le $MaxCer })) {
+            -or -not (@($Report.speech) | Where-Object { $_.imported -and $_.format -eq 'MP3' -and $_.cer -le $MaxCer }) `
+            -or -not (@($Report.speech) | Where-Object { $_.imported -and $_.format -eq 'WAV' -and $_.cer -le $MaxCer })) {
         throw 'Offline runtime evidence is missing or failed.'
     }
-    Write-Host 'PASS bundled model: SHA-256 verified, Japanese speech (WAV and an imported phone-style MP3) recognized under the CER ceiling, Python network denied.'
+    Write-Host 'PASS bundled model: SHA-256 verified; Japanese WAV clips plus imported MP3 and WAV files (Japanese folder/file names) recognized under the CER ceiling; Python network denied.'
     Write-Host 'Public read speech only: microphone, medical dictation accuracy and target-input acceptance were not tested.'
 } finally {
     Pop-Location

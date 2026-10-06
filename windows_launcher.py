@@ -191,6 +191,7 @@ def offline_self_test(model_directory, report_path, speech_set=None, max_cer=Non
                     characters += len(reference)
                     report["speech"].append({"reference": clip["reference"], "hypothesis": text,
                                              "imported": bool(clip.get("import")),
+                                             "format": clip.get("format", "WAV"),
                                              "cer": round(distance / max(1, len(reference)), 4),
                                              "seconds": round(time.monotonic() - began, 2)})
                 report["cer"] = round(errors / max(1, characters), 4)
