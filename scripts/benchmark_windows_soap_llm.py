@@ -81,7 +81,14 @@ def sha256(path):
 def fetch_llama(work, tag=None):
     api = "https://api.github.com/repos/ggml-org/llama.cpp/releases/" + (f"tags/{tag}" if tag else "latest")
     release = json.load(urllib.request.urlopen(api, timeout=60))
-    asset = next(a for a in release["assets"] if re.fullmatch(r"llama-.*-bin-win-cpu-x64\.zip", a["name"]))
+    names = [a["name"] for a in release["assets"]]
+    print("LLAMA_ASSETS " + " ".join(n for n in names if "win" in n.lower()), flush=True)
+    windows_cpu = [a for a in release["assets"] if a["name"].lower().endswith(".zip")
+                   and all(k in a["name"].lower() for k in ("win", "cpu"))
+                   and any(k in a["name"].lower() for k in ("x64", "amd64"))]
+    if not windows_cpu:
+        raise SystemExit("No Windows CPU x64 llama.cpp asset in " + release["tag_name"])
+    asset = windows_cpu[0]
     archive = work / asset["name"]
     if not archive.exists():
         urllib.request.urlretrieve(asset["browser_download_url"], archive)
