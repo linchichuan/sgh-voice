@@ -96,6 +96,7 @@ def make_mac_zip():
     return buffer.getvalue()
 
 
+@pytest.mark.skipif(__import__("sys").platform == "win32", reason="POSIX modes and symlinks (macOS build only)")
 def test_macos_runtime_keeps_layout_symlinks_and_exec_bit(tmp_path):
     data = make_mac_zip()
     manifest = {"runtime_macos": {"project": "ggml-org/llama.cpp", "tag": "b1", "asset": "llama-b1-bin-macos-arm64.zip",

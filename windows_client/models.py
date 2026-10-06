@@ -34,7 +34,7 @@ class ModelIntegrityError(RuntimeError):
 
 
 def bundle_base():
-    """Folder that holds models\ and llm\ in an installed build.
+    """Folder that holds models/ and llm/ in an installed build.
 
     Windows: next to the executable. macOS .app: Contents/Resources.
     Source checkouts: build/windows (tests and development only).
