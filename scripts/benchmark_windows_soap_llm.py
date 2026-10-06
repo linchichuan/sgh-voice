@@ -78,17 +78,32 @@ def sha256(path):
     return digest.hexdigest()
 
 
+def _windows_cpu_asset(release):
+    for asset in release.get("assets", []):
+        name = asset["name"].lower()
+        if (name.endswith(".zip") and "win" in name and "cpu" in name
+                and any(k in name for k in ("x64", "amd64"))):
+            return asset
+    return None
+
+
 def fetch_llama(work, tag=None):
-    api = "https://api.github.com/repos/ggml-org/llama.cpp/releases/" + (f"tags/{tag}" if tag else "latest")
-    release = json.load(urllib.request.urlopen(api, timeout=60))
-    names = [a["name"] for a in release["assets"]]
-    print("LLAMA_ASSETS " + " ".join(n for n in names if "win" in n.lower()), flush=True)
-    windows_cpu = [a for a in release["assets"] if a["name"].lower().endswith(".zip")
-                   and all(k in a["name"].lower() for k in ("win", "cpu"))
-                   and any(k in a["name"].lower() for k in ("x64", "amd64"))]
-    if not windows_cpu:
-        raise SystemExit("No Windows CPU x64 llama.cpp asset in " + release["tag_name"])
-    asset = windows_cpu[0]
+    # "latest" is not always a binary build; scan recent releases for the
+    # official Windows CPU x64 zip (or use the pinned --llama-tag).
+    base = "https://api.github.com/repos/ggml-org/llama.cpp/releases"
+    releases = ([json.load(urllib.request.urlopen(f"{base}/tags/{tag}", timeout=60))] if tag
+                else json.load(urllib.request.urlopen(f"{base}?per_page=40", timeout=60)))
+    release = asset = None
+    for candidate in releases:
+        if candidate.get("draft"):
+            continue
+        asset = _windows_cpu_asset(candidate)
+        if asset:
+            release = candidate
+            break
+        print(f"LLAMA_SKIP {candidate.get('tag_name')}: " + " ".join(a["name"] for a in candidate.get("assets", [])[:12]), flush=True)
+    if asset is None:
+        raise SystemExit("No Windows CPU x64 llama.cpp asset in recent releases")
     archive = work / asset["name"]
     if not archive.exists():
         urllib.request.urlretrieve(asset["browser_download_url"], archive)
