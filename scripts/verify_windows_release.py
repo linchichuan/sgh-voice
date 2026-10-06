@@ -127,8 +127,12 @@ def verify_public_manifest(manifest: dict, installer: Path, source_commit: str, 
             raise ValueError(f"Acceptance criterion not recorded as PASS: {criterion}")
 
 
-def installer_slices(installer: Path) -> list:
-    return sorted(installer.parent.glob(installer.stem + "-*.bin"))
+def soap_setup_record(installer: Path):
+    companion = installer.with_name(installer.stem + "-soap-model.exe")
+    if not companion.is_file():
+        return None
+    verify_pe(companion)
+    return {"name": companion.name, "sizeBytes": companion.stat().st_size, "sha256": sha256(companion)}
 
 
 def verify_build(installer: Path, app: Path, smoke_path: Path, source_commit: str) -> dict:
@@ -150,9 +154,8 @@ def verify_build(installer: Path, app: Path, smoke_path: Path, source_commit: st
         **expected,
         "createdAt": datetime.now(timezone.utc).isoformat(),
         "installer": {"name": installer.name, "sizeBytes": installer.stat().st_size, "sha256": sha256(installer)},
-        # Disk-spanning slices (the bundled models exceed one setup file); keep them beside the .exe.
-        "slices": [{"name": part.name, "sizeBytes": part.stat().st_size, "sha256": sha256(part)}
-                   for part in installer_slices(installer)],
+        # Companion SOAP model setup, run by the main setup from the same folder.
+        "soapSetup": soap_setup_record(installer),
         "application": {"name": app.name, "sha256": sha256(app)},
         "smokeReport": report,
         "windowsAcceptance": "not-run",

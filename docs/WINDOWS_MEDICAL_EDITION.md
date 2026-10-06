@@ -131,9 +131,13 @@ c69260f2ab26d659b7c398f9a2b2b48ed0df16c3b47d7326782fd9cba71690c1  models/whisper
 
 ### 安裝檔
 
-兩個模型合計約 4.4 GB，超過單一安裝檔上限，所以改用 Inno Setup 的 DiskSpanning：產出 `SGHVoice-Windows-<ver>-x64-unsigned.exe` 加上 `…-1.bin`、`…-2.bin` 等分割檔，**必須放在同一個資料夾**，執行 .exe 即可。`SHA256SUMS.txt` 包含所有分割檔。
+兩個模型合計約 4.4 GB，超過 Windows 單一執行檔約 4 GB 的上限，所以分成兩個安裝檔，放在同一個資料夾：
 
-**需要使用者修改 workflow**：`.github/workflows/windows-medical.yml` 的 artifact `path` 要加一行 `dist/windows/*.bin`，否則 artifact 只有 .exe，無法安裝。
+- `SGHVoice-Windows-<ver>-x64-unsigned.exe`：主程式與語音模型（約 1.9 GB）。院方只要執行這個。
+- `SGHVoice-Windows-<ver>-x64-unsigned-soap-model.exe`：SOAP 模型與 llama.cpp（約 2.8 GB）。主程式安裝時若在同一資料夾找到它，會自動以靜默模式安裝到 `{app}\llm`；它不登錄獨立的解除安裝項目，解除主程式時一併刪除 `{app}\llm`。
+- 若缺少第二個檔案，主程式仍可安裝與辨識，只是 SOAP 顯示為「未安裝」。
+
+兩個都是 `.exe`，現有 workflow 的 artifact 設定（`dist/windows/*.exe`）就會一起上傳，不需要修改 workflow（GitHub App 沒有修改 workflow 的權限）。`SHA256SUMS.txt` 包含兩個安裝檔與所有模型/runtime 檔案。
 
 ### 驗證範圍
 

@@ -145,9 +145,15 @@ def test_installer_is_per_machine_with_bundled_model_and_no_profile_deletion():
     assert "PrivilegesRequired=admin" in installer
     assert "DefaultDirName={autopf}\\SGHVoice" in installer
     assert 'Source: "{#SourceDir}\\models\\*"; DestDir: "{app}\\models"' in installer
-    assert 'Source: "{#SourceDir}\\llm\\*"; DestDir: "{app}\\llm"' in installer
-    assert "nocompression" in installer and "DiskSpanning=yes" in installer
-    assert "[UninstallDelete]" not in installer
+    assert "nocompression" in installer and "DiskSpanning" not in installer
+    # Only the companion SOAP model folder is removed on uninstall, never user profiles.
+    uninstall = installer.split("[UninstallDelete]", 1)[1].split("[Code]", 1)[0]
+    entries = [line for line in uninstall.splitlines() if line.startswith("Type:")]
+    assert entries == ['Type: filesandordirs; Name: "{app}\\llm"']
+    assert "{#SoapSetup}" in installer and "SoapSetupPresent" in installer
+    soap = (ROOT / "windows/installer-soap.iss").read_text(encoding="utf-8")
+    assert "Uninstallable=no" in soap and "PrivilegesRequired=admin" in soap
+    assert "OutputBaseFilename=SGHVoice-Windows-{#AppVersion}-x64-unsigned-soap-model" in soap
 
 
 def test_smoke_without_bundled_model_is_rejected(artifacts, tmp_path):
@@ -168,9 +174,10 @@ def test_smoke_without_bundled_llm_is_rejected(artifacts):
         release.verify_build(installer, app, smoke, commit)
 
 
-def test_disk_spanning_slices_are_recorded(artifacts):
+def test_companion_soap_setup_is_recorded(artifacts):
     installer, app, smoke, commit = artifacts
-    (installer.parent / (installer.stem + "-1.bin")).write_bytes(b"slice one")
-    (installer.parent / (installer.stem + "-2.bin")).write_bytes(b"slice two")
-    result = release.verify_build(installer, app, smoke, commit)
-    assert [part["name"] for part in result["slices"]] == [installer.stem + "-1.bin", installer.stem + "-2.bin"]
+    assert release.verify_build(installer, app, smoke, commit)["soapSetup"] is None
+    companion = installer.with_name(installer.stem + "-soap-model.exe")
+    companion.write_bytes(installer.read_bytes())
+    record = release.verify_build(installer, app, smoke, commit)["soapSetup"]
+    assert record["name"] == companion.name and record["sha256"] == release.sha256(companion)

@@ -8,6 +8,7 @@
 #ifndef OutputDir
   #error OutputDir is required
 #endif
+#define SoapSetup "SGHVoice-Windows-" + AppVersion + "-x64-unsigned-soap-model.exe"
 
 [Setup]
 AppId={{FF155096-E838-4FF3-8AAE-23D89693E9A7}
@@ -34,12 +35,11 @@ CloseApplications=yes
 RestartApplications=no
 SetupLogging=yes
 ; User profile/configuration data is deliberately outside the install directory.
-; The speech model (~1.6 GB) and the SOAP language model (~2.7 GB) are stored
-; uncompressed: quantized weights barely compress and LZMA would only slow
-; building and installation. Together they exceed one setup file, so Setup is
-; split into the .exe plus .bin slices that must stay in the same folder.
-DiskSpanning=yes
-DiskSliceSize=max
+; The speech model (~1.6 GB) is stored uncompressed: quantized weights barely
+; compress and LZMA would only slow building and installation. The SOAP
+; language model (~2.7 GB) would push one setup past the ~4 GB Windows limit,
+; so it ships as a second setup (installer-soap.iss) in the same folder, which
+; this setup runs silently into {app}\llm.
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
@@ -51,11 +51,24 @@ Name: "desktopicon"; Description: "Create a desktop shortcut"; Flags: unchecked
 [Files]
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Excludes: "\models,\models\*,\llm,\llm\*"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "{#SourceDir}\models\*"; DestDir: "{app}\models"; Flags: ignoreversion recursesubdirs createallsubdirs nocompression
-Source: "{#SourceDir}\llm\*"; DestDir: "{app}\llm"; Flags: ignoreversion recursesubdirs createallsubdirs nocompression
 
 [Icons]
 Name: "{autoprograms}\SGH Voice"; Filename: "{app}\SGH Voice.exe"
 Name: "{autodesktop}\SGH Voice"; Filename: "{app}\SGH Voice.exe"; Tasks: desktopicon
 
 [Run]
+; Installs the SOAP model when its setup sits beside this one (normal delivery).
+; Without it the app still works; SOAP drafts are then shown as unavailable.
+Filename: "{src}\{#SoapSetup}"; Parameters: "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /DIR=""{app}\llm"""; StatusMsg: "SOAP model…"; Flags: waituntilterminated; Check: SoapSetupPresent
 Filename: "{app}\SGH Voice.exe"; Description: "Open SGH Voice"; Flags: nowait postinstall skipifsilent
+
+[UninstallDelete]
+; Only the SOAP model folder installed by the companion setup; user profiles
+; (%LOCALAPPDATA%\SGHVoice) are never deleted.
+Type: filesandordirs; Name: "{app}\llm"
+
+[Code]
+function SoapSetupPresent: Boolean;
+begin
+  Result := FileExists(ExpandConstant('{src}\{#SoapSetup}'));
+end;

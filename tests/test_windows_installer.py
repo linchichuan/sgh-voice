@@ -57,7 +57,10 @@ def test_installer_is_per_machine_and_silent_mode_skips_interactive_launch():
     assert "PrivilegesRequired=admin" in INSTALLER
     assert "{autoprograms}" in INSTALLER and "{autodesktop}" in INSTALLER
     assert "Flags: nowait postinstall skipifsilent" in INSTALLER
-    assert "[UninstallDelete]" not in INSTALLER
+    # Uninstall may remove only the companion SOAP model folder, never user data.
+    uninstall = INSTALLER.split("[UninstallDelete]", 1)[1].split("[", 1)[0]
+    assert [l for l in uninstall.splitlines() if l.startswith("Type:")] == ['Type: filesandordirs; Name: "{app}\\llm"']
+    assert "LOCALAPPDATA" not in uninstall.replace("%LOCALAPPDATA%\\SGHVoice) are never deleted", "")
 
 
 def test_installer_smoke_checks_machine_registration_and_legacy_per_user_paths():

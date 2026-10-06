@@ -59,14 +59,16 @@ try {
     if ($Smoke.ExitCode -ne 0 -or -not (Test-Path $SmokeReport)) { throw 'Frozen application self-test failed.' }
     & $Iscc "/DAppVersion=$Version" "/DSourceDir=$AppDirectory" "/DOutputDir=$DistRoot" windows/installer.iss
     if ($LASTEXITCODE -ne 0) { throw 'Inno Setup compilation failed.' }
+    # Companion setup with the SOAP model (kept separate: one setup must stay under ~4 GB).
+    & $Iscc "/DAppVersion=$Version" "/DSourceDir=$(Join-Path $AppDirectory 'llm')" "/DOutputDir=$DistRoot" windows/installer-soap.iss
+    if ($LASTEXITCODE -ne 0) { throw 'Inno Setup compilation of the SOAP model setup failed.' }
     $Installer = Join-Path $DistRoot "SGHVoice-Windows-$Version-x64-unsigned.exe"
     & python scripts/verify_windows_release.py --installer $Installer --app $AppExe --smoke-report $SmokeReport --source-commit $SourceCommit --write-manifest "$DistRoot\windows-build.json"
     if ($LASTEXITCODE -ne 0) { throw 'Build verification failed.' }
-    # Checksums for hospital IT: the installer, its slices, and every bundled model/runtime file.
+    # Checksums for hospital IT: both setups and every bundled model/runtime file.
     $Sums = @((Get-FileHash -LiteralPath $Installer -Algorithm SHA256).Hash.ToLowerInvariant() + '  ' + (Split-Path -Leaf $Installer))
-    foreach ($Slice in Get-ChildItem -LiteralPath $DistRoot -Filter "SGHVoice-Windows-$Version-x64-unsigned-*.bin" | Sort-Object Name) {
-        $Sums += (Get-FileHash -LiteralPath $Slice.FullName -Algorithm SHA256).Hash.ToLowerInvariant() + '  ' + $Slice.Name
-    }
+    $SoapSetup = Join-Path $DistRoot "SGHVoice-Windows-$Version-x64-unsigned-soap-model.exe"
+    $Sums += (Get-FileHash -LiteralPath $SoapSetup -Algorithm SHA256).Hash.ToLowerInvariant() + '  ' + (Split-Path -Leaf $SoapSetup)
     $Bundled = @(Get-ChildItem -LiteralPath (Join-Path $AppDirectory 'models') -Recurse -File) + @(Get-ChildItem -LiteralPath (Join-Path $AppDirectory 'llm') -Recurse -File)
     foreach ($ModelFile in $Bundled | Sort-Object FullName) {
         $Relative = [IO.Path]::GetRelativePath($AppDirectory, $ModelFile.FullName).Replace('\', '/')
