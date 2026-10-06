@@ -33,6 +33,20 @@ class ModelIntegrityError(RuntimeError):
         super().__init__(code)
 
 
+def bundle_base():
+    """Folder that holds models\ and llm\ in an installed build.
+
+    Windows: next to the executable. macOS .app: Contents/Resources.
+    Source checkouts: build/windows (tests and development only).
+    """
+    if getattr(sys, "frozen", False):
+        executable = Path(sys.executable).resolve()
+        if sys.platform == "darwin" and executable.parent.name == "MacOS":
+            return executable.parent.parent / "Resources"
+        return executable.parent
+    return Path(__file__).resolve().parents[1] / "build" / "windows"
+
+
 def bundled_model_dir():
     """Install-relative model folder: <app>\\models\\<id>.
 
@@ -42,11 +56,7 @@ def bundled_model_dir():
     override = os.environ.get("SGHVOICE_MODEL_DIR")
     if override:
         return Path(override)
-    if getattr(sys, "frozen", False):
-        base = Path(sys.executable).resolve().parent
-    else:
-        base = Path(__file__).resolve().parents[1] / "build" / "windows"
-    return base / "models" / MANIFEST["id"]
+    return bundle_base() / "models" / MANIFEST["id"]
 
 
 def file_sha256(path):

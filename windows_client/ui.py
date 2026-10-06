@@ -75,6 +75,7 @@ LABELS = {
         'soap_pending': 'Transcript ready. Writing the SOAP draft next (about 1–5 minutes)…',
         'soap_copy': 'Copy a finished SOAP draft to the clipboard automatically (paste it into the record with Ctrl+V)',
         'soap_copied': 'SOAP draft created and copied to the clipboard. Check it against the transcript below, then paste it with Ctrl+V.',
+        'hotkeys_unsupported': 'Global shortcuts are not available in this edition. Use the Record button.',
         'soap_done': 'SOAP draft created. Check every item against the transcript below before using it.',
         'soap_heading': '【SOAP draft (generated on this computer; must be checked)】',
         'soap_unverified': '【Check: not found in the transcript】',
@@ -162,6 +163,7 @@ LABELS = {
         'soap_pending': '逐字稿完成，接著產生 SOAP 草稿（約 1～5 分鐘）…',
         'soap_copy': 'SOAP 草稿完成後自動複製到剪貼簿（在病歷中按 Ctrl+V 貼上）',
         'soap_copied': 'SOAP 草稿已產生並複製到剪貼簿。請先對照下方逐字稿確認，再按 Ctrl+V 貼上。',
+        'hotkeys_unsupported': '此版本不支援全域快捷鍵，請使用「錄音」按鈕。',
         'soap_done': 'SOAP 草稿已產生。使用前請逐項對照下方逐字稿確認。',
         'soap_heading': '【SOAP 草稿（本機產生・需確認）】',
         'soap_unverified': '【需確認：逐字稿中找不到】',
@@ -249,6 +251,7 @@ LABELS = {
         'soap_pending': '文字起こしが完了しました。続けて SOAP 下書きを作成しています（1～5 分程度）…',
         'soap_copy': 'SOAP 下書きができたら自動でクリップボードにコピーする（カルテに Ctrl+V で貼り付け）',
         'soap_copied': 'SOAP 下書きを作成し、クリップボードにコピーしました。下の文字起こしと照合して確認してから、Ctrl+V で貼り付けてください。',
+        'hotkeys_unsupported': 'この版ではショートカットキーは使えません。録音ボタンを使ってください。',
         'soap_done': 'SOAP 下書きを作成しました。使用する前に、下の文字起こしと照合して各項目を確認してください。',
         'soap_heading': '【SOAP 下書き（このパソコンで自動作成・要確認）】',
         'soap_unverified': '【要確認：文字起こしに見当たらない語句】',
@@ -377,6 +380,7 @@ class WindowsApp:
 
     def __init__(self, root, config, *, controller_factory, native, hotkeys_factory,
                  save_config, validate_hotkey=None, model_info=None, llm_info=None,
+                 hotkeys_available=True,
                  choose_audio_file=None, choose_save_path=None):
         self.root = root
         self.config = deepcopy(config)
@@ -386,6 +390,7 @@ class WindowsApp:
         self.validate_hotkey = validate_hotkey
         self.model_info = dict(model_info or {})
         self.llm_info = dict(llm_info or {})
+        self.hotkeys_available = hotkeys_available
         self.choose_audio_file = choose_audio_file
         self.choose_save_path = choose_save_path
         self.events = queue.SimpleQueue()
@@ -701,6 +706,9 @@ class WindowsApp:
 
     def _start_hotkeys(self):
         self._hotkeys_ready = False
+        if not self.hotkeys_available:
+            self.hotkey_notice.set(self.tr("hotkeys_unsupported"))
+            return
         try:
             if self.hotkeys is not None:
                 self.hotkeys.stop()
@@ -726,6 +734,9 @@ class WindowsApp:
         self.enqueue("toggle_hotkey", target)
 
     def _render_hotkeys(self):
+        if not self.hotkeys_available:
+            self.hotkey_notice.set(self.tr("hotkeys_unsupported"))
+            return
         message = self.tr("hotkeys_ready").format(toggle=self.config["windows_toggle_hotkey"], cancel=self.config["windows_cancel_hotkey"]) if self._hotkeys_ready else self.tr("hotkeys_failed")
         self.hotkey_notice.set(message)
 

@@ -1,0 +1,15 @@
+# macOS arm64 / CPython 3.12 build environment for the offline medical edition.
+# Same runtime versions as requirements-windows.txt; wheel-only. CI build only
+# (hash pinning for macOS wheels is a follow-up before a formal release).
+ctranslate2==4.8.2
+tokenizers==0.23.2
+onnxruntime==1.30.0
+numpy==2.4.2
+soundfile==0.13.1
+sounddevice==0.5.5
+opencc-python-reimplemented==0.1.7
+huggingface-hub==1.33.0
+pyyaml==6.0.3
+pyinstaller==6.22.3
+pyinstaller-hooks-contrib==2026.8
+pytest==9.1.1

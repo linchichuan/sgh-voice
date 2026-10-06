@@ -79,3 +79,45 @@ def test_host_allow_list():
     for url in ("http://github.com/a", "https://github.com.evil.example/a", "https://user@github.com/a",
                 "https://github.com:8443/a", "https://huggingface.co/a"):
         assert not fetch.allowed_runtime_url(url)
+
+
+def make_mac_zip():
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as bundle:
+        exe = zipfile.ZipInfo("build/bin/llama-completion")
+        exe.external_attr = (0o100755 << 16)
+        bundle.writestr(exe, b"\xcf\xfa\xed\xfe binary")
+        lib = zipfile.ZipInfo("build/lib/libllama.0.dylib")
+        lib.external_attr = (0o100644 << 16)
+        bundle.writestr(lib, b"dylib")
+        alias = zipfile.ZipInfo("build/lib/libllama.dylib")
+        alias.external_attr = (0o120777 << 16)
+        bundle.writestr(alias, b"libllama.0.dylib")
+    return buffer.getvalue()
+
+
+def test_macos_runtime_keeps_layout_symlinks_and_exec_bit(tmp_path):
+    data = make_mac_zip()
+    manifest = {"runtime_macos": {"project": "ggml-org/llama.cpp", "tag": "b1", "asset": "llama-b1-bin-macos-arm64.zip",
+                                  "sha256": hashlib.sha256(data).hexdigest(), "executable": "llama-completion"}}
+    target = fetch.fetch_runtime(tmp_path / "runtime", manifest=manifest, opener=Opener(data),
+                                 log=lambda *_: None, platform="macos")
+    exe = target / "build/bin/llama-completion"
+    assert exe.is_file() and exe.stat().st_mode & 0o111
+    assert (target / "build/lib/libllama.dylib").is_symlink()
+    assert (target / "build/lib/libllama.dylib").resolve() == (target / "build/lib/libllama.0.dylib").resolve()
+    import json
+    assert json.loads((target / "runtime.json").read_text())["executable"] == "build/bin/llama-completion"
+
+
+def test_macos_runtime_refuses_path_traversal(tmp_path):
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as bundle:
+        bundle.writestr("../escape/llama-completion", b"x")
+    data = buffer.getvalue()
+    manifest = {"runtime_macos": {"project": "ggml-org/llama.cpp", "tag": "b1", "asset": "a.zip",
+                                  "sha256": hashlib.sha256(data).hexdigest(), "executable": "llama-completion"}}
+    with pytest.raises(fetch.FetchError):
+        fetch.fetch_runtime(tmp_path / "runtime", manifest=manifest, opener=Opener(data),
+                            log=lambda *_: None, platform="macos")
+    assert not (tmp_path.parent / "escape").exists()

@@ -172,3 +172,21 @@ def test_result_composition_keeps_transcript():
     assert text.startswith("[SOAP]\n" + DRAFT)
     assert "[check] インスリン、1.73" in text
     assert text.endswith("[T]\n" + TRANSCRIPT)
+
+
+def test_runtime_layout_file_locates_nested_executable(bundle):
+    root, manifest, cache = bundle
+    (root / "runtime" / "llama-completion.exe").unlink()
+    nested = root / "runtime" / "build" / "bin"
+    nested.mkdir(parents=True)
+    (nested / "llama-completion.exe").write_bytes(b"MZ")
+    (root / "runtime" / "runtime.json").write_text(json.dumps({"executable": "build/bin/llama-completion.exe"}))
+    assert SoapDrafter(root, cache_dir=cache, manifest=manifest).locate() == nested / "llama-completion.exe"
+    (root / "runtime" / "runtime.json").write_text(json.dumps({"executable": "../outside"}))
+    with pytest.raises(SoapError):
+        SoapDrafter(root, cache_dir=cache, manifest=manifest).locate()
+
+
+def test_runtime_spec_per_platform():
+    assert soap.runtime_spec(platform="win32")["executable"] == "llama-completion.exe"
+    assert soap.runtime_spec(platform="darwin")["executable"] == "llama-completion"

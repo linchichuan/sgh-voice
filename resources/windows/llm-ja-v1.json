@@ -22,6 +22,14 @@
     "license": "MIT",
     "executable": "llama-completion.exe"
   },
+  "runtime_macos": {
+    "project": "ggml-org/llama.cpp",
+    "tag": "b11435",
+    "asset": "llama-b11435-bin-macos-arm64.zip",
+    "sha256": "PENDING",
+    "license": "MIT",
+    "executable": "llama-completion"
+  },
   "generation": {
     "max_tokens": 1500,
     "temperature": 0.2,

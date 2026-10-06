@@ -8,7 +8,8 @@ import ast
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-APPLICATION = sorted(p for p in (ROOT / "windows_client").glob("*.py")) + [ROOT / "windows_launcher.py"]
+APPLICATION = (sorted(p for p in (ROOT / "windows_client").glob("*.py"))
+               + [ROOT / "windows_launcher.py", ROOT / "mac_medical_launcher.py"])
 NETWORK_MODULES = {"urllib.request", "http", "http.client", "requests", "httpx", "aiohttp",
                    "huggingface_hub", "openai", "anthropic", "groq", "webbrowser", "ftplib",
                    "smtplib", "ssl", "socketserver"}
@@ -28,7 +29,7 @@ def test_application_code_imports_no_network_client():
     for path in APPLICATION:
         modules = imported_modules(path)
         assert not {m for m in modules if m in NETWORK_MODULES or m.split(".")[0] in NETWORK_MODULES}, path.name
-        if path.name != "windows_launcher.py":
+        if path.name not in ("windows_launcher.py",):
             # Only the offline self-test imports socket, to deny connections.
             assert "socket" not in modules, path.name
 

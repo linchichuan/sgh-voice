@@ -23,7 +23,7 @@ import threading
 import time
 import unicodedata
 
-from windows_client.models import ModelIntegrityError, RESOURCE_ROOT, verified_model_dir
+from windows_client.models import ModelIntegrityError, RESOURCE_ROOT, bundle_base, verified_model_dir
 
 LLM_MANIFEST = json.loads((RESOURCE_ROOT / "llm-ja-v1.json").read_text(encoding="utf-8"))
 LLM_VERIFIED_CACHE = "llm-verified.json"
@@ -68,11 +68,15 @@ def bundled_llm_root():
     override = os.environ.get("SGHVOICE_LLM_DIR")
     if override:
         return Path(override)
-    if getattr(sys, "frozen", False):
-        base = Path(sys.executable).resolve().parent
-    else:
-        base = Path(__file__).resolve().parents[1] / "build" / "windows"
-    return base / "llm"
+    return bundle_base() / "llm"
+
+
+def runtime_spec(manifest=None, platform=None):
+    """The pinned llama.cpp build for this operating system."""
+    manifest = manifest or LLM_MANIFEST
+    if (platform or sys.platform) == "darwin":
+        return manifest["runtime_macos"]
+    return manifest["runtime"]
 
 
 def build_prompt(transcript):
@@ -130,7 +134,10 @@ def unverified_terms(draft, transcript):
 
 def physical_memory_bytes():
     if sys.platform != "win32":
-        return None
+        try:
+            return int(os.sysconf("SC_PHYS_PAGES") * os.sysconf("SC_PAGE_SIZE"))
+        except (AttributeError, OSError, ValueError):
+            return None
     import ctypes
 
     class MemoryStatus(ctypes.Structure):
@@ -158,7 +165,17 @@ class SoapDrafter:
 
     def locate(self):
         """Verify the pinned GGUF (cached) and the runtime; raise SoapError."""
-        executable = self.root / "runtime" / self.manifest["runtime"]["executable"]
+        runtime = self.root / "runtime"
+        executable = runtime / runtime_spec(self.manifest)["executable"]
+        layout = runtime / "runtime.json"  # macOS keeps the archive's bin/ lib/ layout
+        if layout.is_file():
+            try:
+                relative = Path(json.loads(layout.read_text(encoding="utf-8"))["executable"])
+            except (OSError, ValueError, KeyError, TypeError):
+                raise SoapError("soap_unavailable") from None
+            if relative.is_absolute() or ".." in relative.parts:
+                raise SoapError("soap_unavailable")
+            executable = runtime / relative
         if executable.is_symlink() or not executable.is_file():
             raise SoapError("soap_unavailable")
         try:
@@ -200,7 +217,7 @@ class SoapDrafter:
             flags = 0
             if sys.platform == "win32":
                 flags = subprocess.CREATE_NO_WINDOW | subprocess.BELOW_NORMAL_PRIORITY_CLASS
-            environment = {key: os.environ[key] for key in ("SYSTEMROOT", "WINDIR", "TEMP", "TMP", "PATH")
+            environment = {key: os.environ[key] for key in ("SYSTEMROOT", "WINDIR", "TEMP", "TMP", "TMPDIR", "PATH", "HOME")
                            if key in os.environ}
             # CI diagnostics only (fictional transcript): runtime log to a file.
             diagnostics = os.environ.get("SGHVOICE_SOAP_STDERR")

@@ -207,6 +207,10 @@ def offline_self_test(model_directory, report_path, speech_set=None, max_cer=Non
             if soap_transcript:
                 # The bundled llama.cpp child process drafts SOAP from a fictional transcript.
                 from windows_client.soap import SoapDrafter, has_soap_headings
+                # As in the app on small machines: free the speech model before the LLM runs.
+                del decoder
+                import gc
+                gc.collect()
                 transcript = Path(soap_transcript).read_text(encoding="utf-8")
                 drafter = SoapDrafter(cache_dir=folder)
                 drafted = drafter.draft(transcript)
