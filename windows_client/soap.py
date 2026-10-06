@@ -43,6 +43,7 @@ SYSTEM_PROMPT = """あなたは日本の医療機関で使われる診療記録�
 - 会話の中で明示された情報だけを書く。推測、一般論、会話にない診断名・検査・薬剤・注意事項を追加しない。
 - 数値、薬剤名、用量、回数は会話のとおりに書く。会話で言われていない単位や基準値は付け加えない。
 - 患者が否定した症状（例：「胸の痛みはない」）も、否定であることがわかるように S に書く。
+- 医師の説明や指示（例：「〜が出たらすぐ連絡してください」）は P に書き、患者の症状や否定された症状として S に書かない。
 - 会話に該当する情報がない項目は「記載なし」と書く。
 - 日本語で書く。中国語の字体や表現を使わない。
 - 出力は次の 4 つの見出しと箇条書きのみ。前置きや結びの文は書かない。
@@ -193,7 +194,7 @@ class SoapDrafter:
             command = [str(executable), "-m", str(self._model), "-f", str(prompt),
                        "-n", str(generation["max_tokens"]), "-c", str(context),
                        "--temp", str(generation["temperature"]), "--top-p", str(generation["top_p"]),
-                       "-no-cnv", "--no-display-prompt"]
+                       "--seed", str(generation["seed"]), "-no-cnv", "--no-display-prompt"]
             flags = 0
             if sys.platform == "win32":
                 flags = subprocess.CREATE_NO_WINDOW | subprocess.BELOW_NORMAL_PRIORITY_CLASS

@@ -28,9 +28,10 @@ def main(argv=None):
     missing, invented, headings = check(text)
     print("===== SOAP draft (fictional consultation) =====\n" + text + "\n===== end =====")
     print("Check (not found in transcript): " + ", ".join(soap.get("unverified", [])))
-    print(json.dumps({"seconds": soap.get("seconds"), "transcript_chars": soap.get("transcript_chars"),
+    print(json.dumps({"seconds": soap.get("seconds"), "repeat_seconds": soap.get("repeat_seconds"),
+                      "repeat_identical": soap.get("repeat_identical"), "transcript_chars": soap.get("transcript_chars"),
                       "headings": headings, "missing": missing, "invented": invented}, ensure_ascii=False))
-    if not report.get("soap_tested") or not headings or missing or invented:
+    if not report.get("soap_tested") or not headings or missing or invented or not soap.get("repeat_identical"):
         print("FAIL SOAP draft is missing required facts or contains items never said", file=sys.stderr)
         return 1
     print("PASS SOAP draft: headings present, required values kept, nothing invented from the check list")

@@ -23,7 +23,7 @@ def test_prompt_disables_thinking_and_keeps_rules():
     assert prompt.startswith("<|im_start|>system\n")
     assert "<|im_start|>user\n会話<|im_end|>" in prompt
     assert prompt.endswith("<|im_start|>assistant\n<think>\n\n</think>\n\n")
-    for rule in ("推測", "否定", "記載なし", "単位"):
+    for rule in ("推測", "否定", "記載なし", "単位", "指示"):
         assert rule in soap.SYSTEM_PROMPT
 
 
@@ -113,7 +113,7 @@ def test_draft_runs_child_process_without_network_settings(bundle, monkeypatch):
     call = calls[0]
     command = call["command"]
     assert Path(command[0]).name == "llama-completion.exe"
-    for flag in ("-no-cnv", "--no-display-prompt", "-n", "-c", "--temp"):
+    for flag in ("-no-cnv", "--no-display-prompt", "-n", "-c", "--temp", "--seed"):
         assert flag in command
     assert not any(part.startswith(("-hf", "--hf", "-mu", "--model-url")) for part in command)
     assert TRANSCRIPT in call["prompt_text"]

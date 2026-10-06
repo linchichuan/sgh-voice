@@ -208,12 +208,17 @@ def offline_self_test(model_directory, report_path, speech_set=None, max_cer=Non
                 # The bundled llama.cpp child process drafts SOAP from a fictional transcript.
                 from windows_client.soap import SoapDrafter, has_soap_headings
                 transcript = Path(soap_transcript).read_text(encoding="utf-8")
-                drafted = SoapDrafter(cache_dir=folder).draft(transcript)
+                drafter = SoapDrafter(cache_dir=folder)
+                drafted = drafter.draft(transcript)
+                # A second run must give the same draft (fixed seed) and must also succeed.
+                repeat = drafter.draft(transcript)
                 report["soap"] = {"text": drafted["text"], "unverified": drafted["unverified"],
-                                  "seconds": drafted["seconds"], "transcript_chars": len(transcript),
+                                  "seconds": drafted["seconds"], "repeat_seconds": repeat["seconds"],
+                                  "repeat_identical": repeat["text"] == drafted["text"],
+                                  "transcript_chars": len(transcript),
                                   "headings": has_soap_headings(drafted["text"])}
                 report["soap_tested"] = True
-                ok = ok and report["soap"]["headings"]
+                ok = ok and report["soap"]["headings"] and report["soap"]["repeat_identical"]
             report["ok"] = ok and not attempts
     except Exception as exc:
         report["error"] = type(exc).__name__

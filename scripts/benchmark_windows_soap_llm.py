@@ -33,7 +33,7 @@ CANDIDATES = [
     ("qwen3.5-2b", "unsloth/Qwen3.5-2B-GGUF", "Qwen3.5-2B-Q4_K_M.gguf", 16384, "Apache-2.0"),
 ]
 
-SYSTEM = """あなたは日本の医療機関で使われる診療記録の下書き作成を補助します。
+SYSTEM_BENCHMARK_2026_10_06 = """あなたは日本の医療機関で使われる診療記録の下書き作成を補助します。
 入力は、医師と患者の診察中の会話を音声認識で文字にしたものです。話者の区別はなく、誤認識を含むことがあります。
 この会話から、医師が確認・修正するための SOAP 形式の下書きを日本語で作成してください。
 
@@ -68,6 +68,10 @@ FORBIDDEN = {
     "ECG": r"心電図",
     "antihypertensive started": r"降圧薬.{0,10}(開始|処方し|追加し)",
 }
+
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from windows_client.soap import SYSTEM_PROMPT as SYSTEM  # noqa: E402  (product prompt)
 
 
 def sha256(path):

@@ -26,6 +26,7 @@
     "max_tokens": 1500,
     "temperature": 0.2,
     "top_p": 0.9,
-    "max_context": 16384
+    "max_context": 16384,
+    "seed": 20261006
   }
 }
