@@ -29,7 +29,7 @@ from hotkey_config import (
 # `from config import APP_VERSION`，不要各自硬編一份字串（曾經各寫各的，
 # app.py 停在 2.7.0、dashboard.py 已到 2.7.4，兩邊回報的版本互相矛盾）。
 # 手動與 CHANGELOG.md 最新版本同步。
-APP_VERSION = "2.7.5"
+APP_VERSION = "2.7.6"
 
 # 跨 thread 序列化 stats.json 的 read-modify-write，避免 update_stats 與 _track_usage race
 _STATS_LOCK = threading.RLock()
@@ -376,7 +376,7 @@ SCENE_PRESETS = {
         ),
     },
     "medical_consultation": {
-        "label": "看診紀錄（SOAP病歷摘要）",
+        "label": "看診紀錄（SOAP摘錄草稿・需醫師核對）",
         "custom_words": [
             "BP", "DM", "HTN", "SOB", "URI", "Appt", "Sx", "Tx", "Dx", "Hx",
             "心電図", "CT", "MRI", "エコー", "カルテ", "レントゲン"
@@ -388,17 +388,17 @@ SCENE_PRESETS = {
         # 根本不相容：舊版以 system_prompt_extra 內鬥主 prompt（「強行覆寫上述格式」），
         # 且 SOAP 輸出的 bigram overlap / 長度比必觸發幻覺偵測 → 五引擎全滅退回 regex，
         # 實質上永遠產不出 SOAP。改走 edit 模式（transcriber 偵測 edit_directive 自動切換），
-        # 用 <command>/<text> 結構 + edit 模式的寬鬆 validator。
+        # 用 <command>/<text> 結構。SOAP 不信任 edit 的通用 validator：管線
+        # 另做完整原句保留檢查，全部結果都必須經醫師人工核對，禁止自動貼入。
         "system_prompt_extra": "",
         "edit_directive": (
-            "將這段「醫師與病患/家屬的看診對話逐字稿」整理為結構化醫療摘要（SOAP），供醫師貼入電子病歷：\n"
-            "[S] 主觀陳述：病患自述症狀、病史\n"
-            "[O] 客觀發現：醫師觀察、檢查數值（BP、HbA1c 等保留原值）\n"
-            "[A] 評估：醫師提及的診斷或鑑別診斷\n"
-            "[P] 計畫：處置、用藥、回診安排\n"
-            "規則：只使用對話中明確出現的資訊，缺漏的段落寫「（對話中未提及）」，嚴禁推測或補寫診斷。"
-            "醫療縮寫保留並於首次出現時展開，如「BP（血壓）」；藥品名、檢查名保持原文。"
-            "中文一律繁體中文（台灣用語），日文醫療術語（カルテ、処方箋）保持日文。"
+            "將逐字稿按完整原句分類成 SOAP 摘錄草稿，供醫師對照原文人工核對，不是診斷或正式病歷。\n"
+            "只輸出四段，各標題單獨一行，依序為 [S]、[O]、[A]、[P]。\n"
+            "S 為主觀陳述，O 為客觀發現，A 為醫師明確提及的評估，P 為明確提及的計畫。\n"
+            "每個原句必須逐字複製且恰好出現一次，可搬移整句但不可拆句、合句、刪字或改字。"
+            "保留所有原字形、空格、標點、數字、藥名、單位、否定和不確定語氣，不展開縮寫、不翻譯。"
+            "原文沒有句號時保留完整原段，不自行摘要或推測。沒有可分配的原句則段落留空，"
+            "不得新增『正常』『無過敏』或『未提及』等任何文字，不加清單符號或前言。"
         ),
     },
 }

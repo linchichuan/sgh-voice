@@ -17,8 +17,8 @@
 
 ### Android capabilities
 
-- Current sideload update: Android 2.8.8, versionCode 38, 17.6 MB. Existing sideload users can find update instructions at https://voice.shingihou.com/android-update.html; Google Play installations should keep updating through Google Play. This does not grant closed-test membership or count toward the 12 testers
-- The 2.8.7 landing-page image is a UI preview, not evidence of real-device audio capture or recognition accuracy
+- Current sideload update: Android 2.8.9, versionCode 39, 17.9 MB. Existing sideload users can find update instructions at https://voice.shingihou.com/android-update.html; Google Play installations should keep updating through Google Play. This does not grant closed-test membership or count toward the 12 testers
+- The 2.8.9 landing-page image is a UI preview, not evidence of real-device audio capture or recognition accuracy
 - Four modes in one Android input method: Voice, Zhuyin, Japanese, and English
 - All four modes share one height based on the original Zhuyin size; adjust it in Settings from 90% to 125% in 5% steps, or reset to 100%. Small windows apply a common height limit and scrolling where needed
 - The original Shingihou company logo sits directly beside the larger SGH label as one centred brand group at the top left of the keyboard
@@ -59,7 +59,9 @@
 - 2.8.3 adds shared, adjustable keyboard height and replaces Japanese 12-key tap cycling with directional flick input
 - 2.8.6 refines the light mint recording surface and joins the original company logo with a larger, centred SGH label
 - 2.8.7 refines conservative cleanup, confirmation-gated short vocabulary memory, English and Japanese input handling, and the soft recording interface. Vocabulary memory is local personalization, not model training; neither cleanup nor vocabulary hints guarantee recognition accuracy
-- 2.8.8 improves filler and stutter cleanup while preserving meaningful transitions, intentional ellipses, language, and tone. Detected new ellipses replacing fillers or changes to protected content trigger the existing source-transcript fallback and notice; punctuation quality still depends on the selected model, and real-device recording quality has not been established by mocked tests
+- 2.8.8 improves filler and stutter cleanup while preserving meaningful transitions, intentional ellipses, language, and tone. Detected new ellipses replacing fillers or changes to protected content trigger the existing source-transcript fallback and notice
+- 2.8.9 adds larger Zhuyin candidates, prefix selection with the remaining sounds preserved, and a guarded one-step reselection. It adds common emoji, direct kana confirmation, 45,371 offline English corpus words and 32,005 Japanese candidates. These dictionaries are local candidate lookup, not cloud model training or full spelling correction
+- Long unpunctuated dictations may receive at most one additional punctuation-only request to the selected, consented AI provider. This can add cost and latency; guarded failure retains the transcript. Model accuracy and real-device behavior remain unverified
 - Notes, pending drafts and retry audio disappear when the input-method service ends or the device restarts; continuous background recording is not supported
 - Cloud consent is checked before each new request; withdrawal prevents follow-up AI requests and retry uploads
 - Automated checks and emulator inspection do not establish real-device dictation accuracy; the physical-device acceptance checklist remains pending
@@ -76,6 +78,13 @@
 - Download: https://github.com/linchichuan/sgh-voice/releases/tag/v2.6.0
 - App price: free
 - Cloud usage: BYOK; provider charges may apply
+
+### macOS test prerelease
+
+- Version: 2.7.6, Apple Silicon only; https://github.com/linchichuan/sgh-voice/releases/tag/v2.7.6
+- Ad-hoc signed, not Apple-notarized. Installation, launch and microphone acceptance remain unverified. This does not replace the separately listed public release
+- Opt-in SOAP produces an exact-source extractive draft in local History, never automatic insertion. A clinician must compare source and draft, correct classification and manually copy reviewed content. This is not a clinically validated EHR
+- Clinical draft edits are excluded from dictionary learning; no patient-data or live provider acceptance was performed
 
 ### macOS capabilities
 

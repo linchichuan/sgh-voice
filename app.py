@@ -10,6 +10,7 @@ macOS 選單列常駐 + Web Dashboard + 全域快捷鍵
 """
 import sys
 import os
+from medical_soap import result_message as medical_soap_message
 
 # 模型快取指向外接 SSD（Ollama 由 .zshrc 的 OLLAMA_MODELS 管理）
 if not os.environ.get("HF_HOME") and os.path.isdir("/Volumes/Satechi_SSD/huggingface"):
@@ -1509,7 +1510,9 @@ class VoiceEngine:
             if result and result.get("error"):
                 error_code = result.get("error")
                 error_detail = result.get("error_detail", "")
-                if error_code == "translation_failed":
+                if str(error_code).startswith("medical_soap_"):
+                    message = medical_soap_message(result)
+                elif error_code == "translation_failed":
                     message = "翻譯失敗：請確認已設定可用的 LLM API Key 或稍後重試"
                 else:
                     message = f"翻譯要求無效：{error_detail or error_code}"
@@ -1521,7 +1524,7 @@ class VoiceEngine:
                     )
                 if not other_inflight:
                     try:
-                        self.overlay.show("translation_failed")
+                        self.overlay.show("idle" if str(error_code).startswith("medical_soap_") else "translation_failed")
                     except Exception:
                         pass
             elif result:
@@ -1893,6 +1896,14 @@ class VoiceEngine:
                 except Exception: pass
 
             result = self.transcriber.retry_last_llm(on_stage=_retry_on_stage)
+            if result and str(result.get("error", "")).startswith("medical_soap_"):
+                message = medical_soap_message(result)
+                log("warn", message)
+                notify("SGH Voice", message)
+                try: self.overlay.show("idle")
+                except Exception: pass
+                self._safe_status_change("idle")
+                return
             if not result:
                 log("warn", "Retry 失敗（cache 過期或 LLM 全部失敗）")
                 try: self.overlay.show("idle")
@@ -1958,6 +1969,11 @@ class VoiceEngine:
                     should_cancel=cancel_event.is_set,
                 )
                 if not result or cancel_event.is_set():
+                    return
+                if str(result.get("error", "")).startswith("medical_soap_"):
+                    message = medical_soap_message(result)
+                    log("warn", message)
+                    notify("SGH Voice", message)
                     return
                 final = (result.get("final") or "").strip()
                 if not final:
@@ -3125,7 +3141,9 @@ def run_cli():
         )
 
         if not result or result.get("error"):
-            if result and result.get("error") == "translation_failed":
+            if result and str(result.get("error", "")).startswith("medical_soap_"):
+                print(medical_soap_message(result))
+            elif result and result.get("error") == "translation_failed":
                 print("⚠️  翻譯失敗，請確認 LLM 服務與 API Key\n")
             else:
                 print("⚠️  未偵測到音訊\n")
@@ -3197,6 +3215,12 @@ def start_clipboard_observer(engine):
                 continue
 
             last_item = recent[0]
+            # A copied clinical draft is not an ASR correction, even after a
+            # clinician edits it. Exclude before reading clipboard text or
+            # calling either history-update or dictionary-learning pathways.
+            if (last_item.get("pipeline_mode") == "medical_soap"
+                    or "medical_soap" in str(last_item.get("mode", ""))):
+                continue
             last_dictated = last_item.get("final_text", "")
             last_ts_str = last_item.get("timestamp", "")
 

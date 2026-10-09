@@ -220,7 +220,7 @@ BUILT_VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' 
 # missing. Gate the actual embedded PYZ, not only the build exit code.
 ARCHIVE_LIST="$(pyi-archive_viewer "$APP_PATH/Contents/MacOS/${APP_NAME}" -r -b)"
 REQUIRED_PYTHON_MODULES=(
-    app config dashboard dictation_cleanup event_ledger medical_dictionary memory transcriber translation
+    app config dashboard dictation_cleanup event_ledger medical_dictionary medical_soap memory transcriber translation
     mlx mlx.nn mlx_whisper mlx_audio mlx_audio.stt
     mlx_audio.stt.models.qwen3_asr.qwen3_asr
 )

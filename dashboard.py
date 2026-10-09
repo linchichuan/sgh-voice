@@ -457,7 +457,12 @@ def api_update_history(timestamp):
     learned = []
     auto_learn_enabled = bool(load_config().get("enable_auto_learn", True))
     if auto_learn_enabled and old_text != new_text:
-        learned = memory.learn_correction(old_text, new_text, source="manual")
+        source_entry = next((entry for entry in memory.get_history(n=2000)
+                             if entry.get("timestamp") == timestamp), {})
+        medical_draft = (source_entry.get("pipeline_mode") == "medical_soap"
+                         or "medical_soap" in source_entry.get("mode", ""))
+        if not medical_draft:
+            learned = memory.learn_correction(old_text, new_text, source="manual")
 
     return jsonify({"ok": True, "learned": learned})
 

@@ -161,6 +161,12 @@ def test_scene_edit_directive_switches_to_edit_mode(mock_transcriber, monkeypatc
     )
     assert captured["mode"] == "edit"
     assert "SOAP" in captured["edit_context"] or "[S]" in captured["edit_context"]
-    assert result["final"].startswith("[S]")
-    assert mock_transcriber.memory.history[-1]["mode"] == "edit"
-    assert mock_transcriber.memory.history[-1]["pipeline_mode"] == "edit"
+    # The edit provider route is retained, but its rewritten clinical text is
+    # no longer automatically pasteable. This fixture changes literal values
+    # and drops source sentences, so the independent SOAP gate must reject it.
+    assert mock_transcriber._last_stt_cache["mode"] == "edit"
+    assert mock_transcriber._last_stt_cache["soap_requested"] is True
+    assert result["final"] == ""
+    assert result["error"] == "medical_soap_failed"
+    assert mock_transcriber.memory.history[-1]["mode"] == "medical_soap"
+    assert mock_transcriber.memory.history[-1]["pipeline_mode"] == "medical_soap"

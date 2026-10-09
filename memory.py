@@ -682,7 +682,14 @@ class Memory:
                 if h.get("timestamp") == timestamp:
                     old_text = h.get("final_text", "")
                     h["final_text"] = new_final_text
-                    h["edited"] = True
+                    medical_draft = (h.get("pipeline_mode") == "medical_soap"
+                                     or "medical_soap" in str(h.get("mode", "")))
+                    # Reviewing a clinical draft is not an ASR correction.
+                    # Legacy promotion tools key on edited=True, so do not
+                    # emit that training signal even after a manual review.
+                    h["edited"] = not medical_draft
+                    if medical_draft:
+                        h["medical_review_edited"] = True
                     h["correction_source"] = str(source or "manual")
                     h["edited_at"] = datetime.now().isoformat()
                     save_history(self.history)

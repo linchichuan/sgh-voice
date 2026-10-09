@@ -18,6 +18,7 @@ from config import (
     MULTILINGUAL_CANONICAL_WORDS,
 )
 import medical_dictionary
+from medical_soap import validate_soap_draft, REVIEW_NOTICE, FAILURE_NOTICE
 from dictation_cleanup import (
     ellipses_preserved,
     hesitation_reference,
@@ -641,8 +642,11 @@ class Transcriber:
             return None
         t_stt = time.time() - t_stt0
 
+        # SOAP is a separate safety contract: neither spoken rewrite commands
+        # nor a later scene change may silently downgrade it to generic edit.
+        soap_requested = mode == "dictate" and self.config.get("active_scene") == "medical_consultation"
         # 句尾 meta-command 偵測（可能改寫 raw + mode + edit_context）
-        if mode == "dictate":
+        if mode == "dictate" and not soap_requested:
             stripped, override_style = self._detect_voice_command(raw)
             if override_style:
                 raw = stripped
@@ -652,7 +656,8 @@ class Transcriber:
 
         # 場景強制 edit 模式（如 SOAP 病歷摘要）：這類場景的本質是「重新組織內容」，
         # 與 dictate 的逐字轉寫契約/validator 根本不相容（舊版 SOAP 輸出必被幻覺偵測
-        # 誤殺）。改走 edit 模式：<command>=場景指令、<text>=逐字稿、寬鬆 validator。
+        # 誤殺）。沿用 edit provider 格式，回傳後另走 SOAP 的獨立安全邊界，
+        # 不可把通用 edit validator 通過當成臨床驗證或自動貼上許可。
         if mode == "dictate":
             scene_directive = SCENE_PRESETS.get(
                 self.config.get("active_scene", "general"), {}
@@ -665,6 +670,7 @@ class Transcriber:
         self._last_stt_cache = {
             "raw": raw,
             "mode": mode,
+            "soap_requested": soap_requested,
             "edit_context": edit_context,
             "audio_duration": audio_duration,
             "app_info": app_info,
@@ -682,13 +688,14 @@ class Transcriber:
         scene_corrections = medical_dictionary.augment_scene_corrections(
             scene_key, SCENE_PRESETS.get(scene_key, {}).get("corrections"), self.config
         )
-        corrected = self.memory.apply_corrections(
+        corrected = raw if soap_requested else self.memory.apply_corrections(
             raw,
             scene_corrections=scene_corrections,
             scene_key=scene_key,
             app_id=app_id,
         )
-        corrected = self._apply_smart_replace(corrected)
+        if not soap_requested:
+            corrected = self._apply_smart_replace(corrected)
 
         # ── LLM 階段 ─────────────────────────────────────
         if _cancelled():
@@ -831,6 +838,11 @@ class Transcriber:
                     final, llm_source = res, source
                     break
 
+        if soap_requested:
+            if _cancelled():
+                return None
+            return self._medical_soap_result(raw, final, stt_source, llm_source,
+                                             time.time() - t0, app_info)
         if final is None:
             if mode == "translate":
                 event_ledger.log(
@@ -925,6 +937,29 @@ class Transcriber:
             })
         return result
 
+    def _medical_soap_result(self, raw, draft, stt_source, llm_source, elapsed, app_info):
+        accepted, reason = validate_soap_draft(raw, draft)
+        status = "review_required" if accepted else "failed"
+        entry = {
+            "timestamp": datetime.now().isoformat(), "whisper_raw": raw,
+            "source_text": raw, "final_text": (REVIEW_NOTICE + "\n\n" + accepted) if accepted else FAILURE_NOTICE,
+            "mode": "medical_soap", "pipeline_mode": "medical_soap",
+            "scene": "medical_consultation", "soap_status": status,
+            "soap_draft": accepted or "", "soap_reason": reason,
+            "stt_source": stt_source, "llm_source": llm_source,
+            "process_time": round(elapsed, 2),
+            "app_name": app_info.get("app_name"), "bundle_id": app_info.get("bundle_id"),
+        }
+        saved = False
+        try:
+            saved = self.memory.add_to_history(entry) is True
+        except Exception as exc:
+            event_ledger.log("medical_soap_recovery_write_failed", error=type(exc).__name__)
+        event_ledger.log("medical_soap_held", reason=reason, source_recoverable=saved)
+        return {"raw": raw, "final": "", "soap_draft": accepted or "",
+                "error": "medical_soap_" + status, "source_recoverable": saved,
+                "process_time": elapsed}
+
     def retry_last_llm(self, on_stage=None):
         """Retry hotkey 入口：用 cache 的 raw STT 重跑 corrections + LLM，回傳 result dict。
         跳過 STT 階段（省 1.5s），讓使用者拿到第二版而不用重錄。"""
@@ -952,6 +987,7 @@ class Transcriber:
         t0 = time.time()
         raw = cache["raw"]
         mode = cache["mode"]
+        soap_requested = bool(cache.get("soap_requested"))
         edit_context = cache.get("edit_context", "")
         app_info = cache.get("app_info") or {}
         app_id = cache.get("app_id")
@@ -972,13 +1008,14 @@ class Transcriber:
         scene_corrections = medical_dictionary.augment_scene_corrections(
             scene_key, SCENE_PRESETS.get(scene_key, {}).get("corrections"), self.config
         )
-        corrected = self.memory.apply_corrections(
+        corrected = raw if soap_requested else self.memory.apply_corrections(
             raw,
             scene_corrections=scene_corrections,
             scene_key=scene_key,
             app_id=app_id,
         )
-        corrected = self._apply_smart_replace(corrected)
+        if not soap_requested:
+            corrected = self._apply_smart_replace(corrected)
 
         # ── LLM 階段（同 transcribe 主路徑邏輯，但用 temperature=0.3 讓結果有差異） ──
         final = None
@@ -1073,6 +1110,9 @@ class Transcriber:
                     final, llm_source = res, source
                     break
 
+        if soap_requested:
+            return self._medical_soap_result(raw, final, cache.get("stt_source", "cache"),
+                                             llm_source, time.time() - t0, app_info)
         if final is None:
             if mode == "translate":
                 return {

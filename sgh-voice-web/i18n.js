@@ -1,23 +1,24 @@
 const translations = {
     ja: {
-        "update.cleanup": "音声認識後の句読点・段落と、意味のないためらい・言いよどみの整理を改善。「えーと」「えっと」などを省いた後も自然につながる文章を目指します。",
-        "update.preserve": "意味のある接続詞、意図的な省略記号、口調と元の言語を保ち、発話にない内容は補いません。人名・数値・否定表現・用量・単位はご確認ください。",
-        "update.fallback": "ためらいを省略記号に置き換えたり、保護対象の内容を変更したことを検出すると、元の文字起こしに戻し、お知らせします。AI の整理結果と実機での音声品質はご確認ください。",
+        "update.cleanup": "長い音声入力に句読点がない場合、文字を変えずに句読点だけを補う処理を1回再試行します。数値や否定表現の保護は維持します。",
+        "update.preserve": "注音の候補を拡大。先頭の語を選んでも残りの注音を保持し、直後なら「戻す」で選び直せます。絵文字と、日本語のかなのままの確定にも対応。",
+        "update.fallback": "英語のオフライン辞書に45,371語を追加し、日本語を32,005候補に拡充。同じ入力欄への再接続と録音中の画面点灯も改善しました。実機での操作結果をお知らせください。",
+        "update.punctuation.notice": "句読点の再試行はAIが有効で条件を満たす場合のみ行い、追加のAPI料金と待ち時間が生じる場合があります。失敗時は原文を保持し、認識や句読点の正確性を保証しません。",
         "update.support": "更新について問い合わせる",
         "update.apply": "初めての方：Google Play テストに応募",
-        "update.changes": "2.8.8 の変更点",
+        "update.changes": "2.8.9 の変更点",
         "update.safety": "テスト版のため、重要なデータは事前にバックアップしてください。Google Play Protect は有効のままお使いください。",
         "update.install": "既存アプリを残したまま、ダウンロードした更新ファイルを開いてください。更新できない場合は、表示されたエラーを確認し、サポートへお問い合わせください。",
-        "update.download": "2.8.8 更新ファイルをダウンロード",
+        "update.download": "2.8.9 更新ファイルをダウンロード",
         "update.channel.desc": "Google Play からインストールした方は、Google Play で更新してください。このページの更新はクローズドテストへの参加手続きではなく、12人のテスター数にも含まれません。",
         "update.channel.title": "インストール元に合わせて更新",
         "update.intro": "このページは、既にサイドロード版をインストールしている方向けの更新案内です。",
-        "update.title": "Android 2.8.8 に更新",
+        "update.title": "Android 2.8.9 に更新",
         "update.kicker": "既存のサイドロード版をご利用の方へ",
         "update.back": "ホームに戻る",
-        "update.meta.description": "既存のサイドロード版利用者向け Android 2.8.8 更新案内。Google Play クローズドテストの参加手続きとは異なります。",
-        "update.meta.title": "SGH Voice — Android サイドロード版 2.8.8 更新",
-        "update.entry": "サイドロード版をご利用中の方：2.8.8 更新案内",
+        "update.meta.description": "既存のサイドロード版利用者向け Android 2.8.9 更新案内。Google Play クローズドテストの参加手続きとは異なります。",
+        "update.meta.title": "SGH Voice — Android サイドロード版 2.8.9 更新",
+        "update.entry": "サイドロード版をご利用中の方：2.8.9 更新案内",
         "writing.preview": "「文章作成」では長い考えを整理し、プレビューを確認してから挿入できます。文章整理や語彙のヒントは認識精度を保証するものではありません。",
         "download.android.submitted": "申請受付済み・招待待ち",
         "download.android.success": "申請を受け付けました。招待の手配をお待ちください。Google Play のテスト資格はまだ付与されておらず、メールもまだ送信していません。自動ダウンロードはありません。",
@@ -30,9 +31,9 @@ const translations = {
         "demo.dictate": "音声入力",
         "demo.write": "文章作成",
         "demo.hint": "一つの円で、録音の開始と終了",
-        "demo.caption": "2.8.7 UI プレビュー・実機での録音検証ではありません",
+        "demo.caption": "2.8.9 UI プレビュー・実機での録音検証ではありません",
         "compact.keyboard.title": "4つの入力を切り替え",
-        "compact.keyboard.desc": "各モードで高さを調整可能。英語の Space／Enter、日本語のタップ・フリック入力時のカーソル処理を改善し、録音画面も穏やかに。",
+        "compact.keyboard.desc": "高さを調整できる共通レイアウト。注音の候補を拡大し、選び直し・絵文字・英日オフライン辞書を追加しました。",
         "compact.learning.title": "短い修正は、確認してから。",
         "compact.learning.desc": "短い語句の修正は確認待ちに。別の音声入力で繰り返し確認するか、手動で確認すると有効になります。確認・取り消し・消去も可能です。",
         "compact.details": "入力・学習・一時保存について",
@@ -200,24 +201,25 @@ const translations = {
     },
 
     zh: {
-        "update.cleanup": "改善聽寫後的標點、分段及無意義贅詞、口吃整理，讓移除「啊、呃、嗯」後的文字自然接回句子。",
-        "update.preserve": "保留有意義的「然後」、刻意的省略號、語氣與原本語言；不補編沒說出的內容，姓名、數字、否定、劑量與單位仍須核對。",
-        "update.fallback": "若偵測到整理結果新增省略號代替贅詞，或變更受保護內容，會退回原逐字稿並顯示提示；AI 整理與實機收音品質仍需確認。",
+        "update.cleanup": "長段語音缺少標點時，可再嘗試一次只補標點、不改文字的整理；仍保留原有的數值與否定保護。",
+        "update.preserve": "注音候選加大，能先選前段、保留後面的注音；剛選錯可按「重選」。新增常用 emoji，日文可直接確認假名。",
+        "update.fallback": "英文離線詞庫新增 45,371 詞，日文擴至 32,005 候選。同欄位重新連接與錄音亮屏處理已改善；真實手機操作仍請回報。",
+        "update.punctuation.notice": "標點補救只在已啟用 AI 且符合條件時觸發，可能增加一次 API 費用與等待；失敗仍保留原文，不保證辨識或標點完全正確。",
         "update.support": "聯絡更新支援",
         "update.apply": "第一次使用？申請 Google Play 測試",
-        "update.changes": "2.8.8 更新重點",
+        "update.changes": "2.8.9 更新重點",
         "update.safety": "測試版可能不穩定，請先備份重要資料，並保持 Google Play Protect 開啟。",
         "update.install": "保留既有 App，開啟下載的更新檔進行更新。若無法更新，請保留錯誤訊息並聯絡支援。",
-        "update.download": "下載 2.8.8 更新檔",
+        "update.download": "下載 2.8.9 更新檔",
         "update.channel.desc": "從 Google Play 安裝的使用者，請繼續透過 Google Play 更新。此頁側載更新不等於加入封閉測試，也不計入 12 人測試人數。",
         "update.channel.title": "沿用原本的更新管道",
         "update.intro": "此頁提供已安裝側載版使用者更新；請先確認原本的安裝來源。",
-        "update.title": "更新 Android 2.8.8",
+        "update.title": "更新 Android 2.8.9",
         "update.kicker": "給已安裝側載版的使用者",
         "update.back": "回到首頁",
-        "update.meta.description": "提供既有 Android 側載使用者的 2.8.8 更新說明。此更新不等於加入 Google Play 封閉測試。",
-        "update.meta.title": "SGH Voice — Android 側載版 2.8.8 更新",
-        "update.entry": "已安裝側載版？查看 2.8.8 更新",
+        "update.meta.description": "提供既有 Android 側載使用者的 2.8.9 更新說明。此更新不等於加入 Google Play 封閉測試。",
+        "update.meta.title": "SGH Voice — Android 側載版 2.8.9 更新",
+        "update.entry": "已安裝側載版？查看 2.8.9 更新",
         "writing.preview": "選「幫我寫」可整理較長想法，預覽成稿後再插入。整理與詞彙提示不保證辨識準確率。",
         "download.android.submitted": "已收到申請，等待邀請",
         "download.android.success": "已收到申請，等待安排邀請。這不代表已取得 Google Play 測試資格；目前尚未寄出郵件，也不會自動下載。",
@@ -230,9 +232,9 @@ const translations = {
         "demo.dictate": "語音輸入",
         "demo.write": "幫我寫",
         "demo.hint": "一個圓，開始與結束錄音",
-        "demo.caption": "2.8.7 介面預覽 · 非實機收音驗證",
+        "demo.caption": "2.8.9 介面預覽 · 非實機收音驗證",
         "compact.keyboard.title": "四種輸入，隨時切換",
-        "compact.keyboard.desc": "共用可調高度；改善英文 Space／Enter、日文點按與 flick 滑動輸入的游標處理，錄音介面更柔和。",
+        "compact.keyboard.desc": "共用可調高度；注音候選加大、可重選，新增 emoji 及英日離線詞庫，減少來回改字的操作。",
         "compact.learning.title": "短詞修正，確認後記住。",
         "compact.learning.desc": "短詞修正先待確認；不同次語音重複確認，或手動確認後才生效。可查看、撤銷或清除。",
         "compact.details": "輸入方式、學習與暫存說明",
@@ -400,24 +402,25 @@ const translations = {
     },
 
     en: {
-        "update.cleanup": "Improves punctuation, paragraphing, and removal of meaningless fillers and clear stutters after transcription, so removing sounds such as um or uh leaves natural sentences.",
-        "update.preserve": "Preserves meaningful transitions such as then, intentional ellipses, tone, and the original languages without inventing missing content. Review names, numbers, negation, doses, and units.",
-        "update.fallback": "Detected replacements of fillers with new ellipses or changes to protected content trigger a source-transcript fallback with a notice. AI cleanup and real-device recording quality still need review.",
+        "update.cleanup": "Long dictations without punctuation can receive one formatting-only retry without changing the words. Existing number and negation safeguards remain enabled.",
+        "update.preserve": "Larger Zhuyin candidates let you select the beginning while keeping the remaining sounds. Undo the most recent choice, insert common emoji, or confirm Japanese kana without conversion.",
+        "update.fallback": "Adds 45,371 offline English words and expands Japanese to 32,005 candidates. Improves same-field recording reconnection and keeps the screen on while recording. Real-device feedback is still needed.",
+        "update.punctuation.notice": "Punctuation recovery only runs when AI is enabled and conditions are met. It may add one API charge and extra waiting time. Failure keeps the source; recognition and punctuation accuracy are not guaranteed.",
         "update.support": "Contact update support",
         "update.apply": "New here? Apply for the Google Play test",
-        "update.changes": "What's new in 2.8.8",
+        "update.changes": "What's new in 2.8.9",
         "update.safety": "Test builds may be unstable. Back up important data and keep Google Play Protect enabled.",
         "update.install": "Keep the existing app installed and open the downloaded update file. If the update cannot install, save the error message and contact support.",
-        "update.download": "Download the 2.8.8 update",
+        "update.download": "Download the 2.8.9 update",
         "update.channel.desc": "If you installed from Google Play, continue updating through Google Play. Sideloading this update does not join the closed test or count toward the 12 testers.",
         "update.channel.title": "Keep your original update channel",
         "update.intro": "This update is for people who already have the sideloaded version. Check your original installation source first.",
-        "update.title": "Update to Android 2.8.8",
+        "update.title": "Update to Android 2.8.9",
         "update.kicker": "FOR EXISTING SIDELOAD USERS",
         "update.back": "Back to home",
-        "update.meta.description": "Android 2.8.8 update for existing sideload users. This does not join the Google Play closed test.",
-        "update.meta.title": "SGH Voice — Android sideload update 2.8.8",
-        "update.entry": "Already using a sideloaded version? Update to 2.8.8",
+        "update.meta.description": "Android 2.8.9 update for existing sideload users. This does not join the Google Play closed test.",
+        "update.meta.title": "SGH Voice — Android sideload update 2.8.9",
+        "update.entry": "Already using a sideloaded version? Update to 2.8.9",
         "writing.preview": "Choose Help me write to organize longer thoughts, then review the draft before inserting. Cleanup and vocabulary hints do not guarantee recognition accuracy.",
         "download.android.submitted": "Application received · awaiting invitation",
         "download.android.success": "Application received. Please wait while we arrange invitations. Google Play test access has not been granted and no email has been sent yet. No download will start automatically.",
@@ -430,9 +433,9 @@ const translations = {
         "demo.dictate": "Dictate",
         "demo.write": "Help me write",
         "demo.hint": "One circle to start and stop recording",
-        "demo.caption": "2.8.7 UI preview · not a real-device recording test",
+        "demo.caption": "2.8.9 UI preview · not a real-device recording test",
         "compact.keyboard.title": "Four ways to type",
-        "compact.keyboard.desc": "Shared adjustable height, improved English Space/Enter and cursor handling for Japanese tap and flick input, with a softer recording interface.",
+        "compact.keyboard.desc": "Shared adjustable height, larger Zhuyin candidates with reselection, common emoji, and expanded offline English and Japanese dictionaries.",
         "compact.learning.title": "Confirm short corrections first.",
         "compact.learning.desc": "Short corrections start as pending. They become active after repeated confirmation across separate dictations, or manual confirmation. Review, undo, or clear them.",
         "compact.details": "Input, learning, and temporary storage",
@@ -606,7 +609,6 @@ const META_LOCALE = { ja: "ja_JP", zh: "zh_TW", en: "en_US" };
 
 function setLanguage(lang) {
     const normalized = translations[lang] ? lang : "zh";
-    localStorage.setItem("sgh_lang", normalized);
 
     const url = new URL(window.location.href);
     url.searchParams.set("lang", normalized);
@@ -616,6 +618,9 @@ function setLanguage(lang) {
 
 function applyLanguage(lang) {
     const normalized = translations[lang] ? lang : "zh";
+    // Keep query-selected language when navigating to the update page too.
+    // Storage restrictions must not stop translation rendering.
+    try { localStorage.setItem("sgh_lang", normalized); } catch (_) {}
     const data = translations[normalized];
 
     document.querySelectorAll("[data-i18n]").forEach((element) => {
@@ -664,7 +669,8 @@ function detectInitialLang() {
     const queryLanguage = new URLSearchParams(window.location.search).get("lang");
     if (queryLanguage && translations[queryLanguage]) return queryLanguage;
 
-    const savedLanguage = localStorage.getItem("sgh_lang");
+    let savedLanguage;
+    try { savedLanguage = localStorage.getItem("sgh_lang"); } catch (_) {}
     if (savedLanguage && translations[savedLanguage]) return savedLanguage;
 
     const browserLanguage = (navigator.language || "en").toLowerCase();
