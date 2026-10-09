@@ -26,6 +26,8 @@ class DictionaryManager internal constructor(
         private const val PREF_NAME = "sgh_voice_dictionary"
         private const val KEY_CUSTOM_WORDS = "custom_words"
         private const val KEY_CORRECTIONS = "corrections"
+        private const val KEY_SCENE_WORDS_PREFIX = "scene_custom_words."
+        const val MAX_SCENE_CUSTOM_WORDS = 100
 
         /**
          * 內部基礎詞庫 — 提升辨識精度，不在 UI 顯示
@@ -62,7 +64,7 @@ class DictionaryManager internal constructor(
             "Cloud Haiku" to "Claude Haiku",
         )
 
-        // ─── 使用場景預設（同步自 macOS config.py SCENE_PRESETS）───
+        // ─── 使用場景預設；僅提供拼字與格式參考，不是新增事實的來源。───
         data class ScenePreset(
             val label: String,
             val customWords: List<String>,
@@ -76,6 +78,29 @@ class DictionaryManager internal constructor(
                 customWords = emptyList(),
                 corrections = emptyMap(),
                 systemPromptExtra = ""
+            ),
+            "software_development" to ScenePreset(
+                label = "軟體開發",
+                customWords = listOf(
+                    "GitHub", "GitHub Actions", "CI/CD", "git push", "pull request",
+                    "TypeScript", "Kotlin", "Firebase", "Gradle", "API", "WebSocket",
+                    "commit", "deployment", "Docker"
+                ),
+                corrections = emptyMap(),
+                systemPromptExtra = "軟體開發場景：保留原文中的產品名、程式碼、指令與檔名拼寫；" +
+                    "不把普通詞擅自改成產品名，不新增操作步驟、技術細節或事實。" +
+                    "依原文意思補標點和分段，不改變語言。"
+            ),
+            "business_japanese" to ScenePreset(
+                label = "商務日文",
+                customWords = listOf(
+                    "見積書", "請求書", "納期", "契約書", "発注書", "稟議", "議事録",
+                    "ご確認", "お打ち合わせ", "担当者", "取引先", "お世話になっております"
+                ),
+                corrections = emptyMap(),
+                systemPromptExtra = "商務日文場景：若原文為日文，保留原本敬語程度；" +
+                    "不因場景而翻譯語言，不額外加入寒暄、敬稱、姓名、日期、金額或承諾。" +
+                    "依原文意思補標點與分段，不新增事實。"
             ),
             "medical" to ScenePreset(
                 label = "醫療・藥品・生技",
@@ -134,8 +159,8 @@ class DictionaryManager internal constructor(
 
     /** 目前啟用的場景 */
     var activeScene: String
-        get() = prefs.getString("active_scene", "general") ?: "general"
-        set(value) { prefs.edit().putString("active_scene", value).apply() }
+        get() = prefs.getString("active_scene", "general")?.takeIf { it in SCENE_PRESETS } ?: "general"
+        set(value) { prefs.edit().putString("active_scene", value.takeIf { it in SCENE_PRESETS } ?: "general").apply() }
 
     init {
         loadCustomWords()
@@ -156,7 +181,8 @@ class DictionaryManager internal constructor(
             // Only 已生效 words; 待確認 words stay on the device until confirmed.
             learnedWords = if (includePersonalization) personalization.getPromptWords(limit = 50) else emptyList(),
             sceneWords = sceneWords,
-            baseWords = BASE_CUSTOM_WORDS
+            baseWords = BASE_CUSTOM_WORDS,
+            sceneCustomWords = getSceneCustomWords()
         )
     }
 
@@ -172,7 +198,8 @@ class DictionaryManager internal constructor(
             learnedWords = if (includePersonalization) learnedLlmWords() else emptyList(),
             sceneWords = scene?.customWords ?: emptyList(),
             baseWords = BASE_CUSTOM_WORDS,
-            corrections = BASE_CORRECTIONS + (scene?.corrections ?: emptyMap()) + corrections
+            corrections = BASE_CORRECTIONS + (scene?.corrections ?: emptyMap()) + corrections,
+            sceneCustomWords = getSceneCustomWords()
         )
     }
 
@@ -251,6 +278,41 @@ class DictionaryManager internal constructor(
      */
     fun getSceneSystemPromptExtra(): String {
         return SCENE_PRESETS[activeScene]?.systemPromptExtra ?: ""
+    }
+
+    /** Local, manually entered scene terms. These never create literal replacement rules. */
+    fun getSceneCustomWords(sceneId: String = activeScene): List<String> {
+        if (sceneId !in SCENE_PRESETS) return emptyList()
+        return runCatching {
+            val raw = prefs.getString(KEY_SCENE_WORDS_PREFIX + sceneId, null) ?: return emptyList()
+            val array = JSONArray(raw)
+            (0 until array.length()).asSequence()
+                .mapNotNull { VocabularyHintPolicy.sanitizeTerm(array.optString(it)) }
+                .distinctBy { it.lowercase(java.util.Locale.ROOT) }
+                .take(MAX_SCENE_CUSTOM_WORDS)
+                .toList()
+        }.getOrDefault(emptyList())
+    }
+
+    /** Returns false for invalid, duplicate or over-limit terms; cloud prompt budgets still apply. */
+    fun addSceneCustomWord(word: String, sceneId: String = activeScene): Boolean {
+        if (sceneId !in SCENE_PRESETS) return false
+        val normalized = VocabularyHintPolicy.sanitizeTerm(word) ?: return false
+        val words = getSceneCustomWords(sceneId)
+        if (words.size >= MAX_SCENE_CUSTOM_WORDS || words.any { it.equals(normalized, ignoreCase = true) }) return false
+        saveSceneCustomWords(sceneId, words + normalized)
+        return true
+    }
+
+    fun removeSceneCustomWord(word: String, sceneId: String = activeScene) {
+        if (sceneId !in SCENE_PRESETS) return
+        saveSceneCustomWords(sceneId, getSceneCustomWords(sceneId).filterNot { it == word })
+    }
+
+    private fun saveSceneCustomWords(sceneId: String, words: List<String>) {
+        val array = JSONArray()
+        words.forEach { array.put(it) }
+        prefs.edit().putString(KEY_SCENE_WORDS_PREFIX + sceneId, array.toString()).apply()
     }
 
     /**

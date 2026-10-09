@@ -31,6 +31,115 @@ import java.util.Locale
 @Config(sdk = [35], qualifiers = "w393dp-h852dp-xxhdpi")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class ZhuyinCandidateUiTest {
+    @Test fun `typing and clearing zhuyin never moves or resizes any key`() {
+        val view = keyboard()
+        val rows = view.findViewById<LinearLayout>(R.id.manual_key_rows)
+        fun keyBounds(): List<List<Int>> = (0 until rows.childCount).flatMap { rowIndex ->
+            val row = rows.getChildAt(rowIndex) as LinearLayout
+            (0 until row.childCount).map { keyIndex ->
+                val key = row.getChildAt(keyIndex)
+                val location = IntArray(2).also(key::getLocationInWindow)
+                listOf(location[0], location[1], key.width, key.height)
+            }
+        }
+        val idleBounds = keyBounds()
+        view.updateCandidates("ㄓ", listOf("知", "之", "只", "支", "枝"))
+        measure(view)
+        ShadowLooper.idleMainLooper()
+        measure(view)
+        assertEquals("The first phonetic key must not push the entire keyboard down", idleBounds, keyBounds())
+        view.updateCandidates("", emptyList())
+        measure(view)
+        assertEquals("Clearing composition must not move keys back up", idleBounds, keyBounds())
+    }
+
+    @Test fun `candidate states retain every key target on narrow large text and resized keyboards`() {
+        for (width in listOf(320, 393)) for (fontScale in listOf(1f, 1.5f)) {
+            val view = keyboard(width, fontScale)
+            for (percent in listOf(90, 100, 125)) {
+                view.setKeyboardHeightPercent(percent)
+                view.updateCandidates("", emptyList())
+                measure(view, width)
+                val rows = view.findViewById<LinearLayout>(R.id.manual_key_rows)
+                fun bounds(): List<List<Int>> = (0 until rows.childCount).flatMap { rowIndex ->
+                    val row = rows.getChildAt(rowIndex) as LinearLayout
+                    (0 until row.childCount).map { index ->
+                        val key = row.getChildAt(index)
+                        val xy = IntArray(2).also(key::getLocationInWindow)
+                        listOf(xy[0], xy[1], key.width, key.height)
+                    }
+                }
+                val expected = bounds()
+                val expectedHeight = view.height
+                for ((reading, choices) in listOf(
+                    "ㄓ" to listOf("知", "之", "只", "支", "枝", "織"),
+                    "ㄅㄨˋ ㄓ ㄉㄠˋ ㄓ" to listOf("不知道", "不知", "不"),
+                    "ㄅㄆㄇㄈ" to emptyList(),
+                    "" to listOf("謝謝", "好的"),
+                    "" to emptyList()
+                )) {
+                    view.updateCandidates(reading, choices)
+                    measure(view, width)
+                    ShadowLooper.idleMainLooper()
+                    measure(view, width)
+                    assertEquals("$width / $fontScale / $percent / $reading", expected, bounds())
+                    assertEquals(expectedHeight, view.height)
+                }
+                populate(view, width)
+                view.findViewById<View>(R.id.btn_expand_candidates).performClick()
+                measure(view, width)
+                view.findViewById<View>(R.id.btn_expand_candidates).performClick()
+                measure(view, width)
+                assertEquals("Explicit expansion must return to identical key targets", expected, bounds())
+            }
+        }
+    }
+
+    @Test fun `manual languages share the same key area origin and footprint`() {
+        val view = keyboard()
+        val rows = view.findViewById<LinearLayout>(R.id.manual_key_rows)
+        val expected = IntArray(2).also(rows::getLocationInWindow).toList()
+        val expectedHeight = rows.height
+        for (mode in listOf(KeyboardView.InputMode.ZHUYIN, KeyboardView.InputMode.JAPANESE,
+            KeyboardView.InputMode.ENGLISH)) {
+            view.setInputMode(mode)
+            for (composition in listOf("", "test")) {
+                view.updateCandidates(composition, if (composition.isEmpty()) emptyList() else listOf("候選"))
+                measure(view)
+                assertEquals(mode.name, expected, IntArray(2).also(rows::getLocationInWindow).toList())
+                assertEquals(mode.name, expectedHeight, rows.height)
+            }
+        }
+        view.setInputMode(KeyboardView.InputMode.JAPANESE)
+        view.setJapaneseInputStyle(com.shingihou.sghvoice.ime.japanese.JapaneseInputStyle.KANA_12_KEY)
+        measure(view)
+        assertEquals(expected, IntArray(2).also(rows::getLocationInWindow).toList())
+        assertEquals(expectedHeight, rows.height)
+    }
+
+    @Test fun `continuous draft offers faithful organization separately from writing`() {
+        val view = keyboard()
+        val listener = mock<KeyboardView.KeyboardActionListener>()
+        view.setKeyboardActionListener(listener)
+        view.setInputMode(KeyboardView.InputMode.VOICE)
+        view.setVoiceActionMode(KeyboardView.VoiceActionMode.COMPOSE)
+        view.setDraftActions(true, false)
+        view.setDraftPreview("第一段想法\n第二段想法")
+        measure(view)
+        val generate = view.findViewById<View>(R.id.btn_compose_generate)
+        generate.performClick()
+        verify(listener, never()).onComposeGenerate()
+        verify(listener, never()).onComposeOrganize()
+        val menu = org.robolectric.shadows.ShadowPopupMenu.getLatestPopupMenu()
+        assertEquals(2, menu.menu.size())
+        menu.menu.performIdentifierAction(1, 0)
+        verify(listener).onComposeOrganize()
+        verify(listener, never()).onComposeGenerate()
+        generate.performClick()
+        org.robolectric.shadows.ShadowPopupMenu.getLatestPopupMenu().menu.performIdentifierAction(2, 0)
+        verify(listener).onComposeGenerate()
+    }
+
     private fun measure(view: KeyboardView, widthDp: Int = 393, heightDp: Int = 852) {
         val density = view.resources.displayMetrics.density
         view.measure(
@@ -183,8 +292,6 @@ class ZhuyinCandidateUiTest {
 
     @Test fun `render current native candidate strip and expanded list`() {
         val view = keyboard(locale = Locale.TAIWAN)
-        populate(view)
-        view.setZhuyinReselectAvailable(true)
         val output = File("build/reports/keyboard-preview").apply { mkdirs() }
         fun capture(name: String) {
             measure(view)
@@ -193,7 +300,31 @@ class ZhuyinCandidateUiTest {
             File(output, name).outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
             bitmap.recycle()
         }
+        capture("zhuyin-stable-idle-100.png")
+        populate(view)
+        view.setZhuyinReselectAvailable(true)
         capture("zhuyin-candidates-100.png")
+        view.updateCandidates("ㄓ", listOf("知", "之", "只", "支", "枝", "織"))
+        measure(view)
+        ShadowLooper.idleMainLooper()
+        capture("zhuyin-stable-typing-100.png")
+        // Side-by-side native View render: no personal app content or designed mockup.
+        val idle = keyboard(locale = Locale.TAIWAN)
+        // Opening the second Activity can let the first window remeasure full-screen.
+        // Restore both IME constraints before drawing their actual native Views.
+        measure(idle)
+        measure(view)
+        assertEquals(idle.height, view.height)
+        val comparison = Bitmap.createBitmap(view.width * 2, view.height, Bitmap.Config.ARGB_8888)
+        val comparisonCanvas = Canvas(comparison)
+        idle.draw(comparisonCanvas)
+        comparisonCanvas.translate(view.width.toFloat(), 0f)
+        view.draw(comparisonCanvas)
+        File(output, "zhuyin-stable-comparison.png").outputStream().use {
+            comparison.compress(Bitmap.CompressFormat.PNG, 100, it)
+        }
+        comparison.recycle()
+        populate(view)
         view.findViewById<View>(R.id.btn_expand_candidates).performClick()
         capture("zhuyin-candidates-expanded-100.png")
     }

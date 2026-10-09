@@ -4,6 +4,7 @@ import com.shingihou.sghvoice.api.LlmClient
 import com.shingihou.sghvoice.api.WhisperClient
 import com.shingihou.sghvoice.api.CloudProcessingConsentException
 import com.shingihou.sghvoice.api.TranslationException
+import com.shingihou.sghvoice.api.ComposeException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -24,6 +25,12 @@ class TranscriptionPipeline(
     private val openCCConverter: OpenCCConverter,
     private val cloudProcessingAllowed: () -> Boolean
 ) {
+
+    /** Per-operation, content-free timings. Never persisted or uploaded. */
+    data class Timings(val recognitionMs: Long, val textProcessingMs: Long, val totalMs: Long)
+
+    private fun elapsedMs(started: Long): Long =
+        ((System.nanoTime() - started) / 1_000_000L).coerceAtLeast(0)
 
     /**
      * 處理結果封裝
@@ -46,7 +53,8 @@ class TranscriptionPipeline(
          * Dictation only: the text the user would have seen without AI cleanup (STT after the
          * same dictionary/OpenCC passes). Learning may only learn spans that came from it.
          */
-        val learningBaseline: String = ""
+        val learningBaseline: String = "",
+        val timings: Timings? = null
     )
 
     /**
@@ -97,6 +105,7 @@ class TranscriptionPipeline(
         includePersonalization: Boolean = false,
         recentContext: () -> String = { "" }
     ): Result {
+        val startedAt = System.nanoTime()
         try {
             currentCoroutineContext().ensureActive()
             requireCloudProcessingConsent()
@@ -105,6 +114,7 @@ class TranscriptionPipeline(
             val whisperPrompt = dictionaryManager.buildWhisperPrompt(includePersonalization)
             requireCloudProcessingConsent()
             val rawText = whisperClient.transcribe(wavData, whisperPrompt)
+            val recognitionMs = elapsedMs(startedAt)
             // Focus handoff may keep this operation alive. Re-check consent after
             // STT before reading learned data or starting another cloud request.
             currentCoroutineContext().ensureActive()
@@ -116,6 +126,7 @@ class TranscriptionPipeline(
                 return result
             }
             callback?.onWhisperCompleted(rawText)
+            val textStartedAt = System.nanoTime()
 
             // === 第二層：詞庫修正 ===
             val correctedText = dictionaryManager.applyCorrections(rawText, includePersonalization)
@@ -136,8 +147,11 @@ class TranscriptionPipeline(
                     processTranslation(correctedText, rawText, task.request, callback, allowedContext)
             }
             currentCoroutineContext().ensureActive()
-            callback?.onCompleted(result)
-            return result
+            val measuredResult = result.copy(timings = Timings(
+                recognitionMs, elapsedMs(textStartedAt), elapsedMs(startedAt)
+            ))
+            callback?.onCompleted(measuredResult)
+            return measuredResult
 
         } catch (error: CancellationException) {
             throw error
@@ -155,6 +169,27 @@ class TranscriptionPipeline(
                 error = errorMsg
             )
         }
+    }
+
+    /**
+     * Explicit, faithful organization of the entire in-memory draft. Unlike a writing brief,
+     * these segments are inert speech: never execute a dictated instruction or invent an answer.
+     * A failed/disabled guard must leave the original draft available, not mark raw text as done.
+     */
+    suspend fun organizeNotes(notes: String, includePersonalization: Boolean = false): String {
+        currentCoroutineContext().ensureActive()
+        requireCloudProcessingConsent()
+        if (notes.isBlank() || notes.length > VoiceDraftState.MAX_COMPOSE_CHARACTERS) {
+            throw ComposeException("Draft is empty or too long.")
+        }
+        val result = processDictation(notes, notes, null, includePersonalization, { "" })
+        currentCoroutineContext().ensureActive()
+        requireCloudProcessingConsent()
+        if (result.refinementStatus != LlmClient.RefinementStatus.APPLIED || result.text.isBlank() ||
+            result.text.length > VoiceDraftState.MAX_PENDING_CHARACTERS) {
+            throw ComposeException("Draft organization was unavailable or rejected.")
+        }
+        return result.text
     }
 
     /** Compose only after the user confirms all captured segments. No dictation fallback. */

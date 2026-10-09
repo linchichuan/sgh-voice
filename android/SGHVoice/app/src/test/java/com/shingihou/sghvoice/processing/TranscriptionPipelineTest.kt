@@ -6,6 +6,9 @@ import com.shingihou.sghvoice.api.CloudProcessingConsentException
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertSame
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.mockito.Mock
@@ -70,6 +73,10 @@ class TranscriptionPipelineTest {
         assertEquals("我的公司是新義豊，在 Fukuoka。", result.text)
         assertEquals(true, result.success)
         assertEquals(LlmClient.RefinementStatus.APPLIED, result.refinementStatus)
+        assertNotNull(result.timings)
+        assertTrue(result.timings!!.recognitionMs >= 0)
+        assertTrue(result.timings.textProcessingMs >= 0)
+        assertTrue(result.timings.totalMs >= result.timings.recognitionMs + result.timings.textProcessingMs)
     }
 
     @Test
@@ -109,14 +116,28 @@ class TranscriptionPipelineTest {
                 )
             )
 
+            var completed: TranscriptionPipeline.Result? = null
+            val callback = object : TranscriptionPipeline.ProgressCallback {
+                override fun onWhisperStarted() = Unit
+                override fun onWhisperCompleted(text: String) = Unit
+                override fun onLlmStarted() = Unit
+                override fun onCompleted(result: TranscriptionPipeline.Result) { completed = result }
+                override fun onError(error: String) = Unit
+            }
             val result = pipeline.process(
                 rawWav,
-                VoiceTask.Translation(request)
+                VoiceTask.Translation(request), callback
             )
 
             assertEquals(true, result.success)
             assertEquals("請確認明天的時間", result.translations[0].text)
             assertEquals("明日の時間をご確認ください", result.translations[1].text)
+            assertSame(result, completed)
+            assertNotNull(result.timings)
+            assertTrue(result.timings!!.totalMs >= result.timings.recognitionMs + result.timings.textProcessingMs)
+            verify(whisperClient, times(1)).transcribe(any(), any())
+            verify(llmClient, times(1)).translate(correctedSource, request)
+            verify(llmClient, times(0)).refineDictation(any(), any(), any(), any(), any())
             verify(dictionaryManager, times(1)).applyCorrections(rawText)
             Unit
         }

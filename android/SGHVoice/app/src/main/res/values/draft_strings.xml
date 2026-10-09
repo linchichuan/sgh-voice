@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="draft_organize_choice">整理原話（不代寫）</string>
+    <string name="draft_write_choice">幫我寫（按指令代寫）</string>
+    <string name="draft_organizing">正在整理本次全部段落…</string>
+    <string name="voice_dictation_timing">完成・辨識 %1$.1f 秒・整理 %2$.1f 秒</string>
+    <string name="voice_translation_timing">完成・辨識 %1$.1f 秒・翻譯 %2$.1f 秒</string>
+</resources>

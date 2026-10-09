@@ -17,8 +17,8 @@
 
 ### Android capabilities
 
-- Current sideload update: Android 2.8.9, versionCode 39, 17.9 MB. Existing sideload users can find update instructions at https://voice.shingihou.com/android-update.html; Google Play installations should keep updating through Google Play. This does not grant closed-test membership or count toward the 12 testers
-- The 2.8.9 landing-page image is a UI preview, not evidence of real-device audio capture or recognition accuracy
+- Current sideload update: Android 2.8.10, versionCode 40, 17.9 MB. Existing sideload users can find update instructions at https://voice.shingihou.com/android-update.html; Google Play installations should keep updating through Google Play. This does not grant closed-test membership or count toward the 12 testers
+- The 2.8.10 landing-page image is a UI preview, not evidence of real-device audio capture or recognition accuracy
 - Four modes in one Android input method: Voice, Zhuyin, Japanese, and English
 - All four modes share one height based on the original Zhuyin size; adjust it in Settings from 90% to 125% in 5% steps, or reset to 100%. Small windows apply a common height limit and scrolling where needed
 - The original Shingihou company logo sits directly beside the larger SGH label as one centred brand group at the top left of the keyboard
@@ -60,7 +60,7 @@
 - 2.8.6 refines the light mint recording surface and joins the original company logo with a larger, centred SGH label
 - 2.8.7 refines conservative cleanup, confirmation-gated short vocabulary memory, English and Japanese input handling, and the soft recording interface. Vocabulary memory is local personalization, not model training; neither cleanup nor vocabulary hints guarantee recognition accuracy
 - 2.8.8 improves filler and stutter cleanup while preserving meaningful transitions, intentional ellipses, language, and tone. Detected new ellipses replacing fillers or changes to protected content trigger the existing source-transcript fallback and notice
-- 2.8.9 adds larger Zhuyin candidates, prefix selection with the remaining sounds preserved, and a guarded one-step reselection. It adds common emoji, direct kana confirmation, 45,371 offline English corpus words and 32,005 Japanese candidates. These dictionaries are local candidate lookup, not cloud model training or full spelling correction
+- 2.8.10 keeps Zhuyin keys stationary while typing, restores the English number row, and arranges Japanese twelve-key input between left and right function columns. It adds selectable development/business Japanese vocabulary and continuous-draft organization with preview before insertion, plus punctuation and negation safeguards. Pending vocabulary is not sent to recognition. These changes require real-device feedback; they are not evidence of improved recognition accuracy
 - Long unpunctuated dictations may receive at most one additional punctuation-only request to the selected, consented AI provider. This can add cost and latency; guarded failure retains the transcript. Model accuracy and real-device behavior remain unverified
 - Notes, pending drafts and retry audio disappear when the input-method service ends or the device restarts; continuous background recording is not supported
 - Cloud consent is checked before each new request; withdrawal prevents follow-up AI requests and retry uploads

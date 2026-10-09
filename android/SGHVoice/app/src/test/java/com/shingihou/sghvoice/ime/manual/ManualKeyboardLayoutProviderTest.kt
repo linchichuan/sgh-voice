@@ -8,6 +8,33 @@ import org.junit.Test
 class ManualKeyboardLayoutProviderTest {
     private val provider = ManualKeyboardLayoutProvider()
 
+    @Test fun `Japanese phone layout centers twelve keys between two four key rails`() {
+        val layout = provider.layout(ManualKeyboardMode.JAPANESE,
+            japaneseInputStyle = JapaneseInputStyle.KANA_12_KEY)
+        assertEquals("No fifth toolbar below the kana matrix", 4, layout.rows.size)
+        assertTrue(layout.rows.all { it.keys.size == 5 })
+        assertEquals(listOf(listOf("あ", "か", "さ"), listOf("た", "な", "は"),
+            listOf("ま", "や", "ら"), listOf("小゛゜", "わ", "、。?!")),
+            layout.rows.map { it.keys.subList(1, 4).map { key -> key.label } })
+        assertEquals(KeyAction.CursorLeft, layout.rows[1].keys.first().action)
+        assertEquals(KeyAction.CursorRight, layout.rows[1].keys.last().action)
+        assertEquals(KeyAction.Backspace, layout.rows[0].keys.last().action)
+        assertEquals(KeyAction.Enter, layout.rows[3].keys.last().action)
+        layout.rows.forEach { row ->
+            assertEquals(listOf(.75f, 1f, 1f, 1f, .75f), row.keys.map { it.widthWeight })
+        }
+    }
+
+    @Test fun `English always shows a directly tappable number row above the letters`() {
+        for (shift in ShiftState.entries) {
+            val layout = provider.layout(ManualKeyboardMode.ENGLISH, shiftState = shift)
+            assertEquals("1234567890", layout.rows.first().keys.joinToString("") { it.label })
+            assertEquals(5, layout.rows.size)
+            assertEquals("1234567890".map { KeyAction.InsertText(it.toString()) },
+                layout.rows.first().keys.map { it.action })
+        }
+    }
+
     @Test
     fun `English QWERTY reflects shift state and common actions`() {
         val lowercase = provider.layout(ManualKeyboardMode.ENGLISH)
@@ -18,14 +45,14 @@ class ManualKeyboardLayoutProviderTest {
 
         assertEquals(
             "qwertyuiop",
-            lowercase.rows.first().keys.joinToString("") { it.label }
+            lowercase.rows[1].keys.joinToString("") { it.label }
         )
         assertEquals(
             "QWERTYUIOP",
-            uppercase.rows.first().keys.joinToString("") { it.label }
+            uppercase.rows[1].keys.joinToString("") { it.label }
         )
-        assertTrue(lowercase.rows[2].keys.first().action is KeyAction.Shift)
-        assertTrue(lowercase.rows[2].keys.last().action is KeyAction.Backspace)
+        assertTrue(lowercase.rows[3].keys.first().action is KeyAction.Shift)
+        assertTrue(lowercase.rows[3].keys.last().action is KeyAction.Backspace)
         assertTrue(lowercase.rows.last().keys[2].action is KeyAction.Space)
     }
 
@@ -49,21 +76,22 @@ class ManualKeyboardLayoutProviderTest {
     }
 
     @Test
-    fun `Japanese 12 key layout has kana groups and retains Romaji switch`() {
+    fun `Japanese 12 key layout has kana groups and exposes input options`() {
         val layout = provider.layout(
             ManualKeyboardMode.JAPANESE,
             japaneseInputStyle = JapaneseInputStyle.KANA_12_KEY
         )
         val keys = layout.rows.flattenKeys()
 
-        assertEquals(5, layout.rows.size)
-        assertEquals(listOf("あ", "か", "さ"), layout.rows.first().keys.take(3).map { it.label })
+        assertEquals(4, layout.rows.size)
+        assertEquals(listOf("あ", "か", "さ"), layout.rows.first().keys.subList(1, 4).map { it.label })
         assertEquals(10, keys.count { it.action is KeyAction.TapJapaneseKana })
         assertTrue(keys.any { it.action == KeyAction.TransformJapaneseKana })
         assertTrue(keys.any { it.action == KeyAction.CursorLeft })
         assertTrue(keys.any { it.action == KeyAction.CursorRight })
-        assertTrue(keys.any { it.action == KeyAction.ToggleJapaneseScript })
-        assertTrue(keys.any { it.action == KeyAction.ToggleJapaneseLayout && it.label == "ABC" })
+        assertTrue(keys.any { it.action == KeyAction.JapaneseInputOptions })
+        assertTrue(keys.any { it.action == KeyAction.ShowJapaneseCandidates })
+        assertTrue(keys.any { it.action == KeyAction.ReverseJapaneseKana })
         assertTrue(keys.any { it.label == "あ" && "い" in it.alternatives })
         assertTrue(keys.any { it.action == KeyAction.Backspace })
     }
@@ -78,24 +106,23 @@ class ManualKeyboardLayoutProviderTest {
         val columnWeights = keypadRows.first().keys.map { it.widthWeight }
 
         keypadRows.forEach { row ->
-            assertEquals(4, row.keys.size)
+            assertEquals(5, row.keys.size)
             assertEquals(columnWeights, row.keys.map { it.widthWeight })
-            assertEquals(1, row.keys.take(3).map { it.widthWeight }.distinct().size)
-            assertTrue(row.keys.last().widthWeight < row.keys.first().widthWeight)
+            assertEquals(1, row.keys.subList(1, 4).map { it.widthWeight }.distinct().size)
+            assertTrue(row.keys.last().widthWeight < row.keys[1].widthWeight)
+            assertEquals(row.keys.first().widthWeight, row.keys.last().widthWeight)
         }
         assertEquals(
-            listOf(KeyAction.Backspace, KeyAction.CursorLeft,
-                KeyAction.CursorRight, KeyAction.Enter),
+            listOf(KeyAction.Backspace, KeyAction.CursorRight,
+                KeyAction.Space, KeyAction.Enter),
             keypadRows.map { it.keys.last().action }
         )
-        assertEquals("わ", keypadRows.last().keys[1].label)
+        assertEquals("わ", keypadRows.last().keys[2].label)
         assertEquals(
-            listOf(KeyAction.SwitchLayer(KeyboardLayer.NUMBERS),
-                KeyAction.ToggleJapaneseLayout, KeyAction.ToggleJapaneseScript, KeyAction.Space),
-            layout.rows.last().keys.map { it.action }
+            listOf(KeyAction.ReverseJapaneseKana, KeyAction.CursorLeft,
+                KeyAction.ShowJapaneseCandidates, KeyAction.JapaneseInputOptions),
+            layout.rows.map { it.keys.first().action }
         )
-        val bottomKeys = layout.rows.last().keys
-        assertTrue(bottomKeys.last().widthWeight > bottomKeys.dropLast(1).maxOf { it.widthWeight })
     }
 
     @Test

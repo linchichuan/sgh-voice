@@ -1,0 +1,11 @@
+<resources>
+    <string name="japanese_reverse_kana">回到同組上一個假名</string>
+    <string name="japanese_candidates_action">展開日文轉換候選</string>
+    <string name="japanese_confirm_reading">確認原假名，不強制轉成漢字</string>
+    <string name="japanese_enter_action">換行或執行輸入欄位動作</string>
+    <string name="japanese_input_options">日文輸入選項</string>
+    <string name="japanese_switch_katakana">カタカナ（片假名）</string>
+    <string name="japanese_switch_hiragana">ひらがな（平假名）</string>
+    <string name="japanese_switch_romaji">ABC（羅馬字輸入）</string>
+    <string name="japanese_switch_numbers">123（數字與符號）</string>
+</resources>

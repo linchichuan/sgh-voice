@@ -698,6 +698,8 @@ private fun DictionaryTab(
     ) {
         Text(stringResource(R.string.title_dictionary_manage), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
 
+        SceneVocabularyPicker(dictionaryManager)
+
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(
                 modifier = Modifier.padding(16.dp),

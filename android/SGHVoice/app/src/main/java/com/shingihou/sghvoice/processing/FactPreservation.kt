@@ -51,6 +51,23 @@ internal object FactPreservation {
 
     fun countNegations(text: String): Int = NEGATION.findAll(adverbMazu.replace(text, "＿")).count()
 
+    /**
+     * A formatter must not change 「不要部署」 into 「不，要部署」 or 「不，部署」.
+     * Counts alone miss both changes. Keep each negation phrase and whether its
+     * following content was separated by punctuation; ordinary spaces do not
+     * separate English words into clauses. Call after explicit speech repair
+     * normalization so a genuine 「三點，不對，四點」 remains removable.
+     */
+    fun negationBoundarySignature(text: String): List<String> {
+        val neutral = adverbMazu.replace(text, "＿")
+        return NEGATION.findAll(neutral).map { match ->
+            var next = match.range.last + 1
+            while (next < neutral.length && neutral[next] in " \t") next++
+            val joined = next < neutral.length && Character.isLetterOrDigit(neutral.codePointAt(next))
+            "${match.value.lowercase()}:${if (joined) "joined" else "separated"}"
+        }.toList()
+    }
+
     fun containsNumeral(text: String): Boolean = text.any { it in NUMERAL_CHARS }
 
     private fun signature(text: String): List<String> {

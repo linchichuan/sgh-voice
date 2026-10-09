@@ -1,0 +1,11 @@
+<resources>
+    <string name="japanese_reverse_kana">Previous kana in this group</string>
+    <string name="japanese_candidates_action">Show Japanese conversion candidates</string>
+    <string name="japanese_confirm_reading">Confirm kana without converting to kanji</string>
+    <string name="japanese_enter_action">Enter or perform the field action</string>
+    <string name="japanese_input_options">Japanese input options</string>
+    <string name="japanese_switch_katakana">カタカナ (Katakana)</string>
+    <string name="japanese_switch_hiragana">ひらがな (Hiragana)</string>
+    <string name="japanese_switch_romaji">ABC (Romaji input)</string>
+    <string name="japanese_switch_numbers">123 (Numbers and symbols)</string>
+</resources>

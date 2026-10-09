@@ -4,6 +4,12 @@ import com.shingihou.sghvoice.processing.TranslationLanguage
 import com.shingihou.sghvoice.processing.TranslationOutput
 import com.shingihou.sghvoice.processing.TranslationRequest
 import kotlinx.coroutines.runBlocking
+import okhttp3.OkHttpClient
+import okhttp3.Protocol
+import okhttp3.Response
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.ResponseBody.Companion.toResponseBody
+import okio.Buffer
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
@@ -33,6 +39,59 @@ class LlmClientTranslationTest {
         )
         assertTrue(prompt.contains("A question must remain a question"))
         assertTrue(prompt.contains("source_text"))
+        assertTrue(prompt.contains("Restore natural sentence punctuation in every target language"))
+        assertTrue(prompt.contains("short paragraphs at clear topic changes"))
+        assertTrue(prompt.contains("first/second/third points as separate ordered items"))
+        assertTrue(prompt.contains("Perform translation and this formatting in the same response"))
+    }
+
+    @Test
+    fun `four translations and paragraph formatting share one request per provider`() = runBlocking {
+        val source = "今天先測試明天再部署"
+        val context = "上一段是開發排程。"
+        val targetRequest = TranslationRequest.create(TranslationLanguage.entries)
+        val translations = mapOf(
+            "zh-Hant" to "今天先測試，明天再部署。",
+            "ja" to "今日は先にテストし、明日デプロイします。",
+            "en" to "Test today, then deploy tomorrow.",
+            "ko" to "오늘 먼저 테스트하고 내일 배포합니다."
+        )
+        for (engine in listOf("claude", "openai", "groq")) {
+            val payloads = mutableListOf<JSONObject>()
+            val config = mock<ApiConfig>().also {
+                `when`(it.llmEngine).thenReturn(engine)
+                `when`(it.anthropicApiKey).thenReturn("synthetic-test-key")
+                `when`(it.openAiApiKey).thenReturn("synthetic-test-key")
+                `when`(it.groqApiKey).thenReturn("synthetic-test-key")
+                `when`(it.claudeModel).thenReturn("test-model")
+                `when`(it.openAiLlmModel).thenReturn("test-model")
+                `when`(it.groqLlmModel).thenReturn("test-model")
+                `when`(it.hasCloudProcessingConsent).thenReturn(true)
+            }
+            val transport = OkHttpClient.Builder().addInterceptor { chain ->
+                val buffer = Buffer()
+                chain.request().body!!.writeTo(buffer)
+                payloads += JSONObject(buffer.readUtf8())
+                val output = JSONObject().put("translations", JSONArray(translations.map { (tag, text) ->
+                    JSONObject().put("language", tag).put("text", text)
+                })).toString()
+                val reply = JSONObject()
+                    .put("stop_reason", "end_turn")
+                    .put("content", JSONArray().put(JSONObject().put("type", "text").put("text", output)))
+                    .put("choices", JSONArray().put(JSONObject().put("finish_reason", "stop")
+                        .put("message", JSONObject().put("content", output))))
+                Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1).code(200)
+                    .message("OK").body(reply.toString().toResponseBody("application/json".toMediaType())).build()
+            }.build()
+            val result = LlmClient(config, transport).translate(source, targetRequest, context)
+            assertEquals(engine, 4, result.size)
+            assertEquals(engine, 1, payloads.size)
+            val messages = payloads.single().getJSONArray("messages")
+            val sent = JSONObject(messages.getJSONObject(messages.length() - 1).getString("content"))
+            assertEquals(source, sent.getString("source_text"))
+            assertEquals(context, sent.getString("previous_context"))
+            assertTrue(result.none { context in it.text })
+        }
     }
 
     @Test

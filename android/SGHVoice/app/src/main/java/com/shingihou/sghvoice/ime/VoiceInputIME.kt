@@ -667,6 +667,14 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
     }
 
     override fun onComposeGenerate() {
+        generateComposeDraft(organizeOnly = false)
+    }
+
+    override fun onComposeOrganize() {
+        generateComposeDraft(organizeOnly = true)
+    }
+
+    private fun generateComposeDraft(organizeOnly: Boolean) {
         if (voiceActionMode != KeyboardView.VoiceActionMode.COMPOSE ||
             currentState !in setOf(ImeState.IDLE, ImeState.DONE, ImeState.ERROR) ||
             !drafts.hasComposeNotes
@@ -697,15 +705,20 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
         val operationId = voiceOperationId
         val notes = drafts.composeNotes()
         setState(ImeState.PROCESSING)
-        keyboardView?.setStatusText(getString(R.string.voice_compose_processing))
+        keyboardView?.setStatusText(getString(if (organizeOnly) R.string.draft_organizing
+            else R.string.voice_compose_processing))
         composeJob?.cancel()
         composeJob = serviceScope.launch {
             val activePipeline = awaitPipeline(sessionId, operationId) ?: return@launch
             try {
-                val draft = activePipeline.composeNotes(notes)
+                val draft = if (organizeOnly) {
+                    activePipeline.organizeNotes(notes, includePersonalization = personalizationAllowed())
+                } else activePipeline.composeNotes(notes)
                 if (drafts.composeNotes() != notes) return@launch
                 // Generated content always requires review and explicit insertion.
-                drafts.savePending(draft, VoiceDraftState.PendingOrigin.COMPOSED_DRAFT)
+                if (!drafts.savePending(draft, VoiceDraftState.PendingOrigin.COMPOSED_DRAFT)) {
+                    throw ComposeException("Draft exceeds preview limits.")
+                }
                 draftNotice = null
                 if (isCurrentOperation(sessionId, operationId)) {
                     setState(ImeState.DONE)
@@ -1153,6 +1166,15 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
                             if (result.success && textToCommit.isNotBlank()) {
                                 if (targetConnection.commitText(textToCommit, 1)) {
                                     setState(ImeState.DONE)
+                                    // The existing status line shows actual local stage durations,
+                                    // not a provider marketing estimate. Keep error notices higher priority.
+                                    result.timings?.let { timing ->
+                                        keyboardView?.setStatusText(getString(
+                                            if (task is VoiceTask.Translation) R.string.voice_translation_timing
+                                            else R.string.voice_dictation_timing,
+                                            timing.recognitionMs / 1000.0, timing.textProcessingMs / 1000.0
+                                        ))
+                                    }
                                     if (task == VoiceTask.Dictation) {
                                         when (result.refinementStatus) {
                                             LlmClient.RefinementStatus.UNAVAILABLE ->
@@ -1439,6 +1461,9 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
             is KeyAction.TapJapaneseKana,
             KeyAction.TransformJapaneseKana,
             KeyAction.FinalizeJapaneseKana,
+            KeyAction.ReverseJapaneseKana,
+            KeyAction.ShowJapaneseCandidates,
+            KeyAction.JapaneseInputOptions,
             KeyAction.CursorLeft,
             KeyAction.CursorRight,
             is KeyAction.SwitchLayer -> Unit
@@ -1490,6 +1515,9 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
             is KeyAction.TapJapaneseKana,
             KeyAction.TransformJapaneseKana,
             KeyAction.FinalizeJapaneseKana,
+            KeyAction.ReverseJapaneseKana,
+            KeyAction.ShowJapaneseCandidates,
+            KeyAction.JapaneseInputOptions,
             KeyAction.CursorLeft,
             KeyAction.CursorRight,
             is KeyAction.SwitchLayer -> Unit
@@ -1525,6 +1553,13 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
             }
 
             KeyAction.FinalizeJapaneseKana -> japaneseComposer.finalizeKanaTap()
+
+            KeyAction.ReverseJapaneseKana -> {
+                japaneseComposer.reverseKana(SystemClock.uptimeMillis())
+                updateManualUi()
+            }
+            // These are local View actions, never editor writes.
+            KeyAction.ShowJapaneseCandidates, KeyAction.JapaneseInputOptions -> Unit
 
             KeyAction.ToggleJapaneseLayout -> {
                 if (japaneseComposer.hasComposition) commitJapaneseRaw()
@@ -1604,6 +1639,9 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
             is KeyAction.TapJapaneseKana,
             KeyAction.TransformJapaneseKana,
             KeyAction.FinalizeJapaneseKana,
+            KeyAction.ReverseJapaneseKana,
+            KeyAction.ShowJapaneseCandidates,
+            KeyAction.JapaneseInputOptions,
             KeyAction.CursorLeft,
             KeyAction.CursorRight,
             is KeyAction.SwitchLayer -> Unit

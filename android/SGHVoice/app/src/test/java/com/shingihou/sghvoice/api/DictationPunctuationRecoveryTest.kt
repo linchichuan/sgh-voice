@@ -130,6 +130,72 @@ class DictationPunctuationRecoveryTest {
         assertEquals(2, requests.size)
     }
 
+    @Test fun `short Chinese prose receives a local sentence ending without another provider call`() {
+        val source = "今天先測試明天再部署"
+        val expected = "$source。"
+        val (result, requests) = run(source, listOf(source))
+        assertEquals(expected, result.text)
+        assertEquals(1, requests.size)
+    }
+
+    @Test fun `earlier sentence ending does not hide a long unpunctuated tail`() {
+        val source = "好的。今天請林先生買三台電腦明天再付款不要更改金額"
+        val expected = "好的。今天請林先生買三台電腦，明天再付款，不要更改金額。"
+        val (result, requests) = run(source, listOf(source, expected))
+        assertEquals(expected, result.text)
+        assertEquals(2, requests.size)
+    }
+
+    @Test fun `one final period is not enough for a long wall of Chinese text`() {
+        val source = "今天先確認測試報告然後檢查手機畫面明天我們會討論部署安排還要保留原本的功能不要改動登入方式最後請整理這次的測試結果。"
+        val expected = "今天先確認測試報告，然後檢查手機畫面。明天我們會討論部署安排，還要保留原本的功能，不要改動登入方式。最後請整理這次的測試結果。"
+        val (result, requests) = run(source, listOf(source, expected))
+        assertEquals(expected, result.text)
+        assertEquals(2, requests.size)
+    }
+
+    @Test fun `formatting recovery preserves already validated stutter cleanup`() {
+        val source = "GitHub GitHub Actions 今天先測試明天確認後再部署不要更改任何設定"
+        val cleaned = source.replace("GitHub GitHub", "GitHub")
+        val expected = "GitHub Actions 今天先測試，明天確認後再部署，不要更改任何設定。"
+        val (result, requests) = run(source, listOf(cleaned, expected))
+        assertEquals(expected, result.text)
+        assertEquals(2, requests.size)
+        val recoveryPayload = JSONObject(requests[1].getJSONArray("messages")
+            .getJSONObject(1).getString("content"))
+        assertEquals(cleaned, recoveryPayload.getString("source_text"))
+        assertFalse(recoveryPayload.has("previous_context"))
+    }
+
+    @Test fun `isolated names and brief acknowledgements do not cause another provider request`() {
+        for (source in listOf("GitHub", "好的", "新義豊株式会社", "OK", "https://example.com/a/very/long/path",
+            "今天是不是要先測試", "今天可以部署了嗎", "今天需要確認 API", "明日は会議に参加します")) {
+            val (result, requests) = run(source, listOf(source))
+            assertEquals(source, result.text)
+            assertEquals(source, 1, requests.size)
+        }
+    }
+
+    @Test fun `provider transport failure returns original without formatting retry`() {
+        val source = "今天請林先生買三台電腦明天再付款不要更改金額"
+        var calls = 0
+        val (result, _) = run(source, emptyList(), onRequest = {
+            calls++
+            throw java.io.IOException("Synthetic provider failure")
+        })
+        assertEquals(source, result.text)
+        assertEquals(LlmClient.RefinementStatus.UNAVAILABLE, result.status)
+        assertEquals(1, calls)
+    }
+
+    @Test fun `punctuation recovery cannot split a negation into an affirmative clause`() {
+        val source = "今天請不要更改任何設定明天再確認測試結果"
+        val unsafe = "今天請不，要更改任何設定，明天再確認測試結果。"
+        val (result, requests) = run(source, listOf(source, unsafe))
+        assertEquals(source, result.text)
+        assertEquals(2, requests.size)
+    }
+
     @Test fun `recovery changing a number or negation still fails closed without a third request`() {
         val source = "今天請林先生買三台電腦明天再付款不要更改金額"
         val wrong = "今天請王先生買四台電腦，明天再付款，可以更改金額。"

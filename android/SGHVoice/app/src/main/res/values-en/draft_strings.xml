@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="draft_organize_choice">Organize speech (no rewriting)</string>
+    <string name="draft_write_choice">Write from my instructions</string>
+    <string name="draft_organizing">Organizing all segments of this draft…</string>
+    <string name="voice_dictation_timing">Done · speech %1$.1fs · cleanup %2$.1fs</string>
+    <string name="voice_translation_timing">Done · speech %1$.1fs · translation %2$.1fs</string>
+</resources>

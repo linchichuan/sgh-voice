@@ -11,6 +11,8 @@ import android.graphics.PixelFormat
 import android.graphics.Typeface
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.InsetDrawable
+import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.RippleDrawable
 import android.graphics.drawable.StateListDrawable
 import android.text.SpannableString
 import android.text.Spanned
@@ -92,6 +94,7 @@ class KeyboardView @JvmOverloads constructor(
         fun onVoiceActionModeChanged(mode: VoiceActionMode)
         fun onComposeContinue()
         fun onComposeGenerate()
+        fun onComposeOrganize() {}
         fun onComposeClear()
         fun onPendingInsert()
         fun onPendingDiscard()
@@ -166,6 +169,7 @@ class KeyboardView @JvmOverloads constructor(
     private lateinit var compositionSummary: HorizontalScrollView
     private lateinit var compositionSummaryContent: FrameLayout
     private lateinit var inputStrip: LinearLayout
+    private lateinit var manualCandidateHeader: LinearLayout
     private lateinit var zhuyinReselectButton: TextView
     private var zhuyinReselectAvailable = false
     private lateinit var candidateScroller: HorizontalScrollView
@@ -467,6 +471,7 @@ class KeyboardView @JvmOverloads constructor(
             .distinct()
             .take(MAX_RENDERED_CANDIDATES)
             .toList()
+        renderJapaneseUtilityKeys()
         candidateContainer.removeAllViews()
         candidateGrid.removeAllViews()
         candidateScroller.scrollTo(0, 0)
@@ -496,7 +501,7 @@ class KeyboardView @JvmOverloads constructor(
             val hasOverflow =
                 candidateContainer.measuredWidth > candidateScroller.measuredWidth
             candidateExpandButton.isVisible =
-                hasOverflow || renderedSnapshot.size > EXPANDED_CANDIDATE_COLUMNS
+                candidatesExpanded || hasOverflow || renderedSnapshot.size > EXPANDED_CANDIDATE_COLUMNS
             if (!candidateExpandButton.isVisible) setCandidatesExpanded(false)
         }
     }
@@ -516,7 +521,8 @@ class KeyboardView @JvmOverloads constructor(
     private fun renderCompositionLayout() {
         val zhuyin = inputMode == InputMode.ZHUYIN
         val expandedZhuyin = zhuyin && candidatesExpanded
-        val useSummary = zhuyin && !expandedZhuyin
+        val separateReading = zhuyin || isJapanesePhoneLayout()
+        val useSummary = separateReading && !candidatesExpanded
         val targetParent = if (useSummary) compositionSummaryContent else inputStrip
         if (compositionText.parent != targetParent) {
             (compositionText.parent as? ViewGroup)?.removeView(compositionText)
@@ -531,19 +537,27 @@ class KeyboardView @JvmOverloads constructor(
             }
         }
         compositionText.textLocale = candidateTextLocale()
-        compositionText.textSize = if (zhuyin) 14f else 17f
-        compositionText.maxWidth = if (zhuyin) Int.MAX_VALUE else dp(96)
-        compositionText.minWidth = if (zhuyin) 0 else dp(48)
+        compositionText.textSize = if (separateReading) 14f else 17f
+        compositionText.maxWidth = if (useSummary || zhuyin) Int.MAX_VALUE else dp(96)
+        compositionText.minWidth = if (separateReading) 0 else dp(48)
         compositionText.maxLines = if (expandedZhuyin) 2 else 1
         compositionText.ellipsize = when {
             expandedZhuyin -> TextUtils.TruncateAt.END
-            zhuyin -> null
+            useSummary || zhuyin -> null
             else -> TextUtils.TruncateAt.START
         }
-        compositionText.background = if (zhuyin) null else
+        compositionText.background = if (separateReading) null else
             ContextCompat.getDrawable(context, R.drawable.composition_chip_bg)
-        compositionSummary.isVisible = useSummary && !emojiPanelVisible && compositionText.text.isNotBlank()
-        compositionSummary.layoutParams.height = dp(if (resources.configuration.fontScale > 1.3f) 32 else 28)
+        // Reserve the reading line even before typing. GONE used to move every key
+        // by 28dp and shrink the rows on the first phonetic tap.
+        compositionSummary.visibility = when {
+            !useSummary || emojiPanelVisible -> View.GONE
+            compositionText.text.isNotBlank() -> View.VISIBLE
+            else -> View.INVISIBLE
+        }
+        val readingHeight = dp(if (resources.configuration.fontScale > 1.3f) 28 else 20)
+        compositionSummary.layoutParams.height = readingHeight
+        manualCandidateHeader.layoutParams.height = readingHeight + dp(56)
         if (zhuyin) compositionSummary.scrollTo(0, 0)
         inputStrip.layoutParams.height = dp(if (zhuyin) 56 else 50)
         inputStrip.updatePadding(top = dp(if (zhuyin) 2 else 3), bottom = dp(if (zhuyin) 2 else 3))
@@ -734,6 +748,7 @@ class KeyboardView @JvmOverloads constructor(
         compositionSummary = findViewById(R.id.zhuyin_composition_summary)
         compositionSummaryContent = findViewById(R.id.zhuyin_composition_summary_content)
         inputStrip = findViewById(R.id.input_strip)
+        manualCandidateHeader = findViewById(R.id.manual_candidate_header)
         zhuyinReselectButton = findViewById(R.id.btn_zhuyin_reselect)
         candidateScroller = findViewById(R.id.candidate_scroller)
         candidateContainer = findViewById(R.id.candidate_container)
@@ -805,12 +820,11 @@ class KeyboardView @JvmOverloads constructor(
         val fixedHeight = keyboardRoot.paddingTop + keyboardRoot.paddingBottom + dp(44) +
             if (voiceActionRow.isVisible) dp(56) else 0
         val bodyBudget = (targetHeight - fixedHeight).coerceAtLeast(0)
-        // Four-row QWERTY grows into the same key area as five-row Zhuyin/Kana.
+        // Romaji grows into the same key area as five-row English/Zhuyin/Kana.
         // On very short screens, scroll rather than reduce targets below 44dp.
         val rows = manualKeyRows.childCount
         if (rows > 0) {
-            val candidateAreaHeight = manualPanel.paddingTop + inputStrip.layoutParams.height +
-                if (compositionSummary.isVisible) compositionSummary.layoutParams.height else 0
+            val candidateAreaHeight = manualPanel.paddingTop + manualCandidateHeader.layoutParams.height
             val gridHeight = (bodyBudget - candidateAreaHeight).coerceAtLeast(rows * dp(44))
             manualKeyRows.layoutParams.height = gridHeight
             for (index in 0 until rows) {
@@ -866,7 +880,20 @@ class KeyboardView @JvmOverloads constructor(
         }
         composeGenerateButton.setOnClickListener {
             hapticTap(it)
-            listener?.onComposeGenerate()
+            // Keep the two task cards. Choose the meaning of "generate" explicitly:
+            // faithful organization must never treat a spoken question as a writing command.
+            PopupMenu(context, it).apply {
+                menu.add(0, 1, 0, R.string.draft_organize_choice)
+                menu.add(0, 2, 1, R.string.draft_write_choice)
+                setOnMenuItemClickListener { item ->
+                    if (isVoiceIdle()) {
+                        if (item.itemId == 1) listener?.onComposeOrganize()
+                        else listener?.onComposeGenerate()
+                    }
+                    true
+                }
+                show()
+            }
         }
         composeClearButton.setOnClickListener {
             hapticTap(it)
@@ -1080,6 +1107,7 @@ class KeyboardView @JvmOverloads constructor(
     }
 
     private fun renderManualKeyboard() {
+        renderCompositionLayout()
         val manualMode = when (inputMode) {
             InputMode.ZHUYIN -> ManualKeyboardMode.ZHUYIN
             InputMode.JAPANESE -> ManualKeyboardMode.JAPANESE
@@ -1097,13 +1125,15 @@ class KeyboardView @JvmOverloads constructor(
                     LayoutParams.MATCH_PARENT,
                     if (manualMode == ManualKeyboardMode.ZHUYIN) dp(52) else dp(48)
                 )
+                val letterRowIndex = rowIndex - if (manualMode == ManualKeyboardMode.ENGLISH &&
+                    keyboardLayer == KeyboardLayer.LETTERS && !emojiPanelVisible) 1 else 0
                 val horizontalInset = when {
                     emojiPanelVisible -> 0
                     manualMode == ManualKeyboardMode.ZHUYIN ||
                         japaneseInputStyle == JapaneseInputStyle.KANA_12_KEY && manualMode == ManualKeyboardMode.JAPANESE ||
                         keyboardLayer != KeyboardLayer.LETTERS -> 0
-                    rowIndex == 1 -> dp(14)
-                    rowIndex == 2 -> dp(2)
+                    letterRowIndex == 1 -> dp(14)
+                    letterRowIndex == 2 -> dp(2)
                     else -> 0
                 }
                 setPadding(horizontalInset, 0, horizontalInset, 0)
@@ -1112,6 +1142,56 @@ class KeyboardView @JvmOverloads constructor(
             manualKeyRows.addView(rowView)
         }
         updateTouchSplitting(this)
+        renderJapaneseUtilityKeys()
+    }
+
+    private fun isJapanesePhoneLayout(): Boolean = inputMode == InputMode.JAPANESE &&
+        japaneseInputStyle == JapaneseInputStyle.KANA_12_KEY &&
+        keyboardLayer == KeyboardLayer.LETTERS && !emojiPanelVisible
+
+    /** Change labels in place. Rebuilding keys while typing would interrupt an active flick. */
+    private fun renderJapaneseUtilityKeys() {
+        if (!isJapanesePhoneLayout()) return
+        val composing = compositionText.text.isNotBlank()
+        findViewWithTag<TextView>("japanese_kana_space")?.apply {
+            text = if (composing) "候補" else "空白"
+            contentDescription = context.getString(if (composing) R.string.japanese_candidates_action else R.string.key_space)
+        }
+        findViewWithTag<TextView>("japanese_kana_enter")?.apply {
+            if (composing) { text = "確定"; textSize = 16f } else setEnterIcon(this)
+            contentDescription = context.getString(if (composing) R.string.japanese_confirm_reading else R.string.japanese_enter_action)
+        }
+        findViewWithTag<View>("japanese_kana_convert")?.isEnabled = latestCandidates.isNotEmpty()
+        findViewWithTag<View>("japanese_kana_reverse")?.isEnabled = composing
+    }
+
+    private fun showJapaneseCandidates() {
+        if (!isJapanesePhoneLayout() || latestCandidates.isEmpty()) return
+        // Explicit conversion is allowed even when two kana fallbacks fit the strip.
+        candidateExpandButton.isVisible = true
+        setCandidatesExpanded(true)
+    }
+
+    private fun showJapaneseInputOptions(anchor: View) {
+        PopupMenu(context, anchor).apply {
+            menu.add(0, 1, 0, if (japaneseScriptMode == JapaneseScriptMode.HIRAGANA)
+                R.string.japanese_switch_katakana else R.string.japanese_switch_hiragana)
+            menu.add(0, 2, 1, R.string.japanese_switch_romaji)
+            menu.add(0, 3, 2, R.string.japanese_switch_numbers)
+            setOnMenuItemClickListener { item ->
+                when (item.itemId) {
+                    1 -> listener?.onKeyAction(KeyAction.ToggleJapaneseScript)
+                    2 -> listener?.onKeyAction(KeyAction.ToggleJapaneseLayout)
+                    3 -> {
+                        listener?.onKeyAction(KeyAction.FinalizeJapaneseKana)
+                        keyboardLayer = KeyboardLayer.NUMBERS
+                        renderManualKeyboard()
+                    }
+                }
+                true
+            }
+            show()
+        }
     }
 
     private fun createKeyButton(key: KeySpec): TextView {
@@ -1139,6 +1219,9 @@ class KeyboardView @JvmOverloads constructor(
                 KeyAction.NextEmojiPage -> context.getString(R.string.keyboard_emoji_next_page)
                 KeyAction.CursorLeft -> context.getString(R.string.keyboard_cursor_left)
                 KeyAction.CursorRight -> context.getString(R.string.keyboard_cursor_right)
+                KeyAction.ReverseJapaneseKana -> context.getString(R.string.japanese_reverse_kana)
+                KeyAction.ShowJapaneseCandidates -> context.getString(R.string.japanese_candidates_action)
+                KeyAction.JapaneseInputOptions -> context.getString(R.string.japanese_input_options)
                 else -> key.contentDescription
             }
             gravity = android.view.Gravity.CENTER
@@ -1148,10 +1231,21 @@ class KeyboardView @JvmOverloads constructor(
                 key.action is KeyAction.InsertEmoji -> 24f
                 key.action == KeyAction.Enter -> 27f
                 key.action == KeyAction.CursorLeft || key.action == KeyAction.CursorRight -> 22f
+                isJapanesePhoneLayout() && key.action is KeyAction.TapJapaneseKana -> 23f
+                isJapanesePhoneLayout() && key.action == KeyAction.ReverseJapaneseKana -> 24f
+                isJapanesePhoneLayout() -> 16f
                 displayLabel.length > 4 -> 12f
                 inputMode == InputMode.ZHUYIN && key.role == KeyRole.CHARACTER -> 21f
                 key.role == KeyRole.CHARACTER -> 18f
                 else -> 13f
+            }
+            if (isJapanesePhoneLayout() && key.action !is KeyAction.TapJapaneseKana &&
+                key.action != KeyAction.CursorLeft && key.action != KeyAction.CursorRight &&
+                key.action != KeyAction.ReverseJapaneseKana && key.action != KeyAction.Backspace) {
+                // Rails are intentionally narrower. Fit their short labels without ellipses
+                // at large system font sizes while retaining the full-size touch cell.
+                TextViewCompat.setAutoSizeTextTypeUniformWithConfiguration(this, 10, 16, 1,
+                    TypedValue.COMPLEX_UNIT_SP)
             }
             val isActiveModifier =
                 key.action == KeyAction.Shift && shiftState != ShiftState.OFF
@@ -1167,13 +1261,23 @@ class KeyboardView @JvmOverloads constructor(
                 R.color.key_text
             }
             setTextColor(ContextCompat.getColor(context, textColorRes))
-            background = InsetDrawable(
-                ContextCompat.getDrawable(context, backgroundRes),
-                dp(2),
-                dp(2),
-                dp(2),
-                dp(2)
-            )
+            val surface = if (isJapanesePhoneLayout()) {
+                val fill = when {
+                    key.role == KeyRole.ACTION -> R.color.key_enter_bg
+                    key.role == KeyRole.MODIFIER || key.role == KeyRole.SPACE -> R.color.key_special_bg
+                    else -> R.color.key_bg
+                }
+                // Compact, quiet rectangular caps; the whole cell remains the touch target.
+                val shape = GradientDrawable().apply {
+                    cornerRadius = dp(6).toFloat()
+                    setColor(ContextCompat.getColor(context, fill))
+                }
+                RippleDrawable(ColorStateList.valueOf(ContextCompat.getColor(context, R.color.key_bg_pressed)), shape, null)
+            } else ContextCompat.getDrawable(context, backgroundRes)
+            val inset = dp(if (isJapanesePhoneLayout()) 3 else 2)
+            background = InsetDrawable(surface, inset, inset, inset, inset)
+            // setBackground copies drawable padding; text insets must be applied afterwards.
+            if (isJapanesePhoneLayout()) setPadding(dp(6), 0, dp(6), 0)
             setTypeface(
                 Typeface.create(
                     "sans-serif",
@@ -1189,6 +1293,12 @@ class KeyboardView @JvmOverloads constructor(
             setOnClickListener {
                 hapticTap(it)
                 when (val action = key.action) {
+                    KeyAction.JapaneseInputOptions -> showJapaneseInputOptions(this)
+                    KeyAction.ShowJapaneseCandidates -> showJapaneseCandidates()
+                    KeyAction.Space -> {
+                        if (isJapanesePhoneLayout() && compositionText.text.isNotBlank()) showJapaneseCandidates()
+                        else listener?.onKeyAction(action)
+                    }
                     KeyAction.ToggleEmoji -> setEmojiPanelVisible(!emojiPanelVisible)
                     KeyAction.NextEmojiPage -> {
                         emojiPage = EmojiPalette.normalizedPage(emojiPage + 1)

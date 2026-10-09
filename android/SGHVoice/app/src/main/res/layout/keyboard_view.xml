@@ -585,11 +585,20 @@
         android:paddingTop="6dp"
         android:visibility="gone">
 
-        <!-- Zhuyin composition uses its own line, so a long reading never squeezes choices. -->
+        <!-- A shared, fixed header keeps the first key row anchored in every manual mode.
+             Composition/candidate visibility must never change this height. -->
+        <LinearLayout
+            android:id="@+id/manual_candidate_header"
+            android:layout_width="match_parent"
+            android:layout_height="76dp"
+            android:gravity="center_vertical"
+            android:orientation="vertical">
+
+        <!-- Reserve the reading line before the first tap; long readings scroll horizontally. -->
         <HorizontalScrollView
             android:id="@+id/zhuyin_composition_summary"
             android:layout_width="match_parent"
-            android:layout_height="28dp"
+            android:layout_height="20dp"
             android:overScrollMode="never"
             android:scrollbars="none"
             android:visibility="gone">
@@ -677,6 +686,8 @@
                 android:scaleType="centerInside"
                 android:src="@drawable/ic_expand_more"
                 android:visibility="gone" />
+        </LinearLayout>
+
         </LinearLayout>
 
         <ScrollView

@@ -137,6 +137,18 @@ class JapaneseComposer(
         lastKanaTapIndex = 0
     }
 
+    /** Reverse one kana choice, not an editor-wide undo or a deletion of earlier text. */
+    fun reverseKana(nowMs: Long): Boolean {
+        if (inputStyle != JapaneseInputStyle.KANA_12_KEY || kanaInput.isEmpty()) return false
+        val last = kanaInput.last().toString()
+        val group = Kana12Key.groups.entries.firstOrNull { last in it.value } ?: return false
+        lastKanaTapIndex = (group.value.indexOf(last) + group.value.size - 1) % group.value.size
+        kanaInput.replace(kanaInput.lastIndex, kanaInput.length, group.value[lastKanaTapIndex])
+        lastKanaTapGroup = group.key
+        lastKanaTapAtMs = nowMs
+        return true
+    }
+
     /** Cycles the last kana through its small, voiced or semi-voiced forms. */
     fun transformLastKana(): Boolean {
         if (inputStyle != JapaneseInputStyle.KANA_12_KEY || kanaInput.isEmpty()) return false

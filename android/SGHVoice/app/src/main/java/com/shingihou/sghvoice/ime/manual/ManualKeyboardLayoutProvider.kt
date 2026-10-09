@@ -9,7 +9,8 @@ import java.util.Locale
 /**
  * Produces key-grid data for every manual mode without creating Android Views.
  *
- * English and Japanese Romaji share QWERTY geometry. Japanese can alternatively
+ * English keeps a dedicated number row above QWERTY. Japanese Romaji shares the
+ * letter geometry and can alternatively
  * expose the native phone 12-key kana layout without changing other modes.
  * Numeric and symbol pages are shared across all three manual modes.
  */
@@ -135,7 +136,9 @@ class ManualKeyboardLayoutProvider {
             ManualKeyboardMode.JAPANESE -> japaneseBottomRow()
             ManualKeyboardMode.ZHUYIN -> error("Zhuyin does not use QWERTY rows.")
         }
-        return letterRows
+        return if (mode == ManualKeyboardMode.ENGLISH) {
+            listOf(characterRow(prefix, "1234567890")) + letterRows
+        } else letterRows
     }
 
     private fun englishBottomRow(): KeyboardRow = KeyboardRow(
@@ -167,25 +170,26 @@ class ManualKeyboardLayoutProvider {
 
     private fun kana12Rows(): List<KeyboardRow> = listOf(
         kanaRow(
+            actionKey("japanese_kana_reverse", "↶", KeyAction.ReverseJapaneseKana, "Previous kana in this group"),
             listOf("a", "ka", "sa").map(::kanaGroupKey),
             backspaceKey("japanese_kana")
         ),
         kanaRow(
+            actionKey("japanese_cursor_left", "←", KeyAction.CursorLeft, "Move text cursor left"),
             listOf("ta", "na", "ha").map(::kanaGroupKey),
             actionKey(
-                "japanese_cursor_left", "←",
-                KeyAction.CursorLeft,
-                "Move text cursor left"
-            )
-        ),
-        kanaRow(
-            listOf("ma", "ya", "ra").map(::kanaGroupKey),
-            actionKey(
-                "japanese_cursor_right", "→", KeyAction.CursorRight,
+                "japanese_cursor_right", "→",
+                KeyAction.CursorRight,
                 "Move text cursor right"
             )
         ),
         kanaRow(
+            actionKey("japanese_kana_convert", "変換", KeyAction.ShowJapaneseCandidates, "Show conversion candidates"),
+            listOf("ma", "ya", "ra").map(::kanaGroupKey),
+            spaceKey("japanese_kana_space", widthWeight = 1f)
+        ),
+        kanaRow(
+            actionKey("japanese_input_options", "あA1", KeyAction.JapaneseInputOptions, "Japanese input options"),
             listOf(
                 actionKey(
                     "japanese_kana_modifier", "小゛゜",
@@ -195,33 +199,16 @@ class ManualKeyboardLayoutProvider {
                 kanaGroupKey("wa"),
                 characterKey(
                     "japanese_kana_punctuation", "、", "Japanese punctuation",
-                    alternatives = listOf("。", "！", "？")
-                )
+                    alternatives = listOf("。", "！", "？", "…")
+                ).copy(label = "、。?!")
             ),
             enterKey("japanese_kana_enter")
-        ),
-        KeyboardRow(
-            listOf(
-                switchLayerKey(
-                    "japanese_kana_numbers", "?123", KeyboardLayer.NUMBERS,
-                    widthWeight = 1f
-                ),
-                actionKey(
-                    "japanese_layout", "ABC", KeyAction.ToggleJapaneseLayout,
-                    "Switch to Japanese Romaji QWERTY"
-                ),
-                actionKey(
-                    "japanese_script", "かな", KeyAction.ToggleJapaneseScript,
-                    "Toggle Hiragana and Katakana"
-                ),
-                spaceKey("japanese_kana_space", widthWeight = 1.75f)
-            )
         )
     )
 
-    /** Keep the phone keypad's three columns aligned beside a narrower action rail. */
-    private fun kanaRow(keys: List<KeySpec>, action: KeySpec): KeyboardRow =
-        KeyboardRow(keys + action.copy(widthWeight = 0.75f))
+    /** A 3x4 phone keypad between two equal, narrower four-key utility rails. */
+    private fun kanaRow(left: KeySpec, keys: List<KeySpec>, right: KeySpec): KeyboardRow =
+        KeyboardRow(listOf(left.copy(widthWeight = 0.75f)) + keys + right.copy(widthWeight = 0.75f))
 
     private fun kanaGroupKey(group: String): KeySpec {
         val kana = Kana12Key.groups.getValue(group)

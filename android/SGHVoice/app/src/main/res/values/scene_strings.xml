@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="scene_vocabulary_title">語音場景詞庫</string>
+    <string name="scene_vocabulary_hint">選擇這次說話的情境。只影響語音辨識與整理，不改變鍵盤排列。</string>
+    <string name="scene_vocabulary_selected">目前場景：%1$s</string>
+    <string name="scene_vocabulary_general">一般</string>
+    <string name="scene_vocabulary_software">軟體開發</string>
+    <string name="scene_vocabulary_business_japanese">商務日文</string>
+    <string name="scene_vocabulary_medical">醫療・藥品・生技</string>
+    <string name="scene_vocabulary_general_description">日常訊息與筆記，使用全域常用詞及下方手動加入的詞。</string>
+    <string name="scene_vocabulary_software_description">提供 GitHub Actions、CI/CD、git push、TypeScript 等拼字參考；不新增技術內容。</string>
+    <string name="scene_vocabulary_business_description">提供見積書、請求書、納期等日文詞彙；保留原文語言與敬語程度，不自動翻譯。</string>
+    <string name="scene_vocabulary_medical_description">提供醫療、檢查與藥品用語參考。結果仍須人工確認，不保證臨床正確性。</string>
+    <string name="scene_vocabulary_local_privacy">詞彙保存在本機。使用雲端辨識或整理時，依既有雲端同意送出選中場景及全域詞彙中的提示；這是拼字參考，不是模型訓練。</string>
+    <string name="scene_vocabulary_add_label">本場景專用詞</string>
+    <string name="scene_vocabulary_add_action">新增場景專用詞</string>
+    <string name="scene_vocabulary_delete_action">刪除場景詞：%1$s</string>
+    <string name="scene_vocabulary_invalid">請輸入不重複、64 字元內的短詞，不含指令或換行；每個場景最多 100 詞。</string>
+    <string name="scene_vocabulary_count">手動加入 %1$d／%2$d 詞。提示有長度限制，不一定全部送出。</string>
+    <string name="scene_vocabulary_scope_hint">這裡的詞只在選中此場景時使用。所有場景都需要的詞，請加入下方的「自訂詞彙」。待確認的學習詞仍只留在本機。</string>
+</resources>

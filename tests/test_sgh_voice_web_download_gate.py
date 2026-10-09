@@ -141,9 +141,9 @@ def test_feature_illustration_is_not_presented_as_a_verified_release_screenshot(
     assert "android-zhuyin-v250.webp" not in html
     assert "android-translation-ui.webp" not in html
     assert "android-zhuyin-ui.webp" not in html
-    assert "2.8.9 介面預覽 · 非實機收音驗證" in html
-    assert "2.8.9 UI preview · not a real-device recording test" in translations
-    assert 'assets/generated/android-2.8.9-voice.png' in html
+    assert "2.8.10 介面預覽 · 非實機收音驗證" in html
+    assert "2.8.10 UI preview · not a real-device recording test" in translations
+    assert 'assets/generated/android-2.8.10-voice.png' in html
     for unsupported_claim in (
         "ACTUAL ANDROID BUILD",
         "これが v2.8.2 の実画面です",
@@ -187,8 +187,8 @@ def test_android_release_manifest_matches_public_artifact_and_copy():
     index = read_web_file("index.html")
     llms = read_web_file("llms.txt")
 
-    assert release["versionName"] == "2.8.9"
-    assert release["versionCode"] == 39
+    assert release["versionName"] == "2.8.10"
+    assert release["versionCode"] == 40
     assert re.fullmatch(r"[0-9a-f]{64}", release["sha256"])
     assert re.fullmatch(r"[0-9A-F]{64}", release["certificateSha256"])
     assert artifact.is_file()
@@ -197,7 +197,7 @@ def test_android_release_manifest_matches_public_artifact_and_copy():
     # Owner sideload artifacts remain verifiable but are not recruitment CTAs.
     assert release["fileName"] not in index
     assert release["fileName"] not in llms
-    assert 'i18n.js?v=20261009-android289' in index
+    assert 'i18n.js?v=20261009-android2810' in index
     assert 'main.js?v=20260930-alpha' in index
 
 

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="scene_vocabulary_title">Voice vocabulary by scene</string>
+    <string name="scene_vocabulary_hint">Choose what you are talking about. This affects speech recognition and refinement, not the keyboard layout.</string>
+    <string name="scene_vocabulary_selected">Current scene: %1$s</string>
+    <string name="scene_vocabulary_general">General</string>
+    <string name="scene_vocabulary_software">Software development</string>
+    <string name="scene_vocabulary_business_japanese">Business Japanese</string>
+    <string name="scene_vocabulary_medical">Medical and life sciences</string>
+    <string name="scene_vocabulary_general_description">For everyday messages and notes. Uses shared vocabulary and the words you add to this scene.</string>
+    <string name="scene_vocabulary_software_description">Spelling references include GitHub Actions, CI/CD, git push and TypeScript. Does not add technical details.</string>
+    <string name="scene_vocabulary_business_description">References Japanese terms such as 見積書, 請求書 and 納期. Preserves the original language and politeness level; does not automatically translate.</string>
+    <string name="scene_vocabulary_medical_description">References medical, examination and medicine names. Results still need human review; clinical accuracy is not guaranteed.</string>
+    <string name="scene_vocabulary_local_privacy">Words are stored on this device. Cloud recognition and refinement may receive hints from the selected scene and shared vocabulary under your existing cloud consent. These are spelling references, not model training.</string>
+    <string name="scene_vocabulary_add_label">Word for this scene</string>
+    <string name="scene_vocabulary_add_action">Add scene word</string>
+    <string name="scene_vocabulary_delete_action">Delete scene word: %1$s</string>
+    <string name="scene_vocabulary_invalid">Use a unique short term of up to 64 characters, without instructions or line breaks. Each scene holds up to 100 terms.</string>
+    <string name="scene_vocabulary_count">%1$d / %2$d manually added terms. Hint length is limited; not every term is sent.</string>
+    <string name="scene_vocabulary_scope_hint">These words are used only while this scene is selected. For terms needed in every scene, use Custom words below. Pending learned terms still stay on this device.</string>
+</resources>

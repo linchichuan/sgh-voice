@@ -1,0 +1,11 @@
+<resources>
+    <string name="japanese_reverse_kana">同じ行の前のかなに戻す</string>
+    <string name="japanese_candidates_action">変換候補を表示</string>
+    <string name="japanese_confirm_reading">漢字に変換せず、かなのまま確定</string>
+    <string name="japanese_enter_action">改行または入力欄の操作</string>
+    <string name="japanese_input_options">日本語の入力切り替え</string>
+    <string name="japanese_switch_katakana">カタカナ</string>
+    <string name="japanese_switch_hiragana">ひらがな</string>
+    <string name="japanese_switch_romaji">ABC（ローマ字入力）</string>
+    <string name="japanese_switch_numbers">123（数字・記号）</string>
+</resources>

@@ -5,6 +5,26 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 class Kana12KeyFlickTest {
+    @Test fun `reverse cycle preserves preceding kana and wraps without deleting`() {
+        val composer = JapaneseComposer()
+        org.junit.Assert.assertFalse(composer.reverseKana(0))
+        composer.setInputStyle(JapaneseInputStyle.KANA_12_KEY)
+        org.junit.Assert.assertFalse(composer.reverseKana(0))
+        composer.appendKana("あ")
+        composer.tapKana("na", 100)
+        composer.tapKana("na", 200)
+        assertEquals("あに", composer.composition)
+        org.junit.Assert.assertTrue(composer.reverseKana(300))
+        assertEquals("あな", composer.composition)
+        composer.reverseKana(400)
+        assertEquals("あの", composer.composition)
+        composer.tapKana("na", 500)
+        assertEquals("あな", composer.composition)
+        composer.setScriptMode(JapaneseScriptMode.KATAKANA)
+        composer.reverseKana(600)
+        assertEquals("アノ", composer.composition)
+    }
+
     private val directions = listOf(
         KanaFlickDirection.CENTER, KanaFlickDirection.LEFT, KanaFlickDirection.UP,
         KanaFlickDirection.RIGHT, KanaFlickDirection.DOWN

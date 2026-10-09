@@ -30,6 +30,18 @@ renders the kana keypad. In the real IME, repeated centre taps cycle the kana
 group; left/up/right/down flicks select a vowel directly. The separate ← / →
 keys move the text caret after committing composition, not the candidate list.
 This visual-only activity does not simulate the full Japanese composer.
+The kana layout uses a central 3-by-4 matrix between two narrower, four-key
+utility rails. Left: previous kana in the same group, caret left, conversion
+candidates, and the SGH-local `あA1` input menu. Right: delete, caret right,
+space/candidates, and enter/confirm. The input menu retains Katakana/Hiragana,
+Romaji and numbers without opening the system IME picker. Conversion opens an
+explicit candidate panel instead of silently inserting the first kanji result;
+confirm inserts the original kana, so single vowels remain directly usable.
+The reading occupies the already-reserved small line above candidates. Candidate
+updates change labels in place, never rebuild or move a key during a flick.
+`JapanesePhoneLayoutUiTest` renders normal/large-font idle and typing previews in
+`build/reports/keyboard-preview/japanese-rails-*.png`; these are native View
+renders under Robolectric, not physical-device acceptance.
 `--ei heightPercent 90` changes the shared keyboard height (90–125, default 100),
 without saving a preference. `--ez translation true --es state idle` opens
 the translation picker. All text and retry state are synthetic.

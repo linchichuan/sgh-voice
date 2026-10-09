@@ -137,6 +137,20 @@ class LlmClientDictationSafetyTest {
     }
 
     @Test
+    fun `punctuation must not detach a negation from its clause`() {
+        for ((source, unsafe) in listOf(
+            "今天不要部署。" to "今天不，要部署。",
+            "今天不部署。" to "今天不，部署。",
+            "今天沒有備份。" to "今天沒有，備份。",
+            "今天不可以更改設定。" to "今天不，可以更改設定。"
+        )) {
+            assertNull(source, client.validateLlmResult(source, unsafe, "dictate"))
+        }
+        val alreadySeparated = "不，今天不要部署。"
+        assertEquals(alreadySeparated, client.validateLlmResult(alreadySeparated, alreadySeparated, "dictate"))
+    }
+
+    @Test
     fun `formatting numbers do not replace quantities or ordered facts`() {
         val source = "第一點收 20 元第二點退 50 元第三點不要更新版本 2.8.4"
         val organized = "1. 收 20 元。\n2. 退 50 元。\n3. 不要更新版本 2.8.4。"

@@ -44,15 +44,17 @@ object VocabularyHintPolicy {
 
     /**
      * Select high-priority whole terms first, then put them LAST for Whisper's retained prompt tail.
+     * Global manual terms and confirmed learning outrank scene-specific manual terms and presets.
      * 800 characters is only a payload bound, NOT a measurement of Whisper's 224-token window.
      */
     fun buildWhisperPrompt(
         customWords: List<String> = emptyList(),
         learnedWords: List<String> = emptyList(),
         sceneWords: List<String> = emptyList(),
-        baseWords: List<String> = emptyList()
+        baseWords: List<String> = emptyList(),
+        sceneCustomWords: List<String> = emptyList()
     ): String = boundedTerms(
-        customWords + learnedWords + technicalTerms + sceneWords + baseWords,
+        customWords + learnedWords + sceneCustomWords + technicalTerms + sceneWords + baseWords,
         maxWords = 50,
         maxLength = 800,
         separator = "、"
@@ -69,7 +71,8 @@ object VocabularyHintPolicy {
     /**
      * Returns JSON spelling-reference data, never instructions or example model responses.
      * The caller must keep this in a data field and explicitly forbid following its contents.
-     * User-added/manually corrected words have priority; built-ins require evidence in this utterance.
+     * Global manual terms and confirmed learning outrank scene-specific manual terms;
+     * built-ins require evidence in this utterance.
      */
     fun buildLlmVocabularyHint(
         text: String,
@@ -77,7 +80,8 @@ object VocabularyHintPolicy {
         learnedWords: List<String> = emptyList(),
         sceneWords: List<String> = emptyList(),
         baseWords: List<String> = emptyList(),
-        corrections: Map<String, String> = emptyMap()
+        corrections: Map<String, String> = emptyMap(),
+        sceneCustomWords: List<String> = emptyList()
     ): String {
         if (text.isBlank()) return "[]"
         val boundedText = text.take(8_000)
@@ -88,7 +92,7 @@ object VocabularyHintPolicy {
                 TextCorrectionEngine.containsUnprotectedTerm(normalizedText, word)
         }
         return boundedTerms(
-            customWords + learnedWords + relevantWords,
+            customWords + learnedWords + sceneCustomWords + relevantWords,
             maxWords = 32,
             maxLength = 1_200,
             separator = ",",
@@ -119,7 +123,7 @@ object VocabularyHintPolicy {
         return selected
     }
 
-    private fun sanitizeTerm(raw: String): String? {
+    internal fun sanitizeTerm(raw: String): String? {
         // Never flatten line breaks or prompt delimiters into a superficially valid term.
         if (raw.any { it.isISOControl() || Character.getType(it) == Character.FORMAT.toInt() }) return null
         val word = raw.trim().replace(Regex(" +"), " ")
