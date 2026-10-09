@@ -2,6 +2,7 @@ package com.shingihou.sghvoice.ime.japanese
 
 import android.content.Context
 import java.io.InputStream
+import java.util.PriorityQueue
 
 data class JapaneseLexiconEntry(
     val text: String,
@@ -51,15 +52,14 @@ class CompactJapaneseLexicon private constructor(
         val prefix = JapaneseScripts.katakanaToHiragana(readingPrefix.trim())
         if (prefix.isEmpty()) return emptyList()
 
+        // Keep only the best requested candidates, but examine the full matching
+        // range. An alphabetic scan cap hides common words after the first rows.
         val collected = mutableMapOf<String, JapaneseLexiconEntry>()
+        val bestFirst = compareByDescending<JapaneseLexiconEntry> { it.score }
+            .thenBy { it.text.length }.thenBy { it.text }
+        val best = PriorityQueue(bestFirst.reversed())
         var readingIndex = lowerBound(sortedReadings, prefix)
-        var readingsScanned = 0
-        var candidatesScanned = 0
-        while (
-            readingIndex < sortedReadings.size &&
-            readingsScanned < MAX_PREFIX_READINGS_TO_SCAN &&
-            candidatesScanned < MAX_PREFIX_CANDIDATES_TO_SCAN
-        ) {
+        while (readingIndex < sortedReadings.size) {
             val candidateReading = sortedReadings[readingIndex]
             if (!candidateReading.startsWith(prefix)) break
 
@@ -67,26 +67,23 @@ class CompactJapaneseLexicon private constructor(
                 candidateReading.length - prefix.length
                 ).coerceAtLeast(0) * PREFIX_COMPLETION_PENALTY
             for (entry in entriesByReading[candidateReading].orEmpty()) {
-                if (candidatesScanned >= MAX_PREFIX_CANDIDATES_TO_SCAN) break
                 val adjusted = entry.copy(score = entry.score - completionPenalty)
                 val old = collected[adjusted.text]
-                if (old == null || adjusted.score > old.score) {
-                    collected[adjusted.text] = adjusted
+                if (old != null) {
+                    if (adjusted.score <= old.score) continue
+                    best.remove(old)
+                } else if (best.size >= limit) {
+                    if (bestFirst.compare(adjusted, best.peek()) >= 0) continue
+                    collected.remove(best.remove().text)
                 }
-                candidatesScanned += 1
+                collected[adjusted.text] = adjusted
+                best.add(adjusted)
             }
 
-            readingsScanned += 1
             readingIndex += 1
         }
 
-        return collected.values
-            .sortedWith(
-                compareByDescending<JapaneseLexiconEntry> { it.score }
-                    .thenBy { it.text.length }
-                    .thenBy { it.text }
-            )
-            .take(limit)
+        return best.sortedWith(bestFirst)
     }
 
     val readingCount: Int
@@ -96,8 +93,6 @@ class CompactJapaneseLexicon private constructor(
         get() = entriesByReading.values.sumOf { it.size }
 
     companion object {
-        private const val MAX_PREFIX_READINGS_TO_SCAN = 64
-        private const val MAX_PREFIX_CANDIDATES_TO_SCAN = 256
         // JMdict priority scores span roughly 2,000–5,100. A meaningful
         // per-kana completion cost prevents a longer high-priority compound
         // (for example 日本酒) from outranking its common shorter completion

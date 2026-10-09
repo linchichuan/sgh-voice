@@ -24,6 +24,8 @@ import com.shingihou.sghvoice.ime.manual.EnglishCandidate
 import com.shingihou.sghvoice.ime.manual.EnglishCandidateProvider
 import com.shingihou.sghvoice.ime.manual.EnglishComposer
 import com.shingihou.sghvoice.ime.manual.EnglishEdit
+import com.shingihou.sghvoice.ime.manual.LocalEnglishCandidateProvider
+import com.shingihou.sghvoice.ime.manual.AndroidEnglishCandidateProvider
 import com.shingihou.sghvoice.ime.manual.KeyAction
 import com.shingihou.sghvoice.ime.manual.InputCursorMovement
 import com.shingihou.sghvoice.ime.manual.ShiftState
@@ -110,6 +112,7 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
     private lateinit var japaneseLexicon: AndroidJapaneseLexicon
     private lateinit var japaneseComposer: JapaneseComposer
     private lateinit var englishComposer: EnglishComposer
+    private lateinit var englishLexicon: AndroidEnglishCandidateProvider
 
     private var inputSessionId = 0L
     private var voiceOperationId = 0L
@@ -134,6 +137,21 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
     private var currentLearningDecision: LearningPolicyDecision = LearningPolicy.evaluate(null)
     private var activeVoiceTask: VoiceTask = VoiceTask.Dictation
     private var japaneseInputStyle = JapaneseInputStyle.ROMAJI
+    private val zhuyinReselection = ZhuyinReselection()
+    private var pendingZhuyinLearning: ZhuyinCandidate? = null
+
+    // Snapshot identity: EditorInfo itself is mutable and selection changes are not
+    // a new editor. Anonymous fields additionally require the same connection.
+    private data class RecordingEditor(
+        val packageName: String?, val fieldId: Int, val fieldName: String?,
+        val inputType: Int, val imeOptions: Int, val privateOptions: String?
+    )
+    private var recordingEditor: RecordingEditor? = null
+    private var recordingEditorConnection: InputConnection? = null
+    private fun recordingEditor(info: EditorInfo?) = info?.let {
+        RecordingEditor(it.packageName, it.fieldId, it.fieldName, it.inputType, it.imeOptions, it.privateImeOptions)
+    }
+    private fun microphoneActive() = currentState == ImeState.STARTING || currentState == ImeState.RECORDING
 
     override fun onCreate() {
         super.onCreate()
@@ -157,6 +175,7 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
             zhuyinComposer = ZhuyinComposer(zhuyinLexicon)
             japaneseLexicon = AndroidJapaneseLexicon(this)
             japaneseComposer = JapaneseComposer(japaneseLexicon)
+            englishLexicon = AndroidEnglishCandidateProvider(this)
             englishComposer = EnglishComposer(
                 candidateProvider = EnglishCandidateProvider { prefix, limit ->
                     buildEnglishCandidates(prefix, limit)
@@ -181,6 +200,7 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
             setKeyboardHeightPercent(apiConfig?.keyboardHeightPercent ?: KeyboardSizing.DEFAULT_PERCENT)
             setJapaneseInputStyle(japaneseInputStyle)
             updateState(currentState)
+            keepScreenOn = microphoneActive()
             setDraftActions(drafts.hasComposeNotes, drafts.hasPendingText && !currentLearningDecision.sensitiveField)
         }
         keyboardView = view
@@ -191,6 +211,17 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
 
     override fun onStartInput(attribute: EditorInfo?, restarting: Boolean) {
         super.onStartInput(attribute, restarting)
+        val incoming = recordingEditor(attribute)
+        if (restarting && microphoneActive() && incoming != null &&
+            !incoming.packageName.isNullOrBlank() && incoming == recordingEditor &&
+            !LearningPolicy.evaluate(attribute).sensitiveField &&
+            (incoming.fieldId > 0 || !incoming.fieldName.isNullOrBlank() ||
+                (recordingEditorConnection != null && recordingEditorConnection === currentInputConnection))
+        ) {
+            // A host refresh (restartInput), not a focus loss: keep the capture
+            // and its session token. The destination is captured when stopping.
+            return
+        }
         beginInputSession(attribute)
     }
 
@@ -205,6 +236,7 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
         keyboardView?.setKeyboardHeightPercent(apiConfig?.keyboardHeightPercent ?: KeyboardSizing.DEFAULT_PERCENT)
         keyboardView?.setJapaneseInputStyle(japaneseInputStyle)
         keyboardView?.updateState(currentState)
+        keyboardView?.keepScreenOn = microphoneActive()
         refreshDraftActions()
         showAvailableDraftStatus()
         updateManualUi()
@@ -237,6 +269,9 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
         cancelCorrectionTracking()
         serviceScope.cancel()
         audioRecorder?.release()
+        keyboardView?.keepScreenOn = false
+        recordingEditor = null
+        recordingEditorConnection = null
         keyboardView = null
         super.onDestroy()
     }
@@ -268,6 +303,7 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
                     Log.e(TAG, "Japanese lexicon warm-up failed", error)
                 }
             }
+            if (::englishLexicon.isInitialized) englishLexicon.warmUp()
 
             try {
                 val config = apiConfig ?: ApiConfig(this@VoiceInputIME)
@@ -303,6 +339,8 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
         inputSessionId += 1
         invalidateVoiceOperation(resetState = true, preserveInFlight = pendingHandoffOperations.isNotEmpty())
         currentLearningDecision = LearningPolicy.evaluate(editorInfo)
+        recordingEditor = recordingEditor(editorInfo)
+        recordingEditorConnection = currentInputConnection
         resetManualComposers()
         cancelCorrectionTracking()
         updateManualUi()
@@ -310,6 +348,9 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
     }
 
     private fun finishInputSession() {
+        finalizeZhuyinSelectionLearning()
+        recordingEditor = null
+        recordingEditorConnection = null
         finalizeCorrectionTracking(reinspect = true)
         preserveSpeechOnFocusLoss()
         inputSessionId += 1
@@ -322,6 +363,8 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
     }
 
     private fun resetManualComposers() {
+        pendingZhuyinLearning = null
+        zhuyinReselection.clear()
         if (::zhuyinComposer.isInitialized) zhuyinComposer.clear()
         if (::japaneseComposer.isInitialized) japaneseComposer.clear()
         if (::englishComposer.isInitialized) englishComposer.reset()
@@ -1320,6 +1363,8 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
         }
 
     override fun onInputModeChanged(mode: KeyboardView.InputMode) {
+        finalizeZhuyinSelectionLearning()
+        zhuyinReselection.clear()
         if (mode == currentInputMode) return
 
         commitActiveComposition()
@@ -1334,8 +1379,19 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
     }
 
     override fun onKeyAction(action: KeyAction) {
+        if (action != KeyAction.Backspace) finalizeZhuyinSelectionLearning()
+        pendingZhuyinLearning = null
+        zhuyinReselection.clear()
+        keyboardView?.setZhuyinReselectAvailable(false)
+        if (action is KeyAction.InsertEmoji) {
+            insertEmoji(action.text)
+            return
+        }
+        if (action == KeyAction.ToggleEmoji || action == KeyAction.NextEmojiPage) return
         if (action == KeyAction.CursorLeft || action == KeyAction.CursorRight) {
             commitActiveComposition()
+            if (currentInputMode == KeyboardView.InputMode.JAPANESE &&
+                ::japaneseComposer.isInitialized && japaneseComposer.hasComposition) return
             currentInputConnection?.let { connection ->
                 connection.finishComposingText()
                 InputCursorMovement.move(connection, toRight = action == KeyAction.CursorRight)
@@ -1351,6 +1407,7 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
     }
 
     override fun onCandidateSelected(candidate: String) {
+        if (currentLearningDecision.sensitiveField) return
         when (currentInputMode) {
             KeyboardView.InputMode.ZHUYIN -> selectZhuyinCandidate(candidate)
             KeyboardView.InputMode.JAPANESE -> selectJapaneseCandidate(candidate)
@@ -1359,8 +1416,18 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
         }
     }
 
+    override fun onZhuyinReselectRequested() {
+        if (currentInputMode != KeyboardView.InputMode.ZHUYIN || currentLearningDecision.sensitiveField ||
+            !::zhuyinComposer.isInitialized) return
+        val reading = zhuyinReselection.restore(currentInputConnection, inputSessionId)
+        pendingZhuyinLearning = null
+        if (reading != null) zhuyinComposer.setComposition(reading)
+        updateManualUi()
+    }
+
     private fun handleVoiceKey(action: KeyAction) {
         when (action) {
+            KeyAction.ToggleEmoji, KeyAction.NextEmojiPage, is KeyAction.InsertEmoji -> Unit
             is KeyAction.InsertText -> currentInputConnection?.commitText(action.text, 1)
             KeyAction.Backspace ->
                 currentInputConnection?.deleteSurroundingTextInCodePoints(1, 0)
@@ -1381,6 +1448,7 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
     private fun handleZhuyinKey(action: KeyAction) {
         if (!::zhuyinComposer.isInitialized) return
         when (action) {
+            KeyAction.ToggleEmoji, KeyAction.NextEmojiPage, is KeyAction.InsertEmoji -> Unit
             is KeyAction.InsertText -> {
                 val symbol = action.text.singleOrNull()
                 if (symbol != null && symbol in ZhuyinComposer.STANDARD_SYMBOLS) {
@@ -1431,6 +1499,7 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
     private fun handleJapaneseKey(action: KeyAction) {
         if (!::japaneseComposer.isInitialized) return
         when (action) {
+            KeyAction.ToggleEmoji, KeyAction.NextEmojiPage, is KeyAction.InsertEmoji -> Unit
             is KeyAction.InsertText -> {
                 val accepted = if (japaneseInputStyle == JapaneseInputStyle.KANA_12_KEY) {
                     japaneseComposer.appendKana(action.text)
@@ -1438,7 +1507,8 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
                     japaneseComposer.appendRomaji(action.text)
                 }
                 if (!accepted) {
-                    commitJapaneseBest()
+                    commitJapaneseRaw()
+                    if (japaneseComposer.hasComposition) return
                     currentInputConnection?.commitText(action.text, 1)
                 }
                 updateManualUi()
@@ -1457,7 +1527,7 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
             KeyAction.FinalizeJapaneseKana -> japaneseComposer.finalizeKanaTap()
 
             KeyAction.ToggleJapaneseLayout -> {
-                if (japaneseComposer.hasComposition) commitJapaneseBest()
+                if (japaneseComposer.hasComposition) commitJapaneseRaw()
                 if (japaneseComposer.hasComposition) return
                 val next = if (japaneseInputStyle == JapaneseInputStyle.ROMAJI) {
                     JapaneseInputStyle.KANA_12_KEY
@@ -1485,7 +1555,7 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
             }
 
             KeyAction.Enter -> {
-                if (!commitJapaneseBest()) performEnterAction()
+                if (!commitJapaneseRaw()) performEnterAction()
             }
 
             KeyAction.ToggleJapaneseScript -> {
@@ -1502,6 +1572,7 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
     private fun handleEnglishKey(action: KeyAction) {
         if (!::englishComposer.isInitialized) return
         when (action) {
+            KeyAction.ToggleEmoji, KeyAction.NextEmojiPage, is KeyAction.InsertEmoji -> Unit
             is KeyAction.InsertText -> {
                 val character = action.text.singleOrNull()
                 if (character != null &&
@@ -1568,16 +1639,31 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
             .firstOrNull { it.text == candidate }
             ?: return
         val hadComposition = zhuyinComposer.hasComposition
+        val originalReading = zhuyinComposer.composition
+        finalizeZhuyinSelectionLearning()
+        zhuyinReselection.clear()
         if (currentInputConnection?.commitText(selected.text, 1) == true) {
-            if (personalizationAllowed()) {
+            if (!hadComposition && personalizationAllowed()) {
                 personalization.recordCandidateSelection(
                     LearningLanguage.ZHUYIN,
                     selected.reading,
                     selected.text
                 )
             }
-            if (hadComposition) zhuyinComposer.clear()
+            if (hadComposition) zhuyinComposer.consumeCandidate(selected)
+            if (hadComposition && !currentLearningDecision.sensitiveField) {
+                currentInputConnection?.let { zhuyinReselection.remember(it, inputSessionId, originalReading, selected.text) }
+                pendingZhuyinLearning = selected
+            }
             updateManualUi()
+        }
+    }
+
+    private fun finalizeZhuyinSelectionLearning() {
+        val candidate = pendingZhuyinLearning ?: return
+        pendingZhuyinLearning = null
+        if (personalizationAllowed() && zhuyinReselection.isAvailable(currentInputConnection, inputSessionId)) {
+            personalization.recordCandidateSelection(LearningLanguage.ZHUYIN, candidate.reading, candidate.text)
         }
     }
 
@@ -1599,6 +1685,7 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
     }
 
     private fun selectEnglishCandidate(candidate: String) {
+        if (!currentLearningDecision.localSuggestionsAllowed) return
         if (!::englishComposer.isInitialized || !englishComposer.isComposing) return
         val prefix = englishComposer.currentWord
         val selected = englishComposer.candidates(ENGLISH_CANDIDATE_LIMIT)
@@ -1618,7 +1705,7 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
         if (!::zhuyinComposer.isInitialized || !zhuyinComposer.hasComposition) {
             return false
         }
-        val selected = rankedZhuyinCandidates().firstOrNull()
+        val selected = rankedZhuyinCandidateObjects().firstOrNull { it.source != ZhuyinCandidateSource.HEAD_MATCH }?.text
             ?: zhuyinComposer.peekBestOrRaw()?.text
             ?: return false
         if (currentInputConnection?.commitText(selected, 1) == true) {
@@ -1648,10 +1735,44 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
         return true
     }
 
+    private fun commitJapaneseRaw(): Boolean {
+        if (!::japaneseComposer.isInitialized || !japaneseComposer.hasComposition) return false
+        val raw = japaneseComposer.peekRaw() ?: return false
+        if (currentInputConnection?.commitText(raw.text, 1) == true) {
+            japaneseComposer.clear()
+            updateManualUi()
+        }
+        return true
+    }
+
+    private fun insertEmoji(emoji: String) {
+        if (currentState in setOf(ImeState.STARTING, ImeState.RECORDING, ImeState.STOPPING, ImeState.PROCESSING)) return
+        val connection = currentInputConnection ?: return
+        val prefix = when (currentInputMode) {
+            KeyboardView.InputMode.JAPANESE -> if (::japaneseComposer.isInitialized) japaneseComposer.peekRaw()?.text.orEmpty() else ""
+            KeyboardView.InputMode.ZHUYIN -> if (::zhuyinComposer.isInitialized && zhuyinComposer.hasComposition)
+                rankedZhuyinCandidateObjects().firstOrNull { it.source != ZhuyinCandidateSource.HEAD_MATCH }?.text
+                    ?: zhuyinComposer.peekBestOrRaw()?.text.orEmpty() else ""
+            KeyboardView.InputMode.ENGLISH -> if (::englishComposer.isInitialized) englishComposer.currentWord else ""
+            KeyboardView.InputMode.VOICE -> ""
+        }
+        // One commit keeps a multi-code-point emoji intact. Do not discard the
+        // pending word if the editor rejects the write or has lost its connection.
+        if (connection.commitText(prefix + emoji, 1)) {
+            when (currentInputMode) {
+                KeyboardView.InputMode.JAPANESE -> if (::japaneseComposer.isInitialized) japaneseComposer.clear()
+                KeyboardView.InputMode.ZHUYIN -> if (::zhuyinComposer.isInitialized) zhuyinComposer.clear()
+                KeyboardView.InputMode.ENGLISH -> if (::englishComposer.isInitialized) englishComposer.commitWord()
+                KeyboardView.InputMode.VOICE -> Unit
+            }
+            updateManualUi()
+        }
+    }
+
     private fun commitActiveComposition(): Boolean {
         return when (currentInputMode) {
             KeyboardView.InputMode.ZHUYIN -> commitZhuyinBest()
-            KeyboardView.InputMode.JAPANESE -> commitJapaneseBest()
+            KeyboardView.InputMode.JAPANESE -> commitJapaneseRaw()
             KeyboardView.InputMode.ENGLISH -> commitEnglishComposition()
             KeyboardView.InputMode.VOICE -> false
         }
@@ -1715,7 +1836,7 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
             )
         }
         if (candidates.isEmpty()) return emptyList()
-        val inputKey = candidates.first().reading
+        val inputKey = if (zhuyinComposer.hasComposition) zhuyinComposer.normalizedReading else candidates.first().reading
         val rankedTexts = rankCandidates(
             LearningLanguage.ZHUYIN,
             inputKey,
@@ -1751,14 +1872,16 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
     }
 
     private fun buildEnglishCandidates(prefix: String, limit: Int): List<EnglishCandidate> {
-        if (prefix.isBlank() || !::dictionaryManager.isInitialized) return emptyList()
+        if (prefix.isBlank() || limit <= 0 || !currentLearningDecision.localSuggestionsAllowed) return emptyList()
         val localTerms = (
-            dictionaryManager.getCustomWords() +
-                if (::personalization.isInitialized) {
+            (if (::dictionaryManager.isInitialized && currentLearningDecision.personalizationAllowed)
+                dictionaryManager.getCustomWords() else emptyList()) +
+                (if (personalizationAllowed()) {
                     personalization.getPromptWords(LearningLanguage.ENGLISH, 50)
                 } else {
                     emptyList()
-                }
+                }) + (if (::englishLexicon.isInitialized) englishLexicon else LocalEnglishCandidateProvider)
+                    .candidates(prefix, limit).map { it.text }
             )
             .asSequence()
             .filter { term ->
@@ -1786,6 +1909,13 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
 
     private fun updateManualUi() {
         val view = keyboardView ?: return
+        view.setZhuyinReselectAvailable(currentInputMode == KeyboardView.InputMode.ZHUYIN &&
+            !currentLearningDecision.sensitiveField && zhuyinReselection.isAvailable(currentInputConnection, inputSessionId))
+        if (currentLearningDecision.sensitiveField) {
+            // Never mirror a password into our plaintext composition/candidate UI.
+            view.updateCandidates("", emptyList())
+            return
+        }
         when (currentInputMode) {
             KeyboardView.InputMode.VOICE -> view.updateCandidates("", emptyList())
             KeyboardView.InputMode.ZHUYIN -> {
@@ -1816,7 +1946,7 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
                 } else {
                     ""
                 }
-                val candidates = if (::englishComposer.isInitialized) {
+                val candidates = if (::englishComposer.isInitialized && currentLearningDecision.localSuggestionsAllowed) {
                     englishComposer.candidates(ENGLISH_CANDIDATE_LIMIT).map { it.text }
                 } else {
                     emptyList()
@@ -1886,6 +2016,8 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
             candidatesStart,
             candidatesEnd
         )
+        keyboardView?.setZhuyinReselectAvailable(currentInputMode == KeyboardView.InputMode.ZHUYIN &&
+            !currentLearningDecision.sensitiveField && zhuyinReselection.isAvailable(currentInputConnection, inputSessionId))
         if (currentInputMode == KeyboardView.InputMode.ENGLISH &&
             ::englishComposer.isInitialized && englishComposer.isComposing &&
             (candidatesStart < 0 || candidatesEnd < 0 ||
@@ -2042,6 +2174,7 @@ class VoiceInputIME : InputMethodService(), KeyboardView.KeyboardActionListener 
     private fun setState(state: ImeState) {
         currentState = state
         keyboardView?.updateState(state)
+        keyboardView?.keepScreenOn = microphoneActive()
     }
 
     private fun showError(message: String) {

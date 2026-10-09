@@ -284,4 +284,11 @@
     <string name="price_groq_llm_large">每 100 萬 token：輸入 US$0.15／輸出 US$0.60</string>
     <string name="model_price_reference">價格基準：2026-07-27 查核的供應商官方公開價格；實際帳單與後續調整以供應商為準。</string>
     <string name="groq_reasoning_notice">SGH Voice 對 GPT OSS 使用 low 推理強度，降低語音整理時的延遲與推理 token 消耗。</string>
+    <string name="keyboard_emoji_open">表情符號；長按切換系統鍵盤</string>
+    <string name="keyboard_emoji_close">返回鍵盤</string>
+    <string name="keyboard_emoji_next_page">下一頁表情符號</string>
+    <string name="keyboard_emoji_page">表情符號 %1$d／%2$d</string>
+    <string name="keyboard_zhuyin_reselect">重選</string>
+    <string name="keyboard_zhuyin_reselect_desc">撤回剛選的字，恢復注音重新選字</string>
+    <string name="english_dictionary_attribution">英文詞庫衍生自 AOSP LatinIME（Apache 2.0），包含 Lexiteria LLC 字典署名；完整 NOTICE 隨 App 打包。只在本機提供候選，不會上傳輸入內容。</string>
 </resources>

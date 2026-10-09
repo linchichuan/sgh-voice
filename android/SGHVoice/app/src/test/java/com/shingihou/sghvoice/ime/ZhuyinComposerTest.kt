@@ -67,7 +67,8 @@ class ZhuyinComposerTest {
 
         val candidates = composer.getCandidates(
             limit = 4,
-            includeRawFallback = false
+            includeRawFallback = false,
+            includeHeadMatches = false // Test the full-reading beam, not the separate prefix choices.
         )
 
         assertEquals(listOf("我是", "我事", "我市", "我室"), candidates.map { it.text })

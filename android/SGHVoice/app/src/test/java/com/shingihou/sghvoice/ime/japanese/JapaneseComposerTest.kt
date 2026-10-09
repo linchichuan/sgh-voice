@@ -8,6 +8,77 @@ import org.junit.Test
 
 class JapaneseComposerTest {
 
+    @Test
+    fun `single vowels retain plain kana with a full dictionary candidate list`() {
+        val crowdedLexicon = JapaneseLexicon {
+            (1..12).map { index -> JapaneseLexiconEntry("漢字候補$index", score = 20 - index) }
+        }
+        listOf("a" to "あ", "i" to "い", "u" to "う", "e" to "え", "o" to "お")
+            .forEach { (romaji, kana) ->
+                val composer = JapaneseComposer(crowdedLexicon)
+                assertTrue(composer.appendRomaji(romaji))
+                val candidates = composer.getCandidates()
+                assertTrue("$kana must remain selectable", candidates.any { it.text == kana })
+                assertTrue(candidates.size <= JapaneseComposer.DEFAULT_CANDIDATE_LIMIT)
+                assertEquals(kana, composer.commitRaw()?.text)
+
+                assertTrue(composer.setInputStyle(JapaneseInputStyle.KANA_12_KEY))
+                assertTrue(composer.appendKana(kana))
+                assertTrue(composer.getCandidates().any { it.text == kana })
+                assertEquals(kana, composer.commitRaw()?.text)
+            }
+    }
+
+    @Test
+    fun `prefix predictions cannot displace either kana fallback`() {
+        val composer = JapaneseComposer(object : JapaneseLexicon {
+            override fun lookup(reading: String) = emptyList<JapaneseLexiconEntry>()
+
+            override fun lookupPrefix(readingPrefix: String, limit: Int) =
+                (1..limit).map { JapaneseLexiconEntry("予測$it") }
+        })
+        composer.appendRomaji("a")
+
+        assertEquals(listOf("予測1", "あ", "ア"), composer.getCandidates(3).map { it.text })
+        assertEquals("予測1", composer.peekBestOrRaw()?.text)
+        assertEquals(listOf("あ"), composer.getCandidates(1).map { it.text })
+        composer.toggleScriptMode()
+        assertEquals(listOf("ア"), composer.getCandidates(1).map { it.text })
+        assertTrue(composer.getCandidates(0).isEmpty())
+    }
+
+    @Test
+    fun `peek raw finalizes kana without clearing composition before host accepts it`() {
+        val composer = JapaneseComposer(lexicon)
+        composer.appendRomaji("nihon")
+
+        assertEquals("にほん", composer.peekRaw()?.text)
+        assertEquals("nihon", composer.rawRomaji)
+        assertTrue(composer.hasComposition)
+        assertEquals("日本", composer.peekBestOrRaw()?.text)
+
+        composer.toggleScriptMode()
+        assertEquals("ニホン", composer.peekRaw()?.text)
+        assertTrue(composer.hasComposition)
+        assertEquals("ニホン", composer.commitRaw()?.text)
+        assertNull(composer.peekRaw())
+    }
+
+    @Test
+    fun `an existing top kana dictionary result keeps its conversion rank`() {
+        val composer = JapaneseComposer(JapaneseLexicon {
+            listOf(
+                JapaneseLexiconEntry("ある", score = 100),
+                JapaneseLexiconEntry("有る", score = 50),
+                JapaneseLexiconEntry("或る", score = 30)
+            )
+        })
+        composer.appendRomaji("aru")
+
+        assertEquals(listOf("ある", "有る", "アル"), composer.getCandidates(3).map { it.text })
+        assertEquals("ある", composer.peekBestOrRaw()?.text)
+    }
+
     private val lexicon = JapaneseLexicon { reading ->
         when (reading) {
             "にほん" -> listOf(

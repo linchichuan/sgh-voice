@@ -15,6 +15,23 @@ import java.util.Locale
  */
 class ManualKeyboardLayoutProvider {
 
+    /** Six columns retain 44dp targets on compact phones; paging never adds height. */
+    fun emojiRows(page: Int): List<KeyboardRow> {
+        val pageIndex = EmojiPalette.normalizedPage(page)
+        return EmojiPalette.pages[pageIndex].chunked(6).mapIndexed { row, values ->
+            KeyboardRow(values.mapIndexed { column, emoji ->
+                KeySpec("emoji_${pageIndex}_${row}_$column", emoji, KeyAction.InsertEmoji(emoji))
+            })
+        } + KeyboardRow(listOf(
+            actionKey("emoji_close", "ABC", KeyAction.ToggleEmoji, "Return to keyboard"),
+            actionKey("emoji_next", "${pageIndex + 1}/${EmojiPalette.pages.size} ›",
+                KeyAction.NextEmojiPage, "Next emoji page", widthWeight = 1.5f),
+            spaceKey("emoji_space", widthWeight = 1.5f),
+            backspaceKey("emoji").copy(widthWeight = 1f),
+            enterKey("emoji_enter").copy(widthWeight = 1f)
+        ))
+    }
+
     fun layout(
         mode: ManualKeyboardMode,
         layer: KeyboardLayer = KeyboardLayer.LETTERS,

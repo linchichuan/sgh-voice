@@ -1,0 +1,23 @@
+{
+  "dataLicence": "Apache-2.0",
+  "excludedFlaggedWordCount": 4558,
+  "filters": "Unflagged lowercase ASCII words and contractions; 2-32 characters; no proper-name expansion",
+  "formatVersion": 1,
+  "generatedAtUtc": "2026-10-09T03:33:21+00:00",
+  "lexiconBytes": 566462,
+  "lexiconFile": "aosp_english.tsv",
+  "lexiconSha256": "a51d9185731cc480290f6a7702c121a1168d2f6a1f3230a98635769a8b6fda69",
+  "licenceSha256": "d04394c729fc9fda050d5733d8ee11663fb54fe54d94532de968cf85c1cc42fb",
+  "licenceUrl": "https://android.googlesource.com/platform/packages/inputmethods/LatinIME/+/127336e9f29d69607eab55982324b210279ae8c5/NOTICE",
+  "maxWords": 50000,
+  "minFrequency": 60,
+  "scannedWordCount": 165544,
+  "sourceBytes": 914050,
+  "sourceCommit": "127336e9f29d69607eab55982324b210279ae8c5",
+  "sourceDictionaryHeader": "dictionary=main:en,locale=en,description=English,date=1414726273,version=54",
+  "sourceProjectUrl": "https://android.googlesource.com/platform/packages/inputmethods/LatinIME",
+  "sourceSha256": "07682388185c285d307e341d1733331af8699f735b4137e9f22571017fab69d2",
+  "sourceUrl": "https://android.googlesource.com/platform/packages/inputmethods/LatinIME/+/127336e9f29d69607eab55982324b210279ae8c5/dictionaries/en_wordlist.combined.gz",
+  "updateProcedure": "Review a new official AOSP commit, update SOURCE_COMMIT, regenerate and verify tests before shipping with the APK.",
+  "wordCount": 45371
+}

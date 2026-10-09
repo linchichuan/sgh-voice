@@ -104,4 +104,20 @@ class CompactJapaneseLexiconTest {
 
         assertEquals(listOf("橋", "箸"), lexicon.lookup("はし").map { it.text })
     }
+
+    @Test
+    fun `prefix query finds common words beyond the former alphabetic scan cap`() {
+        val rows = (0..99).joinToString("\n") { index ->
+            "あ${(0x3042 + index).toChar()}\t1\t候補$index"
+        }
+        val lexicon = load(rows + "\nあん\t9000\t案\n")
+        assertEquals("案", lexicon.lookupPrefix("あ", 3).first().text)
+        assertEquals(3, lexicon.lookupPrefix("あ", 3).size)
+    }
+
+    @Test
+    fun `prefix top k handles duplicate surfaces at different scores`() {
+        val lexicon = load("あい\t1\t愛\nあう\t3\t会う\nあん\t9\t愛\n")
+        assertEquals(listOf("愛", "会う"), lexicon.lookupPrefix("あ", 2).map { it.text })
+    }
 }

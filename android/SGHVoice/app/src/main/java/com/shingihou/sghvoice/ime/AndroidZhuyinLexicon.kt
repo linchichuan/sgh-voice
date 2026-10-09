@@ -54,7 +54,7 @@ class AndroidZhuyinLexicon(context: Context) : ZhuyinLexicon {
         return mergeRankedEntries(
             userLexicon.lookup(normalized) +
                 PhaseOneZhuyinLexicon.lookup(normalized).map(::boostSeedEntry),
-            exactAsset.lookupExact(normalized),
+            traditionalStockEntries(normalized, exactAsset.lookupExact(normalized)),
             limit = Int.MAX_VALUE
         )
     }
@@ -70,7 +70,7 @@ class AndroidZhuyinLexicon(context: Context) : ZhuyinLexicon {
             userLexicon.lookupToneFolded(reading, limit) +
                 PhaseOneZhuyinLexicon.lookupToneFolded(reading, limit)
                     .map(::boostSeedEntry),
-            foldedAsset.lookupExact(folded),
+            traditionalStockEntries(folded, foldedAsset.lookupExact(folded)),
             limit = limit
         )
     }
@@ -97,7 +97,7 @@ class AndroidZhuyinLexicon(context: Context) : ZhuyinLexicon {
                 val completionPenalty = (
                     row.key.length - prefix.length
                     ).coerceAtLeast(0) * PREFIX_COMPLETION_PENALTY
-                row.entries.forEach { entry ->
+                traditionalStockEntries(row.key, row.entries).forEach { entry ->
                     if (candidatesScanned >= MAX_PREFIX_CANDIDATES_TO_SCAN) {
                         return@forEach
                     }
@@ -136,6 +136,22 @@ class AndroidZhuyinLexicon(context: Context) : ZhuyinLexicon {
 
     private fun boostSeedEntry(entry: ZhuyinLexiconEntry): ZhuyinLexiconEntry =
         entry.copy(score = SEED_SCORE_OFFSET + entry.score)
+
+    /** Hide common simplified single-character variants only in the bundled
+     * reading candidates. Explicit user entries, names and ambiguous traditional
+     * characters such as 云 remain untouched; Japanese uses a separate lexicon. */
+    private fun traditionalStockEntries(
+        reading: String,
+        entries: List<ZhuyinLexiconEntry>
+    ): List<ZhuyinLexiconEntry> {
+        val variant = when (foldZhuyinTones(reading)) {
+            "ㄊㄧ" -> "体"
+            "ㄨㄤ" -> "网"
+            "ㄨㄢ" -> "万"
+            else -> return entries
+        }
+        return entries.filterNot { it.text == variant }
+    }
 
     private fun mergeRankedEntries(
         first: List<ZhuyinLexiconEntry>,

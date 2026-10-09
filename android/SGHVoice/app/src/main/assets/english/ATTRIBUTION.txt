@@ -1,0 +1,18 @@
+SGH Voice English Lexicon Attribution
+
+Derived from the Android Open Source Project LatinIME English dictionary.
+Copyright (c) 2008, The Android Open Source Project.
+Includes Dictionaries © Lexiteria LLC. Used by permission.
+
+Source: https://android.googlesource.com/platform/packages/inputmethods/LatinIME/+/127336e9f29d69607eab55982324b210279ae8c5/dictionaries/en_wordlist.combined.gz
+Pinned commit: 127336e9f29d69607eab55982324b210279ae8c5
+Source gzip SHA-256: 07682388185c285d307e341d1733331af8699f735b4137e9f22571017fab69d2
+Licence: Apache License 2.0. The complete upstream notice is AOSP_NOTICE.txt.
+Upstream licence declaration: https://android.googlesource.com/platform/packages/inputmethods/LatinIME/+/127336e9f29d69607eab55982324b210279ae8c5/Android.bp
+
+SGH Voice adaptation: filtered flagged/non-word/uppercase entries, retained
+45371 common words by upstream frequency, and changed the format to a
+sorted UTF-8 TSV. This is prefix completion only, not an autocorrect engine.
+The app's separately curated everyday seed words have higher priority.
+No dictionary queries, typed input or learning data are sent to the source.
+No endorsement by AOSP, Google or Lexiteria is implied.

@@ -284,4 +284,11 @@
     <string name="price_groq_llm_large">Per 1M tokens: US$0.15 input / US$0.60 output</string>
     <string name="model_price_reference">Price reference: official public provider pricing checked 2026-07-27. Your provider’s current pricing and bill take precedence.</string>
     <string name="groq_reasoning_notice">SGH Voice uses low reasoning effort for GPT OSS to limit latency and reasoning-token use during dictation cleanup.</string>
+    <string name="keyboard_emoji_open">Emoji; hold to switch system keyboard</string>
+    <string name="keyboard_emoji_close">Back to keyboard</string>
+    <string name="keyboard_emoji_next_page">Next emoji page</string>
+    <string name="keyboard_emoji_page">Emoji %1$d of %2$d</string>
+    <string name="keyboard_zhuyin_reselect">Undo</string>
+    <string name="keyboard_zhuyin_reselect_desc">Undo the last word selection and restore its Zhuyin reading</string>
+    <string name="english_dictionary_attribution">English dictionary derived from AOSP LatinIME (Apache 2.0), including Lexiteria LLC dictionary attribution. The full NOTICE is bundled. Suggestions stay on-device; typed text is not uploaded.</string>
 </resources>

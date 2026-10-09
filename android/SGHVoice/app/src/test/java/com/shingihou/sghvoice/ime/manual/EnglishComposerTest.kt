@@ -8,6 +8,43 @@ import org.junit.Test
 class EnglishComposerTest {
 
     @Test
+    fun `default composer suggests common local words without changing typed prefix`() {
+        val composer = EnglishComposer()
+        "hel".forEach { composer.inputCharacter(it) }
+
+        val suggestions = composer.candidates().map { it.text }
+
+        assertTrue("hello must be offered for hel", "hello" in suggestions)
+        assertTrue("help must be offered for hel", "help" in suggestions)
+        assertEquals("hel", composer.currentWord)
+        assertEquals(EnglishEdit.CommitText("hel "), composer.commitWord(" "))
+    }
+
+    @Test
+    fun `local completions track prefix edits and candidate selection is explicit`() {
+        val composer = EnglishComposer()
+        composer.pressShift()
+        "hell".forEach { composer.inputCharacter(it) }
+        assertEquals(listOf("hello"), composer.candidates().map { it.text })
+        assertEquals(EnglishEdit.SetComposingText("Hel"), composer.backspace())
+        assertTrue(composer.candidates().any { it.text == "help" })
+        val hello = composer.candidates().first { it.text == "hello" }
+        assertEquals(EnglishEdit.CommitText("Hello "), composer.acceptCandidate(hello, " "))
+        assertTrue(composer.candidates().isEmpty())
+    }
+
+    @Test
+    fun `local vocabulary only completes prefixes and respects limits`() {
+        val provider = LocalEnglishCandidateProvider
+        assertEquals(listOf("hello"), provider.candidates("HEL", 1).map { it.text })
+        assertTrue(provider.candidates("wor", 8).map { it.text }.containsAll(listOf("work", "world")))
+        assertTrue(provider.candidates("", 8).isEmpty())
+        assertTrue(provider.candidates("he", 0).isEmpty())
+        assertTrue(provider.candidates("zzzz", 8).isEmpty())
+        assertTrue(provider.candidates("hel", 8).all { it.text.startsWith("hel") })
+    }
+
+    @Test
     fun `one-shot shift applies to one letter and then turns off`() {
         val composer = EnglishComposer()
 

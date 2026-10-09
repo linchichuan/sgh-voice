@@ -40,7 +40,12 @@ enum class KeyRole {
 
 sealed class KeyAction {
     data class InsertText(val text: String) : KeyAction()
+    /** Commit one complete emoji sequence, including variation selectors and ZWJ. */
+    data class InsertEmoji(val text: String) : KeyAction()
     data class SwitchLayer(val layer: KeyboardLayer) : KeyAction()
+
+    object ToggleEmoji : KeyAction()
+    object NextEmojiPage : KeyAction()
 
     object Backspace : KeyAction()
     object Enter : KeyAction()

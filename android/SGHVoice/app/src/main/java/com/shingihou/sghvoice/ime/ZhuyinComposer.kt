@@ -64,6 +64,7 @@ enum class ZhuyinCandidateSource {
     PREFIX_PREDICTION,
     CONTEXT_PREDICTION,
     SEGMENTED,
+    HEAD_MATCH,
     RAW_FALLBACK
 }
 
@@ -286,7 +287,8 @@ class ZhuyinComposer(
      */
     fun getCandidates(
         limit: Int = DEFAULT_CANDIDATE_LIMIT,
-        includeRawFallback: Boolean = true
+        includeRawFallback: Boolean = true,
+        includeHeadMatches: Boolean = true
     ): List<ZhuyinCandidate> {
         require(limit >= 0) { "Candidate limit cannot be negative." }
         if (limit == 0 || !hasComposition) return emptyList()
@@ -294,18 +296,24 @@ class ZhuyinComposer(
         val reading = normalizedReading
         val ranked = mutableListOf<ZhuyinCandidate>()
         val seenTexts = mutableSetOf<String>()
+        val heads = if (includeHeadMatches) headCandidates() else emptyList()
+        // Leave room for selecting only the beginning, even with many exact
+        // phrase homophones. A full phrase still ranks ahead of partial choices.
+        val fullBudget = if (heads.isEmpty()) limit else
+            (limit - minOf(heads.size, maxOf(1, limit / 3))).coerceAtLeast(1)
 
         fun appendEntries(
             entries: List<ZhuyinLexiconEntry>,
-            source: ZhuyinCandidateSource
+            source: ZhuyinCandidateSource,
+            budget: Int = limit
         ) {
-            if (ranked.size >= limit) return
+            if (ranked.size >= budget) return
             entries.asSequence()
                 .filter { it.text.isNotBlank() }
                 .sortedByDescending { it.score }
                 .distinctBy { it.text }
                 .forEach { entry ->
-                    if (ranked.size >= limit) return@forEach
+                    if (ranked.size >= budget) return@forEach
                     if (seenTexts.add(entry.text)) {
                         ranked += ZhuyinCandidate(
                             text = entry.text,
@@ -319,15 +327,21 @@ class ZhuyinComposer(
 
         appendEntries(
             lexicon.lookup(reading),
-            ZhuyinCandidateSource.LEXICON
+            ZhuyinCandidateSource.LEXICON,
+            fullBudget
         )
         appendEntries(
             lexicon.lookupToneFolded(
                 reading,
                 minOf(limit, MAX_PREDICTION_QUERY_RESULTS)
             ),
-            ZhuyinCandidateSource.TONE_FOLDED
+            ZhuyinCandidateSource.TONE_FOLDED,
+            fullBudget
         )
+
+        heads.forEach { candidate ->
+            if (ranked.size < limit && seenTexts.add(candidate.text)) ranked += candidate
+        }
 
         if (syllables.size == 1) {
             appendEntries(
@@ -350,6 +364,38 @@ class ZhuyinComposer(
             if (seenTexts.add(raw.text)) ranked += raw
         }
         return ranked.take(limit)
+    }
+
+    private fun headCandidates(): List<ZhuyinCandidate> {
+        val sounds = syllables
+        if (sounds.size < 2) return emptyList()
+        // At most eight bounded prefix lookups, never a whole-dictionary scan.
+        val groups = (minOf(sounds.size - 1, 8) downTo 1).map { length ->
+            val head = sounds.take(length)
+            if (!head.all(::isCompleteSyllable)) return@map emptyList()
+            val reading = head.joinToString(" ")
+            (lexicon.lookup(reading) + lexicon.lookupToneFolded(reading, 3))
+                .filter { it.text.isNotBlank() }
+                .distinctBy { it.text }
+                .take(3)
+                .map { ZhuyinCandidate(it.text, reading, ZhuyinCandidateSource.HEAD_MATCH, it.score) }
+        }
+        // Always expose both the longest matched beginning and its first word;
+        // several homophones of a long phrase must not crowd the single word out.
+        val orderedGroups = if (groups.size > 1) listOf(groups.first(), groups.last()) + groups.drop(1).dropLast(1) else groups
+        return orderedGroups.mapNotNull { it.firstOrNull() } + orderedGroups.flatMap { it.drop(1) }
+    }
+
+    /** Consume only the reading represented by a successful editor write. */
+    fun consumeCandidate(candidate: ZhuyinCandidate): Boolean {
+        if (!hasComposition) return false
+        val count = candidate.reading.split(' ').size
+        if (candidate.reading != syllables.take(count).joinToString(" ") || count > syllables.size) return false
+        if (candidate.source != ZhuyinCandidateSource.HEAD_MATCH && candidate.reading != normalizedReading) return false
+        val fromCompleted = minOf(count, completedSyllables.size)
+        repeat(fromCompleted) { completedSyllables.removeAt(0) }
+        if (count > fromCompleted) current.clear()
+        return true
     }
 
     /**
@@ -387,7 +433,7 @@ class ZhuyinComposer(
 
     /**
      * Selects the currently visible candidate at [index]. A valid selection
-     * clears the composition and returns the exact value the IME should commit.
+     * consumes the selected reading and leaves any unselected suffix editable.
      */
     fun selectCandidate(
         index: Int,
@@ -395,7 +441,7 @@ class ZhuyinComposer(
         includeRawFallback: Boolean = true
     ): ZhuyinCandidate? {
         val selected = getCandidates(limit, includeRawFallback).getOrNull(index) ?: return null
-        clear()
+        consumeCandidate(selected)
         return selected
     }
 
@@ -405,7 +451,7 @@ class ZhuyinComposer(
      */
     fun peekBestOrRaw(): ZhuyinCandidate? {
         if (!hasComposition) return null
-        return getCandidates(limit = 1, includeRawFallback = false).firstOrNull()
+        return getCandidates(limit = 1, includeRawFallback = false, includeHeadMatches = false).firstOrNull()
             ?: rawCandidate()
     }
 

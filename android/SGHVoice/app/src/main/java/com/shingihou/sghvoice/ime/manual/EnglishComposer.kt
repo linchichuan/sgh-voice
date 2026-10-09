@@ -51,7 +51,7 @@ sealed class EnglishEdit {
  */
 class EnglishComposer(
     private val candidateProvider: EnglishCandidateProvider =
-        EnglishCandidateProvider { _, _ -> emptyList() },
+        LocalEnglishCandidateProvider,
     private val candidateHook: EnglishCandidateHook = object : EnglishCandidateHook {}
 ) {
     private val buffer = StringBuilder()

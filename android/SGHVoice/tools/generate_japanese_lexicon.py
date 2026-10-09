@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Generate SGH Voice's compact Japanese IME lexicon from JMdict.
 
-The generator intentionally keeps only exact reading-to-surface mappings for
-entries carrying one of JMdict's first-tier priority markers. It does not turn
+The generator keeps exact reading-to-surface mappings for common first/second
+tier entries and ranked newspaper vocabulary, excluding obsolete/search-only
+forms. It does not turn
 JMdict into a full morphological or statistical conversion engine.
 
 Official sources:
@@ -43,13 +44,31 @@ CC_BY_SA_LEGAL_CODE_URL = (
 USER_AGENT = "SGH-Voice-JMdict-Generator/1.0"
 
 FORMAT_VERSION = 1
-DEFAULT_PRIORITY_TAGS = ("ichi1", "news1", "spec1", "gai1")
+DEFAULT_PRIORITY_TAGS = (
+    "ichi1", "news1", "spec1", "gai1", "ichi2", "news2", "spec2", "gai2",
+    *(f"nf{rank:02d}" for rank in range(1, 49)),
+)
 PRIORITY_SCORES = {
     "spec1": 4_000,
     "ichi1": 3_000,
     "news1": 2_000,
     "gai1": 2_000,
+    "spec2": 1_200,
+    "ichi2": 900,
+    "news2": 800,
+    "gai2": 800,
 }
+EXCLUDED_FORM_INFORMATION = frozenset({
+    "sK", "sk", "rK", "rk", "oK", "ok",
+    "search-only kanji form", "search-only kana form",
+    "rarely used kanji form", "rarely-used kanji form",
+    "rarely used kana form", "rarely-used kana form",
+    "word containing outdated kanji or kanji usage",
+    "out-dated or obsolete kana usage", "outdated or obsolete kana usage",
+})
+EXCLUDED_SENSE_INFORMATION = frozenset({
+    "arch", "obs", "rare", "archaic", "obsolete term", "rare term",
+})
 NF_RE = re.compile(r"^nf(\d{2})$")
 CREATED_RE = re.compile(rb"JMdict created:\s*(\d{4}-\d{2}-\d{2})")
 
@@ -119,6 +138,8 @@ def extract_candidates(
         "scannedEntryCount": 0,
         "priorityEntryCount": 0,
         "candidatePairCountBeforeDeduplication": 0,
+        "excludedFormCount": 0,
+        "excludedEntryCount": 0,
     }
 
     parser = ET.iterparse(io.BytesIO(xml_bytes), events=("end",))
@@ -126,9 +147,21 @@ def extract_candidates(
         if entry.tag != "entry":
             continue
         stats["scannedEntryCount"] += 1
+        senses = entry.findall("sense")
+        if senses and all(
+            EXCLUDED_SENSE_INFORMATION.intersection(element_texts(sense, "misc"))
+            or set(element_texts(sense, "pos")) == {"counter"}
+            for sense in senses
+        ):
+            stats["excludedEntryCount"] += 1
+            entry.clear()
+            continue
 
         written_forms: list[tuple[str, set[str]]] = []
         for kanji_element in entry.findall("k_ele"):
+            if EXCLUDED_FORM_INFORMATION.intersection(element_texts(kanji_element, "ke_inf")):
+                stats["excludedFormCount"] += 1
+                continue
             surface = (kanji_element.findtext("keb") or "").strip()
             if not is_safe_field(surface):
                 continue
@@ -138,6 +171,9 @@ def extract_candidates(
 
         entry_produced_candidate = False
         for reading_element in entry.findall("r_ele"):
+            if EXCLUDED_FORM_INFORMATION.intersection(element_texts(reading_element, "re_inf")):
+                stats["excludedFormCount"] += 1
+                continue
             raw_reading = (reading_element.findtext("reb") or "").strip()
             if not is_safe_field(raw_reading):
                 continue
@@ -263,6 +299,8 @@ Source snapshot date: {snapshot_date}
 Source SHA-256: {source_sha256}
 Included subset: {reading_count} exact readings / {candidate_count} candidates
 Priority filters: {", ".join(sorted(priority_tags))}
+Excluded: search-only, rare and obsolete forms; archaic/obsolete-only entries
+and counter-only entries. Native Japanese written forms are preserved.
 
 The generated jmdict_common.tsv and adaptations of that data are distributed
 under CC BY-SA 4.0. The SGH Voice application code is separately licensed.
@@ -369,6 +407,9 @@ def main() -> None:
         "candidatePairCountBeforeDeduplication": stats[
             "candidatePairCountBeforeDeduplication"
         ],
+        "excludedFormCount": stats["excludedFormCount"],
+        "excludedEntryCount": stats["excludedEntryCount"],
+        "excludedFormInformation": sorted(EXCLUDED_FORM_INFORMATION),
         "readingCount": len(entries),
         "candidateCount": candidate_count,
         "lexiconFile": "jmdict_common.tsv",

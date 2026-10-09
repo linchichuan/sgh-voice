@@ -282,11 +282,19 @@ class JapaneseComposer(
                 )
             )
         }
-        candidates += fallbacks
-
-        return candidates
+        // Kana must stay selectable even when dictionary results fill the strip.
+        // Keep the existing conversion order within the remaining dictionary slots.
+        val visibleFallbacks = fallbacks.distinctBy { it.text }.take(limit)
+        val fallbackTexts = visibleFallbacks.map { it.text }.toSet()
+        val conversions = candidates
             .distinctBy { it.text }
-            .take(limit)
+            .filterNot { it.text in fallbackTexts }
+            .take(limit - visibleFallbacks.size)
+        val visibleTexts = (conversions + visibleFallbacks).map { it.text }.toSet()
+        // A dictionary result may itself be kana. Retain its original rank.
+        return (candidates + visibleFallbacks)
+            .distinctBy { it.text }
+            .filter { it.text in visibleTexts }
     }
 
     fun selectCandidate(
@@ -298,7 +306,7 @@ class JapaneseComposer(
         return selected
     }
 
-    fun peekBestOrRaw(): JapaneseCandidate? = getCandidates(limit = 1).firstOrNull()
+    fun peekBestOrRaw(): JapaneseCandidate? = getCandidates().firstOrNull()
 
     fun commitBestOrRaw(): JapaneseCandidate? {
         val candidate = peekBestOrRaw() ?: return null
@@ -307,13 +315,14 @@ class JapaneseComposer(
     }
 
     /**
-     * Commits the preferred kana fallback without applying a kanji candidate.
+     * Reads the preferred kana fallback without applying a kanji candidate.
+     * The host can commit first and only clear after InputConnection succeeds.
      * Unresolved non-`n` romaji is preserved verbatim.
      */
-    fun commitRaw(): JapaneseCandidate? {
+    fun peekRaw(): JapaneseCandidate? {
         if (!hasComposition) return null
         val reading = hiraganaReading
-        val candidate = if (reading == null) {
+        return if (reading == null) {
             JapaneseCandidate(
                 text = composition,
                 reading = composition,
@@ -333,6 +342,11 @@ class JapaneseComposer(
                 )
             }
         }
+    }
+
+    /** Commits exactly the preferred kana reading, never a dictionary prediction. */
+    fun commitRaw(): JapaneseCandidate? {
+        val candidate = peekRaw() ?: return null
         clear()
         return candidate
     }

@@ -12,10 +12,12 @@ Data licence: Creative Commons Attribution-ShareAlike 4.0 International
 Full licence file: CC-BY-SA-4.0.txt
 
 Source distribution: https://www.edrdg.org/pub/Nihongo/JMdict_b.gz
-Source snapshot date: 2026-07-26
-Source SHA-256: 2e583f835dc1517f8c53718ebb74a8c98651f786f7b508c521387baaa0070d00
-Included subset: 19631 exact readings / 22819 candidates
-Priority filters: gai1, ichi1, news1, spec1
+Source snapshot date: 2026-10-09
+Source SHA-256: 04cc54f92f7d82078c788e8957d44783bd565df377e7de3571bdac6fad7d2140
+Included subset: 26818 exact readings / 32005 candidates
+Priority filters: gai1, gai2, ichi1, ichi2, news1, news2, nf01, nf02, nf03, nf04, nf05, nf06, nf07, nf08, nf09, nf10, nf11, nf12, nf13, nf14, nf15, nf16, nf17, nf18, nf19, nf20, nf21, nf22, nf23, nf24, nf25, nf26, nf27, nf28, nf29, nf30, nf31, nf32, nf33, nf34, nf35, nf36, nf37, nf38, nf39, nf40, nf41, nf42, nf43, nf44, nf45, nf46, nf47, nf48, spec1, spec2
+Excluded: search-only, rare and obsolete forms; archaic/obsolete-only entries
+and counter-only entries. Native Japanese written forms are preserved.
 
 The generated jmdict_common.tsv and adaptations of that data are distributed
 under CC BY-SA 4.0. The SGH Voice application code is separately licensed.

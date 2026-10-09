@@ -284,4 +284,11 @@
     <string name="price_groq_llm_large">100 万 token：入力 US$0.15／出力 US$0.60</string>
     <string name="model_price_reference">価格基準：2026-07-27 に確認した各社の公式公開価格です。実際の請求と今後の変更は各サービスの表示を優先してください。</string>
     <string name="groq_reasoning_notice">SGH Voice は GPT OSS を low 推論強度で使用し、音声整理時の遅延と推論 token の消費を抑えます。</string>
+    <string name="keyboard_emoji_open">絵文字。長押しでシステムキーボードを切り替え</string>
+    <string name="keyboard_emoji_close">キーボードに戻る</string>
+    <string name="keyboard_emoji_next_page">次の絵文字ページ</string>
+    <string name="keyboard_emoji_page">絵文字 %1$d／%2$d</string>
+    <string name="keyboard_zhuyin_reselect">戻す</string>
+    <string name="keyboard_zhuyin_reselect_desc">直前の選択を取り消して注音から選び直す</string>
+    <string name="english_dictionary_attribution">英語辞書は AOSP LatinIME（Apache 2.0）由来で、Lexiteria LLC の辞書クレジットを含みます。NOTICE 全文を同梱しています。候補は端末内で検索し、入力内容を送信しません。</string>
 </resources>

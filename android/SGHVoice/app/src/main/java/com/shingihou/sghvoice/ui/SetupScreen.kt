@@ -1190,6 +1190,13 @@ private fun UsageTab() {
                 ) {
                     Text(stringResource(R.string.btn_zhuyin_license))
                 }
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(stringResource(R.string.english_dictionary_attribution), style = MaterialTheme.typography.bodySmall)
+                TextButton(onClick = {
+                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(
+                        "https://android.googlesource.com/platform/packages/inputmethods/LatinIME/+/127336e9f29d69607eab55982324b210279ae8c5/NOTICE"
+                    )))
+                }) { Text(stringResource(R.string.btn_dictionary_license)) }
             }
         }
     }

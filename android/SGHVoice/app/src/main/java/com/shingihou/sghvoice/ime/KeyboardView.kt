@@ -5,11 +5,13 @@ import android.content.Context
 import android.content.res.ColorStateList
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.ColorFilter
 import android.graphics.Paint
+import android.graphics.PixelFormat
 import android.graphics.Typeface
+import android.graphics.drawable.Drawable
 import android.graphics.drawable.InsetDrawable
-import android.graphics.drawable.GradientDrawable
-import android.graphics.drawable.RippleDrawable
+import android.graphics.drawable.StateListDrawable
 import android.text.SpannableString
 import android.text.Spanned
 import android.text.TextUtils
@@ -46,6 +48,7 @@ import com.shingihou.sghvoice.ime.japanese.JapaneseScriptMode
 import com.shingihou.sghvoice.ime.japanese.JapaneseInputStyle
 import com.shingihou.sghvoice.ime.japanese.KanaFlickKeyView
 import com.shingihou.sghvoice.ime.manual.KeyAction
+import com.shingihou.sghvoice.ime.manual.EmojiPalette
 import com.shingihou.sghvoice.ime.manual.KeyRole
 import com.shingihou.sghvoice.ime.manual.KeySpec
 import com.shingihou.sghvoice.ime.manual.KeyboardLayer
@@ -55,6 +58,7 @@ import com.shingihou.sghvoice.ime.manual.ShiftState
 import com.shingihou.sghvoice.processing.RecognitionLanguage
 import com.shingihou.sghvoice.processing.TranslationLanguage
 import com.shingihou.sghvoice.processing.TranslationRequest
+import java.util.Locale
 
 /**
  * SGH Voice 鍵盤視圖。
@@ -71,6 +75,7 @@ class KeyboardView @JvmOverloads constructor(
     companion object {
         private const val MAX_RENDERED_CANDIDATES = 48
         private const val EXPANDED_CANDIDATE_COLUMNS = 3
+        private const val ZHUYIN_EXPANDED_CANDIDATE_COLUMNS = 2
     }
 
     enum class InputMode {
@@ -100,6 +105,7 @@ class KeyboardView @JvmOverloads constructor(
         fun onCandidateSelected(candidate: String)
         fun onNextKeyboardPressed()
         fun onKeyboardPickerRequested()
+        fun onZhuyinReselectRequested() {}
     }
 
     private val layoutProvider = ManualKeyboardLayoutProvider()
@@ -157,6 +163,11 @@ class KeyboardView @JvmOverloads constructor(
     private lateinit var translationChipButtons: Map<TranslationLanguage, TextView>
     private val selectedTranslationTargets = linkedSetOf<TranslationLanguage>()
     private lateinit var compositionText: TextView
+    private lateinit var compositionSummary: HorizontalScrollView
+    private lateinit var compositionSummaryContent: FrameLayout
+    private lateinit var inputStrip: LinearLayout
+    private lateinit var zhuyinReselectButton: TextView
+    private var zhuyinReselectAvailable = false
     private lateinit var candidateScroller: HorizontalScrollView
     private lateinit var candidateContainer: LinearLayout
     private lateinit var candidateExpandButton: ImageButton
@@ -171,6 +182,8 @@ class KeyboardView @JvmOverloads constructor(
     private lateinit var enterButton: TextView
     private var latestCandidates: List<String> = emptyList()
     private var candidatesExpanded = false
+    private var emojiPanelVisible = false
+    private var emojiPage = 0
 
     init {
         layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
@@ -196,7 +209,7 @@ class KeyboardView @JvmOverloads constructor(
 
     private fun updateTouchSplitting(group: ViewGroup) {
         // Only flick needs a single gesture owner. Keep normal overlapping QWERTY taps.
-        group.isMotionEventSplittingEnabled = inputMode != InputMode.JAPANESE ||
+        group.isMotionEventSplittingEnabled = emojiPanelVisible || inputMode != InputMode.JAPANESE ||
             japaneseInputStyle != JapaneseInputStyle.KANA_12_KEY || keyboardLayer != KeyboardLayer.LETTERS
         for (index in 0 until group.childCount) {
             (group.getChildAt(index) as? ViewGroup)?.let(::updateTouchSplitting)
@@ -204,9 +217,12 @@ class KeyboardView @JvmOverloads constructor(
     }
 
     fun setInputMode(mode: InputMode) {
+        emojiPanelVisible = false
+        candidateExpandButton.isEnabled = true
         setCandidatesExpanded(false)
         hideTranslationPanel()
         inputMode = mode
+        renderCompositionLayout()
         keyboardLayer = KeyboardLayer.LETTERS
         shiftState = ShiftState.OFF
 
@@ -235,6 +251,7 @@ class KeyboardView @JvmOverloads constructor(
         }
         renderVoiceModeLabel()
         renderDraftActions()
+        renderEmojiButton()
         updateTouchSplitting(this)
     }
 
@@ -250,7 +267,7 @@ class KeyboardView @JvmOverloads constructor(
         if (layer == keyboardLayer && shift == shiftState) return
         keyboardLayer = layer
         shiftState = shift
-        if (inputMode != InputMode.VOICE) renderManualKeyboard()
+        if (inputMode != InputMode.VOICE || emojiPanelVisible) renderManualKeyboard()
     }
 
     fun setJapaneseScriptMode(mode: JapaneseScriptMode) {
@@ -340,15 +357,16 @@ class KeyboardView @JvmOverloads constructor(
         // The full touch target remains; only the painted edge fades away.
         micOuterRing.background = null
         micOuterRing.elevation = 0f
-        val surface = SoftVoiceCircleDrawable(surfaceColor)
-        val mask = GradientDrawable().apply {
-            shape = GradientDrawable.OVAL
-            setColor(Color.WHITE)
-        }
         micButton.backgroundTintList = null
-        micButton.background = RippleDrawable(
-            ColorStateList.valueOf(ColorUtils.setAlphaComponent(accent, 32)), surface, mask
-        )
+        // An opaque oval ripple mask reintroduces a hard edge during touch/focus.
+        // Every feedback state must fade to transparent using the same surface.
+        micButton.background = StateListDrawable().apply {
+            addState(intArrayOf(android.R.attr.state_pressed),
+                SoftVoiceCircleDrawable(ColorUtils.blendARGB(surfaceColor, ink, 0.05f)))
+            addState(intArrayOf(android.R.attr.state_focused),
+                SoftVoiceCircleDrawable(ColorUtils.blendARGB(surfaceColor, ink, 0.08f)))
+            addState(intArrayOf(), SoftVoiceCircleDrawable(surfaceColor))
+        }
         micActionIcon.imageTintList = ColorStateList.valueOf(ink)
         micActionLabel.setTextColor(ink)
         audioWaveform.setPaletteColors(accent, ColorUtils.blendARGB(voicePalette, ink, 0.36f))
@@ -362,6 +380,9 @@ class KeyboardView @JvmOverloads constructor(
 
     private fun renderDraftActions() {
         val idle = isVoiceIdle()
+        if (emojiPanelVisible && !idle) setEmojiPanelVisible(false)
+        nextKeyboardButton.isEnabled = idle
+        nextKeyboardButton.alpha = if (idle) 1f else 0.45f
         val canChangeVoiceTask = idle
         listOf(dictationTaskButton, composeTaskButton).forEach { button ->
             button.isEnabled = canChangeVoiceTask
@@ -439,6 +460,7 @@ class KeyboardView @JvmOverloads constructor(
     fun updateCandidates(composition: String, candidates: List<String>) {
         compositionText.text = composition
         compositionText.isVisible = composition.isNotBlank()
+        renderCompositionLayout()
         latestCandidates = candidates
             .asSequence()
             .filter { it.isNotBlank() }
@@ -477,6 +499,66 @@ class KeyboardView @JvmOverloads constructor(
                 hasOverflow || renderedSnapshot.size > EXPANDED_CANDIDATE_COLUMNS
             if (!candidateExpandButton.isVisible) setCandidatesExpanded(false)
         }
+    }
+
+    fun setZhuyinReselectAvailable(available: Boolean) {
+        zhuyinReselectAvailable = available
+        renderZhuyinReselectAction()
+    }
+
+    private fun candidateTextLocale(): Locale = when (inputMode) {
+        InputMode.ZHUYIN -> Locale.TAIWAN
+        InputMode.JAPANESE -> Locale.JAPANESE
+        InputMode.ENGLISH -> Locale.ENGLISH
+        InputMode.VOICE -> resources.configuration.locales[0]
+    }
+
+    private fun renderCompositionLayout() {
+        val zhuyin = inputMode == InputMode.ZHUYIN
+        val expandedZhuyin = zhuyin && candidatesExpanded
+        val useSummary = zhuyin && !expandedZhuyin
+        val targetParent = if (useSummary) compositionSummaryContent else inputStrip
+        if (compositionText.parent != targetParent) {
+            (compositionText.parent as? ViewGroup)?.removeView(compositionText)
+            if (useSummary) {
+                compositionSummaryContent.addView(compositionText,
+                    FrameLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT))
+            } else {
+                inputStrip.addView(compositionText, 0,
+                    LayoutParams(if (expandedZhuyin) 0 else LayoutParams.WRAP_CONTENT,
+                        dp(if (expandedZhuyin) 52 else 44), if (expandedZhuyin) 1f else 0f)
+                        .apply { marginEnd = dp(3) })
+            }
+        }
+        compositionText.textLocale = candidateTextLocale()
+        compositionText.textSize = if (zhuyin) 14f else 17f
+        compositionText.maxWidth = if (zhuyin) Int.MAX_VALUE else dp(96)
+        compositionText.minWidth = if (zhuyin) 0 else dp(48)
+        compositionText.maxLines = if (expandedZhuyin) 2 else 1
+        compositionText.ellipsize = when {
+            expandedZhuyin -> TextUtils.TruncateAt.END
+            zhuyin -> null
+            else -> TextUtils.TruncateAt.START
+        }
+        compositionText.background = if (zhuyin) null else
+            ContextCompat.getDrawable(context, R.drawable.composition_chip_bg)
+        compositionSummary.isVisible = useSummary && !emojiPanelVisible && compositionText.text.isNotBlank()
+        compositionSummary.layoutParams.height = dp(if (resources.configuration.fontScale > 1.3f) 32 else 28)
+        if (zhuyin) compositionSummary.scrollTo(0, 0)
+        inputStrip.layoutParams.height = dp(if (zhuyin) 56 else 50)
+        inputStrip.updatePadding(top = dp(if (zhuyin) 2 else 3), bottom = dp(if (zhuyin) 2 else 3))
+        candidateScroller.layoutParams.height = dp(if (zhuyin) 52 else 44)
+        candidateExpandButton.layoutParams.apply {
+            width = dp(if (zhuyin) 48 else 44)
+            height = dp(if (zhuyin) 52 else 44)
+        }
+        renderZhuyinReselectAction()
+    }
+
+    private fun renderZhuyinReselectAction() {
+        zhuyinReselectButton.isVisible = inputMode == InputMode.ZHUYIN && !emojiPanelVisible
+        zhuyinReselectButton.isEnabled = zhuyinReselectAvailable && zhuyinReselectButton.isVisible
+        zhuyinReselectButton.alpha = if (zhuyinReselectButton.isEnabled) 1f else 0.45f
     }
 
     fun updateState(state: VoiceInputIME.ImeState) {
@@ -649,6 +731,10 @@ class KeyboardView @JvmOverloads constructor(
             TranslationLanguage.KOREAN to findViewById(R.id.chip_translation_ko)
         )
         compositionText = findViewById(R.id.tv_composition)
+        compositionSummary = findViewById(R.id.zhuyin_composition_summary)
+        compositionSummaryContent = findViewById(R.id.zhuyin_composition_summary_content)
+        inputStrip = findViewById(R.id.input_strip)
+        zhuyinReselectButton = findViewById(R.id.btn_zhuyin_reselect)
         candidateScroller = findViewById(R.id.candidate_scroller)
         candidateContainer = findViewById(R.id.candidate_container)
         candidateExpandButton = findViewById(R.id.btn_expand_candidates)
@@ -723,7 +809,9 @@ class KeyboardView @JvmOverloads constructor(
         // On very short screens, scroll rather than reduce targets below 44dp.
         val rows = manualKeyRows.childCount
         if (rows > 0) {
-            val gridHeight = (bodyBudget - dp(56)).coerceAtLeast(rows * dp(44))
+            val candidateAreaHeight = manualPanel.paddingTop + inputStrip.layoutParams.height +
+                if (compositionSummary.isVisible) compositionSummary.layoutParams.height else 0
+            val gridHeight = (bodyBudget - candidateAreaHeight).coerceAtLeast(rows * dp(44))
             manualKeyRows.layoutParams.height = gridHeight
             for (index in 0 until rows) {
                 manualKeyRows.getChildAt(index).layoutParams.height =
@@ -803,7 +891,7 @@ class KeyboardView @JvmOverloads constructor(
 
         nextKeyboardButton.setOnClickListener {
             hapticTap(it)
-            listener?.onNextKeyboardPressed()
+            if (isVoiceIdle()) setEmojiPanelVisible(!emojiPanelVisible)
         }
         nextKeyboardButton.setOnLongClickListener {
             it.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
@@ -813,6 +901,12 @@ class KeyboardView @JvmOverloads constructor(
         candidateExpandButton.setOnClickListener {
             hapticTap(it)
             setCandidatesExpanded(!candidatesExpanded)
+        }
+        zhuyinReselectButton.setOnClickListener {
+            if (!zhuyinReselectButton.isEnabled) return@setOnClickListener
+            hapticTap(it)
+            setCandidatesExpanded(false)
+            listener?.onZhuyinReselectRequested()
         }
         micButton.setOnClickListener {
             hapticTap(it)
@@ -877,6 +971,34 @@ class KeyboardView @JvmOverloads constructor(
         layerButton.setText(R.string.key_ideographic_comma)
         commaButton.text = "，"
         periodButton.text = "。"
+    }
+
+    private fun setEmojiPanelVisible(visible: Boolean) {
+        emojiPanelVisible = visible
+        renderCompositionLayout()
+        candidateExpandButton.isEnabled = !visible
+        setCandidatesExpanded(false)
+        val showVoice = inputMode == InputMode.VOICE && !visible
+        voicePanel.isVisible = showVoice
+        voiceActionRow.isVisible = showVoice
+        manualPanel.isVisible = !showVoice
+        renderEmojiButton()
+        if (showVoice) manualKeyRows.removeAllViews() else renderManualKeyboard()
+        updateTouchSplitting(this)
+        requestLayout()
+    }
+
+    private fun renderEmojiButton() {
+        nextKeyboardButton.contentDescription = context.getString(
+            if (emojiPanelVisible) R.string.keyboard_emoji_close else R.string.keyboard_emoji_open
+        )
+        if (emojiPanelVisible) {
+            nextKeyboardButton.setImageResource(R.drawable.ic_keyboard_switch)
+        } else {
+            nextKeyboardButton.setImageDrawable(EmojiEntryDrawable(
+                ContextCompat.getColor(context, R.color.key_text), dp(24)
+            ))
+        }
     }
 
     private fun renderVoiceModeLabel() {
@@ -962,13 +1084,12 @@ class KeyboardView @JvmOverloads constructor(
             InputMode.ZHUYIN -> ManualKeyboardMode.ZHUYIN
             InputMode.JAPANESE -> ManualKeyboardMode.JAPANESE
             InputMode.ENGLISH -> ManualKeyboardMode.ENGLISH
-            InputMode.VOICE -> return
+            InputMode.VOICE -> if (emojiPanelVisible) ManualKeyboardMode.ENGLISH else return
         }
-        val layout = layoutProvider.layout(
-            manualMode, keyboardLayer, shiftState, japaneseInputStyle
-        )
+        val rows = if (emojiPanelVisible) layoutProvider.emojiRows(emojiPage)
+            else layoutProvider.layout(manualMode, keyboardLayer, shiftState, japaneseInputStyle).rows
         manualKeyRows.removeAllViews()
-        layout.rows.forEachIndexed { rowIndex, row ->
+        rows.forEachIndexed { rowIndex, row ->
             val rowView = LinearLayout(context).apply {
                 orientation = HORIZONTAL
                 gravity = android.view.Gravity.CENTER
@@ -977,6 +1098,7 @@ class KeyboardView @JvmOverloads constructor(
                     if (manualMode == ManualKeyboardMode.ZHUYIN) dp(52) else dp(48)
                 )
                 val horizontalInset = when {
+                    emojiPanelVisible -> 0
                     manualMode == ManualKeyboardMode.ZHUYIN ||
                         japaneseInputStyle == JapaneseInputStyle.KANA_12_KEY && manualMode == ManualKeyboardMode.JAPANESE ||
                         keyboardLayer != KeyboardLayer.LETTERS -> 0
@@ -997,6 +1119,12 @@ class KeyboardView @JvmOverloads constructor(
             else TextView(context)).apply {
             tag = key.id
             val displayLabel = when {
+                key.action == KeyAction.ToggleEmoji -> when (inputMode) {
+                    InputMode.VOICE -> context.getString(R.string.mode_voice)
+                    InputMode.ZHUYIN -> "注"
+                    InputMode.JAPANESE -> "あ"
+                    InputMode.ENGLISH -> "ABC"
+                }
                 key.role == KeyRole.SPACE -> context.getString(R.string.key_space)
                 key.id == "japanese_script" &&
                     japaneseScriptMode == JapaneseScriptMode.HIRAGANA -> "カナ"
@@ -1007,6 +1135,8 @@ class KeyboardView @JvmOverloads constructor(
             }
             text = displayLabel
             contentDescription = when (key.action) {
+                KeyAction.ToggleEmoji -> context.getString(R.string.keyboard_emoji_close)
+                KeyAction.NextEmojiPage -> context.getString(R.string.keyboard_emoji_next_page)
                 KeyAction.CursorLeft -> context.getString(R.string.keyboard_cursor_left)
                 KeyAction.CursorRight -> context.getString(R.string.keyboard_cursor_right)
                 else -> key.contentDescription
@@ -1015,6 +1145,7 @@ class KeyboardView @JvmOverloads constructor(
             includeFontPadding = false
             maxLines = 1
             textSize = when {
+                key.action is KeyAction.InsertEmoji -> 24f
                 key.action == KeyAction.Enter -> 27f
                 key.action == KeyAction.CursorLeft || key.action == KeyAction.CursorRight -> 22f
                 displayLabel.length > 4 -> 12f
@@ -1058,6 +1189,14 @@ class KeyboardView @JvmOverloads constructor(
             setOnClickListener {
                 hapticTap(it)
                 when (val action = key.action) {
+                    KeyAction.ToggleEmoji -> setEmojiPanelVisible(!emojiPanelVisible)
+                    KeyAction.NextEmojiPage -> {
+                        emojiPage = EmojiPalette.normalizedPage(emojiPage + 1)
+                        renderManualKeyboard()
+                        manualKeyRows.announceForAccessibility(context.getString(
+                            R.string.keyboard_emoji_page, emojiPage + 1, EmojiPalette.pages.size
+                        ))
+                    }
                     is KeyAction.SwitchLayer -> {
                         keyboardLayer = action.layer
                         shiftState = ShiftState.OFF
@@ -1130,6 +1269,7 @@ class KeyboardView @JvmOverloads constructor(
     private fun createCandidateMessage(messageRes: Int): TextView =
         TextView(context).apply {
             setText(messageRes)
+            textLocale = candidateTextLocale()
             setTextColor(ContextCompat.getColor(context, R.color.keyboard_muted_text))
             textSize = 13f
             gravity = android.view.Gravity.CENTER_VERTICAL
@@ -1142,21 +1282,25 @@ class KeyboardView @JvmOverloads constructor(
     private fun createCandidateButton(
         candidate: String,
         primary: Boolean,
-        gridIndex: Int? = null
+        gridRow: Int? = null,
+        gridColumn: Int = 0,
+        gridSpan: Int = 1
     ): TextView {
         return TextView(context).apply {
             text = candidate
+            textLocale = candidateTextLocale()
             contentDescription = context.getString(
                 R.string.candidate_content_description,
                 candidate
             )
             gravity = android.view.Gravity.CENTER
             includeFontPadding = false
-            maxLines = 1
-            ellipsize = TextUtils.TruncateAt.END
+            val expandedZhuyin = inputMode == InputMode.ZHUYIN && gridRow != null
+            maxLines = if (expandedZhuyin) Int.MAX_VALUE else 1
+            ellipsize = if (expandedZhuyin) null else TextUtils.TruncateAt.END
             minWidth = dp(48)
             textSize = if (inputMode == InputMode.ZHUYIN) {
-                if (candidate.length > 2) 18f else 22f
+                22f
             } else {
                 if (candidate.length > 2) 17f else 20f
             }
@@ -1171,19 +1315,22 @@ class KeyboardView @JvmOverloads constructor(
                 context,
                 if (primary) R.drawable.candidate_primary_bg else R.drawable.candidate_bg
             )
-            setPadding(dp(12), 0, dp(12), 0)
-            layoutParams = if (gridIndex == null) {
-                LayoutParams(LayoutParams.WRAP_CONTENT, dp(44)).apply {
+            val candidateHeight = dp(if (inputMode == InputMode.ZHUYIN) 52 else 44)
+            minimumHeight = candidateHeight
+            setPadding(dp(12), if (expandedZhuyin) dp(8) else 0,
+                dp(12), if (expandedZhuyin) dp(8) else 0)
+            layoutParams = if (gridRow == null) {
+                LayoutParams(LayoutParams.WRAP_CONTENT, candidateHeight).apply {
                     marginStart = dp(3)
                     marginEnd = dp(3)
                 }
             } else {
                 GridLayout.LayoutParams(
-                    GridLayout.spec(gridIndex / EXPANDED_CANDIDATE_COLUMNS),
-                    GridLayout.spec(gridIndex % EXPANDED_CANDIDATE_COLUMNS, 1f)
+                    GridLayout.spec(gridRow),
+                    GridLayout.spec(gridColumn, gridSpan, gridSpan.toFloat())
                 ).apply {
                     width = 0
-                    height = dp(44)
+                    height = if (expandedZhuyin) LayoutParams.WRAP_CONTENT else candidateHeight
                     setMargins(dp(3), dp(3), dp(3), dp(3))
                 }
             }
@@ -1197,20 +1344,25 @@ class KeyboardView @JvmOverloads constructor(
 
     private fun setCandidatesExpanded(expanded: Boolean) {
         val shouldExpand =
-            expanded && latestCandidates.isNotEmpty() && candidateExpandButton.isVisible
+            expanded && !emojiPanelVisible && latestCandidates.isNotEmpty() && candidateExpandButton.isVisible
         if (shouldExpand && !candidatesExpanded) {
             renderCandidateGrid()
         } else if (!shouldExpand) {
             candidateGrid.removeAllViews()
         }
         candidatesExpanded = shouldExpand
+        renderCompositionLayout()
         if (shouldExpand && manualKeyRows.height > 0) {
             candidateExpandedPanel.layoutParams =
                 candidateExpandedPanel.layoutParams.apply {
                     height = (manualKeyRows.height - dp(4)).coerceAtLeast(0)
                 }
         }
-        candidateScroller.visibility = if (shouldExpand) View.INVISIBLE else View.VISIBLE
+        candidateScroller.visibility = when {
+            shouldExpand && inputMode == InputMode.ZHUYIN -> View.GONE
+            shouldExpand -> View.INVISIBLE
+            else -> View.VISIBLE
+        }
         candidateExpandedPanel.isVisible = shouldExpand
         manualKeyRows.isVisible = !shouldExpand
         candidateExpandButton.setImageResource(
@@ -1227,10 +1379,27 @@ class KeyboardView @JvmOverloads constructor(
 
     private fun renderCandidateGrid() {
         candidateGrid.removeAllViews()
+        val columns = if (inputMode == InputMode.ZHUYIN) ZHUYIN_EXPANDED_CANDIDATE_COLUMNS
+            else EXPANDED_CANDIDATE_COLUMNS
+        candidateGrid.columnCount = columns
+        var row = 0
+        var column = 0
         latestCandidates.forEachIndexed { index, candidate ->
+            val span = if (inputMode == InputMode.ZHUYIN &&
+                candidate.codePointCount(0, candidate.length) > 4) columns else 1
+            if (column + span > columns) {
+                row++
+                column = 0
+            }
             candidateGrid.addView(
-                createCandidateButton(candidate, primary = index == 0, gridIndex = index)
+                createCandidateButton(candidate, primary = index == 0,
+                    gridRow = row, gridColumn = column, gridSpan = span)
             )
+            column += span
+            if (column == columns) {
+                row++
+                column = 0
+            }
         }
     }
 
@@ -1394,4 +1563,38 @@ class KeyboardView @JvmOverloads constructor(
     }
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
+}
+
+/** A monochrome toolbar icon, independent of the device's colored emoji font. */
+private class EmojiEntryDrawable(color: Int, private val size: Int) : Drawable() {
+    private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        this.color = color
+        strokeWidth = 1.8f
+        style = Paint.Style.STROKE
+        strokeCap = Paint.Cap.ROUND
+    }
+
+    override fun getIntrinsicWidth() = size
+    override fun getIntrinsicHeight() = size
+
+    override fun draw(canvas: Canvas) {
+        val saved = canvas.save()
+        canvas.translate(bounds.left.toFloat(), bounds.top.toFloat())
+        canvas.scale(bounds.width() / 24f, bounds.height() / 24f)
+        paint.style = Paint.Style.STROKE
+        canvas.drawCircle(12f, 12f, 9f, paint)
+        canvas.drawArc(7f, 8f, 17f, 17f, 20f, 140f, false, paint)
+        paint.style = Paint.Style.FILL
+        canvas.drawCircle(9f, 9f, 1f, paint)
+        canvas.drawCircle(15f, 9f, 1f, paint)
+        canvas.restoreToCount(saved)
+    }
+
+    override fun setAlpha(alpha: Int) { paint.alpha = alpha; invalidateSelf() }
+    override fun setColorFilter(colorFilter: ColorFilter?) {
+        paint.colorFilter = colorFilter
+        invalidateSelf()
+    }
+    @Suppress("DEPRECATION")
+    override fun getOpacity() = PixelFormat.TRANSLUCENT
 }

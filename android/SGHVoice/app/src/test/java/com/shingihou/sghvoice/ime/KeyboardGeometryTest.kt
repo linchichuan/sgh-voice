@@ -277,6 +277,14 @@ class KeyboardGeometryTest {
                 bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
             }
             bitmap.recycle()
+            view.findViewById<View>(R.id.btn_next_keyboard).performClick()
+            measure(view)
+            val emoji = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+            view.draw(Canvas(emoji))
+            File(output, "${mode.name.lowercase()}-emoji-100.png").outputStream().use {
+                emoji.compress(Bitmap.CompressFormat.PNG, 100, it)
+            }
+            emoji.recycle()
         }
         view.setInputMode(KeyboardView.InputMode.VOICE)
         view.updateState(VoiceInputIME.ImeState.RECORDING)
@@ -292,5 +300,15 @@ class KeyboardGeometryTest {
             recording.compress(Bitmap.CompressFormat.PNG, 100, it)
         }
         recording.recycle()
+        view.findViewById<View>(R.id.btn_mic).apply {
+            isPressed = true
+            background.jumpToCurrentState()
+        }
+        val pressed = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+        view.draw(Canvas(pressed))
+        File(output, "voice-recording-pressed-100.png").outputStream().use {
+            pressed.compress(Bitmap.CompressFormat.PNG, 100, it)
+        }
+        pressed.recycle()
     }
 }
