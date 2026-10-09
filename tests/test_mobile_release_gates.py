@@ -302,3 +302,13 @@ def test_android_rc_acceptance_tracks_the_current_sideload_release():
     assert source_name.group(1) == public_release["versionName"]
     assert int(source_code.group(1)) == public_release["versionCode"]
     assert "Android 2.8.9（versionCode 39）" in acceptance
+
+
+def test_android_daemon_uses_ci_provisioned_jdk_without_stale_vendor_urls():
+    criteria = (ANDROID_ROOT / "gradle" / "gradle-daemon-jvm.properties").read_text()
+    workflow = (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text()
+    android_job = workflow.split("  android:", 1)[1].split("  ios:", 1)[0]
+    assert "toolchainVersion=21" in criteria
+    assert "toolchainVendor=" not in criteria
+    assert "toolchainUrl." not in criteria
+    assert 'java-version: "21"' in android_job

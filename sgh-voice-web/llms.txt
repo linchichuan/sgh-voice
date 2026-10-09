@@ -82,7 +82,7 @@
 ### macOS test prerelease
 
 - Version: 2.7.6, Apple Silicon only; https://github.com/linchichuan/sgh-voice/releases/tag/v2.7.6
-- Ad-hoc signed, not Apple-notarized. Installation, launch and microphone acceptance remain unverified. This does not replace the separately listed public release
+- Apple Development-signed, not Apple-notarized. Installation, launch and microphone acceptance remain unverified. This does not replace the separately listed public release
 - Opt-in SOAP produces an exact-source extractive draft in local History, never automatic insertion. A clinician must compare source and draft, correct classification and manually copy reviewed content. This is not a clinically validated EHR
 - Clinical draft edits are excluded from dictionary learning; no patient-data or live provider acceptance was performed
 

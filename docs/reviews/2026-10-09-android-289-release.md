@@ -61,6 +61,21 @@ No Developer ID Application identity or notary profile was available. Mac 2.6.0
 remains the separately listed public release. The 2.7.6 download is explicitly a
 test prerelease; it must not be called Apple-notarized or clinically validated.
 
+Final rebuilt DMG: `SGH.Voice-2.7.6-apple-silicon.dmg`, 155,368,764 bytes,
+SHA-256 `bbeecc6f9d0bbd8ef17b8cba251b3a18826c365dfa0ccffc84dd99670236db15`.
+The actual bundled application uses **Apple Development** signing, not ad-hoc;
+it is still not Developer ID / notarized distribution. Read-only mounted bundle
+signature, version 2.7.6, arm64 architecture and embedded PYZ fixes were verified.
+
+## CI follow-up
+
+Run `37882880220` failed before Android compilation: the IDE-generated JetBrains
+JDK URL returned HTTP 400. Daemon criteria overrode the CI-provided Java 17.
+CI now explicitly provisions Temurin 21 and project criteria accept installed JDK
+21 without stale vendor URLs; a regression gate checks this agreement. This changes
+build infrastructure, not APK runtime code or its previously verified bytes.
+Reference: https://docs.gradle.org/current/userguide/gradle_daemon.html#sec:daemon_jvm_criteria
+
 ## Publication contract
 
 - Publish only a fast-forward main commit; CI must pass for that exact SHA before
